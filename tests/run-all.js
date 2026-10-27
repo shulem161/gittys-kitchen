@@ -16,9 +16,12 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
 
 (async () => {
   const b = await chromium.launch();
-  const ctx = await b.newContext({viewport: {width: 1100, height: 900}});
+  const ctx = await b.newContext({viewport: {width: 1100, height: 900}, acceptDownloads: true});
   await ctx.route(/gstatic\.com|fonts\.g/, r => r.fulfill({contentType: 'text/javascript', body: ''}));
   await ctx.route(/gstatic\.com\/firebasejs\/.*app-compat/, r => r.fulfill({contentType: 'text/javascript', body: FAKE}));
+  // Stand-in for the AI recipe reader (Firebase AI Logic)
+  await ctx.route(/firebasejs\/12\.\d+\.\d+\/firebase-app\.js/, r => r.fulfill({contentType: 'text/javascript', headers: {'access-control-allow-origin': '*'}, body: 'export function getApps(){return []} export function initializeApp(c,n){return {name:n}}'}));
+  await ctx.route(/firebasejs\/12\.\d+\.\d+\/firebase-ai\.js/, r => r.fulfill({contentType: 'text/javascript', headers: {'access-control-allow-origin': '*'}, body: 'export class GoogleAIBackend{} export function getAI(){return {}} export function getGenerativeModel(){return {generateContent: async()=>({response:{text:()=>JSON.stringify({title:"Scanned Test Cake",category:"Cakes",from:"",note:"",parts:[{type:"ingredients",heading:"",items:["2 cups flour"]},{type:"method",heading:"",items:["Bake at 350°F"]}]})}})}}'}));
   await ctx.route(/version\.json/, r => r.fulfill({contentType: 'application/json', body: '{"web":"0","apk":0}'}));
   const notes = []; await ctx.route(/ntfy\.sh/, r => { notes.push(new URL(r.request().url()).searchParams.get('title')); r.fulfill({status: 200, body: '{}', headers: {'access-control-allow-origin': '*'}}); });
   const page = async () => { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(e.message)); await p.goto(F); await p.waitForTimeout(400); return p; };
@@ -73,6 +76,16 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#review'); await A.waitForTimeout(500); await A.click('[data-pact=ok]'); await A.waitForTimeout(800);
     await B.goto(F + '#c-bread'); await B.waitForTimeout(500);
     ok('approved photo shows on card', await B.locator('.rc.has-img').count() >= 1);
+
+    // Download a recipe as PDF
+    await B.goto(F + '#r-boston-cream-pie'); await B.waitForTimeout(400);
+    const [dl] = await Promise.all([B.waitForEvent('download'), B.click('#dl')]);
+    const pdfPath = path.join(os.tmpdir(), 'gk-test.pdf'); await dl.saveAs(pdfPath);
+    ok('recipe downloads as a PDF', fs.readFileSync(pdfPath).slice(0, 5).toString() === '%PDF-' && /\.pdf$/.test(dl.suggestedFilename()), dl.suggestedFilename());
+
+    // Scan a recipe from a photo (AI stand-in)
+    await B.goto(F + '#scan'); await B.waitForTimeout(300); await B.setInputFiles('#scan-file', IMG); await B.waitForTimeout(2000);
+    ok('scanned recipe fills the form', (await B.inputValue('#ed-t').catch(() => '')) === 'Scanned Test Cake');
 
     // Favorites
     await B.goto(F + '#r-croissants'); await B.waitForTimeout(300); await B.click('#fav'); await B.waitForTimeout(300);

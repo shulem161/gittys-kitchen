@@ -1,6 +1,6 @@
 {
-  "web": "3.7",
-  "apk": 6,
+  "web": "3.8",
+  "apk": 7,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Add photos of your dishes and suggest recipe changes."
+  "notes": "Download recipes as PDF and scan recipes from a photo."
 }

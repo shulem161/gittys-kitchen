@@ -292,6 +292,14 @@ body.out .updbar{display:none}
 .lightbox p{color:#E6EBF2;margin:0;font-size:15px;text-align:center}
 .lb-close{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));width:42px;height:42px;border-radius:50%;border:0;background:rgba(255,255,255,.15);color:#fff;font-size:18px;cursor:pointer}
 .edit-of{margin:0;font-size:14px;color:var(--wheat);font-weight:600}
+/* scan a recipe */
+.scan{display:flex;flex-direction:column;gap:16px;max-width:720px}
+.scan h2{font-size:28px}
+.scan-btn{align-self:flex-start;cursor:pointer;display:inline-block}
+.scan-prev{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.scan-prev img{width:160px;max-height:220px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.scan-prev > div{display:flex;gap:12px;align-items:center}
+.scan-prev p{margin:0}
 /* recipe editor */
 .note.setup{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:28px}
 .note.setup p{margin:4px 0 0;color:var(--muted)}
@@ -420,7 +428,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.7";
+const WEB_VERSION = "3.8";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -614,7 +622,7 @@ function tabs(active){
 function category(c){
   const list = RECIPES.filter(r=>r.c===c);
   app.innerHTML = `<section class="wrap">${tabs(c)}
-    <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}${!offline&&(!isAdmin()||recipesOnline)?` · <a class="link" href="#new-${slug(c).slice(2)}">+ Add a recipe</a>`:""}</p></div>
+    <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}${!offline&&(!isAdmin()||recipesOnline)?` · <a class="link" href="#new-${slug(c).slice(2)}">+ Add a recipe</a> · <a class="link" href="#scan-${slug(c).slice(2)}">Scan a recipe</a>`:""}</p></div>
     <div class="grid">${list.length ? list.map(card).join("") : `<div class="empty">No ${esc(c)} recipes yet.${offline?"":` <a class="link" href="#new-${slug(c).slice(2)}">Add the first one</a>`}</div>`}</div></section>`;
   const a=app.querySelector('.tab[aria-current="page"]'); if(a) a.parentElement.scrollLeft = a.offsetLeft - 16;
 }
@@ -682,6 +690,7 @@ function recipe(r){
         ${recipesOnline&&!offline?`<a class="btn solid" href="#edit-${r.id}">${isAdmin()?"Edit recipe":"Suggest changes"}</a>`:""}
         <button class="btn fav" id="fav" aria-pressed="${isFav}">${HEART}${isFav?"Saved to favorites":"Save to favorites"}</button>
         <button class="btn" id="wake" aria-pressed="${!!wakeLock}">${wakeLock?"Screen stays on":"Keep screen on"}</button>
+        <button class="btn" id="dl" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download</button>
         <button class="btn" id="reset">Clear checkmarks</button>
       </div>
     </section>
@@ -696,6 +705,7 @@ function recipe(r){
     </div>
   </div>`;
   loadPhotos(r);
+  document.getElementById("dl").onclick=e=>downloadRecipe(r, e.currentTarget);
   document.getElementById("fav").onclick=e=>{
     const b=e.currentTarget, f=favs(), on=!f.includes(r.id);
     if(offline){ toast("Favorites need internet. Connect and try again."); return; }
@@ -859,7 +869,7 @@ function openMenu(confirming){
   m.innerHTML = `<div class="who"><b>${esc(myName())}</b><span>${isAdmin()?"Admin":"Member"}${offline?" · offline":""}</span></div>
     ${isAdmin()?(()=>{const mp=members.filter(m=>m.status==="pending").length;return `<a href="#admin" role="menuitem">Approve members <span class="n${mp?" hot":""}">${mp?mp+" waiting":""}</span></a>`})():""}
     ${isAdmin()?`<a href="#review" role="menuitem">Approve recipes &amp; photos <span class="n${pendingSubs().length+pendingPhotos.length?" hot":""}">${pendingSubs().length+pendingPhotos.length?(pendingSubs().length+pendingPhotos.length)+" waiting":""}</span></a>`:""}
-    ${!offline&&(!isAdmin()||recipesOnline)?`<a href="#new" role="menuitem">Add a recipe <span class="n"></span></a>`:""}
+    ${!offline&&(!isAdmin()||recipesOnline)?`<a href="#new" role="menuitem">Add a recipe <span class="n"></span></a><a href="#scan" role="menuitem">Scan a recipe <span class="n">from a photo</span></a>`:""}
     ${isAdmin()?"":`<a href="#mine" role="menuitem">My recipes <span class="n">${subs.length||""}</span></a>`}
     <a href="#favorites" role="menuitem">My favorites <span class="n">${favs().length}</span></a>
     ${isAdmin()?`<button type="button" role="menuitem" id="m-ntfy">Send test notification <span class="n"></span></button>`:""}
@@ -931,12 +941,12 @@ function adminBanner(){
 }
 
 /* ---------- recipe editor (admin) ---------- */
-function editor(r, cat, sub){
+function editor(r, cat, sub, draft){
   const isNew = !r;
   const suggest = !isAdmin();
   const editOf = r ? r.id : (sub && sub.editOf ? sub.editOf : "");
   const target = editOf ? RECIPES.find(x=>x.id===editOf) : null;
-  const src = r || (sub ? fromDoc(sub.id, sub) : null);
+  const src = r || (sub ? fromDoc(sub.id, sub) : null) || draft || null;
   if(!isNew && !recipesOnline){ toast("Put the recipes online first, from the home page."); location.hash=""; return; }
   const secs = src ? src.s.map(([ing,h,items])=>({ing:!!ing,h,items:items.join("\n")}))
                  : [{ing:true,h:"",items:""},{ing:false,h:"",items:""}];
@@ -1239,6 +1249,204 @@ function bindPhotoReview(){
   });
 }
 
+/* ---------- download a recipe as a PDF (built on the device, no outside service) ---------- */
+const WINANSI = {"€":128,"‚":130,"„":132,"…":133,"•":149,"‘":145,"’":146,"“":147,"”":148,"–":150,"—":151,"™":153};
+function pdfText(s){
+  s = String(s).replace(/⅓/g," 1/3").replace(/⅔/g," 2/3").replace(/⅛/g," 1/8").replace(/⅜/g," 3/8").replace(/→/g,"->").replace(/×/g,"x").replace(/^ /,"");
+  let out=""; for(const ch of s){ const c=ch.codePointAt(0); out += WINANSI[ch]!==undefined ? String.fromCharCode(WINANSI[ch]) : c<256 ? ch : "?"; }
+  return out;
+}
+const pdfEsc = s => pdfText(s).replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)");
+let _mc=null;
+function textWidth(s, size, bold, serif){
+  _mc = _mc || document.createElement("canvas").getContext("2d");
+  _mc.font = `${bold?"bold ":""}${size}px ${serif?"Times New Roman, Times, serif":"Helvetica, Arial, sans-serif"}`;
+  return _mc.measureText(s).width;
+}
+function wrap(s, size, maxW, bold, serif){
+  const words=String(s).split(/\s+/).filter(Boolean), lines=[]; let line="";
+  for(const w of words){ const t=line?line+" "+w:w; if(textWidth(t,size,bold,serif)<=maxW || !line) line=t; else { lines.push(line); line=w; } }
+  if(line) lines.push(line); return lines.length?lines:[""];
+}
+async function photoForPdf(r){
+  if(!r.coverPhoto || !db || offline) return r.cover||"";
+  try{ const d=await db.collection("photos").doc(r.coverPhoto).get(); if(d.exists && d.data().img) return d.data().img; }catch(e){}
+  return r.cover||"";
+}
+function imgSize(src){ return new Promise(res=>{ const i=new Image(); i.onload=()=>res([i.naturalWidth,i.naturalHeight]); i.onerror=()=>res(null); i.src=src; }); }
+
+async function makeRecipePdf(r){
+  const W=612, H=792, M=54, CW=W-2*M;
+  const pages=[]; let ops=[], y=M;
+  const C = {ink:"0.106 0.149 0.220", muted:"0.357 0.400 0.471", accent:"0.173 0.353 0.604", wheat:"0.718 0.525 0.184", line:"0.835 0.863 0.906"};
+  const newPage = () => { if(ops.length) pages.push(ops); ops=[]; y=M+10; };
+  const need = h => { if(H-y-h < M+24) newPage(); };
+  const text = (s,x,yy,size,font,color) => ops.push(`BT /${font} ${size} Tf ${color} rg ${x.toFixed(1)} ${(H-yy).toFixed(1)} Td (${pdfEsc(s)}) Tj ET`);
+  const rule = (yy,color,w) => ops.push(`${color} RG ${w||0.8} w ${M} ${(H-yy).toFixed(1)} m ${W-M} ${(H-yy).toFixed(1)} l S`);
+  // header band
+  ops.push(`${C.accent} rg 0 ${H-8} ${W} 8 re f`);
+  y = M;
+  text("GITTY'S KITCHEN  ·  "+r.c.toUpperCase(), M, y, 9, "F2", C.wheat); y+=26;
+  for(const l of wrap(r.t, 26, CW, true, true)){ text(l, M, y, 26, "F3", C.ink); y+=30; }
+  const meta=[r.by?creditText(r.by):"", temps(r).length?"Oven "+temps(r).join(" -> "):"", `${nIng(r)} ingredients`, `${nSteps(r)} steps`].filter(Boolean).join("   ·   ");
+  text(meta, M, y, 10, "F1", C.muted); y+=16;
+  // photo
+  let image=null;
+  const ph = await photoForPdf(r);
+  if(ph && ph.startsWith("data:image/jpeg")){
+    const sz = await imgSize(ph);
+    if(sz){ const maxH=250, k=Math.min(CW/sz[0], maxH/sz[1]); const iw=sz[0]*k, ih=sz[1]*k;
+      y+=6; ops.push(`q ${iw.toFixed(1)} 0 0 ${ih.toFixed(1)} ${M} ${(H-y-ih).toFixed(1)} cm /Im1 Do Q`); y+=ih+8;
+      image={data:atob(ph.split(",")[1]), w:sz[0], h:sz[1]}; }
+  }
+  y+=6; rule(y, C.line); y+=22;
+  if(r.n){ for(const l of wrap("Note: "+r.n, 11, CW)){ need(16); text(l, M, y, 11, "F1", C.wheat); y+=15; } y+=8; }
+  const parts = buildParts(r); let stepNo=0;
+  parts.forEach((p,pi)=>{
+    if(parts.length>1){ need(40); text(`PART ${pi+1} OF ${parts.length}`, M, y, 9, "F2", C.muted); y+=18; }
+    if(p.ing.length){
+      need(40); text("Ingredients", M, y, 14, "F3", C.ink); y+=20;
+      p.ing.forEach(g=>{
+        if(g.title){ need(30); text(g.title.toUpperCase(), M, y, 9, "F2", C.wheat); y+=15; }
+        g.items.forEach(it=>{ const ls=wrap(it, 11, CW-16); need(ls.length*15+2);
+          text("•", M+2, y, 11, "F1", C.accent); ls.forEach((l,i)=>{ text(l, M+16, y, 11, "F1", C.ink); y+=15; }); y+=2; });
+      });
+      y+=10;
+    }
+    if(p.steps.length){
+      need(40); text("Method", M, y, 14, "F3", C.ink); y+=20;
+      p.steps.forEach(g=>{
+        if(g.title){ need(30); text(g.title.toUpperCase(), M, y, 9, "F2", C.wheat); y+=15; }
+        g.items.forEach(it=>{ stepNo++; const ls=wrap(it, 11, CW-26); need(ls.length*15+6);
+          text(stepNo+".", M, y, 11, "F2", C.accent); ls.forEach(l=>{ text(l, M+26, y, 11, "F1", C.ink); y+=15; }); y+=6; });
+      });
+      y+=10;
+    }
+  });
+  pages.push(ops);
+  // footers
+  pages.forEach((p,i)=>{ p.push(`${C.line} RG 0.6 w ${M} 40 m ${W-M} 40 l S`);
+    p.push(`BT /F1 8 Tf ${C.muted} rg ${M} 28 Td (${pdfEsc("Gitty's Kitchen  ·  "+r.t)}) Tj ET`);
+    const pg=`Page ${i+1} of ${pages.length}`; p.push(`BT /F1 8 Tf ${C.muted} rg ${(W-M-textWidth(pg,8)).toFixed(1)} 28 Td (${pg}) Tj ET`); });
+  // assemble the PDF file
+  const objs=[]; const add = s => { objs.push(s); return objs.length; };
+  const catalog=add(null), pagesObj=add(null);
+  const f1=add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+  const f2=add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+  const f3=add("<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>");
+  const im = image ? add(`<< /Type /XObject /Subtype /Image /Width ${image.w} /Height ${image.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.data.length} >>\nstream\n${image.data}\nendstream`) : 0;
+  const kids=[];
+  pages.forEach(p=>{ const content=p.join("\n");
+    const cs=add(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+    kids.push(add(`<< /Type /Page /Parent ${pagesObj} 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 ${f1} 0 R /F2 ${f2} 0 R /F3 ${f3} 0 R >>${im?` /XObject << /Im1 ${im} 0 R >>`:""} >> /Contents ${cs} 0 R >>`)); });
+  objs[catalog-1]=`<< /Type /Catalog /Pages ${pagesObj} 0 R >>`;
+  objs[pagesObj-1]=`<< /Type /Pages /Kids [${kids.map(k=>k+" 0 R").join(" ")}] /Count ${kids.length} >>`;
+  let pdf="%PDF-1.4\n%\xE2\xE3\xCF\xD3\n"; const offs=[];
+  objs.forEach((o,i)=>{ offs.push(pdf.length); pdf+=`${i+1} 0 obj\n${o}\nendobj\n`; });
+  const xref=pdf.length;
+  pdf+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`+offs.map(o=>String(o).padStart(10,"0")+" 00000 n \n").join("");
+  pdf+=`trailer\n<< /Size ${objs.length+1} /Root ${catalog} 0 R /Info << /Title (${pdfEsc(r.t)}) /Producer (Gitty's Kitchen) >> >>\nstartxref\n${xref}\n%%EOF`;
+  const bytes=new Uint8Array(pdf.length); for(let i=0;i<pdf.length;i++) bytes[i]=pdf.charCodeAt(i)&255;
+  return bytes;
+}
+async function downloadRecipe(r, btn){
+  const label=btn.innerHTML; btn.disabled=true; btn.textContent="Preparing…";
+  try{
+    const bytes = await makeRecipePdf(r);
+    const name = ("Gittys Kitchen - "+r.t.replace(/^Untitled: /,"")).replace(/[\\/:*?"<>|]+/g,"").slice(0,80)+".pdf";
+    if(appBuild){
+      if(window.GKApp && GKApp.saveFile){
+        let bin=""; for(let i=0;i<bytes.length;i+=8192) bin+=String.fromCharCode.apply(null, bytes.subarray(i,i+8192));
+        toast(GKApp.saveFile(name, btoa(bin), "application/pdf") ? "Saved to your Downloads folder" : "Couldn't save on this phone. Open the website in Chrome to download.");
+      } else toast("Update the app to download recipes. Tap Check for updates in your menu.");
+    } else {
+      const url=URL.createObjectURL(new Blob([bytes],{type:"application/pdf"}));
+      const a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 60000);
+      toast("Recipe downloaded");
+    }
+  }catch(e){ toast("Couldn't make the download. Try again."); }
+  btn.disabled=false; btn.innerHTML=label;
+}
+
+/* ---------- scan a recipe from a photo (Gemini through Firebase AI Logic) ---------- */
+const FB_MODULAR = "https://www.gstatic.com/firebasejs/12.5.0/";
+let _aiModel = null;
+async function aiModel(){
+  if(_aiModel) return _aiModel;
+  const appMod = await import(FB_MODULAR+"firebase-app.js");
+  const aiMod = await import(FB_MODULAR+"firebase-ai.js");
+  const app2 = appMod.getApps().find(a=>a.name==="gk-ai") || appMod.initializeApp(FIREBASE_CONFIG, "gk-ai");
+  const ai = aiMod.getAI(app2, {backend: new aiMod.GoogleAIBackend()});
+  _aiModel = aiMod.getGenerativeModel(ai, {model:"gemini-2.5-flash", generationConfig:{responseMimeType:"application/json", temperature:0.2}});
+  return _aiModel;
+}
+function scanPrompt(){
+  return `You are helping a family put a recipe into their cookbook app. Read the recipe in this photo (it may be handwritten, printed, or a screenshot) and return ONLY JSON in this shape:
+{"title": string, "category": string, "from": string, "note": string,
+ "parts": [{"type": "ingredients" | "method", "heading": string, "items": [string]}]}
+Rules:
+- Keep the family's own wording and terms (Yiddish/Hebrew words like lukshen, bekele, kugel, challah stay as written). Only fix obvious spelling mistakes.
+- One ingredient per item, quantity first, e.g. "2 cups flour", "1½ tsp salt", "3 eggs, separated". Use ½ ¼ ¾ ⅓ ⅔ ⅛ for fractions, "tbsp" and "tsp", and °F for temperatures.
+- Method: one clear step per item, in order, as short sentences. Split long paragraphs into steps.
+- If the recipe has separate parts (dough, filling, topping, glaze, sauce), make a separate ingredients part for each with that heading, and method parts with headings when the steps are grouped.
+- "category": choose the best fit from: ${CATS.join(", ")}. If none fits, suggest a short new category name.
+- "from": the person the recipe is credited to, if written on it; otherwise "".
+- "note": anything useful that isn't an ingredient or step (servings, pan size, tips); otherwise "".
+- If several recipes are in the photo, return only the first one and mention the others in "note".
+- If the photo is not a recipe or can't be read, return {"error": "Short reason"}.`;
+}
+function resizeForScan(file){
+  return new Promise((resolve,reject)=>{
+    const url=URL.createObjectURL(file), img=new Image();
+    img.onload=()=>{ const k=Math.min(1,1600/Math.max(img.width,img.height)); const c=document.createElement("canvas");
+      c.width=Math.round(img.width*k); c.height=Math.round(img.height*k); c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url); resolve(c.toDataURL("image/jpeg",.82)); };
+    img.onerror=()=>{ URL.revokeObjectURL(url); reject(new Error("not an image")); };
+    img.src=url;
+  });
+}
+function draftFromScan(j){
+  const parts = Array.isArray(j.parts) ? j.parts : [];
+  const s = parts.map(p=>[p.type==="ingredients"?1:0, String(p.heading||"").trim(), (Array.isArray(p.items)?p.items:[]).map(x=>String(x).trim()).filter(Boolean)]).filter(x=>x[2].length);
+  if(!s.length) throw new Error("No ingredients or steps found in the photo.");
+  return {id:"", c:String(j.category||"").trim()||CATS[0], t:String(j.title||"").trim(), by:String(j.from||"").trim(), n:String(j.note||"").trim()||undefined, s};
+}
+function scanPage(cat){
+  app.innerHTML = `<section class="wrap editor">
+    <a class="back" href="${cat?"#"+slug(cat):"#"}">← Cancel</a>
+    <div class="panel-a scan">
+      <h2>Scan a recipe</h2>
+      <p class="sub">Take a picture of a recipe card, a page from a book, or a screenshot. It will be read and set out neatly so you can check it before ${isAdmin()?"adding it":"sending it to "+esc(ADMIN_NAME)+" for approval"}.</p>
+      <label class="primary scan-btn" for="scan-file">Take or choose a picture</label>
+      <input id="scan-file" type="file" accept="image/*" hidden>
+      <div id="scan-status" class="scan-status"></div>
+      <p class="hint">Tips: lay the recipe flat, fill the screen with it, and make sure it's in good light.</p>
+    </div></section>`;
+  const input=document.getElementById("scan-file"), status=document.getElementById("scan-status");
+  input.onchange=async()=>{
+    const file=input.files&&input.files[0]; input.value=""; if(!file) return;
+    let data; try{ data=await resizeForScan(file); }catch(e){ status.innerHTML=`<p class="err">That file couldn't be used as a picture. Try another one.</p>`; return; }
+    status.innerHTML=`<div class="scan-prev"><img src="${data}" alt="The recipe photo"><div><span class="spin" aria-hidden="true"></span><p><b>Reading the recipe…</b><br><span class="hint">This usually takes 10–20 seconds.</span></p></div></div>`;
+    try{
+      const model=await aiModel();
+      const res=await model.generateContent([scanPrompt(), {inlineData:{data:data.split(",")[1], mimeType:"image/jpeg"}}]);
+      let txt=res.response.text().trim().replace(/^```(?:json)?\s*/,"").replace(/```$/,"");
+      const j=JSON.parse(txt);
+      if(j.error) throw new Error(j.error);
+      const draft=draftFromScan(j);
+      toast("Recipe read. Check it, then "+(isAdmin()?"add it.":"send it for approval."));
+      editor(null, cat, null, draft);
+    }catch(e){
+      const m=String(e&&e.message||e);
+      const off=/api-not-enabled|not been used|disabled|PERMISSION_DENIED|403|ai-logic|firebasevertexai|generativelanguage/i.test(m);
+      status.innerHTML=`<p class="err">${off ? (isAdmin()?"Scanning isn't turned on yet. In Firebase, open AI Logic and enable the Gemini Developer API.":"Scanning isn't available yet. Ask "+esc(ADMIN_NAME)+" to turn it on.")
+        : /fetch|network|Failed to load|import/i.test(m) ? "Couldn't reach the scanner. Check your internet connection and try again."
+        : "Couldn't read a recipe from that picture: "+esc(m.slice(0,140))+". Try a clearer photo, or add the recipe by typing it."}</p>`;
+    }
+  };
+}
+
 function route(){
   closeMenu(); stopRecipePhotos();
   if(state!=="approved"){ document.body.classList.add("out"); gate(); return; }
@@ -1249,6 +1457,7 @@ function route(){
   if(h==="review" && isAdmin()){ q.value=""; reviewPage(); window.scrollTo(0,0); return; }
   if(h.startsWith("review-") && isAdmin()){ const sb=subs.find(x=>x.id===h.slice(7)&&x.status==="pending"); if(sb){ q.value=""; editor(null,null,sb); window.scrollTo(0,0); return; } }
   if(h==="mine" && !isAdmin()){ q.value=""; minePage(); window.scrollTo(0,0); return; }
+  if(!offline && (h==="scan" || h.startsWith("scan-"))){ q.value=""; scanPage(CATS.find(x=>slug(x)==="c-"+h.slice(5))); window.scrollTo(0,0); return; }
   if(!offline && (h==="new" || h.startsWith("new-"))){ q.value=""; editor(null, CATS.find(x=>slug(x)==="c-"+h.slice(4))); window.scrollTo(0,0); return; }
   if(h==="favorites"){ q.value=""; favorites(); window.scrollTo(0,0); return; }
   const r = RECIPES.find(x=>x.id===h);
