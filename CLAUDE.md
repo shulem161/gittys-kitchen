@@ -10,6 +10,9 @@ Family cookbook web app for Shulem Schlesinger (admin). Live at https://shulem16
 - `version.json` — drives the in-app "Update now" / "Download update" bar.
 - `firestore.rules` — Firestore security rules. Pushing a change deploys it automatically
   (`.github/workflows/firebase-rules.yml`, secret `FIREBASE_SERVICE_ACCOUNT`).
+- `data-changes/NNN-*.js` — one-time changes to the live Firestore data (e.g. moving recipes between
+  categories). Pushing a new file runs it once via `.github/workflows/data-changes.yml`; results show as
+  notices on the run. Applied changes are recorded in `meta/dataChanges`.
 - `tests/run-all.js` — end-to-end checks against a Firebase stand-in. Run before every push.
 
 ## Data (Firebase project `gittys-kitchen`, Firestore)
