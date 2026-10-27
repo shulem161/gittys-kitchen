@@ -1,0 +1,21 @@
+# Manual check that the AI recipe reader (Firebase AI Logic) is switched on and answering.
+name: Check recipe reader
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - tools/check-reader.mjs
+      - .github/workflows/check-reader.yml
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-save --no-audit --no-fund firebase@12.5.0
+      - run: node tools/check-reader.mjs
