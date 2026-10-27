@@ -365,6 +365,8 @@ body.out .ptr{top:calc(env(safe-area-inset-top,0px) + 16px)}
 .ph-new .ph-new-form{min-width:0;width:100%}
 .scan-pages{display:flex;flex-direction:column;gap:12px;padding:14px;border:1px dashed var(--line);border-radius:12px}
 .scan-pages .row{display:flex;gap:8px;flex-wrap:wrap}
+.err-detail{font-size:13px;color:var(--muted)}
+.err-detail code{display:block;white-space:pre-wrap;word-break:break-word;margin-top:6px;padding:8px;background:var(--bg);border-radius:8px}
 /* recipe editor */
 .note.setup{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:28px}
 .note.setup p{margin:4px 0 0;color:var(--muted)}
@@ -495,7 +497,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.21";
+const WEB_VERSION = "3.22";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1740,7 +1742,7 @@ function scanPage(cat){
       const off=/api-not-enabled|not been used|disabled|PERMISSION_DENIED|403|ai-logic|firebasevertexai|generativelanguage/i.test(m);
       status.innerHTML=`<p class="err">${off ? (isAdmin()?"Reading recipes isn't turned on yet. In Firebase, open AI Logic and enable the Gemini Developer API.":"This isn't available yet. Ask "+esc(ADMIN_NAME)+" to turn it on.")
         : /fetch|network|Failed to load|import/i.test(m) ? "Couldn't reach the recipe reader. Check your internet connection and try again."
-        : "Couldn't read a recipe from that: "+esc(m.slice(0,140))+". Try a clearer photo or another file, or add the recipe by typing it."}</p>`;
+        : "Couldn't read a recipe from that: "+esc(m.slice(0,140))+". Try a clearer photo or another file, or add the recipe by typing it."}</p>${isAdmin()?`<details class="err-detail"><summary>Details for troubleshooting</summary><code>${esc(m.slice(0,600))}</code></details>`:""}`;
     }
   };
   document.getElementById("scan-cam").onchange=e=>addPhotos(e.target);
