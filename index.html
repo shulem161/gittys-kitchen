@@ -469,7 +469,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.18";
+const WEB_VERSION = "3.19";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1467,7 +1467,7 @@ async function makeBookPdf(cats, onProgress){
   if(art) doc.image(doc.addImage(art,1224,1584), 0, 0, W, H); else doc.rect(0,0,W,H,C.accent);
   doc.text("FAMILY RECIPES  ·  JANUARY 2009", M, 150, 11, "F2", C.white);
   doc.text("Gitty's Kitchen", M, 220, 54, "F3", C.white);
-  doc.text(whole ? `${count} recipes in ${cats.length} categories` : `${cats[0]}  ·  ${count} ${count===1?"recipe":"recipes"}`, M, 262, 15, "F1", C.white);
+  if(!whole) doc.text(cats[0], M, 262, 15, "F1", C.white);
   doc.text("Downloaded "+new Date().toLocaleDateString(undefined,{month:"long",day:"numeric",year:"numeric"}), M, H-60, 10, "F1", C.white);
   // contents page (filled in at the end, once page numbers are known)
   let tocPage=null; if(whole){ doc.page("Gitty's Kitchen  ·  Contents"); tocPage=doc.ops; }
