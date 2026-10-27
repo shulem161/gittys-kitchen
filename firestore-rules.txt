@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+
+    // The admin is whoever owns the name "Shulem Schlesinger".
+    function isAdmin() {
+      let k = 'shulem schlesinger';
+      return signedIn()
+        && exists(/databases/$(database)/documents/names/$(k))
+        && get(/databases/$(database)/documents/names/$(k)).data.uid == request.auth.uid;
+    }
+
+    // One entry per member name, so every name is unique.
+    match /names/{key} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'email']);
+      allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+    }
+
+    // Recipes: approved members can read, only the admin can add, edit or delete.
+    match /recipes/{id} {
+      allow read: if isAdmin()
+        || (signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved');
+      allow write: if isAdmin();
+    }
+
+    // Member profiles. New members always start as "pending";
+    // only the admin can approve, deny or remove them.
+    match /users/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'status', 'created', 'favs'])
+        && get(/databases/$(database)/documents/names/$(request.resource.data.name.lower())).data.uid == request.auth.uid
+        && (request.resource.data.status == 'pending'
+            || (request.resource.data.status == 'approved' && isAdmin()));
+      allow update: if isAdmin()
+        || (signedIn() && request.auth.uid == uid
+            && resource.data.status == 'approved'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favs']));
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
+    }
+  }
+}
