@@ -300,6 +300,7 @@ body.out .updbar{display:none}
 .scan-prev img{width:160px;max-height:220px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
 .scan-prev > div{display:flex;gap:12px;align-items:center}
 .scan-prev p{margin:0}
+.byline{display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--muted);padding:4px 4px 0;border-top:1px solid var(--line);padding-top:12px}
 /* recipe editor */
 .note.setup{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:28px}
 .note.setup p{margin:4px 0 0;color:var(--muted)}
@@ -428,7 +429,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.8";
+const WEB_VERSION = "3.9";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -698,6 +699,7 @@ function recipe(r){
     <div class="parts">
       ${r.n?`<div class="note"><b>Note:</b> ${esc(r.n)}</div>`:""}
       ${partHTML}
+      ${historyLines(r).length?`<div class="byline">${historyLines(r).map(l=>`<span>${esc(l)}</span>`).join("")}</div>`:""}
       <nav class="pager">
         ${prev?`<a href="#${prev.id}"><small>Previous</small>${esc(prev.t.replace("Untitled: ",""))}</a>`:"<span></span>"}
         ${next?`<a href="#${next.id}"><small>Next</small>${esc(next.t.replace("Untitled: ",""))}</a>`:""}
@@ -894,9 +896,11 @@ document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeMenu(); });
 let recipesOnline = false;    // true once the online cookbook has been loaded
 let onlineIds = new Set();    // every recipe id stored online (including deleted ones)
 let unsubRecipes = null;
-const toDoc = r => ({c:r.c, t:r.t, by:r.by||"", n:r.n||"", ord:r.ord||0, deleted:false, updated:Date.now(),
+const withHistory = (rec, base, action, by) => { rec.history = [...((base&&base.history)||[]), {a:action, by:by||"a member", at:Date.now()}].slice(-12); return rec; };
+const historyLines = r => (r.history||[]).slice(-6).map(h=>`${h.a==="added"?"Added":"Changed"} by ${h.by} on ${fmtDate(h.at)}`);
+const toDoc = r => ({c:r.c, t:r.t, by:r.by||"", n:r.n||"", ord:r.ord||0, deleted:false, updated:Date.now(), ...(r.history?{history:r.history}:{}),
   s:r.s.map(([ing,h,items])=>({k:ing?"ing":"step", h:h||"", items:items}))});
-const fromDoc = (id,d) => ({id, c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"",
+const fromDoc = (id,d) => ({id, c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[],
   s:(d.s||[]).map(x=>[x.k==="ing"?1:0, x.h||"", x.items||[]])});
 function sortRecipes(list){
   const ci = c => { const i=ORDER.indexOf(c); return i<0 ? 100 : i; };
@@ -1035,6 +1039,8 @@ function editor(r, cat, sub, draft){
       let id = r ? r.id : target ? target.id : "r-"+t.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
       if(!r && !target){ if(id==="r-") id="r-recipe"; let k=2, base=id; while(onlineIds.has(id)) id=base+"-"+(k++); }
       const rec={id, c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), s, ord: r ? (r.ord||0) : target ? (target.ord||0) : Date.now()};
+      { const base = r || target;
+        withHistory(rec, base, sub ? (sub.editOf&&base?"changed":"added") : (base?"changed":"added"), sub ? sub.byName : myName()); }
       const btn=F.querySelector(".primary"); btn.disabled=true; btn.textContent="Saving…";
       try{
         await db.collection("recipes").doc(id).set(toDoc(rec), {merge:true});
@@ -1069,6 +1075,7 @@ async function approveSub(sub){
   if(!recipesOnline){ toast("Put the recipes online first, from the home page."); return; }
   const tgt = sub.editOf ? RECIPES.find(x=>x.id===sub.editOf) : null;
   const rec = fromDoc(tgt ? tgt.id : newRecipeId(sub.t), sub); rec.ord = tgt ? (tgt.ord||0) : Date.now();
+  withHistory(rec, tgt, tgt?"changed":"added", sub.byName);
   await db.collection("recipes").doc(rec.id).set(toDoc(rec), {merge:true});
   await db.collection("submissions").doc(sub.id).update({status:"approved", recipeId:rec.id, decided:Date.now()});
   toast(tgt ? `Changes to “${tgt.t}” are published` : `“${sub.t}” is published`);
@@ -1323,6 +1330,8 @@ async function makeRecipePdf(r){
       y+=10;
     }
   });
+  const hl = historyLines(r);
+  if(hl.length){ need(hl.length*14+16); rule(y, C.line, 0.5); y+=16; hl.forEach(l=>{ text(l, M, y, 9, "F1", C.muted); y+=13; }); }
   pages.push(ops);
   // footers
   pages.forEach((p,i)=>{ p.push(`${C.line} RG 0.6 w ${M} 40 m ${W-M} 40 l S`);

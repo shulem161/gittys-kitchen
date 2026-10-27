@@ -60,6 +60,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#review'); await A.waitForTimeout(500); await A.locator('.sub-card', {hasText: 'Test Kugel'}).locator('[data-sact=approve]').click(); await A.waitForTimeout(800);
     await B.goto(F + '#mine'); await B.waitForTimeout(400);
     ok('member recipe approved', /Approved/.test(await B.locator('.mrow').first().innerText()));
+    await B.goto(F + '#r-test-kugel'); await B.waitForTimeout(400);
+    ok('recipe shows who added it', /Added by Test Member/.test(await B.locator('.byline').innerText().catch(() => '')));
 
     // Member suggests changes → admin approves
     await B.goto(F + '#edit-r-challah'); await B.waitForTimeout(300); await B.fill('#ed-n', 'Test note'); await B.click('text=Send for approval'); await B.waitForTimeout(600);
@@ -68,6 +70,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#review'); await A.waitForTimeout(500); await A.locator('.sub-card', {hasText: 'Challah'}).locator('[data-sact=approve]').click(); await A.waitForTimeout(800);
     await B.goto(F + '#r-challah'); await B.waitForTimeout(400);
     ok('suggested change live after approval', await B.locator('text=Test note').count() === 1);
+    ok('recipe shows who changed it', /Changed by Test Member/.test(await B.locator('.byline').innerText().catch(() => '')));
 
     // Photos
     await B.goto(F + '#r-bobbys-challah'); await B.waitForTimeout(400); await B.setInputFiles('#ph-file', IMG); await B.waitForTimeout(1500);
