@@ -1,6 +1,6 @@
 {
-  "web": "3.19",
+  "web": "3.20",
   "apk": 7,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Cleaner cookbook cover."
+  "notes": "Add recipes from a photo, PDF or Word file."
 }

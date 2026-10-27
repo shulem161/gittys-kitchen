@@ -89,6 +89,9 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // Scan a recipe from a photo (AI stand-in)
     await B.goto(F + '#scan'); await B.waitForTimeout(300); await B.setInputFiles('#scan-file', IMG); await B.waitForTimeout(2000);
     ok('scanned recipe fills the form', (await B.inputValue('#ed-t').catch(() => '')) === 'Scanned Test Cake');
+    const txt = path.join(os.tmpdir(), 'gk-recipe.txt'); fs.writeFileSync(txt, 'Test Cake\n2 cups flour\nBake at 350 for an hour');
+    await B.goto(F + '#c-cakes'); await B.waitForTimeout(300); await B.goto(F + '#scan'); await B.waitForTimeout(300); await B.setInputFiles('#scan-doc', txt); await B.waitForTimeout(2000);
+    ok('recipe from a text file fills the form', (await B.inputValue('#ed-t').catch(() => '')) === 'Scanned Test Cake');
 
     // Whole cookbook download
     await B.goto(F); await B.waitForTimeout(400);
