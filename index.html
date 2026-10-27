@@ -497,7 +497,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.22";
+const WEB_VERSION = "3.23";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1597,7 +1597,7 @@ async function aiModel(){
   const aiMod = await import(FB_MODULAR+"firebase-ai.js");
   const app2 = appMod.getApps().find(a=>a.name==="gk-ai") || appMod.initializeApp(FIREBASE_CONFIG, "gk-ai");
   const ai = aiMod.getAI(app2, {backend: new aiMod.GoogleAIBackend()});
-  _aiModel = aiMod.getGenerativeModel(ai, {model:"gemini-2.5-flash", generationConfig:{responseMimeType:"application/json", temperature:0.2}});
+  _aiModel = aiMod.getGenerativeModel(ai, {model:"gemini-3.8-flash", generationConfig:{responseMimeType:"application/json", temperature:0.2}});
   return _aiModel;
 }
 function scanPrompt(){
