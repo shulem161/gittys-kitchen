@@ -79,6 +79,13 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#review'); await A.waitForTimeout(500); await A.click('[data-pact=ok]'); await A.waitForTimeout(800);
     await B.goto(F + '#c-bread'); await B.waitForTimeout(500);
     ok('approved photo shows on card', await B.locator('.rc.has-img').count() >= 1);
+    await B.goto(F + '#r-challah'); await B.waitForTimeout(400);
+    await B.setInputFiles('#ph-cam', IMG); await B.waitForTimeout(1200); await B.setInputFiles('#ph-file', [IMG, IMG]); await B.waitForTimeout(2000);
+    ok('several dish photos can be added at once', await B.locator('#ph-pick .ph-thumb').count() === 3);
+    await B.click('#ph-send'); await B.waitForTimeout(1500);
+    ok('several dish photos wait for approval', await B.locator('.ph.wait').count() === 3);
+    await B.goto(F + '#scan'); await B.waitForTimeout(300); await B.setInputFiles('#scan-file', [IMG, IMG]); await B.waitForTimeout(1500);
+    ok('recipe can be scanned from several pages', await B.locator('.scan-pages .ph-thumb').count() === 2);
 
     // Download a recipe as PDF
     await B.goto(F + '#r-boston-cream-pie'); await B.waitForTimeout(400);

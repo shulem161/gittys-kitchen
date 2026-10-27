@@ -1,6 +1,6 @@
 {
-  "web": "3.20",
-  "apk": 7,
+  "web": "3.21",
+  "apk": 8,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Add recipes from a photo, PDF or Word file."
+  "notes": "Take photos with the camera and add several photos at once."
 }

@@ -352,6 +352,19 @@ body.out .ptr{top:calc(env(safe-area-inset-top,0px) + 16px)}
 .imp-cat{padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;font-size:15px}
 .linkbtn{border:0;background:none;cursor:pointer;font:inherit;font-weight:600;font-size:15px;color:var(--accent);padding-left:0}
 .pill.dup{align-self:flex-start;margin:2px 0}
+.ph-btns{display:flex;gap:8px;flex-wrap:wrap}
+.ph-new-thumbs{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.ph-thumb{position:relative;width:96px;height:96px}
+.ph-thumb img{width:96px;height:96px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.ph-thumb.page{width:90px;height:120px}
+.ph-thumb.page img{width:90px;height:120px}
+.ph-x{position:absolute;top:-8px;right:-8px;width:26px;height:26px;border-radius:50%;border:0;background:var(--ink);color:var(--paper);font-size:12px;cursor:pointer}
+.pg-no{position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;font-weight:600;border-radius:999px;padding:1px 7px}
+.ph-more{width:64px;height:64px;border-radius:12px;border:2px dashed var(--line);display:grid;place-items:center;font-size:28px;color:var(--accent);cursor:pointer}
+.ph-new{flex-direction:column}
+.ph-new .ph-new-form{min-width:0;width:100%}
+.scan-pages{display:flex;flex-direction:column;gap:12px;padding:14px;border:1px dashed var(--line);border-radius:12px}
+.scan-pages .row{display:flex;gap:8px;flex-wrap:wrap}
 /* recipe editor */
 .note.setup{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:28px}
 .note.setup p{margin:4px 0 0;color:var(--muted)}
@@ -482,7 +495,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.20";
+const WEB_VERSION = "3.21";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1247,7 +1260,8 @@ function shrink(file){
 function photosSection(r){
   return `<section class="panel-a photos" id="photos" aria-labelledby="ph-h">
     <div class="ph-head"><h2 id="ph-h">Photos</h2>
-      ${offline?"":`<label class="btn solid ph-add" for="ph-file">+ Add a photo</label><input id="ph-file" type="file" accept="image/*" hidden>`}</div>
+      ${offline?"":`<div class="ph-btns"><label class="btn solid ph-add" for="ph-cam"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take a photo</label><label class="btn ph-add" for="ph-file"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg>Choose photos</label></div>
+        <input id="ph-cam" type="file" accept="image/*" capture="environment" hidden><input id="ph-file" type="file" accept="image/*" multiple hidden>`}</div>
     <div id="ph-pick"></div>
     <div class="ph-grid" id="ph-grid"><p class="hint">Loading photos…</p></div>
   </section>`;
@@ -1283,29 +1297,50 @@ function loadPhotos(r){
     approved = s.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>(a.created||0)-(b.created||0)); draw(); }, ()=>{ approved=[]; draw(); }));
   if(!isAdmin()) unsubRecipePhotos.push(col.where("recipeId","==",r.id).where("uid","==",me).onSnapshot(s=>{
     mine = s.docs.map(d=>Object.assign({id:d.id},d.data())); draw(); }, ()=>{}));
-  const input=document.getElementById("ph-file");
-  if(input) input.onchange=async()=>{
-    const file=input.files&&input.files[0]; input.value=""; if(!file) return;
-    const pick=document.getElementById("ph-pick");
-    pick.innerHTML=`<p class="hint">Preparing photo…</p>`;
-    let shot; try{ shot=await shrink(file); }catch(e){ pick.innerHTML=`<p class="err">That file couldn't be used as a photo. Try another picture.</p>`; return; }
-    pick.innerHTML=`<div class="ph-new"><img src="${shot.thumb}" alt="Your new photo">
-      <div class="ph-new-form"><div class="field"><label for="ph-cap">Caption (optional)</label><input id="ph-cap" type="text" maxlength="80" placeholder="e.g. Made it for Shabbos"></div>
-      <p class="hint">${isAdmin()?"It will appear on the recipe right away.":`${esc(ADMIN_NAME)} will approve it before everyone can see it.`}</p>
-      <div class="row"><button type="button" class="btn solid" id="ph-send">${isAdmin()?"Add photo":"Send for approval"}</button><button type="button" class="btn" id="ph-cancel">Cancel</button></div></div></div>`;
-    document.getElementById("ph-cancel").onclick=()=>{ pick.innerHTML=""; };
+  // Photos waiting to be sent (several can be taken or chosen before sending).
+  let shots=[];
+  const pick=document.getElementById("ph-pick");
+  const drawPick=()=>{
+    if(!pick) return;
+    if(!shots.length){ pick.innerHTML=""; return; }
+    pick.innerHTML=`<div class="ph-new">
+      <div class="ph-new-thumbs">${shots.map((s,i)=>`<div class="ph-thumb"><img src="${s.thumb}" alt="New photo ${i+1}"><button type="button" class="ph-x" data-rm="${i}" aria-label="Remove photo ${i+1}">✕</button></div>`).join("")}
+        <label class="ph-more" for="ph-cam" aria-label="Take another photo">+</label></div>
+      <div class="ph-new-form"><div class="field"><label for="ph-cap">Caption (optional)</label><input id="ph-cap" type="text" maxlength="80" placeholder="e.g. Made it for Shabbos" value="${esc(pick.dataset.cap||"")}"></div>
+      <p class="hint">${shots.length} ${shots.length===1?"photo":"photos"}. ${isAdmin()?"They will appear on the recipe right away.":`${esc(ADMIN_NAME)} will approve them before everyone can see them.`}</p>
+      <div class="row"><button type="button" class="btn solid" id="ph-send">${isAdmin()?(shots.length>1?`Add ${shots.length} photos`:"Add photo"):"Send for approval"}</button><button type="button" class="btn" id="ph-cancel">Cancel</button></div></div></div>`;
+    const cap=document.getElementById("ph-cap"); cap.oninput=()=>pick.dataset.cap=cap.value;
+    pick.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ shots.splice(+b.dataset.rm,1); drawPick(); });
+    document.getElementById("ph-cancel").onclick=()=>{ shots=[]; pick.dataset.cap=""; drawPick(); };
     document.getElementById("ph-send").onclick=async e=>{
-      const btn=e.currentTarget; btn.disabled=true; btn.textContent="Uploading…";
-      const caption=document.getElementById("ph-cap").value.trim();
-      const id="p-"+newId(), status=isAdmin()?"approved":"pending";
+      const btn=e.currentTarget; btn.disabled=true;
+      const caption=document.getElementById("ph-cap").value.trim(), status=isAdmin()?"approved":"pending";
+      let sent=0;
       try{
-        await db.collection("photos").doc(id).set({recipeId:r.id, recipeTitle:r.t, uid:me, byName:myName(), caption, img:shot.img, thumb:shot.thumb, status, created:Date.now()});
-        if(isAdmin() && !r.cover) await db.collection("recipes").doc(r.id).update({cover:shot.thumb, coverPhoto:id}).catch(()=>{});
-        if(!isAdmin()) notifyAdmin(`New photo from ${myName()}`, `A photo of “${r.t}” is waiting for your approval.`, "#review", "camera");
-        pick.innerHTML=""; toast(isAdmin()?"Photo added":`Photo sent to ${ADMIN_NAME} for approval`);
-      }catch(err){ btn.disabled=false; btn.textContent=isAdmin()?"Add photo":"Send for approval"; toast("Couldn't upload. Check your internet connection and try again."); }
+        for(const shot of shots.slice()){
+          btn.textContent=`Uploading ${sent+1} of ${shots.length}…`;
+          const id="p-"+newId();
+          await db.collection("photos").doc(id).set({recipeId:r.id, recipeTitle:r.t, uid:me, byName:myName(), caption, img:shot.img, thumb:shot.thumb, status, created:Date.now()+sent});
+          if(isAdmin() && !r.cover){ await db.collection("recipes").doc(r.id).update({cover:shot.thumb, coverPhoto:id}).catch(()=>{}); r.cover=shot.thumb; r.coverPhoto=id; }
+          sent++;
+        }
+        if(!isAdmin()) notifyAdmin(`${sent>1?sent+" new photos":"New photo"} from ${myName()}`, `${sent>1?"Photos":"A photo"} of “${r.t}” ${sent>1?"are":"is"} waiting for your approval.`, "#review", "camera");
+        toast(isAdmin()?(sent>1?`${sent} photos added`:"Photo added"):`${sent>1?sent+" photos":"Photo"} sent to ${ADMIN_NAME} for approval`);
+        shots=[]; pick.dataset.cap=""; drawPick();
+      }catch(err){ shots=shots.slice(sent); drawPick(); toast(sent?`${sent} sent. The rest couldn't upload; check your connection and try again.`:"Couldn't upload. Check your internet connection and try again."); }
     };
   };
+  const addFiles=async input=>{
+    const files=[...(input.files||[])]; input.value=""; if(!files.length) return;
+    const room=12-shots.length; if(room<=0){ toast("That's the most photos for one go. Send these first."); return; }
+    if(pick) pick.insertAdjacentHTML("afterbegin",`<p class="hint" id="ph-prep">Preparing ${files.length>1?files.length+" photos":"photo"}…</p>`);
+    let bad=0;
+    for(const f of files.slice(0,room)){ try{ shots.push(await shrink(f)); }catch(e){ bad++; } }
+    drawPick();
+    if(bad) toast(`${bad} ${bad===1?"file":"files"} couldn't be used as a photo.`);
+    if(files.length>room) toast("Only the first 12 photos were added. Send these, then add more.");
+  };
+  ["ph-cam","ph-file"].forEach(id=>{ const el=document.getElementById(id); if(el) el.onchange=()=>addFiles(el); });
 }
 async function lightbox(p, r){
   const box=document.createElement("div"); box.className="lightbox"; box.setAttribute("role","dialog"); box.setAttribute("aria-label","Photo");
@@ -1650,22 +1685,50 @@ function scanPage(cat){
       <h2>Add from a photo or file</h2>
       <p class="sub">Take a picture of a recipe, or choose a PDF, a Word document or a text file. The recipes are read and set out neatly so you can check them before ${isAdmin()?"adding them":"sending them to "+esc(ADMIN_NAME)+" for approval"}.</p>
       <div class="scan-btns">
-        <label class="primary scan-btn" for="scan-file">Take or choose a photo</label>
+        <label class="primary scan-btn" for="scan-cam"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take a photo</label>
+        <label class="btn scan-btn2" for="scan-file"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg>Choose photos</label>
         <label class="btn scan-btn2" for="scan-doc">Choose a file</label>
       </div>
-      <input id="scan-file" type="file" accept="image/*" hidden>
+      <input id="scan-cam" type="file" accept="image/*" capture="environment" hidden>
+      <input id="scan-file" type="file" accept="image/*" multiple hidden>
+      <div id="scan-pages"></div>
       <input id="scan-doc" type="file" accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" hidden>
       <div id="scan-status" class="scan-status"></div>
-      <p class="hint">Photo tips: lay the recipe flat, fill the screen with it, and use good light. A file can hold many recipes at once.</p>
+      <p class="hint">Photo tips: lay the recipe flat, fill the screen with it, and use good light. If a recipe goes over more than one page or card, take a photo of each page; they're read together as one recipe. A file can hold many recipes at once.</p>
     </div></section>`;
   const status=document.getElementById("scan-status");
+  // Pages of one recipe taken as photos; read together when ready.
+  let pages=[];
+  const pagesBox=document.getElementById("scan-pages");
+  const drawPages=()=>{
+    if(!pages.length){ pagesBox.innerHTML=""; return; }
+    pagesBox.innerHTML=`<div class="scan-pages">
+      <div class="ph-new-thumbs">${pages.map((p,i)=>`<div class="ph-thumb page"><img src="${p}" alt="Page ${i+1}"><span class="pg-no">${i+1}</span><button type="button" class="ph-x" data-rm="${i}" aria-label="Remove page ${i+1}">✕</button></div>`).join("")}
+        <label class="ph-more" for="scan-cam" aria-label="Take a photo of the next page">+</label></div>
+      <p class="hint">${pages.length} ${pages.length===1?"page":"pages"}. Add another page with +, or read the recipe now.</p>
+      <div class="row"><button type="button" class="primary" id="scan-read">Read recipe</button><button type="button" class="btn" id="scan-clear">Start over</button></div></div>`;
+    pagesBox.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ pages.splice(+b.dataset.rm,1); drawPages(); });
+    document.getElementById("scan-clear").onclick=()=>{ pages=[]; drawPages(); status.innerHTML=""; };
+    document.getElementById("scan-read").onclick=()=>{ const imgs=pages.slice(); pagesBox.innerHTML="";
+      read({preview:imgs[0], label:"", parts:imgs.map(d=>({inlineData:{data:d.split(",")[1], mimeType:"image/jpeg"}}))}, imgs.length); };
+  };
+  const addPhotos=async input=>{
+    const files=[...(input.files||[])]; input.value=""; if(!files.length) return;
+    let bad=0;
+    for(const f of files){ if(pages.length>=10) break; try{ pages.push(await resizeForScan(f)); }catch(e){ bad++; } }
+    status.innerHTML = bad ? `<p class="err">${bad} ${bad===1?"file":"files"} couldn't be used as a photo.</p>` : "";
+    drawPages();
+  };
   const handle=async input=>{
     const file=input.files&&input.files[0]; input.value=""; if(!file) return;
     let src; try{ src=await readFileForAI(file); }catch(e){ status.innerHTML=`<p class="err">${esc(e.message||"That file couldn't be used.")}</p>`; return; }
-    status.innerHTML=`<div class="scan-prev">${src.preview?`<img src="${src.preview}" alt="The recipe photo">`:`<div class="scan-file">${esc(file.name)}<span>${esc(src.label)}</span></div>`}<div><span class="spin" aria-hidden="true"></span><p><b>Reading…</b><br><span class="hint">This usually takes 10–30 seconds${src.preview?"":", longer for big files"}.</span></p></div></div>`;
+    src.parts=[src.part]; src.name=file.name; read(src, 1);
+  };
+  const read=async(src, n)=>{
+    status.innerHTML=`<div class="scan-prev">${src.preview?`<img src="${src.preview}" alt="The recipe photo">${n>1?`<span class="hint">+ ${n-1} more ${n===2?"page":"pages"}</span>`:""}`:`<div class="scan-file">${esc(src.name||"")}<span>${esc(src.label)}</span></div>`}<div><span class="spin" aria-hidden="true"></span><p><b>Reading…</b><br><span class="hint">This usually takes 10–30 seconds${src.preview?"":", longer for big files"}.</span></p></div></div>`;
     try{
       const model=await aiModel();
-      const res=await model.generateContent([scanPrompt(), src.part]);
+      const res=await model.generateContent([scanPrompt()+(n>1?`\n\nThese ${n} photos are consecutive pages or sides of the same recipe card(s), in order. Combine them; a recipe that continues onto the next photo is ONE recipe.`:""), ...src.parts]);
       const j=JSON.parse(res.response.text().trim().replace(/^```(?:json)?\s*/,"").replace(/```$/,""));
       if(j.error) throw new Error(j.error);
       const drafts=(Array.isArray(j.recipes)?j.recipes:[j]).map(draftFromScan).filter(Boolean);
@@ -1680,7 +1743,8 @@ function scanPage(cat){
         : "Couldn't read a recipe from that: "+esc(m.slice(0,140))+". Try a clearer photo or another file, or add the recipe by typing it."}</p>`;
     }
   };
-  document.getElementById("scan-file").onchange=e=>handle(e.target);
+  document.getElementById("scan-cam").onchange=e=>addPhotos(e.target);
+  document.getElementById("scan-file").onchange=e=>addPhotos(e.target);
   document.getElementById("scan-doc").onchange=e=>handle(e.target);
 }
 // Several recipes found in one file: pick which to keep and their categories, then send them all.
