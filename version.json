@@ -1,6 +1,6 @@
 {
-  "web": "3.24",
+  "web": "3.25",
   "apk": 8,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "The recipe reader is ready: add recipes from photos and files."
+  "notes": "Faster, more reliable recipe reading from photos and Word files."
 }

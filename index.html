@@ -497,7 +497,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.24";
+const WEB_VERSION = "3.25";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1590,26 +1590,101 @@ async function downloadBook(cats, btn){
 
 /* ---------- scan a recipe from a photo (Gemini through Firebase AI Logic) ---------- */
 const FB_MODULAR = "https://www.gstatic.com/firebasejs/12.5.0/";
-let _aiModel = null;
-async function aiModel(){
-  if(_aiModel) return _aiModel;
-  const appMod = await import(FB_MODULAR+"firebase-app.js");
-  const aiMod = await import(FB_MODULAR+"firebase-ai.js");
-  const app2 = appMod.getApps().find(a=>a.name==="gk-ai") || appMod.initializeApp(FIREBASE_CONFIG, "gk-ai");
-  const ai = aiMod.getAI(app2, {backend: new aiMod.GoogleAIBackend()});
-  _aiModel = aiMod.getGenerativeModel(ai, {model:"gemini-3.8-flash", generationConfig:{responseMimeType:"application/json", temperature:0.2}});
-  return _aiModel;
+// Models to try in order; if one is busy or over its free limit, the next is used right away.
+const READER_MODELS = ["gemini-3.5-flash","gemini-3.5-flash-lite","gemini-flash-lite-latest"];
+let _aiBase = null; const _aiModels = {};
+async function aiModel(name){
+  if(!_aiBase){
+    const appMod = await import(FB_MODULAR+"firebase-app.js");
+    const aiMod = await import(FB_MODULAR+"firebase-ai.js");
+    const app2 = appMod.getApps().find(a=>a.name==="gk-ai") || appMod.initializeApp(FIREBASE_CONFIG, "gk-ai");
+    _aiBase = {aiMod, ai: aiMod.getAI(app2, {backend: new aiMod.GoogleAIBackend()})};
+  }
+  name = name || READER_MODELS[0];
+  return _aiModels[name] = _aiModels[name] || _aiBase.aiMod.getGenerativeModel(_aiBase.ai,
+    {model:name, generationConfig:{responseMimeType:"application/json", temperature:0.2}}, {timeout: 75000});
 }
-// Ask the reader, trying again a couple of times if Google is busy.
-async function askReader(parts){
-  const model=await aiModel(); let last;
-  for(const wait of [0, 3000, 8000]){
-    if(wait) await new Promise(r=>setTimeout(r, wait));
-    try{ return await model.generateContent(parts); }
-    catch(e){ last=e; if(!/503|overloaded|unavailable|deadline|429|resource.?exhausted|try again/i.test(String(e&&e.message||e))) throw e; }
+// Ask the reader: move to the next model when one is busy, over its limit, unavailable or too slow.
+async function askReader(parts, onTry){
+  let last;
+  for(const [i,name] of READER_MODELS.entries()){
+    if(onTry) onTry(i);
+    try{ return await (await aiModel(name)).generateContent(parts); }
+    catch(e){ last=e; if(!/429|quota|5\d\d|overloaded|high demand|unavailable|deadline|abort|timeout|resource.?exhausted|try again|404|not found|no longer available/i.test(String(e&&e.message||e))) throw e; }
   }
   throw last;
 }
+
+// Built-in reader for Word and text files (no AI needed), using the cookbook's own layout rules:
+// a contents list of titles, ingredients that start with an amount, and steps.
+const LOCAL_VERBS = /^(Mix|Bake|Cook|Put|Let|Cool|Freeze|Decorate|Fill|Blend|Then|Steam|Sift|Combine|Pour|Spread|Refrigerate|Roll|Cut|Serve|Beat|Melt|Fry|Knead|Sprinkle|Place|Add|Make|Dip|Shape|Divide|Brush|Preheat|Stir|Boil|Heat|Remove|Cover|Grease|Line|Separate|Whip|Fold|Chill|Drain|Wash|Peel|Slice|Dice|Chop|Grate|Saute|Sauté|Soak|Squeeze|Season)\b/i;
+const LOCAL_HEADERS = new Set(["crust","filling","topping","top","bottom","glaze","cream","sauce","dough","icing","frosting","cake","shell","syrup","dressing","marinade","filing","for brushing"]);
+function localClean(s){
+  s = s.replace(/\t/g," ").replace(/\s{2,}/g," ").trim();
+  const FR={"1\\2":"½","1\\4":"¼","3\\4":"¾","1\\3":"⅓","2\\3":"⅔","1\\8":"⅛","1/2":"½","1/4":"¼","3/4":"¾","1/3":"⅓","2/3":"⅔","1/8":"⅛"};
+  for(const [k,v] of Object.entries(FR)){ const kk=k.replace(/[\\/]/g,m=>"\\"+m); s=s.replace(new RegExp("(\\d) ?"+kk+"(?!\\d)","g"),"$1"+v).replace(new RegExp("(^|[^\\d\\\\/])"+kk+"(?!\\d)","g"),"$1"+v); }
+  s = s.replace(/(\d[½¼¾⅓⅔⅛]?|[½¼¾⅓⅔⅛]) ?T\b\.?/g,"$1 tbsp").replace(/(\d[½¼¾⅓⅔⅛]?|[½¼¾⅓⅔⅛]) ?t\b\.?/g,"$1 tsp")
+       .replace(/º/g,"°").replace(/(\d)\s?°\s?(?!F)/g,"$1°F ").replace(/\b(on|at) ([23456]\d0)(?=\s+(for|until|of)\b)/g,"$1 $2°F").replace(/\s+$/,"");
+  return s.replace(/^[-–\s]+|[-–\s]+$/g,"");
+}
+function localParse(text, fileCat){
+  const raw = text.replace(/\r/g,"\n").split("\n").map(l=>l.replace(/ /g," "));
+  const BUL = /^(?:[•ßΣ·▪?-]|\(\s)/;
+  const isBullet = l => BUL.test(l.trim()) || /^\t\s*6 [A-Z]/.test(l);
+  const strip = l => l.trim().replace(/^(?:[•ßΣ·▪?-]\s*|\(\s+)/,"").replace(/^6 (?=[A-Z])/,"");
+  const norm = s => s.replace(/^\(.*?\)\s*/,"").toLowerCase().replace(/[^a-z0-9#]/g,"");
+  // A contents line: a title, a gap (tab or several spaces), then a page number.
+  const tocLine = l => /[A-Za-z][^\t]*?(?:\t|\s{3,})[\t ]*\d{1,3}\s*$/.test(l.replace(/\s+$/,""));
+  const head = raw.filter(l=>l.trim()).slice(0,70);
+  const hasToc = head.filter(tocLine).length >= 3;
+  const titles=[];
+  if(hasToc) for(const l of head){
+    if(!tocLine(l) && !/Page\s*#/i.test(l)) continue;
+    for(const part of l.split(/(?:\t|\s{3,})[\t ]*\d{1,3}[ ]*(?=\S)|(?:\t|\s{3,})[\t ]*\d{1,3}\s*$/)){
+      const p=part.replace(/Page\s*#/i,"").trim();
+      if(p && /[A-Za-z]{3}/.test(p) && p.length<70) titles.push(p);
+    }
+  }
+  const ALIAS={"brownies#2":"brownie#2","zucherbeansalad":"zucerbeansalad","krepelech#3":"kreplech#3"};
+  const want = titles.map(t=>[norm(t),t]); const used = want.map(()=>false);
+  const recipes=[]; let cur=null;
+  const startRecipe = t => { const m=t.match(/^\((.*?)\)\s*(.*)$/); cur={t:(m?m[2]:t).trim(), by:m?m[1].trim():"", c:fileCat, s:[]}; recipes.push(cur); };
+  const push = (kind, text, title) => { if(!cur) return; const secs=cur.s, last=secs[secs.length-1];
+    if(title!==undefined){ secs.push([kind,title,[]]); return; }
+    if(last && last[0]===kind) last[2].push(text); else secs.push([kind,"",[text]]); };
+  let pastToc = !want.length;
+  for(let i=0;i<raw.length;i++){
+    const l=raw[i]; if(!l.trim()) continue;
+    const bullet=isBullet(l), text=localClean(strip(l)); if(!text) continue;
+    if(!bullet){
+      const n=norm(text), nn=ALIAS[n]||n;
+      if(want.length){
+        const k=want.findIndex((w,j)=>!used[j] && (w[0]===n || w[0]===nn));
+        if(k>=0 && !tocLine(l)){ used[k]=true; pastToc=true; startRecipe(want[k][1]); continue; }
+        if(!pastToc) continue;
+      } else {
+        if(/^bjbj/.test(text) || text.replace(/[^A-Za-z]/g,"").length < text.length*0.4) continue;
+        if(!cur){ startRecipe(text); continue; }
+        if(/^(layer|part|step)\s*\d*$/i.test(text)){ push(1,null,text); continue; }
+        const next=(raw.slice(i+1).find(x=>x.trim())||"").trim();
+        if(text.split(" ").length<=6 && !/^[\d½¼¾⅓⅔⅛]/.test(text) && !LOCAL_VERBS.test(text) && /^[\d½¼¾⅓⅔⅛]/.test(next) && !text.endsWith(":")){ startRecipe(text); continue; }
+      }
+    }
+    if(!cur) continue;
+    const words=text.split(" ").length;
+    if(!bullet && LOCAL_HEADERS.has(text.toLowerCase().replace(/:$/,""))){ push(1,null,text.replace(/:$/,"")); continue; }
+    if(!bullet && text.endsWith(":") && words<=4){ push(1,null,text.slice(0,-1)); continue; }
+    const step = bullet || LOCAL_VERBS.test(text) || /^\d\.\s/.test(text) || (words>=8 && !/^[\d½¼¾⅓⅔⅛]/.test(text));
+    push(step?0:1, text.replace(/^\d\.\s*/,""));
+  }
+  const out = recipes.map(r=>Object.assign(r,{s:r.s.filter(x=>x[2].length)})).filter(r=>r.s.length && r.t);
+  out.usedToc = hasToc; return out;
+}
+function fileCategory(name){
+  const base=String(name||"").replace(/\.[^.]+$/,"").replace(/^[0-9a-f]{6,}-/i,"").replace(/[_-]+/g," ").trim().toLowerCase();
+  return CATS.find(c=>c.toLowerCase()===base) || CATS.find(c=>base.includes(c.toLowerCase())) || "";
+}
+
 function scanPrompt(){
   return `You are helping a family put recipes into their cookbook app. Read the recipe(s) in this photo or document (it may be handwritten, printed, a screenshot, or a Word/PDF file) and return ONLY JSON in this shape:
 {"recipes": [{"title": string, "category": string, "from": string, "note": string,
@@ -1682,7 +1757,7 @@ async function readFileForAI(file){
   else throw new Error("Please choose a photo, a PDF, a Word document or a text file.");
   text=text.replace(/\n{3,}/g,"\n\n").trim().slice(0,80000);
   if(text.replace(/[^A-Za-z]/g,"").length<20) throw new Error("No recipe text was found in this file.");
-  return {label: name.endsWith(".doc")||name.endsWith(".docx") ? "Word document" : "text file", part:{text:"Here is the document text:\n\n"+text}};
+  return {label: name.endsWith(".doc")||name.endsWith(".docx") ? "Word document" : "text file", text, part:{text:"Here is the document text:\n\n"+text}};
 }
 function draftFromScan(j){
   const parts = Array.isArray(j.parts) ? j.parts : [];
@@ -1738,19 +1813,30 @@ function scanPage(cat){
   };
   const read=async(src, n)=>{
     status.innerHTML=`<div class="scan-prev">${src.preview?`<img src="${src.preview}" alt="The recipe photo">${n>1?`<span class="hint">+ ${n-1} more ${n===2?"page":"pages"}</span>`:""}`:`<div class="scan-file">${esc(src.name||"")}<span>${esc(src.label)}</span></div>`}<div><span class="spin" aria-hidden="true"></span><p><b>Reading…</b><br><span class="hint">This usually takes 10–30 seconds${src.preview?"":", longer for big files"}.</span></p></div></div>`;
+    const localDrafts = () => { if(!src.text) return [];
+      const fc = fileCategory(src.name) || cat || "Miscellaneous";
+      return localParse(src.text, fc).map(r=>({id:"", c:r.c||fc, t:r.t, by:r.by, n:undefined, s:r.s})); };
+    const showDrafts = (drafts, how) => {
+      if(how) toast(how);
+      if(drafts.length===1){ toast("Recipe read. Check it, then "+(isAdmin()?"add it.":"send it for approval.")); editor(null, cat, null, drafts[0]); }
+      else importList(drafts, cat);
+    };
+    if(src.text){ const ld=localDrafts(); if(ld.length>=2 && localParse(src.text,"").usedToc){ showDrafts(ld); return; } }
     try{
-      const res=await askReader([scanPrompt()+(n>1?`\n\nThese ${n} photos are consecutive pages or sides of the same recipe card(s), in order. Combine them; a recipe that continues onto the next photo is ONE recipe.`:""), ...src.parts]);
+      const res=await askReader([scanPrompt()+(n>1?`\n\nThese ${n} photos are consecutive pages or sides of the same recipe card(s), in order. Combine them; a recipe that continues onto the next photo is ONE recipe.`:""), ...src.parts],
+        i=>{ if(i>0){ const p=status.querySelector(".scan-prev p"); if(p) p.innerHTML="<b>Still reading…</b><br><span class=\"hint\">The first reader was busy, so another one is trying.</span>"; } });
       const j=JSON.parse(res.response.text().trim().replace(/^```(?:json)?\s*/,"").replace(/```$/,""));
       if(j.error) throw new Error(j.error);
       const drafts=(Array.isArray(j.recipes)?j.recipes:[j]).map(draftFromScan).filter(Boolean);
       if(!drafts.length) throw new Error("No ingredients or steps were found");
-      if(drafts.length===1){ toast("Recipe read. Check it, then "+(isAdmin()?"add it.":"send it for approval.")); editor(null, cat, null, drafts[0]); }
-      else importList(drafts, cat);
+      showDrafts(drafts);
     }catch(e){
       const m=String(e&&e.message||e);
+      const ld=localDrafts();
+      if(ld.length){ showDrafts(ld, "Read with the built-in reader. Please check each recipe."); return; }
       const off=/api-not-enabled|not been used|disabled|PERMISSION_DENIED|403|ai-logic|firebasevertexai|generativelanguage/i.test(m);
       status.innerHTML=`<p class="err">${off ? (isAdmin()?"Reading recipes isn't turned on yet. In Firebase, open AI Logic and enable the Gemini Developer API.":"This isn't available yet. Ask "+esc(ADMIN_NAME)+" to turn it on.")
-        : /503|overloaded|unavailable|deadline|429|resource.?exhausted/i.test(m) ? "The recipe reader is busy right now. Please try again in a minute."
+        : /5\d\d|overloaded|high demand|unavailable|deadline|abort|timeout|429|quota|resource.?exhausted/i.test(m) ? "The recipe readers are busy right now. Please try again in a few minutes, or add the recipe by typing it."
         : /fetch|network|Failed to load|import/i.test(m) ? "Couldn't reach the recipe reader. Check your internet connection and try again."
         : "Couldn't read a recipe from that: "+esc(m.slice(0,140))+". Try a clearer photo or another file, or add the recipe by typing it."}</p>${isAdmin()?`<details class="err-detail"><summary>Details for troubleshooting</summary><code>${esc(m.slice(0,600))}</code></details>`:""}`;
     }
