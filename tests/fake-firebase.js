@@ -1,5 +1,5 @@
 (function(){
-const L=()=>{const d=JSON.parse(localStorage.getItem("__fakedb")||'{"users":{},"names":{},"accounts":{}}');d.recipes=d.recipes||{};d.submissions=d.submissions||{};d.photos=d.photos||{};return d};
+const L=()=>{const d=JSON.parse(localStorage.getItem("__fakedb")||'{"users":{},"names":{},"accounts":{}}');d.recipes=d.recipes||{};d.submissions=d.submissions||{};d.photos=d.photos||{};d.feedback=d.feedback||{};return d};
 const W=d=>{localStorage.setItem("__fakedb",JSON.stringify(d));fire()};
 let subs=[];function fire(){setTimeout(()=>subs.forEach(s=>s()),0)}
 window.addEventListener("storage",e=>{if(e.key==="__fakedb")fire()});

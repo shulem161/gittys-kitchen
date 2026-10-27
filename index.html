@@ -314,6 +314,31 @@ html,body{overscroll-behavior-y:contain}
 .ptr.ready{color:var(--accent)}
 .ptr.spinning svg{animation:spin .7s linear infinite}
 body.out .ptr{top:calc(env(safe-area-inset-top,0px) + 16px)}
+.cover-side{display:flex;flex-direction:column;gap:18px;align-items:flex-start}
+.cat-tools{display:flex;gap:8px;margin:-6px 0 16px}
+/* suggestions & comments */
+.fb-card{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:56px}
+.fb-card .ic{width:48px;height:48px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;flex-shrink:0}
+.fb-card-txt{flex:1;min-width:200px}
+.fb-card-txt h3{font-size:21px}
+.fb-card-txt p{margin:4px 0 0;color:var(--muted)}
+.fb-form{display:flex;flex-direction:column;gap:14px}
+.fb-kinds{display:flex;gap:8px;flex-wrap:wrap}
+.fb-kind input{position:absolute;opacity:0}
+.fb-kind span{display:inline-block;padding:8px 14px;border:1px solid var(--line);border-radius:999px;cursor:pointer;font-weight:500;font-size:15px}
+.fb-kind input:checked + span{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+.fb-kind input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px}
+.fb-item{padding:14px 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px;list-style:none}
+.fb-item:first-child{border-top:0}
+.fb-top{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.fb-top .pill{margin-left:auto}
+.fb-text{margin:0;white-space:pre-wrap}
+.fb-reply{background:var(--accent-soft);border-radius:10px;padding:10px 12px;font-size:15px}
+.fb-admin{display:flex;flex-direction:column;gap:8px}
+.fb-admin textarea,.fb-admin select{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;font-size:15px}
+.fb-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pill.plan{background:var(--accent-soft);color:var(--accent)}
+.fb-link{margin:0;font-size:14px}
 /* recipe editor */
 .note.setup{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:28px}
 .note.setup p{margin:4px 0 0;color:var(--muted)}
@@ -439,12 +464,12 @@ const myName = () => profile ? profile.name : "";
 const uk = k => "gk-u-"+me+"-"+k;
 const favs = () => (profile && profile.favs) || [];
 const initial = n => (String(n).trim()[0]||"?").toUpperCase();
-const pendingCount = () => members.filter(m=>m.status==="pending").length + (isAdmin()?subs.filter(s=>s.status==="pending").length+pendingPhotos.length:0);
+const pendingCount = () => members.filter(m=>m.status==="pending").length + (isAdmin()?subs.filter(s=>s.status==="pending").length+pendingPhotos.length+newFeedback():0);
 function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catch(e){for(let i=0;i<12;i++)a[i]=Math.random()*256|0} return [...a].map(b=>b.toString(16).padStart(2,"0")).join(""); }
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.15";
+const WEB_VERSION = "3.17";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -515,6 +540,7 @@ function boot(){
     if(unsubRecipes){unsubRecipes();unsubRecipes=null}
     if(unsubSubs){unsubSubs();unsubSubs=null;subs=[]}
     if(unsubPendingPhotos){unsubPendingPhotos();unsubPendingPhotos=null;pendingPhotos=[]}
+    if(unsubFeedback){unsubFeedback();unsubFeedback=null;feedback=[]}
     if(!u){ me=null; profile=null; offline=false; state="signedout"; renderAcct(); return route(); }
     me=u.uid;
     if(!profile){ state="loading"; route(); }
@@ -525,7 +551,7 @@ function boot(){
       state = profile.status==="approved" ? "approved" : profile.status==="denied" ? "denied" : "pending";
       cacheProfile(); renderAcct();
       if(isAdmin() && !unsubAll) watchMembers();
-      if(state==="approved"){ watchRecipes(); watchSubs(); watchPendingPhotos(); if(!update){ lastUpdCheck=Date.now(); checkUpdates(false); } else renderUpdateBar(); }
+      if(state==="approved"){ watchRecipes(); watchSubs(); watchPendingPhotos(); watchFeedback(); if(!update){ lastUpdCheck=Date.now(); checkUpdates(false); } else renderUpdateBar(); }
       if(was!==state || state!=="approved") route();
     }, ()=>{
       const c=store("gk-cache");
@@ -624,9 +650,12 @@ function home(){
         <h1>Gitty's Kitchen</h1>
         <p>Challahs, kugels, cakes and cookies, sorted into categories. Tap a recipe to cook from it, checking off ingredients and steps as you go.</p>
       </div>
+      <div class="cover-side">
       <div class="stats">
         <div class="stat"><b>${RECIPES.length}</b><span>Recipes</span></div>
         <div class="stat"><b>${CATS.length}</b><span>Categories</span></div>
+      </div>
+      <button class="btn solid" id="dl-book" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download the whole cookbook</button>
       </div>
     </div>
   </section>
@@ -639,8 +668,15 @@ function home(){
     <div class="section-head"><h2>Categories</h2><p>Choose a section of the cookbook</p></div>
     <div class="cats">${CATS.map(c=>{const n=RECIPES.filter(r=>r.c===c).length;
       return `<a class="cat" href="#${slug(c)}"><div class="ic">${icon(c)}</div><h3>${esc(c)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`}).join("")}</div>
-  </section>`;
+  </section>
+  ${offline?"":`<section class="wrap"><div class="panel-a fb-card">
+    <div class="ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/><path d="M8.5 11h7M8.5 14h4"/></svg></div>
+    <div class="fb-card-txt"><h3>${isAdmin()?"Suggestions &amp; comments":"Have a suggestion or a comment?"}</h3>
+      <p>${isAdmin()?(newFeedback()?`${newFeedback()} new ${newFeedback()===1?"message":"messages"} from members.`:"Messages from members appear here."):"Tell us what you'd like added or changed, or comment on a recipe. "+esc(ADMIN_NAME)+" reads every message."}</p></div>
+    <a class="btn solid" href="${isAdmin()?"#inbox":"#feedback"}">${isAdmin()?"Open inbox":"Send a message"}</a>
+  </div></section>`}`;
   const ib=document.getElementById("importbtn"); if(ib) ib.onclick=()=>importBundled(ib);
+  const db0=document.getElementById("dl-book"); if(db0) db0.onclick=()=>downloadBook(CATS.filter(c=>RECIPES.some(r=>r.c===c)), db0);
 }
 
 function tabs(active){
@@ -652,7 +688,9 @@ function category(c){
   const list = RECIPES.filter(r=>r.c===c);
   app.innerHTML = `<section class="wrap">${tabs(c)}
     <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}${!offline&&(!isAdmin()||recipesOnline)?` · <a class="link" href="#new-${slug(c).slice(2)}">+ Add a recipe</a> · <a class="link" href="#scan-${slug(c).slice(2)}">Scan a recipe</a>`:""}</p></div>
+    ${list.length?`<div class="cat-tools"><button class="btn" id="dl-cat" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download ${esc(c)}</button></div>`:""}
     <div class="grid">${list.length ? list.map(card).join("") : `<div class="empty">No ${esc(c)} recipes yet.${offline?"":` <a class="link" href="#new-${slug(c).slice(2)}">Add the first one</a>`}</div>`}</div></section>`;
+  const dc=document.getElementById("dl-cat"); if(dc) dc.onclick=()=>downloadBook([c], dc);
   const a=app.querySelector('.tab[aria-current="page"]'); if(a) a.parentElement.scrollLeft = a.offsetLeft - 16;
 }
 
@@ -727,6 +765,7 @@ function recipe(r){
     <div class="parts">
       ${r.n?`<div class="note"><b>Note:</b> ${esc(r.n)}</div>`:""}
       ${partHTML}
+      ${offline?"":`<p class="fb-link"><a class="link" href="#feedback-${r.id}">Comment on this recipe</a></p>`}
       ${historyLines(r).length?`<div class="byline">${historyLines(r).map(l=>`<span>${esc(l)}</span>`).join("")}</div>`:""}
       <nav class="pager">
         ${prev?`<a href="#${prev.id}"><small>Previous</small>${esc(prev.t.replace("Untitled: ",""))}</a>`:"<span></span>"}
@@ -901,6 +940,7 @@ function openMenu(confirming){
     ${isAdmin()?`<a href="#review" role="menuitem">Approve recipes &amp; photos <span class="n${pendingSubs().length+pendingPhotos.length?" hot":""}">${pendingSubs().length+pendingPhotos.length?(pendingSubs().length+pendingPhotos.length)+" waiting":""}</span></a>`:""}
     ${!offline&&(!isAdmin()||recipesOnline)?`<a href="#new" role="menuitem">Add a recipe <span class="n"></span></a><a href="#scan" role="menuitem">Scan a recipe <span class="n">from a photo</span></a>`:""}
     ${isAdmin()?"":`<a href="#mine" role="menuitem">My recipes <span class="n">${subs.length||""}</span></a>`}
+    ${isAdmin()?`<a href="#inbox" role="menuitem">Suggestions &amp; comments <span class="n${newFeedback()?" hot":""}">${newFeedback()?newFeedback()+" new":""}</span></a>`:`<a href="#feedback" role="menuitem">Suggestions &amp; comments <span class="n"></span></a>`}
     <a href="#favorites" role="menuitem">My favorites <span class="n">${favs().length}</span></a>
     ${isAdmin()?`<button type="button" role="menuitem" id="m-ntfy">Send test notification <span class="n"></span></button>`:""}
     <button type="button" role="menuitem" id="m-upd">Check for updates <span class="n">v${WEB_VERSION}</span></button>
@@ -1311,99 +1351,190 @@ async function photoForPdf(r){
 }
 function imgSize(src){ return new Promise(res=>{ const i=new Image(); i.onload=()=>res([i.naturalWidth,i.naturalHeight]); i.onerror=()=>res(null); i.src=src; }); }
 
-async function makeRecipePdf(r){
-  const W=612, H=792, M=54, CW=W-2*M;
-  const pages=[]; let ops=[], y=M;
-  const C = {ink:"0.106 0.149 0.220", muted:"0.357 0.400 0.471", accent:"0.173 0.353 0.604", wheat:"0.718 0.525 0.184", line:"0.835 0.863 0.906"};
-  const newPage = () => { if(ops.length) pages.push(ops); ops=[]; y=M+10; };
-  const need = h => { if(H-y-h < M+24) newPage(); };
-  const text = (s,x,yy,size,font,color) => ops.push(`BT /${font} ${size} Tf ${color} rg ${x.toFixed(1)} ${(H-yy).toFixed(1)} Td (${pdfEsc(s)}) Tj ET`);
-  const rule = (yy,color,w) => ops.push(`${color} RG ${w||0.8} w ${M} ${(H-yy).toFixed(1)} m ${W-M} ${(H-yy).toFixed(1)} l S`);
-  // header band
-  ops.push(`${C.accent} rg 0 ${H-8} ${W} 8 re f`);
-  y = M;
-  text("GITTY'S KITCHEN  ·  "+r.c.toUpperCase(), M, y, 9, "F2", C.wheat); y+=26;
-  for(const l of wrap(r.t, 26, CW, true, true)){ text(l, M, y, 26, "F3", C.ink); y+=30; }
+// A tiny PDF writer: pages of text, lines, boxes and JPEG pictures.
+class PdfDoc {
+  constructor(){ this.W=612; this.H=792; this.M=54; this.pages=[]; this.images=[]; this.footers=[]; }
+  get CW(){ return this.W-2*this.M; }
+  page(footer){ this.ops=[]; this.pages.push(this.ops); this.footers.push(footer||null); this.y=this.M; return this.pages.length; }
+  need(h, footer){ if(this.H-this.y-h < this.M+24) { this.page(footer||this.footers[this.footers.length-1]); this.y=this.M+10; } }
+  text(s,x,y,size,font,color){ this.ops.push(`BT /${font} ${size} Tf ${color} rg ${x.toFixed(1)} ${(this.H-y).toFixed(1)} Td (${pdfEsc(s)}) Tj ET`); }
+  textRight(s,xr,y,size,font,color){ this.text(s, xr-textWidth(pdfText(s),size,font!=="F1",font==="F3"), y, size, font, color); }
+  rule(y,color,w,x1,x2){ this.ops.push(`${color} RG ${w||0.8} w ${(x1??this.M)} ${(this.H-y).toFixed(1)} m ${(x2??this.W-this.M)} ${(this.H-y).toFixed(1)} l S`); }
+  rect(x,y,w,h,color){ this.ops.push(`${color} rg ${x.toFixed(1)} ${(this.H-y-h).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)} re f`); }
+  addImage(dataUrl,w,h){ this.images.push({data:atob(dataUrl.split(",")[1]), w, h}); return "Im"+this.images.length; }
+  image(name,x,y,w,h){ this.ops.push(`q ${w.toFixed(1)} 0 0 ${h.toFixed(1)} ${x.toFixed(1)} ${(this.H-y-h).toFixed(1)} cm /${name} Do Q`); }
+  bytes(title){
+    const C=PDF_COLORS;
+    this.pages.forEach((p,i)=>{ const f=this.footers[i]; if(!f) return;
+      p.push(`${C.line} RG 0.6 w ${this.M} 40 m ${this.W-this.M} 40 l S`);
+      p.push(`BT /F1 8 Tf ${C.muted} rg ${this.M} 28 Td (${pdfEsc(f)}) Tj ET`);
+      const pg=`Page ${i+1}`; p.push(`BT /F1 8 Tf ${C.muted} rg ${(this.W-this.M-textWidth(pg,8)).toFixed(1)} 28 Td (${pg}) Tj ET`); });
+    const objs=[]; const add=s=>{ objs.push(s); return objs.length; };
+    const catalog=add(null), pagesObj=add(null);
+    const f1=add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+    const f2=add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+    const f3=add("<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>");
+    const imIds=this.images.map(im=>add(`<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.data.length} >>\nstream\n${im.data}\nendstream`));
+    const xobj = imIds.length ? ` /XObject << ${imIds.map((id,i)=>`/Im${i+1} ${id} 0 R`).join(" ")} >>` : "";
+    const res=add(`<< /Font << /F1 ${f1} 0 R /F2 ${f2} 0 R /F3 ${f3} 0 R >>${xobj} >>`);
+    const kids=this.pages.map(p=>{ const c=p.join("\n"); const cs=add(`<< /Length ${c.length} >>\nstream\n${c}\nendstream`);
+      return add(`<< /Type /Page /Parent ${pagesObj} 0 R /MediaBox [0 0 ${this.W} ${this.H}] /Resources ${res} 0 R /Contents ${cs} 0 R >>`); });
+    objs[catalog-1]=`<< /Type /Catalog /Pages ${pagesObj} 0 R >>`;
+    objs[pagesObj-1]=`<< /Type /Pages /Kids [${kids.map(k=>k+" 0 R").join(" ")}] /Count ${kids.length} >>`;
+    const parts=["%PDF-1.4\n%\xE2\xE3\xCF\xD3\n"]; let len=parts[0].length; const offs=[];
+    objs.forEach((o,i)=>{ offs.push(len); const s=`${i+1} 0 obj\n${o}\nendobj\n`; parts.push(s); len+=s.length; });
+    parts.push(`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`+offs.map(o=>String(o).padStart(10,"0")+" 00000 n \n").join("")+
+      `trailer\n<< /Size ${objs.length+1} /Root ${catalog} 0 R /Info << /Title (${pdfEsc(title)}) /Producer (Gitty's Kitchen) >> >>\nstartxref\n${len}\n%%EOF`);
+    const total=parts.reduce((n,s)=>n+s.length,0), out=new Uint8Array(total); let k=0;
+    for(const s of parts) for(let i=0;i<s.length;i++) out[k++]=s.charCodeAt(i)&255;
+    return out;
+  }
+}
+const PDF_COLORS = {ink:"0.106 0.149 0.220", muted:"0.357 0.400 0.471", accent:"0.173 0.353 0.604", wheat:"0.718 0.525 0.184", line:"0.835 0.863 0.906", white:"1 1 1", soft:"0.886 0.918 0.965"};
+
+// Lay out one recipe starting on the current page.
+async function drawRecipe(doc, r, opts){
+  const C=PDF_COLORS, M=doc.M, CW=doc.CW, footer=opts.footer;
+  doc.text("GITTY'S KITCHEN  ·  "+r.c.toUpperCase(), M, doc.y, 9, "F2", C.wheat); doc.y+=26;
+  for(const l of wrap(r.t.replace(/^Untitled: /,""), 26, CW, true, true)){ doc.text(l, M, doc.y, 26, "F3", C.ink); doc.y+=30; }
   const meta=[r.by?creditText(r.by):"", temps(r).length?"Oven "+temps(r).join(" -> "):"", `${nIng(r)} ingredients`, `${nSteps(r)} steps`].filter(Boolean).join("   ·   ");
-  text(meta, M, y, 10, "F1", C.muted); y+=16;
-  // photo
-  let image=null;
-  const ph = await photoForPdf(r);
+  doc.text(meta, M, doc.y, 10, "F1", C.muted); doc.y+=16;
+  const ph = opts.bigPhoto ? await photoForPdf(r) : (r.cover||"");
   if(ph && ph.startsWith("data:image/jpeg")){
     const sz = await imgSize(ph);
-    if(sz){ const maxH=250, k=Math.min(CW/sz[0], maxH/sz[1]); const iw=sz[0]*k, ih=sz[1]*k;
-      y+=6; ops.push(`q ${iw.toFixed(1)} 0 0 ${ih.toFixed(1)} ${M} ${(H-y-ih).toFixed(1)} cm /Im1 Do Q`); y+=ih+8;
-      image={data:atob(ph.split(",")[1]), w:sz[0], h:sz[1]}; }
+    if(sz){ const maxH=opts.bigPhoto?250:170, k=Math.min(CW/sz[0], maxH/sz[1]); const iw=sz[0]*k, ih=sz[1]*k;
+      doc.y+=6; doc.image(doc.addImage(ph,sz[0],sz[1]), M, doc.y, iw, ih); doc.y+=ih+8; }
   }
-  y+=6; rule(y, C.line); y+=22;
-  if(r.n){ for(const l of wrap("Note: "+r.n, 11, CW)){ need(16); text(l, M, y, 11, "F1", C.wheat); y+=15; } y+=8; }
-  const parts = buildParts(r); let stepNo=0;
+  doc.y+=6; doc.rule(doc.y, C.line); doc.y+=22;
+  if(r.n){ for(const l of wrap("Note: "+r.n, 11, CW)){ doc.need(16,footer); doc.text(l, M, doc.y, 11, "F1", C.wheat); doc.y+=15; } doc.y+=8; }
+  const parts=buildParts(r); let stepNo=0;
   parts.forEach((p,pi)=>{
-    if(parts.length>1){ need(40); text(`PART ${pi+1} OF ${parts.length}`, M, y, 9, "F2", C.muted); y+=18; }
+    if(parts.length>1){ doc.need(40,footer); doc.text(`PART ${pi+1} OF ${parts.length}`, M, doc.y, 9, "F2", C.muted); doc.y+=18; }
     if(p.ing.length){
-      need(40); text("Ingredients", M, y, 14, "F3", C.ink); y+=20;
+      doc.need(40,footer); doc.text("Ingredients", M, doc.y, 14, "F3", C.ink); doc.y+=20;
       p.ing.forEach(g=>{
-        if(g.title){ need(30); text(g.title.toUpperCase(), M, y, 9, "F2", C.wheat); y+=15; }
-        g.items.forEach(it=>{ const ls=wrap(it, 11, CW-16); need(ls.length*15+2);
-          text("•", M+2, y, 11, "F1", C.accent); ls.forEach((l,i)=>{ text(l, M+16, y, 11, "F1", C.ink); y+=15; }); y+=2; });
+        if(g.title){ doc.need(30,footer); doc.text(g.title.toUpperCase(), M, doc.y, 9, "F2", C.wheat); doc.y+=15; }
+        g.items.forEach(it=>{ const ls=wrap(it, 11, CW-16); doc.need(ls.length*15+2,footer);
+          doc.text("•", M+2, doc.y, 11, "F1", C.accent); ls.forEach(l=>{ doc.text(l, M+16, doc.y, 11, "F1", C.ink); doc.y+=15; }); doc.y+=2; });
       });
-      y+=10;
+      doc.y+=10;
     }
     if(p.steps.length){
-      need(40); text("Method", M, y, 14, "F3", C.ink); y+=20;
+      doc.need(40,footer); doc.text("Method", M, doc.y, 14, "F3", C.ink); doc.y+=20;
       p.steps.forEach(g=>{
-        if(g.title){ need(30); text(g.title.toUpperCase(), M, y, 9, "F2", C.wheat); y+=15; }
-        g.items.forEach(it=>{ stepNo++; const ls=wrap(it, 11, CW-26); need(ls.length*15+6);
-          text(stepNo+".", M, y, 11, "F2", C.accent); ls.forEach(l=>{ text(l, M+26, y, 11, "F1", C.ink); y+=15; }); y+=6; });
+        if(g.title){ doc.need(30,footer); doc.text(g.title.toUpperCase(), M, doc.y, 9, "F2", C.wheat); doc.y+=15; }
+        g.items.forEach(it=>{ stepNo++; const ls=wrap(it, 11, CW-26); doc.need(ls.length*15+6,footer);
+          doc.text(stepNo+".", M, doc.y, 11, "F2", C.accent); ls.forEach(l=>{ doc.text(l, M+26, doc.y, 11, "F1", C.ink); doc.y+=15; }); doc.y+=6; });
       });
-      y+=10;
+      doc.y+=10;
     }
   });
   const hl = historyLines(r);
-  if(hl.length){ need(hl.length*14+16); rule(y, C.line, 0.5); y+=16; hl.forEach(l=>{ text(l, M, y, 9, "F1", C.muted); y+=13; }); }
-  pages.push(ops);
-  // footers
-  pages.forEach((p,i)=>{ p.push(`${C.line} RG 0.6 w ${M} 40 m ${W-M} 40 l S`);
-    p.push(`BT /F1 8 Tf ${C.muted} rg ${M} 28 Td (${pdfEsc("Gitty's Kitchen  ·  "+r.t)}) Tj ET`);
-    const pg=`Page ${i+1} of ${pages.length}`; p.push(`BT /F1 8 Tf ${C.muted} rg ${(W-M-textWidth(pg,8)).toFixed(1)} 28 Td (${pg}) Tj ET`); });
-  // assemble the PDF file
-  const objs=[]; const add = s => { objs.push(s); return objs.length; };
-  const catalog=add(null), pagesObj=add(null);
-  const f1=add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
-  const f2=add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
-  const f3=add("<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>");
-  const im = image ? add(`<< /Type /XObject /Subtype /Image /Width ${image.w} /Height ${image.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.data.length} >>\nstream\n${image.data}\nendstream`) : 0;
-  const kids=[];
-  pages.forEach(p=>{ const content=p.join("\n");
-    const cs=add(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
-    kids.push(add(`<< /Type /Page /Parent ${pagesObj} 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 ${f1} 0 R /F2 ${f2} 0 R /F3 ${f3} 0 R >>${im?` /XObject << /Im1 ${im} 0 R >>`:""} >> /Contents ${cs} 0 R >>`)); });
-  objs[catalog-1]=`<< /Type /Catalog /Pages ${pagesObj} 0 R >>`;
-  objs[pagesObj-1]=`<< /Type /Pages /Kids [${kids.map(k=>k+" 0 R").join(" ")}] /Count ${kids.length} >>`;
-  let pdf="%PDF-1.4\n%\xE2\xE3\xCF\xD3\n"; const offs=[];
-  objs.forEach((o,i)=>{ offs.push(pdf.length); pdf+=`${i+1} 0 obj\n${o}\nendobj\n`; });
-  const xref=pdf.length;
-  pdf+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`+offs.map(o=>String(o).padStart(10,"0")+" 00000 n \n").join("");
-  pdf+=`trailer\n<< /Size ${objs.length+1} /Root ${catalog} 0 R /Info << /Title (${pdfEsc(r.t)}) /Producer (Gitty's Kitchen) >> >>\nstartxref\n${xref}\n%%EOF`;
-  const bytes=new Uint8Array(pdf.length); for(let i=0;i<pdf.length;i++) bytes[i]=pdf.charCodeAt(i)&255;
-  return bytes;
+  if(hl.length){ doc.need(hl.length*14+16,footer); doc.rule(doc.y, C.line, 0.5); doc.y+=16; hl.forEach(l=>{ doc.text(l, M, doc.y, 9, "F1", C.muted); doc.y+=13; }); }
 }
+
+async function makeRecipePdf(r){
+  const doc=new PdfDoc(), footer="Gitty's Kitchen  ·  "+r.t.replace(/^Untitled: /,"");
+  doc.page(footer); doc.rect(0,0,doc.W,8,PDF_COLORS.accent);
+  await drawRecipe(doc, r, {footer, bigPhoto:true});
+  return doc.bytes(r.t);
+}
+
+// Cover art (tile pattern + icon) drawn on a canvas and placed in the PDF as a picture.
+async function coverArt(w, h, iconSvg){
+  const c=document.createElement("canvas"); c.width=w; c.height=h; const g=c.getContext("2d");
+  const grad=g.createLinearGradient(0,0,w,h); grad.addColorStop(0,"#2C5A9A"); grad.addColorStop(1,"#2E8C93");
+  g.fillStyle=grad; g.fillRect(0,0,w,h);
+  g.strokeStyle="rgba(255,255,255,.10)"; g.lineWidth=3;
+  for(let y=-60;y<h+120;y+=120) for(let x=-60;x<w+120;x+=120){ g.beginPath(); g.arc(x,y,44,0,Math.PI*2); g.stroke(); }
+  if(iconSvg){
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="320" height="320" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${iconSvg}</svg>`;
+    await new Promise(res=>{ const im=new Image(); im.onload=()=>{ const s=Math.min(w,h)*0.42; g.globalAlpha=.95; g.drawImage(im, w-s-w*0.08, h-s-h*0.12, s, s); g.globalAlpha=1; res(); }; im.onerror=res; im.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg); });
+  }
+  try{ return c.toDataURL("image/jpeg", .86); }catch(e){ return ""; }
+}
+const CHEF_PATH='<path d="M9 14a5 5 0 1 1 3.5-8.6A5 5 0 0 1 22 7a4.5 4.5 0 1 1 1 8.9V25H9z"/><path d="M9 21h14"/>';
+
+// The whole cookbook (or one category) as one PDF book.
+async function makeBookPdf(cats, onProgress){
+  const C=PDF_COLORS, doc=new PdfDoc(), M=doc.M, W=doc.W, H=doc.H;
+  const list = c => RECIPES.filter(r=>r.c===c);
+  const whole = cats.length>1;
+  const count = cats.reduce((n,c)=>n+list(c).length,0);
+  // front cover
+  doc.page(null);
+  const art=await coverArt(1224, 1584, CHEF_PATH);
+  if(art) doc.image(doc.addImage(art,1224,1584), 0, 0, W, H); else doc.rect(0,0,W,H,C.accent);
+  doc.text("FAMILY RECIPES  ·  JANUARY 2009", M, 150, 11, "F2", C.white);
+  doc.text("Gitty's Kitchen", M, 220, 54, "F3", C.white);
+  doc.text(whole ? `${count} recipes in ${cats.length} categories` : `${cats[0]}  ·  ${count} ${count===1?"recipe":"recipes"}`, M, 262, 15, "F1", C.white);
+  doc.text("Downloaded "+new Date().toLocaleDateString(undefined,{month:"long",day:"numeric",year:"numeric"}), M, H-60, 10, "F1", C.white);
+  // contents page (filled in at the end, once page numbers are known)
+  let tocPage=null; if(whole){ doc.page("Gitty's Kitchen  ·  Contents"); tocPage=doc.ops; }
+  const starts={};
+  for(const [ci,c] of cats.entries()){
+    const recs=list(c); if(!recs.length) continue;
+    // category cover: the art now, the recipe list after the recipes are placed
+    const coverNo=doc.page(null); starts[c]=coverNo; const coverOps=doc.ops;
+    const art2=await coverArt(1224, 900, ICONS[c]||ICONS.Miscellaneous);
+    if(art2) doc.image(doc.addImage(art2,1224,900), 0, 0, W, 450); else doc.rect(0,0,W,450,C.accent);
+    const recPages=[];
+    for(const r of recs){
+      const footer=`Gitty's Kitchen  ·  ${c}`;
+      recPages.push(doc.page(footer)); doc.rect(0,0,W,8,C.accent); doc.y=M;
+      await drawRecipe(doc, r, {footer, bigPhoto:false});
+      if(onProgress) onProgress(Object.keys(starts).length, cats.length);
+    }
+    const keep=doc.ops; doc.ops=coverOps;
+    doc.text(`SECTION ${ci+1}`, M, 110, 11, "F2", C.white);
+    doc.text(c, M, 170, 46, "F3", C.white);
+    doc.text(`${recs.length} ${recs.length===1?"recipe":"recipes"}`, M, 205, 14, "F1", C.white);
+    let y=490; const colW=(doc.CW-24)/2, rows=Math.ceil(recs.length/2), lh=Math.min(16,(H-60-y)/rows), size=Math.min(10.5, lh-4);
+    recs.forEach((r,i)=>{ const col=i<rows?0:1, row=col?i-rows:i, x=M+col*(colW+24), yy=y+row*lh;
+      if(yy>H-50) return;
+      let name=r.t.replace(/^Untitled: /,""); while(textWidth(name,size)>colW-34 && name.length>4) name=name.slice(0,-2);
+      if(name!==r.t.replace(/^Untitled: /,"")) name=name.trim()+"…";
+      doc.text(name, x, yy, size, "F1", C.ink); doc.textRight(String(recPages[i]), x+colW, yy, size, "F2", C.accent); });
+    doc.ops=keep;
+  }
+  if(tocPage){
+    const keep=doc.ops; doc.ops=tocPage; let y=M+10;
+    doc.rect(0,0,W,8,C.accent);
+    doc.text("Contents", M, y+20, 30, "F3", C.ink); y+=64;
+    cats.forEach(c=>{ if(!starts[c]) return; doc.text(c, M, y, 14, "F1", C.ink);
+      doc.text(`${list(c).length} recipes`, M+220, y, 10, "F1", C.muted);
+      doc.textRight(String(starts[c]), W-M, y, 14, "F2", C.accent); doc.rule(y+9, C.line, 0.5); y+=30; });
+    doc.ops=keep;
+  }
+  return doc.bytes(whole?"Gitty's Kitchen":"Gitty's Kitchen - "+cats[0]);
+}
+
+async function saveBytes(bytes, name){
+  if(appBuild){
+    if(window.GKApp && GKApp.saveFile){
+      let bin=""; for(let i=0;i<bytes.length;i+=8192) bin+=String.fromCharCode.apply(null, bytes.subarray(i,i+8192));
+      return GKApp.saveFile(name, btoa(bin), "application/pdf") ? "Saved to your Downloads folder" : "Couldn't save on this phone. Open the website in Chrome to download.";
+    }
+    return "Update the app to download. Tap Check for updates in your menu.";
+  }
+  const url=URL.createObjectURL(new Blob([bytes],{type:"application/pdf"}));
+  const a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  return "Downloaded";
+}
+const fileName = s => s.replace(/[\\/:*?"<>|]+/g,"").slice(0,90)+".pdf";
 async function downloadRecipe(r, btn){
   const label=btn.innerHTML; btn.disabled=true; btn.textContent="Preparing…";
+  try{ toast(await saveBytes(await makeRecipePdf(r), fileName("Gittys Kitchen - "+r.t.replace(/^Untitled: /,"")))); }
+  catch(e){ toast("Couldn't make the download. Try again."); }
+  btn.disabled=false; btn.innerHTML=label;
+}
+async function downloadBook(cats, btn){
+  const label=btn.innerHTML; btn.disabled=true; btn.textContent="Making your cookbook…";
   try{
-    const bytes = await makeRecipePdf(r);
-    const name = ("Gittys Kitchen - "+r.t.replace(/^Untitled: /,"")).replace(/[\\/:*?"<>|]+/g,"").slice(0,80)+".pdf";
-    if(appBuild){
-      if(window.GKApp && GKApp.saveFile){
-        let bin=""; for(let i=0;i<bytes.length;i+=8192) bin+=String.fromCharCode.apply(null, bytes.subarray(i,i+8192));
-        toast(GKApp.saveFile(name, btoa(bin), "application/pdf") ? "Saved to your Downloads folder" : "Couldn't save on this phone. Open the website in Chrome to download.");
-      } else toast("Update the app to download recipes. Tap Check for updates in your menu.");
-    } else {
-      const url=URL.createObjectURL(new Blob([bytes],{type:"application/pdf"}));
-      const a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(()=>URL.revokeObjectURL(url), 60000);
-      toast("Recipe downloaded");
-    }
-  }catch(e){ toast("Couldn't make the download. Try again."); }
+    const bytes=await makeBookPdf(cats, (d,n)=>{ btn.textContent=`Making your cookbook… ${Math.round(d/n*100)}%`; });
+    toast(await saveBytes(bytes, fileName(cats.length>1 ? "Gittys Kitchen - Cookbook" : "Gittys Kitchen - "+cats[0])));
+  }catch(e){ toast("Couldn't make the cookbook. Try again."); }
   btn.disabled=false; btn.innerHTML=label;
 }
 
@@ -1485,6 +1616,85 @@ function scanPage(cat){
   };
 }
 
+/* ---------- suggestions & comments ---------- */
+let feedback = [];            // admin: everyone's messages; member: their own
+let unsubFeedback = null;
+const FB_KINDS = {suggestion:"Suggestion", comment:"Comment", problem:"Problem"};
+const FB_STATUS = {new:"New", planned:"Planned", done:"Done", closed:"Closed"};
+const newFeedback = () => isAdmin() ? feedback.filter(f=>f.status==="new").length : 0;
+function watchFeedback(){
+  if(unsubFeedback || !db || !me) return;
+  const q = isAdmin() ? db.collection("feedback") : db.collection("feedback").where("uid","==",me);
+  unsubFeedback = q.onSnapshot(s=>{
+    feedback = s.docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(b.created||0)-(a.created||0));
+    renderAcct();
+    if(/^#(feedback|inbox)/.test(location.hash) && !document.activeElement?.matches?.("textarea,input")) route();
+    else if((location.hash===""||location.hash==="#") && !q.value.trim() && isAdmin()) route();
+  }, ()=>{});
+}
+const fbPill = s => `<span class="pill ${s==="done"?"ok":s==="closed"?"no":s==="planned"?"plan":"wait"}">${FB_STATUS[s]||"New"}</span>`;
+function feedbackPage(recipeId){
+  const rec = recipeId ? RECIPES.find(r=>r.id===recipeId) : null;
+  const mine = feedback;
+  app.innerHTML = `<section class="wrap admin">
+    <div class="section-head" style="margin-top:28px"><h2>Suggestions &amp; comments</h2><p>${esc(ADMIN_NAME)} reads every message</p></div>
+    <form class="panel-a fb-form" id="fbform" novalidate>
+      ${rec?`<p class="edit-of">About the recipe <a class="link" href="#${esc(rec.id)}">${esc(rec.t.replace(/^Untitled: /,""))}</a></p>`:""}
+      <div class="fb-kinds" role="radiogroup" aria-label="Type of message">
+        ${Object.entries(FB_KINDS).map(([k,l],i)=>`<label class="fb-kind"><input type="radio" name="fbk" value="${k}" ${i===0?"checked":""}><span>${l}</span></label>`).join("")}
+      </div>
+      <div class="field"><label for="fb-text">Your message</label>
+        <textarea id="fb-text" rows="5" maxlength="1500" placeholder="${rec?"e.g. I add a little more sugar and it comes out better":"e.g. It would be great to have a shopping list for a recipe"}"></textarea></div>
+      <p class="err" id="fb-err" role="alert" hidden></p>
+      <div><button class="primary" type="submit">Send</button></div>
+    </form>
+    <div class="panel-a"><h3>Your messages</h3>
+      ${mine.length?`<ul class="mlist">${mine.map(f=>`<li class="fb-item">
+          <div class="fb-top"><b>${FB_KINDS[f.kind]||"Message"}</b>${f.recipeTitle?` <span class="hint">about ${esc(f.recipeTitle)}</span>`:""}<span class="hint"> · ${fmtDate(f.created)}</span>${fbPill(f.status)}</div>
+          <p class="fb-text">${esc(f.text)}</p>
+          ${f.reply?`<div class="fb-reply"><b>${esc(ADMIN_NAME)}:</b> ${esc(f.reply)}</div>`:""}
+        </li>`).join("")}</ul>`:`<p class="hint mempty">You haven't sent anything yet. Ideas for the app, comments on a recipe, or anything that isn't working are all welcome.</p>`}
+    </div></section>`;
+  const F=document.getElementById("fbform");
+  F.onsubmit=async e=>{
+    e.preventDefault();
+    const text=F.querySelector("#fb-text").value.trim(), kind=F.querySelector("input[name=fbk]:checked").value, err=F.querySelector("#fb-err");
+    if(text.length<3){ err.textContent="Write your message first."; err.hidden=false; return; }
+    const btn=F.querySelector(".primary"); btn.disabled=true; btn.textContent="Sending…";
+    try{
+      await db.collection("feedback").doc("f-"+newId()).set({uid:me, byName:myName(), kind, text, recipeId:rec?rec.id:"", recipeTitle:rec?rec.t.replace(/^Untitled: /,""):"", status:"new", reply:"", created:Date.now()});
+      if(!isAdmin()) notifyAdmin(`${FB_KINDS[kind]} from ${myName()}`, text.slice(0,180), "#inbox", "speech_balloon");
+      toast("Sent. Thank you!"); F.reset(); location.hash = "feedback";
+    }catch(x){ btn.disabled=false; btn.textContent="Send"; err.textContent="Couldn't send. Check your internet connection and try again."; err.hidden=false; }
+  };
+}
+function inboxPage(){
+  const groups=[["new","New"],["planned","Planned"],["done","Done"],["closed","Closed"]];
+  app.innerHTML = `<section class="wrap admin">
+    <div class="section-head" style="margin-top:28px"><h2>Suggestions &amp; comments</h2><p>${newFeedback()} new · ${feedback.length} in all</p></div>
+    ${feedback.length?groups.map(([s,l])=>{ const list=feedback.filter(f=>(f.status||"new")===s); if(!list.length) return "";
+      return `<div class="panel-a"><h3>${l} <span class="hint">${list.length}</span></h3><ul class="mlist">${list.map(f=>`<li class="fb-item" data-id="${esc(f.id)}">
+        <div class="fb-top"><b>${FB_KINDS[f.kind]||"Message"}</b><span class="hint"> from ${esc(f.byName||"a member")} · ${fmtDate(f.created)}</span>${f.recipeId?` <a class="link" href="#${esc(f.recipeId)}">${esc(f.recipeTitle||"recipe")}</a>`:""}</div>
+        <p class="fb-text">${esc(f.text)}</p>
+        <div class="fb-admin">
+          <textarea class="fb-reply-in" rows="2" maxlength="1000" placeholder="Reply (optional): ${esc((f.byName||"").split(" ")[0])} will see this" aria-label="Reply">${esc(f.reply||"")}</textarea>
+          <div class="fb-row"><select class="fb-status" aria-label="Status">${Object.entries(FB_STATUS).map(([k,v])=>`<option value="${k}" ${k===(f.status||"new")?"selected":""}>${v}</option>`).join("")}</select>
+            <button type="button" class="btn solid" data-fbsave>Save</button><button type="button" class="btn" data-fbdel>Delete</button></div>
+        </div></li>`).join("")}</ul></div>`; }).join("")
+      :`<div class="panel-a"><p class="hint mempty">No messages yet. When members send suggestions or comments, they appear here and you get a notification.</p></div>`}
+  </section>`;
+  app.querySelectorAll(".fb-item[data-id]").forEach(li=>{
+    const f=feedback.find(x=>x.id===li.dataset.id); if(!f) return;
+    li.querySelector("[data-fbsave]").onclick=async e=>{ e.target.disabled=true;
+      try{ await db.collection("feedback").doc(f.id).update({reply:li.querySelector(".fb-reply-in").value.trim(), status:li.querySelector(".fb-status").value, updated:Date.now()}); toast("Saved"); document.activeElement.blur(); route(); }
+      catch(x){ e.target.disabled=false; toast("Couldn't save. Check your connection."); } };
+    li.querySelector("[data-fbdel]").onclick=e=>{ const box=li.querySelector(".fb-row");
+      box.innerHTML=`<span class="hint">Delete this message?</span><button type="button" class="btn warn" data-yes>Delete</button><button type="button" class="btn" data-no>Cancel</button>`;
+      box.querySelector("[data-no]").onclick=inboxPage;
+      box.querySelector("[data-yes]").onclick=async()=>{ try{ await db.collection("feedback").doc(f.id).delete(); toast("Deleted"); }catch(x){ toast("Couldn't delete. Check your connection."); } }; };
+  });
+}
+
 function route(){
   closeMenu(); stopRecipePhotos();
   if(state!=="approved"){ document.body.classList.add("out"); gate(); return; }
@@ -1492,6 +1702,8 @@ function route(){
   const h = decodeURIComponent(location.hash.slice(1));
   if(h==="admin" && isAdmin()){ q.value=""; adminPage(); window.scrollTo(0,0); return; }
   if(!offline && h.startsWith("edit-")){ const er=RECIPES.find(x=>x.id===h.slice(5)); if(er){ q.value=""; editor(er); window.scrollTo(0,0); return; } }
+  if(h==="inbox" && isAdmin()){ q.value=""; inboxPage(); window.scrollTo(0,0); return; }
+  if(h==="feedback" || h.startsWith("feedback-")){ q.value=""; feedbackPage(h.startsWith("feedback-")?h.slice(9):""); window.scrollTo(0,0); return; }
   if(h==="review" && isAdmin()){ q.value=""; reviewPage(); window.scrollTo(0,0); return; }
   if(h.startsWith("review-") && isAdmin()){ const sb=subs.find(x=>x.id===h.slice(7)&&x.status==="pending"); if(sb){ q.value=""; editor(null,null,sb); window.scrollTo(0,0); return; } }
   if(h==="mine" && !isAdmin()){ q.value=""; minePage(); window.scrollTo(0,0); return; }

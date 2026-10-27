@@ -61,6 +61,18 @@ service cloud.firestore {
         || (signedIn() && resource.data.uid == request.auth.uid && resource.data.status == 'pending');
     }
 
+    // Suggestions and comments from members. Only the admin sees them all and can reply.
+    match /feedback/{id} {
+      allow create: if approvedMember()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'new'
+        && request.resource.data.reply == ''
+        && request.resource.data.text is string && request.resource.data.text.size() <= 1500;
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+    }
+
     // Member profiles. New members always start as "pending";
     // only the admin can approve, deny or remove them.
     match /users/{uid} {

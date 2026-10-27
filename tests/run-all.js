@@ -90,6 +90,21 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await B.goto(F + '#scan'); await B.waitForTimeout(300); await B.setInputFiles('#scan-file', IMG); await B.waitForTimeout(2000);
     ok('scanned recipe fills the form', (await B.inputValue('#ed-t').catch(() => '')) === 'Scanned Test Cake');
 
+    // Whole cookbook download
+    await B.goto(F); await B.waitForTimeout(400);
+    const [bk] = await Promise.all([B.waitForEvent('download', {timeout: 120000}), B.click('#dl-book')]);
+    const bookPath = path.join(os.tmpdir(), 'gk-book.pdf'); await bk.saveAs(bookPath);
+    const bookBytes = fs.readFileSync(bookPath);
+    ok('whole cookbook downloads as one PDF', bookBytes.slice(0, 5).toString() === '%PDF-' && (bookBytes.toString('latin1').match(/\/Type \/Page\b/g) || []).length > 100);
+
+    // Suggestions & comments
+    await B.goto(F + '#feedback'); await B.waitForTimeout(300); await B.fill('#fb-text', 'Test suggestion'); await B.click('text=Send'); await B.waitForTimeout(600);
+    ok('member can send a suggestion', /Test suggestion/.test(await B.locator('.fb-item').first().innerText()));
+    await A.goto(F + '#inbox'); await A.waitForTimeout(500);
+    const fi = A.locator('.fb-item', {hasText: 'Test suggestion'}); await fi.locator('.fb-reply-in').fill('Thanks!'); await fi.locator('.fb-status').selectOption('done'); await fi.locator('[data-fbsave]').click(); await A.waitForTimeout(600);
+    await B.goto(F + '#feedback'); await B.waitForTimeout(500);
+    ok('member sees the reply', /Thanks!/.test(await B.locator('.fb-item').first().innerText()));
+
     // Favorites
     await B.goto(F + '#r-croissants'); await B.waitForTimeout(300); await B.click('#fav'); await B.waitForTimeout(300);
     await B.goto(F + '#favorites'); await B.waitForTimeout(300);
