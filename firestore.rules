@@ -41,6 +41,26 @@ service cloud.firestore {
         || (signedIn() && resource.data.uid == request.auth.uid && resource.data.status == 'pending');
     }
 
+    // Photos of finished dishes. Members' photos wait for the admin's approval.
+    function approvedMember() {
+      return signedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved';
+    }
+    match /photos/{id} {
+      allow create: if approvedMember()
+        && request.resource.data.uid == request.auth.uid
+        && (request.resource.data.status == 'pending'
+            || (request.resource.data.status == 'approved' && isAdmin()))
+        && request.resource.data.img is string && request.resource.data.img.size() < 900000
+        && request.resource.data.thumb is string && request.resource.data.thumb.size() < 80000;
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid)
+        || (resource.data.status == 'approved' && approvedMember());
+      allow update: if isAdmin();
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid && resource.data.status == 'pending');
+    }
+
     // Member profiles. New members always start as "pending";
     // only the admin can approve, deny or remove them.
     match /users/{uid} {

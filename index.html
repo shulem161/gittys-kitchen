@@ -92,7 +92,7 @@ button{font:inherit;color:inherit}
 .tab[aria-current="page"] .n{color:var(--paper);opacity:.8}
 
 /* recipe grid */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;padding-bottom:56px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;padding-bottom:56px;align-items:start}
 .rc{display:flex;flex-direction:column;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px 20px;text-decoration:none;color:var(--ink);transition:transform .15s ease,box-shadow .15s,border-color .15s}
 .rc:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:var(--accent)}
 .rc .top{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:22px}
@@ -263,6 +263,35 @@ body.out .updbar{display:none}
 .pill.ok{background:#E3F2E8;color:#25704A}
 .pill.no{background:#FBE9E7;color:#B4413A}
 .pill.wait{background:var(--wheat-soft);color:var(--wheat)}
+/* photos */
+.rc.has-img{padding-top:0;overflow:hidden}
+.rc-img{height:150px;margin:0 -20px 4px;background:var(--accent-soft) center/cover no-repeat}
+.photos{margin-top:20px;display:flex;flex-direction:column;gap:14px}
+.ph-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.ph-head h2{font-size:22px}
+.ph-add{cursor:pointer}
+.ph-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+.ph-grid > p{grid-column:1/-1;margin:0}
+.ph{margin:0;display:flex;flex-direction:column;gap:6px}
+.ph-open{padding:0;border:0;background:none;cursor:zoom-in;border-radius:12px;overflow:hidden}
+.ph img{width:100%;aspect-ratio:1;object-fit:cover;display:block;border-radius:12px;max-width:100%}
+.ph.wait img{opacity:.6}
+.ph figcaption{font-size:13px;color:var(--muted)}
+.ph-admin{display:flex;gap:6px;flex-wrap:wrap}
+.ph-new{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;padding:14px;border:1px dashed var(--line);border-radius:12px}
+.ph-new img{width:140px;height:140px;object-fit:cover;border-radius:10px}
+.ph-new-form{flex:1;min-width:220px;display:flex;flex-direction:column;gap:10px}
+.ph-new-form input{padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;font-size:16px}
+.ph-new-form .row{display:flex;gap:8px}
+.ph-review{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:8px}
+.ph-card{display:flex;flex-direction:column;gap:10px;margin:0}
+.ph-card img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;cursor:zoom-in;max-width:100%}
+.ph-card > div:nth-child(2){display:flex;flex-direction:column;gap:2px}
+.lightbox{position:fixed;inset:0;z-index:30;background:rgba(10,14,22,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:calc(20px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.lightbox img{max-width:100%;max-height:80vh;border-radius:10px;object-fit:contain}
+.lightbox p{color:#E6EBF2;margin:0;font-size:15px;text-align:center}
+.lb-close{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));width:42px;height:42px;border-radius:50%;border:0;background:rgba(255,255,255,.15);color:#fff;font-size:18px;cursor:pointer}
+.edit-of{margin:0;font-size:14px;color:var(--wheat);font-weight:600}
 /* recipe editor */
 .note.setup{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:28px}
 .note.setup p{margin:4px 0 0;color:var(--muted)}
@@ -386,12 +415,12 @@ const myName = () => profile ? profile.name : "";
 const uk = k => "gk-u-"+me+"-"+k;
 const favs = () => (profile && profile.favs) || [];
 const initial = n => (String(n).trim()[0]||"?").toUpperCase();
-const pendingCount = () => members.filter(m=>m.status==="pending").length + (isAdmin()?subs.filter(s=>s.status==="pending").length:0);
+const pendingCount = () => members.filter(m=>m.status==="pending").length + (isAdmin()?subs.filter(s=>s.status==="pending").length+pendingPhotos.length:0);
 function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catch(e){for(let i=0;i<12;i++)a[i]=Math.random()*256|0} return [...a].map(b=>b.toString(16).padStart(2,"0")).join(""); }
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.5";
+const WEB_VERSION = "3.7";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -448,6 +477,7 @@ function boot(){
     if(unsubAll){unsubAll();unsubAll=null;members=[]}
     if(unsubRecipes){unsubRecipes();unsubRecipes=null}
     if(unsubSubs){unsubSubs();unsubSubs=null;subs=[]}
+    if(unsubPendingPhotos){unsubPendingPhotos();unsubPendingPhotos=null;pendingPhotos=[]}
     if(!u){ me=null; profile=null; offline=false; state="signedout"; renderAcct(); return route(); }
     me=u.uid;
     if(!profile){ state="loading"; route(); }
@@ -458,7 +488,7 @@ function boot(){
       state = profile.status==="approved" ? "approved" : profile.status==="denied" ? "denied" : "pending";
       cacheProfile(); renderAcct();
       if(isAdmin() && !unsubAll) watchMembers();
-      if(state==="approved"){ watchRecipes(); watchSubs(); if(!update) checkUpdates(false); else renderUpdateBar(); }
+      if(state==="approved"){ watchRecipes(); watchSubs(); watchPendingPhotos(); if(!update) checkUpdates(false); else renderUpdateBar(); }
       if(was!==state || state!=="approved") route();
     }, ()=>{
       const c=store("gk-cache");
@@ -538,7 +568,8 @@ const HEART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 
 function card(r){
   const t = temps(r);
-  return `<a class="rc" href="#${r.id}">
+  return `<a class="rc${r.cover?" has-img":""}" href="#${r.id}">
+    ${r.cover?`<div class="rc-img" style="background-image:url('${r.cover}')" role="img" aria-label="Photo of ${esc(r.t)}"></div>`:""}
     <div class="top"><span class="chip">${esc(r.c)}</span>${t.length?`<span class="oven">${t.slice(0,2).join(" → ")}</span>`:""}${me&&favs().includes(r.id)?HEART.replace("<svg",'<svg class="heart"'):""}</div>
     <h3>${titleHTML(r)}</h3>
     ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}
@@ -648,12 +679,13 @@ function recipe(r){
         <div class="fact"><b>${nSteps(r)}</b> steps</div>
       </div>
       <div class="tools">
-        ${isAdmin()&&recipesOnline&&!offline?`<a class="btn solid" href="#edit-${r.id}">Edit recipe</a>`:""}
+        ${recipesOnline&&!offline?`<a class="btn solid" href="#edit-${r.id}">${isAdmin()?"Edit recipe":"Suggest changes"}</a>`:""}
         <button class="btn fav" id="fav" aria-pressed="${isFav}">${HEART}${isFav?"Saved to favorites":"Save to favorites"}</button>
         <button class="btn" id="wake" aria-pressed="${!!wakeLock}">${wakeLock?"Screen stays on":"Keep screen on"}</button>
         <button class="btn" id="reset">Clear checkmarks</button>
       </div>
     </section>
+    ${photosSection(r)}
     <div class="parts">
       ${r.n?`<div class="note"><b>Note:</b> ${esc(r.n)}</div>`:""}
       ${partHTML}
@@ -663,6 +695,7 @@ function recipe(r){
       </nav>
     </div>
   </div>`;
+  loadPhotos(r);
   document.getElementById("fav").onclick=e=>{
     const b=e.currentTarget, f=favs(), on=!f.includes(r.id);
     if(offline){ toast("Favorites need internet. Connect and try again."); return; }
@@ -825,7 +858,7 @@ function openMenu(confirming){
   const m=document.createElement("div"); m.className="menu"; m.setAttribute("role","menu");
   m.innerHTML = `<div class="who"><b>${esc(myName())}</b><span>${isAdmin()?"Admin":"Member"}${offline?" · offline":""}</span></div>
     ${isAdmin()?(()=>{const mp=members.filter(m=>m.status==="pending").length;return `<a href="#admin" role="menuitem">Approve members <span class="n${mp?" hot":""}">${mp?mp+" waiting":""}</span></a>`})():""}
-    ${isAdmin()?`<a href="#review" role="menuitem">Approve recipes <span class="n${pendingSubs().length?" hot":""}">${pendingSubs().length?pendingSubs().length+" waiting":""}</span></a>`:""}
+    ${isAdmin()?`<a href="#review" role="menuitem">Approve recipes &amp; photos <span class="n${pendingSubs().length+pendingPhotos.length?" hot":""}">${pendingSubs().length+pendingPhotos.length?(pendingSubs().length+pendingPhotos.length)+" waiting":""}</span></a>`:""}
     ${!offline&&(!isAdmin()||recipesOnline)?`<a href="#new" role="menuitem">Add a recipe <span class="n"></span></a>`:""}
     ${isAdmin()?"":`<a href="#mine" role="menuitem">My recipes <span class="n">${subs.length||""}</span></a>`}
     <a href="#favorites" role="menuitem">My favorites <span class="n">${favs().length}</span></a>
@@ -853,7 +886,7 @@ let onlineIds = new Set();    // every recipe id stored online (including delete
 let unsubRecipes = null;
 const toDoc = r => ({c:r.c, t:r.t, by:r.by||"", n:r.n||"", ord:r.ord||0, deleted:false, updated:Date.now(),
   s:r.s.map(([ing,h,items])=>({k:ing?"ing":"step", h:h||"", items:items}))});
-const fromDoc = (id,d) => ({id, c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, ord:d.ord||0,
+const fromDoc = (id,d) => ({id, c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"",
   s:(d.s||[]).map(x=>[x.k==="ing"?1:0, x.h||"", x.items||[]])});
 function sortRecipes(list){
   const ci = c => { const i=ORDER.indexOf(c); return i<0 ? 100 : i; };
@@ -901,6 +934,8 @@ function adminBanner(){
 function editor(r, cat, sub){
   const isNew = !r;
   const suggest = !isAdmin();
+  const editOf = r ? r.id : (sub && sub.editOf ? sub.editOf : "");
+  const target = editOf ? RECIPES.find(x=>x.id===editOf) : null;
   const src = r || (sub ? fromDoc(sub.id, sub) : null);
   if(!isNew && !recipesOnline){ toast("Put the recipes online first, from the home page."); location.hash=""; return; }
   const secs = src ? src.s.map(([ing,h,items])=>({ing:!!ing,h,items:items.join("\n")}))
@@ -911,8 +946,8 @@ function editor(r, cat, sub){
     app.innerHTML = `<section class="wrap editor">
       <a class="back" href="${sub?"#review":r?"#"+r.id:"#"+(catNow&&CATS.includes(catNow)?slug(catNow):"")}">← Cancel</a>
       <form class="panel-a ed" id="edform" novalidate>
-        <h2>${sub?"Review recipe":!isNew?"Edit recipe":suggest?"Add a recipe":"Add a recipe"}</h2>
-        ${sub?`<p class="sub">Sent by ${esc(sub.byName||"a member")} on ${fmtDate(sub.created)}. Fix anything you like, then approve it.</p>`:suggest?`<p class="sub">${esc(ADMIN_NAME)} will look it over before it appears for everyone.</p>`:""}
+        <h2>${sub?(sub.editOf?"Review changes":"Review recipe"):!isNew?(suggest?"Suggest changes":"Edit recipe"):"Add a recipe"}</h2>
+        ${sub?`<p class="sub">${sub.editOf?`Changes to “${esc(target?target.t:sub.t)}”`:"New recipe"} sent by ${esc(sub.byName||"a member")} on ${fmtDate(sub.created)}. Fix anything you like, then approve it.</p>`:suggest?`<p class="sub">${esc(ADMIN_NAME)} will look it over before it appears for everyone.</p>`:""}
         <div class="field"><label for="ed-t">Recipe name</label><input id="ed-t" type="text" maxlength="80" value="${esc(src?src.t:"")}" placeholder="e.g. Potato Kugel"></div>
         <div class="row2">
           <div class="field"><label for="ed-c">Category</label>
@@ -940,7 +975,7 @@ function editor(r, cat, sub){
         <p class="err" id="ed-err" role="alert" hidden></p>
         <div class="ed-actions">
           <button class="primary" type="submit">${sub?"Approve and publish":suggest?"Send for approval":isNew?"Add recipe":"Save changes"}</button>
-          ${isNew?"":`<button type="button" class="btn danger-btn" id="ed-del">Delete recipe</button>`}
+          ${isNew||suggest?"":`<button type="button" class="btn danger-btn" id="ed-del">Delete recipe</button>`}
         </div>
         <div id="ed-confirm"></div>
       </form></section>`;
@@ -979,19 +1014,20 @@ function editor(r, cat, sub){
         btn0.disabled=true; btn0.textContent="Sending…";
         const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), s, ord:0});
         try{
-          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,s:d.s, uid:me, byName:myName(), status:"pending", created:Date.now()});
-          notifyAdmin(`New recipe from ${myName()}`, `“${t}” is waiting for your approval.`, "#review", "cookie");
+          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,s:d.s, uid:me, byName:myName(), status:"pending", created:Date.now(), editOf});
+          if(editOf) notifyAdmin(`${myName()} suggested changes`, `Changes to “${r?r.t:t}” are waiting for your approval.`, "#review", "pencil2");
+          else notifyAdmin(`New recipe from ${myName()}`, `“${t}” is waiting for your approval.`, "#review", "cookie");
           toast(`Sent to ${ADMIN_NAME} for approval`); location.hash="mine";
         }catch(e){ btn0.disabled=false; btn0.textContent="Send for approval"; fail("Couldn't send. Check your internet connection and try again."); }
         return;
       }
       if(!recipesOnline) return fail("Put the recipes online first, from the home page.");
-      let id = r ? r.id : "r-"+t.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
-      if(!r){ if(id==="r-") id="r-recipe"; let k=2, base=id; while(onlineIds.has(id)) id=base+"-"+(k++); }
-      const rec={id, c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), s, ord: r ? (r.ord||0) : Date.now()};
+      let id = r ? r.id : target ? target.id : "r-"+t.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+      if(!r && !target){ if(id==="r-") id="r-recipe"; let k=2, base=id; while(onlineIds.has(id)) id=base+"-"+(k++); }
+      const rec={id, c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), s, ord: r ? (r.ord||0) : target ? (target.ord||0) : Date.now()};
       const btn=F.querySelector(".primary"); btn.disabled=true; btn.textContent="Saving…";
       try{
-        await db.collection("recipes").doc(id).set(toDoc(rec));
+        await db.collection("recipes").doc(id).set(toDoc(rec), {merge:true});
         if(sub) await db.collection("submissions").doc(sub.id).update({status:"approved", recipeId:id, decided:Date.now()});
         toast(sub?"Recipe approved and published":r?"Changes saved":"Recipe added"); location.hash=id;
       }
@@ -1021,10 +1057,11 @@ function newRecipeId(t){
 }
 async function approveSub(sub){
   if(!recipesOnline){ toast("Put the recipes online first, from the home page."); return; }
-  const rec = fromDoc(newRecipeId(sub.t), sub); rec.ord = Date.now();
-  await db.collection("recipes").doc(rec.id).set(toDoc(rec));
+  const tgt = sub.editOf ? RECIPES.find(x=>x.id===sub.editOf) : null;
+  const rec = fromDoc(tgt ? tgt.id : newRecipeId(sub.t), sub); rec.ord = tgt ? (tgt.ord||0) : Date.now();
+  await db.collection("recipes").doc(rec.id).set(toDoc(rec), {merge:true});
   await db.collection("submissions").doc(sub.id).update({status:"approved", recipeId:rec.id, decided:Date.now()});
-  toast(`“${sub.t}” is published`);
+  toast(tgt ? `Changes to “${tgt.t}” are published` : `“${sub.t}” is published`);
 }
 function previewHTML(sub){
   return (sub.s||[]).map(x=>`<div class="pv-part">${x.h?`<div class="group">${esc(x.h)}</div>`:`<div class="group">${x.k==="ing"?"Ingredients":"Method"}</div>`}
@@ -1033,9 +1070,11 @@ function previewHTML(sub){
 function reviewPage(){
   const pend=pendingSubs(), done=subs.filter(s=>s.status!=="pending").slice(0,10);
   app.innerHTML = `<section class="wrap admin">
+    ${photoReviewHTML()}
     <div class="section-head" style="margin-top:28px"><h2>Approve recipes</h2><p>${pend.length} waiting</p></div>
     ${pend.length ? pend.map(s=>`<article class="panel-a sub-card" data-id="${esc(s.id)}">
         <div class="sub-head"><span class="chip">${esc(s.c)}</span><span class="hint">From ${esc(s.byName||"a member")} · ${fmtDate(s.created)}</span></div>
+        ${s.editOf?`<p class="edit-of">Suggested changes to <a class="link" href="#${esc(s.editOf)}">${esc((RECIPES.find(x=>x.id===s.editOf)||{t:s.t}).t)}</a> (opens the current version)</p>`:""}
         <h3>${esc(s.t)}</h3>${s.by&&s.by!==s.byName?`<div class="credit">Recipe from ${esc(s.by)}</div>`:""}
         ${s.n?`<div class="note"><b>Note:</b> ${esc(s.n)}</div>`:""}
         <div class="pv">${previewHTML(s)}</div>
@@ -1048,6 +1087,7 @@ function reviewPage(){
     ${done.length?`<div class="panel-a"><h3>Recently reviewed</h3><ul class="mlist">${done.map(s=>`<li class="mrow"><div class="mwho"><b>${esc(s.t)}</b><span>From ${esc(s.byName||"a member")} · ${s.status==="approved"?"Approved":"Not approved"} ${fmtDate(s.decided)}</span></div>
       <div class="macts">${s.status==="approved"&&s.recipeId&&RECIPES.some(r=>r.id===s.recipeId)?`<a class="btn" href="#${esc(s.recipeId)}">Open</a>`:""}</div></li>`).join("")}</ul></div>`:""}
   </section>`;
+  bindPhotoReview();
   app.querySelectorAll(".sub-card").forEach(card=>{
     const s=subs.find(x=>x.id===card.dataset.id); if(!s) return;
     const acts=card.querySelector(".sub-acts");
@@ -1063,7 +1103,7 @@ function minePage(){
   const label = s => s.status==="approved" ? `<span class="pill ok">Approved</span>` : s.status==="rejected" ? `<span class="pill no">Not approved</span>` : `<span class="pill wait">Waiting for approval</span>`;
   app.innerHTML = `<section class="wrap admin">
     <div class="section-head" style="margin-top:28px"><h2>My recipes</h2><p>${offline?"":`<a class="link" href="#new">+ Add a recipe</a>`}</p></div>
-    <div class="panel-a">${subs.length?`<ul class="mlist">${subs.map(s=>`<li class="mrow"><div class="mwho"><b>${esc(s.t)}</b><span>${esc(s.c)} · sent ${fmtDate(s.created)}</span></div>
+    <div class="panel-a">${subs.length?`<ul class="mlist">${subs.map(s=>`<li class="mrow"><div class="mwho"><b>${esc(s.t)}</b><span>${s.editOf?"Changes · ":"New recipe · "}${esc(s.c)} · sent ${fmtDate(s.created)}</span></div>
       <div class="macts">${label(s)}${s.status==="approved"&&s.recipeId&&RECIPES.some(r=>r.id===s.recipeId)?`<a class="btn" href="#${esc(s.recipeId)}">Open</a>`:""}
       ${s.status==="pending"?`<button type="button" class="btn" data-withdraw="${esc(s.id)}">Withdraw</button>`:""}</div></li>`).join("")}</ul>`
       :`<p class="hint mempty">You haven't added any recipes yet. Tap “+ Add a recipe” to share one. ${esc(ADMIN_NAME)} approves each recipe before everyone can see it.</p>`}</div>
@@ -1071,13 +1111,141 @@ function minePage(){
   app.querySelectorAll("[data-withdraw]").forEach(b=>b.onclick=async()=>{ b.disabled=true; try{ await db.collection("submissions").doc(b.dataset.withdraw).delete(); toast("Recipe withdrawn"); }catch(e){ b.disabled=false; toast("Couldn't withdraw. Check your connection."); } });
 }
 
+/* ---------- recipe photos ---------- */
+let pendingPhotos = [];          // admin: every photo waiting for approval
+let unsubPendingPhotos = null;
+let unsubRecipePhotos = [];      // listeners for the recipe page that's open
+const PHOTO_MAX = 1200, THUMB_MAX = 360;
+function watchPendingPhotos(){
+  if(unsubPendingPhotos || !db || !isAdmin()) return;
+  unsubPendingPhotos = db.collection("photos").where("status","==","pending").onSnapshot(s=>{
+    pendingPhotos = s.docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(a.created||0)-(b.created||0));
+    renderAcct();
+    if(location.hash==="#review") route();
+  }, ()=>{});
+}
+function stopRecipePhotos(){ unsubRecipePhotos.forEach(u=>{ try{u()}catch(e){} }); unsubRecipePhotos=[]; }
+
+// Shrink a picture so it uploads quickly and fits in the database.
+function shrink(file){
+  return new Promise((resolve,reject)=>{
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = ()=>{
+      const draw = (max, q) => { const k=Math.min(1, max/Math.max(img.width,img.height));
+        const c=document.createElement("canvas"); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+        c.getContext("2d").drawImage(img,0,0,c.width,c.height); return c.toDataURL("image/jpeg", q); };
+      let big = draw(PHOTO_MAX, .74);
+      for(const [m,q] of [[1000,.68],[850,.62],[700,.58]]) if(big.length>850000) big=draw(m,q);
+      const thumb = draw(THUMB_MAX, .62);
+      URL.revokeObjectURL(url);
+      big.length>880000 ? reject(new Error("too big")) : resolve({img:big, thumb});
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error("not an image")); };
+    img.src = url;
+  });
+}
+
+function photosSection(r){
+  return `<section class="panel-a photos" id="photos" aria-labelledby="ph-h">
+    <div class="ph-head"><h2 id="ph-h">Photos</h2>
+      ${offline?"":`<label class="btn solid ph-add" for="ph-file">+ Add a photo</label><input id="ph-file" type="file" accept="image/*" hidden>`}</div>
+    <div id="ph-pick"></div>
+    <div class="ph-grid" id="ph-grid"><p class="hint">Loading photos…</p></div>
+  </section>`;
+}
+function loadPhotos(r){
+  stopRecipePhotos();
+  const grid = document.getElementById("ph-grid"); if(!grid) return;
+  if(!db || offline){ grid.innerHTML = `<p class="hint">Photos need an internet connection.</p>`; return; }
+  let approved=[], mine=[];
+  const draw = () => {
+    const g=document.getElementById("ph-grid"); if(!g) return;
+    const waiting = mine.filter(p=>p.status==="pending");
+    if(!approved.length && !waiting.length){ g.innerHTML = `<p class="hint">No photos yet. Made this recipe? Add a photo of how it came out.</p>`; return; }
+    g.innerHTML = approved.map(p=>`<figure class="ph"><button type="button" class="ph-open" data-id="${esc(p.id)}" aria-label="View photo by ${esc(p.byName||"a member")}"><img src="${p.thumb}" alt="${esc(r.t)} by ${esc(p.byName||"a member")}" loading="lazy"></button>
+        <figcaption>${esc(p.byName||"")}${p.caption?` · ${esc(p.caption)}`:""}</figcaption>
+        ${isAdmin()?`<div class="ph-admin"><button type="button" class="btn sm" data-cover="${esc(p.id)}">${r.coverPhoto===p.id?"Card photo ✓":"Use on card"}</button><button type="button" class="btn sm" data-del="${esc(p.id)}">Remove</button></div>`:""}</figure>`).join("")
+      + waiting.map(p=>`<figure class="ph wait"><img src="${p.thumb}" alt="Your photo, waiting for approval"><figcaption><span class="pill wait">Waiting for approval</span></figcaption></figure>`).join("");
+    g.querySelectorAll(".ph-open").forEach(b=>b.onclick=()=>{ const p=approved.find(x=>x.id===b.dataset.id); if(p) lightbox(p, r); });
+    g.querySelectorAll("[data-cover]").forEach(b=>b.onclick=async()=>{ const p=approved.find(x=>x.id===b.dataset.cover);
+      try{ await db.collection("recipes").doc(r.id).update({cover:p.thumb, coverPhoto:p.id}); r.coverPhoto=p.id; r.cover=p.thumb; draw(); toast("Card photo updated"); }catch(e){ toast("Couldn't save. Check your connection."); } });
+    g.querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
+      const fig=b.closest(".ph"); const box=fig.querySelector(".ph-admin");
+      box.innerHTML=`<button type="button" class="btn sm warn" data-yes>Remove photo</button><button type="button" class="btn sm" data-no>Cancel</button>`;
+      box.querySelector("[data-no]").onclick=draw;
+      box.querySelector("[data-yes]").onclick=async()=>{ const id=b.dataset.del;
+        try{ await db.collection("photos").doc(id).delete();
+          if(r.coverPhoto===id){ const next=approved.find(x=>x.id!==id); await db.collection("recipes").doc(r.id).update({cover: next?next.thumb:"", coverPhoto: next?next.id:""}); }
+          toast("Photo removed"); }catch(e){ toast("Couldn't remove. Check your connection."); } };
+    });
+  };
+  const col = db.collection("photos");
+  unsubRecipePhotos.push(col.where("recipeId","==",r.id).where("status","==","approved").onSnapshot(s=>{
+    approved = s.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>(a.created||0)-(b.created||0)); draw(); }, ()=>{ approved=[]; draw(); }));
+  if(!isAdmin()) unsubRecipePhotos.push(col.where("recipeId","==",r.id).where("uid","==",me).onSnapshot(s=>{
+    mine = s.docs.map(d=>Object.assign({id:d.id},d.data())); draw(); }, ()=>{}));
+  const input=document.getElementById("ph-file");
+  if(input) input.onchange=async()=>{
+    const file=input.files&&input.files[0]; input.value=""; if(!file) return;
+    const pick=document.getElementById("ph-pick");
+    pick.innerHTML=`<p class="hint">Preparing photo…</p>`;
+    let shot; try{ shot=await shrink(file); }catch(e){ pick.innerHTML=`<p class="err">That file couldn't be used as a photo. Try another picture.</p>`; return; }
+    pick.innerHTML=`<div class="ph-new"><img src="${shot.thumb}" alt="Your new photo">
+      <div class="ph-new-form"><div class="field"><label for="ph-cap">Caption (optional)</label><input id="ph-cap" type="text" maxlength="80" placeholder="e.g. Made it for Shabbos"></div>
+      <p class="hint">${isAdmin()?"It will appear on the recipe right away.":`${esc(ADMIN_NAME)} will approve it before everyone can see it.`}</p>
+      <div class="row"><button type="button" class="btn solid" id="ph-send">${isAdmin()?"Add photo":"Send for approval"}</button><button type="button" class="btn" id="ph-cancel">Cancel</button></div></div></div>`;
+    document.getElementById("ph-cancel").onclick=()=>{ pick.innerHTML=""; };
+    document.getElementById("ph-send").onclick=async e=>{
+      const btn=e.currentTarget; btn.disabled=true; btn.textContent="Uploading…";
+      const caption=document.getElementById("ph-cap").value.trim();
+      const id="p-"+newId(), status=isAdmin()?"approved":"pending";
+      try{
+        await db.collection("photos").doc(id).set({recipeId:r.id, recipeTitle:r.t, uid:me, byName:myName(), caption, img:shot.img, thumb:shot.thumb, status, created:Date.now()});
+        if(isAdmin() && !r.cover) await db.collection("recipes").doc(r.id).update({cover:shot.thumb, coverPhoto:id}).catch(()=>{});
+        if(!isAdmin()) notifyAdmin(`New photo from ${myName()}`, `A photo of “${r.t}” is waiting for your approval.`, "#review", "camera");
+        pick.innerHTML=""; toast(isAdmin()?"Photo added":`Photo sent to ${ADMIN_NAME} for approval`);
+      }catch(err){ btn.disabled=false; btn.textContent=isAdmin()?"Add photo":"Send for approval"; toast("Couldn't upload. Check your internet connection and try again."); }
+    };
+  };
+}
+async function lightbox(p, r){
+  const box=document.createElement("div"); box.className="lightbox"; box.setAttribute("role","dialog"); box.setAttribute("aria-label","Photo");
+  box.innerHTML=`<button type="button" class="lb-close" aria-label="Close">✕</button><img alt="${esc(r.t)} by ${esc(p.byName||"a member")}" src="${p.img||p.thumb}"><p>${esc(r.t)} · ${esc(p.byName||"")}${p.caption?` · ${esc(p.caption)}`:""}</p>`;
+  const close=()=>{ box.remove(); document.removeEventListener("keydown",esc1); };
+  const esc1=e=>{ if(e.key==="Escape") close(); };
+  box.onclick=e=>{ if(e.target===box||e.target.classList.contains("lb-close")) close(); };
+  document.addEventListener("keydown",esc1); document.body.appendChild(box); box.querySelector(".lb-close").focus();
+}
+async function approvePhoto(p){
+  await db.collection("photos").doc(p.id).update({status:"approved", decided:Date.now()});
+  const rec=RECIPES.find(x=>x.id===p.recipeId);
+  if(rec && !rec.cover) await db.collection("recipes").doc(rec.id).update({cover:p.thumb, coverPhoto:p.id}).catch(()=>{});
+}
+function photoReviewHTML(){
+  if(!pendingPhotos.length) return "";
+  return `<div class="section-head" style="margin-top:28px"><h2>Photos waiting</h2><p>${pendingPhotos.length} waiting</p></div>
+    <div class="ph-review">${pendingPhotos.map(p=>`<article class="panel-a ph-card" data-pid="${esc(p.id)}">
+      <img src="${p.thumb}" alt="Photo of ${esc(p.recipeTitle||"a recipe")}">
+      <div><b>${esc(p.recipeTitle||"Recipe")}</b><span class="hint">From ${esc(p.byName||"a member")} · ${fmtDate(p.created)}</span>${p.caption?`<span>“${esc(p.caption)}”</span>`:""}</div>
+      <div class="macts"><button type="button" class="btn solid" data-pact="ok">Approve</button><button type="button" class="btn" data-pact="no">Not this one</button></div>
+    </article>`).join("")}</div>`;
+}
+function bindPhotoReview(){
+  app.querySelectorAll(".ph-card").forEach(c=>{
+    const p=pendingPhotos.find(x=>x.id===c.dataset.pid); if(!p) return;
+    c.querySelector('[data-pact="ok"]').onclick=async e=>{ e.target.disabled=true; try{ await approvePhoto(p); toast("Photo approved"); }catch(err){ e.target.disabled=false; toast("Couldn't save. Check your connection."); } };
+    c.querySelector('[data-pact="no"]').onclick=async e=>{ e.target.disabled=true; try{ await db.collection("photos").doc(p.id).update({status:"rejected", decided:Date.now(), img:""}); toast("Photo declined"); }catch(err){ e.target.disabled=false; toast("Couldn't save. Check your connection."); } };
+    c.querySelector("img").onclick=()=>lightbox(p,{t:p.recipeTitle||""});
+  });
+}
+
 function route(){
-  closeMenu();
+  closeMenu(); stopRecipePhotos();
   if(state!=="approved"){ document.body.classList.add("out"); gate(); return; }
   document.body.classList.remove("out");
   const h = decodeURIComponent(location.hash.slice(1));
   if(h==="admin" && isAdmin()){ q.value=""; adminPage(); window.scrollTo(0,0); return; }
-  if(isAdmin() && h.startsWith("edit-")){ const er=RECIPES.find(x=>x.id===h.slice(5)); if(er){ q.value=""; editor(er); window.scrollTo(0,0); return; } }
+  if(!offline && h.startsWith("edit-")){ const er=RECIPES.find(x=>x.id===h.slice(5)); if(er){ q.value=""; editor(er); window.scrollTo(0,0); return; } }
   if(h==="review" && isAdmin()){ q.value=""; reviewPage(); window.scrollTo(0,0); return; }
   if(h.startsWith("review-") && isAdmin()){ const sb=subs.find(x=>x.id===h.slice(7)&&x.status==="pending"); if(sb){ q.value=""; editor(null,null,sb); window.scrollTo(0,0); return; } }
   if(h==="mine" && !isAdmin()){ q.value=""; minePage(); window.scrollTo(0,0); return; }
