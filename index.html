@@ -250,7 +250,14 @@ body.out .bar, body.out footer{display:none}
 @media (prefers-reduced-motion:reduce){.spin{animation:none}}
 
 /* update notice */
-.updbar{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--accent-soft);padding-block:10px;font-size:15px;max-width:none}
+.updbar{position:fixed;z-index:22;left:50%;top:calc(env(safe-area-inset-top,0px) + 74px);transform:translateX(-50%);width:min(560px, calc(100% - 24px));display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--paper);border:1px solid var(--accent);border-radius:16px;box-shadow:0 10px 30px rgba(27,38,56,.22);padding:12px 14px;font-size:15px}
+.updbar.in{animation:updin .35s ease-out}
+@keyframes updin{from{transform:translate(-50%,-24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+.upd-ic{width:40px;height:40px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;flex-shrink:0}
+.upd-txt{flex:1;min-width:170px;display:flex;flex-direction:column;line-height:1.35}
+.upd-txt span{color:var(--muted);font-size:14px}
+.upd-btns{display:flex;gap:8px;margin-left:auto}
+@media (prefers-reduced-motion:reduce){.updbar.in{animation:none}}
 body.out .updbar{display:none}
 /* submissions */
 .sub-card{display:flex;flex-direction:column;gap:10px}
@@ -351,7 +358,7 @@ a.btn.solid{color:var(--paper)}
   </div>
 </header>
 
-<div class="updbar wrap" id="updbar" hidden></div>
+<div class="updbar" id="updbar" role="status" aria-live="polite" hidden></div>
 <div class="offbar" id="offbar" hidden>You're offline. The recipes still work; favorites need internet.</div>
 <main id="app"><section class="auth wrap"><div class="auth-card"><div class="auth-brand"><h1>Gitty's Kitchen</h1><p>168 family recipes in 11 categories.</p></div><div class="auth-form"><h2>Open this in a browser</h2><p class="sub">This preview can't run the cookbook.</p><p class="hint">On Android, install the Gitty's Kitchen app. On iPhone or iPad, open the cookbook's web link in Safari or Chrome.</p></div></div></section></main>
 <footer class="wrap">Gitty's Kitchen · January 2009</footer>
@@ -437,7 +444,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.14";
+const WEB_VERSION = "3.15";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -467,14 +474,26 @@ function renderUpdateBar(){
   const bar=document.getElementById("updbar"); if(!bar) return;
   if(!update || state!=="approved"){ bar.hidden=true; return; }
   const webNew = newer(update.web, WEB_VERSION), apkNew = appBuild && update.apk > appBuild;
-  if(webNew){
-    bar.innerHTML = `<span><b>A new version of Gitty's Kitchen is ready.</b>${update.notes?" "+esc(update.notes):""}</span><button type="button" class="btn solid" id="upd-go">Update now</button>`;
-    bar.hidden=false; document.getElementById("upd-go").onclick=applyWebUpdate;
-  } else if(apkNew){
-    bar.innerHTML = `<span><b>A new Android app is available.</b> Download it, then tap Install.</span><a class="btn solid" href="${esc(SITE+(update.apkUrl||"Gittys-Kitchen.apk"))}">Download update</a>`;
-    bar.hidden=false;
-  } else bar.hidden=true;
+  const key = webNew ? "web-"+update.web : apkNew ? "apk-"+update.apk : "";
+  if(!key || store("gk-upd-later")===key){ bar.hidden=true; return; }
+  const icon = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>';
+  bar.innerHTML = webNew
+    ? `<div class="upd-ic">${icon}</div><div class="upd-txt"><b>Update available</b><span>${update.notes?esc(update.notes):"A new version of Gitty's Kitchen is ready."}</span></div>
+       <div class="upd-btns"><button type="button" class="btn" id="upd-later">Later</button><button type="button" class="btn solid" id="upd-go">Update now</button></div>`
+    : `<div class="upd-ic">${icon}</div><div class="upd-txt"><b>New Android app available</b><span>Download it, then tap Install. Your favorites and membership stay.</span></div>
+       <div class="upd-btns"><button type="button" class="btn" id="upd-later">Later</button><a class="btn solid" id="upd-dl" href="${esc(SITE+(update.apkUrl||"Gittys-Kitchen.apk"))}">Download</a></div>`;
+  const wasHidden = bar.hidden; bar.hidden=false;
+  if(wasHidden){ bar.classList.remove("in"); void bar.offsetWidth; bar.classList.add("in"); }
+  const go=document.getElementById("upd-go"); if(go) go.onclick=()=>{ go.disabled=true; go.textContent="Updating…"; applyWebUpdate(); };
+  document.getElementById("upd-later").onclick=()=>{ store("gk-upd-later", key); bar.hidden=true; };
 }
+// Look for updates while the app is open: every 5 minutes, and whenever it comes back to the screen.
+let lastUpdCheck=0;
+function maybeCheckUpdates(){ if(state!=="approved" || offline || Date.now()-lastUpdCheck<60000) return; lastUpdCheck=Date.now(); checkUpdates(false); }
+setInterval(maybeCheckUpdates, 5*60*1000);
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") maybeCheckUpdates(); });
+addEventListener("online", maybeCheckUpdates);
+addEventListener("focus", maybeCheckUpdates);
 async function applyWebUpdate(){
   try{ if(window.caches){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); } }catch(e){}
   try{ if(navigator.serviceWorker){ const r=await navigator.serviceWorker.getRegistration(); if(r) await r.update(); } }catch(e){}
@@ -506,7 +525,7 @@ function boot(){
       state = profile.status==="approved" ? "approved" : profile.status==="denied" ? "denied" : "pending";
       cacheProfile(); renderAcct();
       if(isAdmin() && !unsubAll) watchMembers();
-      if(state==="approved"){ watchRecipes(); watchSubs(); watchPendingPhotos(); if(!update) checkUpdates(false); else renderUpdateBar(); }
+      if(state==="approved"){ watchRecipes(); watchSubs(); watchPendingPhotos(); if(!update){ lastUpdCheck=Date.now(); checkUpdates(false); } else renderUpdateBar(); }
       if(was!==state || state!=="approved") route();
     }, ()=>{
       const c=store("gk-cache");

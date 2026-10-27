@@ -1,6 +1,6 @@
 {
-  "web": "3.14",
+  "web": "3.15",
   "apk": 7,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Recipes are now in A to Z order."
+  "notes": "Update notices now pop up at the top of the screen."
 }
