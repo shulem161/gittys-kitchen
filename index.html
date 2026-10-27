@@ -252,6 +252,17 @@ body.out .bar, body.out footer{display:none}
 /* update notice */
 .updbar{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--accent-soft);padding-block:10px;font-size:15px;max-width:none}
 body.out .updbar{display:none}
+/* submissions */
+.sub-card{display:flex;flex-direction:column;gap:10px}
+.sub-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sub-card h3{font-size:24px;margin:0}
+.pv{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:4px 24px}
+.pv ul,.pv ol{margin:0;padding-left:20px}
+.pv li{margin:2px 0}
+.pill{font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.pill.ok{background:#E3F2E8;color:#25704A}
+.pill.no{background:#FBE9E7;color:#B4413A}
+.pill.wait{background:var(--wheat-soft);color:var(--wheat)}
 /* recipe editor */
 .note.setup{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:28px}
 .note.setup p{margin:4px 0 0;color:var(--muted)}
@@ -373,12 +384,12 @@ const myName = () => profile ? profile.name : "";
 const uk = k => "gk-u-"+me+"-"+k;
 const favs = () => (profile && profile.favs) || [];
 const initial = n => (String(n).trim()[0]||"?").toUpperCase();
-const pendingCount = () => members.filter(m=>m.status==="pending").length;
+const pendingCount = () => members.filter(m=>m.status==="pending").length + (isAdmin()?subs.filter(s=>s.status==="pending").length:0);
 function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catch(e){for(let i=0;i<12;i++)a[i]=Math.random()*256|0} return [...a].map(b=>b.toString(16).padStart(2,"0")).join(""); }
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.1";
+const WEB_VERSION = "3.2";
 const SITE = "https://shulem161.github.io/gittys-kitchen/";
 const appBuild = (()=>{ const m=navigator.userAgent.match(/GittysKitchenApp\/(\d+)/); return m ? +m[1] : 0; })();
 let update = null;            // {web, apk, apkUrl, notes}
@@ -428,6 +439,7 @@ function boot(){
     if(unsubMe){unsubMe();unsubMe=null}
     if(unsubAll){unsubAll();unsubAll=null;members=[]}
     if(unsubRecipes){unsubRecipes();unsubRecipes=null}
+    if(unsubSubs){unsubSubs();unsubSubs=null;subs=[]}
     if(!u){ me=null; profile=null; offline=false; state="signedout"; renderAcct(); return route(); }
     me=u.uid;
     if(!profile){ state="loading"; route(); }
@@ -438,7 +450,7 @@ function boot(){
       state = profile.status==="approved" ? "approved" : profile.status==="denied" ? "denied" : "pending";
       cacheProfile(); renderAcct();
       if(isAdmin() && !unsubAll) watchMembers();
-      if(state==="approved"){ watchRecipes(); if(!update) checkUpdates(false); else renderUpdateBar(); }
+      if(state==="approved"){ watchRecipes(); watchSubs(); if(!update) checkUpdates(false); else renderUpdateBar(); }
       if(was!==state || state!=="approved") route();
     }, ()=>{
       const c=store("gk-cache");
@@ -562,7 +574,7 @@ function tabs(active){
 function category(c){
   const list = RECIPES.filter(r=>r.c===c);
   app.innerHTML = `<section class="wrap">${tabs(c)}
-    <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}${isAdmin()&&recipesOnline&&!offline?` · <a class="link" href="#new-${slug(c).slice(2)}">+ Add a recipe</a>`:""}</p></div>
+    <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}${!offline&&(!isAdmin()||recipesOnline)?` · <a class="link" href="#new-${slug(c).slice(2)}">+ Add a recipe</a>`:""}</p></div>
     <div class="grid">${list.map(card).join("")}</div></section>`;
   const a=app.querySelector('.tab[aria-current="page"]'); if(a) a.parentElement.scrollLeft = a.offsetLeft - 16;
 }
@@ -803,8 +815,10 @@ function openMenu(confirming){
   const pc = pendingCount();
   const m=document.createElement("div"); m.className="menu"; m.setAttribute("role","menu");
   m.innerHTML = `<div class="who"><b>${esc(myName())}</b><span>${isAdmin()?"Admin":"Member"}${offline?" · offline":""}</span></div>
-    ${isAdmin()?`<a href="#admin" role="menuitem">Approve members <span class="n${pc?" hot":""}">${pc?pc+" waiting":""}</span></a>`:""}
-    ${isAdmin()&&recipesOnline&&!offline?`<a href="#new" role="menuitem">Add a recipe <span class="n"></span></a>`:""}
+    ${isAdmin()?(()=>{const mp=members.filter(m=>m.status==="pending").length;return `<a href="#admin" role="menuitem">Approve members <span class="n${mp?" hot":""}">${mp?mp+" waiting":""}</span></a>`})():""}
+    ${isAdmin()?`<a href="#review" role="menuitem">Approve recipes <span class="n${pendingSubs().length?" hot":""}">${pendingSubs().length?pendingSubs().length+" waiting":""}</span></a>`:""}
+    ${!offline&&(!isAdmin()||recipesOnline)?`<a href="#new" role="menuitem">Add a recipe <span class="n"></span></a>`:""}
+    ${isAdmin()?"":`<a href="#mine" role="menuitem">My recipes <span class="n">${subs.length||""}</span></a>`}
     <a href="#favorites" role="menuitem">My favorites <span class="n">${favs().length}</span></a>
     <button type="button" role="menuitem" id="m-upd">Check for updates <span class="n">v${WEB_VERSION}</span></button>
     <button type="button" role="menuitem" id="m-out">Sign out</button>
@@ -873,25 +887,29 @@ function adminBanner(){
 }
 
 /* ---------- recipe editor (admin) ---------- */
-function editor(r, cat){
+function editor(r, cat, sub){
   const isNew = !r;
+  const suggest = !isAdmin();
+  const src = r || (sub ? fromDoc(sub.id, sub) : null);
   if(!isNew && !recipesOnline){ toast("Put the recipes online first, from the home page."); location.hash=""; return; }
-  const secs = r ? r.s.map(([ing,h,items])=>({ing:!!ing,h,items:items.join("\n")}))
+  const secs = src ? src.s.map(([ing,h,items])=>({ing:!!ing,h,items:items.join("\n")}))
                  : [{ing:true,h:"",items:""},{ing:false,h:"",items:""}];
-  const catNow = r ? r.c : (cat || CATS[0] || "");
+  const catNow = src ? src.c : (cat || CATS[0] || "");
+  const catList = CATS.includes(catNow) || !catNow ? CATS : [...CATS, catNow];
   const draw = () => {
     app.innerHTML = `<section class="wrap editor">
-      <a class="back" href="${r?"#"+r.id:"#"+(catNow?slug(catNow):"")}">← Cancel</a>
+      <a class="back" href="${sub?"#review":r?"#"+r.id:"#"+(catNow&&CATS.includes(catNow)?slug(catNow):"")}">← Cancel</a>
       <form class="panel-a ed" id="edform" novalidate>
-        <h2>${isNew?"Add a recipe":"Edit recipe"}</h2>
-        <div class="field"><label for="ed-t">Recipe name</label><input id="ed-t" type="text" maxlength="80" value="${esc(r?r.t:"")}" placeholder="e.g. Potato Kugel"></div>
+        <h2>${sub?"Review recipe":!isNew?"Edit recipe":suggest?"Add a recipe":"Add a recipe"}</h2>
+        ${sub?`<p class="sub">Sent by ${esc(sub.byName||"a member")} on ${fmtDate(sub.created)}. Fix anything you like, then approve it.</p>`:suggest?`<p class="sub">${esc(ADMIN_NAME)} will look it over before it appears for everyone.</p>`:""}
+        <div class="field"><label for="ed-t">Recipe name</label><input id="ed-t" type="text" maxlength="80" value="${esc(src?src.t:"")}" placeholder="e.g. Potato Kugel"></div>
         <div class="row2">
           <div class="field"><label for="ed-c">Category</label>
-            <select id="ed-c">${CATS.map(c=>`<option ${c===catNow?"selected":""}>${esc(c)}</option>`).join("")}<option value="__new">New category…</option></select>
+            <select id="ed-c">${catList.map(c=>`<option ${c===catNow?"selected":""}>${esc(c)}</option>`).join("")}<option value="__new">New category…</option></select>
             <input id="ed-cn" type="text" maxlength="30" placeholder="New category name" hidden></div>
-          <div class="field"><label for="ed-by">From (optional)</label><input id="ed-by" type="text" maxlength="40" value="${esc(r?r.by:"")}" placeholder="e.g. Bobby"></div>
+          <div class="field"><label for="ed-by">From (optional)</label><input id="ed-by" type="text" maxlength="40" value="${esc(src?src.by:(suggest?myName():""))}" placeholder="e.g. Bobby"></div>
         </div>
-        <div class="field"><label for="ed-n">Note (optional)</label><textarea id="ed-n" rows="2">${esc(r&&r.n?r.n:"")}</textarea></div>
+        <div class="field"><label for="ed-n">Note (optional)</label><textarea id="ed-n" rows="2">${esc(src&&src.n?src.n:"")}</textarea></div>
         <h3>Ingredients and steps</h3>
         <p class="hint">Write one ingredient or one step per line. Add more parts for things like a dough, a filling or a topping.</p>
         <div id="ed-secs">${secs.map((s,i)=>`
@@ -910,7 +928,7 @@ function editor(r, cat){
         <div class="tools"><button type="button" class="btn" data-add="ing">+ Ingredients</button><button type="button" class="btn" data-add="step">+ Method</button></div>
         <p class="err" id="ed-err" role="alert" hidden></p>
         <div class="ed-actions">
-          <button class="primary" type="submit">${isNew?"Add recipe":"Save changes"}</button>
+          <button class="primary" type="submit">${sub?"Approve and publish":suggest?"Send for approval":isNew?"Add recipe":"Save changes"}</button>
           ${isNew?"":`<button type="button" class="btn danger-btn" id="ed-del">Delete recipe</button>`}
         </div>
         <div id="ed-confirm"></div>
@@ -945,17 +963,100 @@ function editor(r, cat){
       if(!c) return fail("Choose a category, or type a new category name.");
       const s = secs.map(x=>[x.ing?1:0, x.h.trim(), x.items.split("\n").map(l=>l.trim()).filter(Boolean)]).filter(x=>x[2].length);
       if(!s.length) return fail("Add at least one ingredient or step.");
+      const btn0=F.querySelector(".primary");
+      if(suggest){
+        btn0.disabled=true; btn0.textContent="Sending…";
+        const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), s, ord:0});
+        try{
+          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,s:d.s, uid:me, byName:myName(), status:"pending", created:Date.now()});
+          toast(`Sent to ${ADMIN_NAME} for approval`); location.hash="mine";
+        }catch(e){ btn0.disabled=false; btn0.textContent="Send for approval"; fail("Couldn't send. Check your internet connection and try again."); }
+        return;
+      }
       if(!recipesOnline) return fail("Put the recipes online first, from the home page.");
       let id = r ? r.id : "r-"+t.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
       if(!r){ if(id==="r-") id="r-recipe"; let k=2, base=id; while(onlineIds.has(id)) id=base+"-"+(k++); }
       const rec={id, c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), s, ord: r ? (r.ord||0) : Date.now()};
       const btn=F.querySelector(".primary"); btn.disabled=true; btn.textContent="Saving…";
-      try{ await db.collection("recipes").doc(id).set(toDoc(rec)); toast(r?"Changes saved":"Recipe added"); location.hash=id; }
-      catch(e){ btn.disabled=false; btn.textContent=r?"Save changes":"Add recipe"; fail("Couldn't save. Check your internet connection and try again."); }
+      try{
+        await db.collection("recipes").doc(id).set(toDoc(rec));
+        if(sub) await db.collection("submissions").doc(sub.id).update({status:"approved", recipeId:id, decided:Date.now()});
+        toast(sub?"Recipe approved and published":r?"Changes saved":"Recipe added"); location.hash=id;
+      }
+      catch(e){ btn.disabled=false; btn.textContent=sub?"Approve and publish":r?"Save changes":"Add recipe"; fail("Couldn't save. Check your internet connection and try again."); }
     };
   };
   draw();
   if(isNew) document.getElementById("ed-t").focus();
+}
+
+/* ---------- recipe submissions ---------- */
+let subs = [];                 // admin: everyone's submissions; member: their own
+let unsubSubs = null;
+const pendingSubs = () => subs.filter(s=>s.status==="pending");
+function watchSubs(){
+  if(unsubSubs || !db || !me) return;
+  const q = isAdmin() ? db.collection("submissions") : db.collection("submissions").where("uid","==",me);
+  unsubSubs = q.onSnapshot(s=>{
+    subs = s.docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(b.created||0)-(a.created||0));
+    renderAcct();
+    const h=location.hash; if((h==="#review"||h==="#mine") && !document.querySelector(".editor")) route();
+  }, ()=>{});
+}
+function newRecipeId(t){
+  let id="r-"+String(t).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,""); if(id==="r-") id="r-recipe";
+  let k=2, base=id; while(onlineIds.has(id)) id=base+"-"+(k++); return id;
+}
+async function approveSub(sub){
+  if(!recipesOnline){ toast("Put the recipes online first, from the home page."); return; }
+  const rec = fromDoc(newRecipeId(sub.t), sub); rec.ord = Date.now();
+  await db.collection("recipes").doc(rec.id).set(toDoc(rec));
+  await db.collection("submissions").doc(sub.id).update({status:"approved", recipeId:rec.id, decided:Date.now()});
+  toast(`“${sub.t}” is published`);
+}
+function previewHTML(sub){
+  return (sub.s||[]).map(x=>`<div class="pv-part">${x.h?`<div class="group">${esc(x.h)}</div>`:`<div class="group">${x.k==="ing"?"Ingredients":"Method"}</div>`}
+    ${x.k==="ing"?`<ul>${x.items.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>`:`<ol>${x.items.map(i=>`<li>${hiTemps(i)}</li>`).join("")}</ol>`}</div>`).join("");
+}
+function reviewPage(){
+  const pend=pendingSubs(), done=subs.filter(s=>s.status!=="pending").slice(0,10);
+  app.innerHTML = `<section class="wrap admin">
+    <div class="section-head" style="margin-top:28px"><h2>Approve recipes</h2><p>${pend.length} waiting</p></div>
+    ${pend.length ? pend.map(s=>`<article class="panel-a sub-card" data-id="${esc(s.id)}">
+        <div class="sub-head"><span class="chip">${esc(s.c)}</span><span class="hint">From ${esc(s.byName||"a member")} · ${fmtDate(s.created)}</span></div>
+        <h3>${esc(s.t)}</h3>${s.by&&s.by!==s.byName?`<div class="credit">Recipe from ${esc(s.by)}</div>`:""}
+        ${s.n?`<div class="note"><b>Note:</b> ${esc(s.n)}</div>`:""}
+        <div class="pv">${previewHTML(s)}</div>
+        <div class="macts sub-acts">
+          <button type="button" class="btn solid" data-sact="approve">Approve</button>
+          <a class="btn" href="#review-${esc(s.id)}">Edit &amp; approve</a>
+          <button type="button" class="btn" data-sact="ask-reject">Not this one</button>
+        </div></article>`).join("")
+      : `<div class="panel-a"><p class="hint mempty">No recipes are waiting. When a member adds one, it appears here and on your account button.</p></div>`}
+    ${done.length?`<div class="panel-a"><h3>Recently reviewed</h3><ul class="mlist">${done.map(s=>`<li class="mrow"><div class="mwho"><b>${esc(s.t)}</b><span>From ${esc(s.byName||"a member")} · ${s.status==="approved"?"Approved":"Not approved"} ${fmtDate(s.decided)}</span></div>
+      <div class="macts">${s.status==="approved"&&s.recipeId&&RECIPES.some(r=>r.id===s.recipeId)?`<a class="btn" href="#${esc(s.recipeId)}">Open</a>`:""}</div></li>`).join("")}</ul></div>`:""}
+  </section>`;
+  app.querySelectorAll(".sub-card").forEach(card=>{
+    const s=subs.find(x=>x.id===card.dataset.id); if(!s) return;
+    const acts=card.querySelector(".sub-acts");
+    acts.querySelector('[data-sact="approve"]').onclick=async e=>{ e.target.disabled=true; try{ await approveSub(s); }catch(err){ e.target.disabled=false; toast("Couldn't publish. Check your connection."); } };
+    acts.querySelector('[data-sact="ask-reject"]').onclick=()=>{
+      acts.innerHTML=`<span class="hint">Decline “${esc(s.t)}”?</span><button type="button" class="btn warn" data-sact="reject">Decline</button><button type="button" class="btn" data-sact="cancel">Cancel</button>`;
+      acts.querySelector('[data-sact="cancel"]').onclick=reviewPage;
+      acts.querySelector('[data-sact="reject"]').onclick=async()=>{ try{ await db.collection("submissions").doc(s.id).update({status:"rejected", decided:Date.now()}); toast("Recipe declined"); }catch(err){ toast("Couldn't save. Check your connection."); } };
+    };
+  });
+}
+function minePage(){
+  const label = s => s.status==="approved" ? `<span class="pill ok">Approved</span>` : s.status==="rejected" ? `<span class="pill no">Not approved</span>` : `<span class="pill wait">Waiting for approval</span>`;
+  app.innerHTML = `<section class="wrap admin">
+    <div class="section-head" style="margin-top:28px"><h2>My recipes</h2><p>${offline?"":`<a class="link" href="#new">+ Add a recipe</a>`}</p></div>
+    <div class="panel-a">${subs.length?`<ul class="mlist">${subs.map(s=>`<li class="mrow"><div class="mwho"><b>${esc(s.t)}</b><span>${esc(s.c)} · sent ${fmtDate(s.created)}</span></div>
+      <div class="macts">${label(s)}${s.status==="approved"&&s.recipeId&&RECIPES.some(r=>r.id===s.recipeId)?`<a class="btn" href="#${esc(s.recipeId)}">Open</a>`:""}
+      ${s.status==="pending"?`<button type="button" class="btn" data-withdraw="${esc(s.id)}">Withdraw</button>`:""}</div></li>`).join("")}</ul>`
+      :`<p class="hint mempty">You haven't added any recipes yet. Tap “+ Add a recipe” to share one. ${esc(ADMIN_NAME)} approves each recipe before everyone can see it.</p>`}</div>
+  </section>`;
+  app.querySelectorAll("[data-withdraw]").forEach(b=>b.onclick=async()=>{ b.disabled=true; try{ await db.collection("submissions").doc(b.dataset.withdraw).delete(); toast("Recipe withdrawn"); }catch(e){ b.disabled=false; toast("Couldn't withdraw. Check your connection."); } });
 }
 
 function route(){
@@ -965,7 +1066,10 @@ function route(){
   const h = decodeURIComponent(location.hash.slice(1));
   if(h==="admin" && isAdmin()){ q.value=""; adminPage(); window.scrollTo(0,0); return; }
   if(isAdmin() && h.startsWith("edit-")){ const er=RECIPES.find(x=>x.id===h.slice(5)); if(er){ q.value=""; editor(er); window.scrollTo(0,0); return; } }
-  if(isAdmin() && (h==="new" || h.startsWith("new-"))){ q.value=""; editor(null, CATS.find(x=>slug(x)==="c-"+h.slice(4))); window.scrollTo(0,0); return; }
+  if(h==="review" && isAdmin()){ q.value=""; reviewPage(); window.scrollTo(0,0); return; }
+  if(h.startsWith("review-") && isAdmin()){ const sb=subs.find(x=>x.id===h.slice(7)&&x.status==="pending"); if(sb){ q.value=""; editor(null,null,sb); window.scrollTo(0,0); return; } }
+  if(h==="mine" && !isAdmin()){ q.value=""; minePage(); window.scrollTo(0,0); return; }
+  if(!offline && (h==="new" || h.startsWith("new-"))){ q.value=""; editor(null, CATS.find(x=>slug(x)==="c-"+h.slice(4))); window.scrollTo(0,0); return; }
   if(h==="favorites"){ q.value=""; favorites(); window.scrollTo(0,0); return; }
   const r = RECIPES.find(x=>x.id===h);
   if(r){ q.value=""; recipe(r); window.scrollTo(0,0); return; }

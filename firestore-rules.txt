@@ -29,6 +29,18 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Recipes sent in by members. Only the admin sees all of them and decides.
+    match /submissions/{id} {
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved';
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update: if isAdmin();
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid && resource.data.status == 'pending');
+    }
+
     // Member profiles. New members always start as "pending";
     // only the admin can approve, deny or remove them.
     match /users/{uid} {
