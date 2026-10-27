@@ -1,6 +1,6 @@
 {
-  "web": "3.9",
+  "web": "3.10",
   "apk": 7,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Recipes now show who added or changed them."
+  "notes": "Pull down to refresh."
 }

@@ -301,6 +301,12 @@ body.out .updbar{display:none}
 .scan-prev > div{display:flex;gap:12px;align-items:center}
 .scan-prev p{margin:0}
 .byline{display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--muted);padding:4px 4px 0;border-top:1px solid var(--line);padding-top:12px}
+/* pull to refresh */
+html,body{overscroll-behavior-y:contain}
+.ptr{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 70px);z-index:25;width:42px;height:42px;border-radius:50%;background:var(--paper);color:var(--muted);box-shadow:var(--shadow);display:grid;place-items:center;transform:translate(-50%,-50px);opacity:0;pointer-events:none;border:1px solid var(--line)}
+.ptr.ready{color:var(--accent)}
+.ptr.spinning svg{animation:spin .7s linear infinite}
+body.out .ptr{top:calc(env(safe-area-inset-top,0px) + 16px)}
 /* recipe editor */
 .note.setup{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:28px}
 .note.setup p{margin:4px 0 0;color:var(--muted)}
@@ -429,7 +435,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.9";
+const WEB_VERSION = "3.10";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1482,6 +1488,22 @@ q.addEventListener("input",()=>{
   v ? results(v) : home();
 });
 window.addEventListener("hashchange",route);
+/* ---------- pull down to refresh ---------- */
+(function(){
+  const ind = document.createElement("div"); ind.className="ptr"; ind.setAttribute("aria-hidden","true");
+  ind.innerHTML='<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>';
+  document.body.appendChild(ind);
+  const LIMIT=90, TRIGGER=70; let startY=null, dist=0, busy=false;
+  const blocked = t => busy || document.querySelector(".editor, .lightbox, #scan-status .spin") || (t && t.closest && t.closest("textarea, input, select, .tabs, .menu"));
+  const show = d => { const p=Math.min(d,LIMIT); ind.style.transform=`translate(-50%, ${p-50}px) rotate(${p*3}deg)`; ind.style.opacity=Math.min(1,p/TRIGGER); ind.classList.toggle("ready", d>=TRIGGER); };
+  const reset = () => { ind.style.transition="transform .2s, opacity .2s"; ind.style.transform="translate(-50%,-50px)"; ind.style.opacity=0; setTimeout(()=>ind.style.transition="",220); };
+  addEventListener("touchstart", e=>{ if(e.touches.length!==1 || window.scrollY>0 || blocked(e.target)) { startY=null; return; } startY=e.touches[0].clientY; dist=0; }, {passive:true});
+  addEventListener("touchmove", e=>{ if(startY===null) return; dist=(e.touches[0].clientY-startY)*0.55; if(dist<=0 || window.scrollY>0){ dist=0; show(0); return; } show(dist); }, {passive:true});
+  addEventListener("touchend", ()=>{ if(startY===null) return; startY=null;
+    if(dist>=TRIGGER && !blocked()){ busy=true; ind.classList.add("spinning"); ind.style.transform="translate(-50%, 24px)"; ind.style.opacity=1; setTimeout(()=>location.reload(), 350); }
+    else reset(); dist=0; }, {passive:true});
+})();
+
 boot();
 </script>
 
