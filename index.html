@@ -437,7 +437,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.13";
+const WEB_VERSION = "3.14";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -482,6 +482,7 @@ async function applyWebUpdate(){
 }
 
 function boot(){
+  sortRecipes(RECIPES);
   if(!FIREBASE_CONFIG){ state="setup"; return route(); }
   if(typeof firebase==="undefined") return goOffline();
   try{
@@ -910,9 +911,10 @@ const toDoc = r => ({c:r.c, t:r.t, by:r.by||"", n:r.n||"", ord:r.ord||0, deleted
   s:r.s.map(([ing,h,items])=>({k:ing?"ing":"step", h:h||"", items:items}))});
 const fromDoc = (id,d) => ({id, c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[],
   s:(d.s||[]).map(x=>[x.k==="ing"?1:0, x.h||"", x.items||[]])});
+// Recipes are listed A to Z by category, then A to Z by name ("Tomato Dip # 2" comes before "# 10").
+const sortName = r => r.t.replace(/^Untitled:\s*/,"").replace(/^[^A-Za-z0-9]+/,"");
 function sortRecipes(list){
-  const ci = c => { const i=ORDER.indexOf(c); return i<0 ? 100 : i; };
-  return list.sort((a,b)=> ci(a.c)-ci(b.c) || (a.c<b.c?-1:a.c>b.c?1:0) || (a.ord||0)-(b.ord||0));
+  return list.sort((a,b)=> byName(a.c,b.c) || sortName(a).localeCompare(sortName(b), undefined, {sensitivity:"base", numeric:true}));
 }
 function setRecipes(list){
   RECIPES = sortRecipes(list);
