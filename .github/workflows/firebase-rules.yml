@@ -1,0 +1,41 @@
+# Sends firestore.rules to the Firebase project whenever it changes.
+# Needs the repository secret FIREBASE_SERVICE_ACCOUNT (a Firebase service account key).
+name: Update Firebase rules
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - firestore.rules
+      - firebase.json
+      - .github/workflows/firebase-rules.yml
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Load the Firebase key
+        env:
+          KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::The FIREBASE_SERVICE_ACCOUNT secret is missing. Add it in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          printf '%s' "$KEY" > "$RUNNER_TEMP/firebase-key.json"
+
+      - name: Publish the rules to Firebase
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-key.json
+        run: npx --yes firebase-tools@13 deploy --only firestore:rules --project gittys-kitchen --non-interactive
+
+      - name: Remove the key file
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase-key.json"
