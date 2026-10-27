@@ -34,7 +34,14 @@ jobs:
       - name: Publish the rules to Firebase
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-key.json
-        run: npx --yes firebase-tools@13 deploy --only firestore:rules --project gittys-kitchen --non-interactive
+        run: |
+          set -o pipefail
+          if ! npx --yes firebase-tools@13 deploy --only firestore:rules --project gittys-kitchen --non-interactive --debug 2>&1 | tee "$RUNNER_TEMP/deploy.log"; then
+            grep -iE "error|denied|permission|not been used|disabled|403|404" "$RUNNER_TEMP/deploy.log" | grep -v "Bearer" | tail -8 | while IFS= read -r line; do
+              echo "::error::${line:0:300}"
+            done
+            exit 1
+          fi
 
       - name: Remove the key file
         if: always()
