@@ -1,0 +1,761 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Gitty's Kitchen</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: porcelain-tile kitchen backdrop; sticky top bar; home = cover card + category tiles; category = recipe card grid; recipe = parts, each with ingredients beside method */
+:root{
+  --bg:#EEF2F7; --tile:#DCE4EF; --paper:#FFFFFF; --ink:#1B2638; --muted:#5B6678; --line:#D5DCE7;
+  --accent:#2C5A9A; --accent-2:#2E8C93; --accent-soft:#E2EAF6; --wheat:#B7862F; --wheat-soft:#F6EBD5; --done:#9AA4B3;
+  --shadow:0 1px 2px rgba(27,38,56,.06),0 8px 24px rgba(27,38,56,.07);
+  --display:"Young Serif",Georgia,"Times New Roman",serif;
+  --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111824;--tile:#18212F;--paper:#18212F;--ink:#E6EBF2;--muted:#A0AABA;--line:#2A3547;
+  --accent:#8EB1E6;--accent-2:#6CC3C9;--accent-soft:#1F2B40;--wheat:#DDB46A;--wheat-soft:#2B2618;--done:#5E6879;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111824;--tile:#18212F;--paper:#18212F;--ink:#E6EBF2;--muted:#A0AABA;--line:#2A3547;
+  --accent:#8EB1E6;--accent-2:#6CC3C9;--accent-soft:#1F2B40;--wheat:#DDB46A;--wheat-soft:#2B2618;--done:#5E6879;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);color-scheme:dark}
+
+*{box-sizing:border-box}
+body{
+  background-color:var(--bg);
+  background-image:
+    radial-gradient(circle at 50% 50%, transparent 17px, var(--tile) 18px, transparent 19px),
+    linear-gradient(var(--tile) 1px, transparent 1px),
+    linear-gradient(90deg, var(--tile) 1px, transparent 1px);
+  background-size:48px 48px;background-position:0 0,-24px -24px,-24px -24px;
+  color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;
+}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--paper)}
+.wrap{max-width:1100px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);font-weight:400;text-wrap:balance;margin:0;line-height:1.15}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.tilestripe{position:absolute;inset:0 0 auto 0;height:6px;background:repeating-linear-gradient(90deg,var(--accent) 0 24px,var(--accent-soft) 24px 48px)}
+
+/* top bar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--line)}
+.bar .wrap{display:flex;align-items:center;gap:16px;padding-block:12px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);flex-shrink:0}
+.brand svg{width:30px;height:30px;color:var(--accent)}
+.brand span{font-family:var(--display);font-size:20px}
+.search{flex:1;min-width:0;max-width:380px;margin-left:auto;position:relative}
+.search input{width:100%;padding:9px 12px 9px 36px;border:1px solid var(--line);border-radius:999px;background:var(--bg);color:var(--ink);font:inherit;font-size:15px}
+.search input:focus{outline:none;border-color:var(--accent);background:var(--paper)}
+.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted)}
+
+/* cover */
+.cover{padding-block:40px 28px}
+.cover .card{background:var(--paper);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:44px clamp(20px,5vw,56px) 36px;position:relative;overflow:hidden;display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--wheat)}
+.cover h1{font-size:clamp(44px,9vw,88px);line-height:1;margin-top:10px;
+  background:linear-gradient(100deg,var(--accent) 10%,var(--accent-2) 90%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.cover p{color:var(--muted);max-width:50ch;margin:14px 0 0}
+.stats{display:flex;gap:28px}
+.stat b{display:block;font-family:var(--display);font-weight:400;font-size:38px;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+
+.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:8px 0 16px;flex-wrap:wrap}
+.section-head h2{font-size:28px}
+.section-head p{margin:0;color:var(--muted);font-size:14px}
+
+/* category tiles */
+.cats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;padding-bottom:56px}
+.cat{display:flex;flex-direction:column;gap:14px;background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:20px;text-decoration:none;color:var(--ink);transition:transform .15s ease,box-shadow .15s,border-color .15s}
+.cat:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:var(--accent)}
+.cat .ic{width:48px;height:48px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
+.cat .ic svg{width:28px;height:28px}
+.cat h3{font-size:21px}
+.cat span{font-size:13px;color:var(--muted);margin-top:-10px}
+
+/* category chips */
+.tabs{display:flex;gap:8px;overflow-x:auto;padding-block:20px 18px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex-shrink:0;border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:7px 14px;font-weight:500;font-size:14px;text-decoration:none;color:var(--ink);display:flex;gap:6px;align-items:center}
+.tab .n{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tab[aria-current="page"]{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+.tab[aria-current="page"] .n{color:var(--paper);opacity:.8}
+
+/* recipe grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;padding-bottom:56px}
+.rc{display:flex;flex-direction:column;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px 20px;text-decoration:none;color:var(--ink);transition:transform .15s ease,box-shadow .15s,border-color .15s}
+.rc:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:var(--accent)}
+.rc .top{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:22px}
+.chip{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);padding:4px 9px;border-radius:999px;white-space:nowrap}
+.oven{font-size:13px;font-weight:600;color:var(--wheat);font-variant-numeric:tabular-nums;white-space:nowrap}
+.rc h3{font-size:21px}
+.credit{font-size:14px;color:var(--muted)}
+.rc .credit{margin-top:-6px}
+.rc .meta{display:flex;gap:16px;font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px;margin-top:auto}
+.rc .meta b{color:var(--ink);font-weight:600}
+.untitled{font-style:italic}
+.empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:48px 16px;background:var(--paper);border:1px dashed var(--line);border-radius:14px}
+
+/* recipe view */
+.back{display:inline-flex;align-items:center;gap:6px;color:var(--accent);text-decoration:none;font-weight:600;font-size:15px;padding-block:24px 8px}
+.rhead{background:var(--paper);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:34px clamp(20px,5vw,44px) 28px;margin-top:8px;position:relative;overflow:hidden}
+.rhead h1{font-size:clamp(30px,5.5vw,48px);margin-top:10px}
+.rhead .credit{margin-top:6px;font-size:15px}
+.facts{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.fact{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:7px 13px;font-size:14px;color:var(--muted)}
+.fact b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.fact.hot{background:var(--wheat-soft);border-color:transparent}
+.fact.hot b{color:var(--wheat)}
+.tools{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.btn{border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:8px 14px;font-size:14px;font-weight:500;cursor:pointer}
+.btn[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.btn:disabled{opacity:.6;cursor:default}
+
+.parts{display:flex;flex-direction:column;gap:20px;padding-block:22px 64px}
+.part{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:24px;display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:32px}
+.part.only-steps,.part.only-ing{grid-template-columns:minmax(0,1fr)}
+.part-label{grid-column:1/-1;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:-14px;display:flex;align-items:center;gap:10px}
+.part-label::after{content:"";flex:1;height:1px;background:var(--line)}
+.col h2{font-size:22px;margin-bottom:4px}
+.group{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--wheat);margin:16px 0 4px}
+.col h2 + .group{margin-top:10px}
+.ing ul{list-style:none;margin:0;padding:0}
+.ing li label{display:flex;gap:12px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.ing li:last-child label{border-bottom:0}
+.ing input{appearance:none;flex-shrink:0;width:20px;height:20px;margin:2px 0 0;border:1.5px solid var(--line);border-radius:6px;background:var(--paper);cursor:pointer;display:grid;place-items:center}
+.ing input:checked{background:var(--accent);border-color:var(--accent)}
+.ing input:checked::after{content:"";width:5px;height:10px;border:solid var(--paper);border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.ing input:checked + span{color:var(--done);text-decoration:line-through}
+.qty{font-weight:600;font-variant-numeric:tabular-nums}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.step{display:grid;grid-template-columns:36px minmax(0,1fr);gap:12px;padding:10px;margin-inline:-10px;border-radius:12px;cursor:pointer;transition:background .15s}
+.step:hover{background:var(--bg)}
+.num{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-size:15px;background:var(--accent-soft);color:var(--accent);font-variant-numeric:tabular-nums}
+.step p{margin:4px 0 0}
+.temp{font-weight:600;color:var(--wheat);white-space:nowrap}
+.step.done .num{background:var(--accent);color:var(--paper)}
+.step.done p{color:var(--done);text-decoration:line-through}
+.note{padding:14px 18px;border-radius:12px;background:var(--wheat-soft);font-size:15px}
+.note b{color:var(--wheat)}
+.pager{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.pager a{color:var(--accent);text-decoration:none;font-weight:600;font-size:15px;max-width:48%}
+.pager a:last-child{text-align:right;margin-left:auto}
+.pager small{display:block;color:var(--muted);font-weight:500;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+
+footer{text-align:center;color:var(--muted);font-size:13px;padding-block:0 40px}
+
+@media (max-width:760px){
+  .cover{padding-block:20px 20px}
+  .cover .card{grid-template-columns:1fr;padding-top:36px}
+  .part{grid-template-columns:minmax(0,1fr);gap:22px;padding:20px}
+  .part-label{margin-bottom:-8px}
+  .brand span{font-size:17px}
+  .cats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .cat{padding:16px}
+}
+@media (max-width:420px){.brand span{display:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* account */
+body.out .bar, body.out footer{display:none}
+.acct{position:relative;flex-shrink:0}
+.avatar{width:38px;height:38px;border-radius:50%;border:0;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;font-family:var(--display);font-size:17px;display:grid;place-items:center;cursor:pointer}
+.avatar.lg{width:48px;height:48px;font-size:21px;flex-shrink:0}
+.menu{position:absolute;right:0;top:calc(100% + 10px);width:250px;background:var(--paper);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:8px;z-index:6}
+.menu .who{padding:10px 12px 12px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.menu .who b{display:block;font-size:16px}
+.menu .who span{font-size:13px;color:var(--muted)}
+.menu a,.menu button{display:flex;width:100%;justify-content:space-between;align-items:center;text-align:left;padding:10px 12px;border:0;background:none;border-radius:8px;cursor:pointer;color:var(--ink);text-decoration:none;font-size:15px}
+.menu a:hover,.menu button:hover{background:var(--bg)}
+.menu .danger{color:#B4413A}
+.menu .n{font-size:13px;color:var(--muted)}
+.confirm{margin:6px 4px 4px;padding:12px;border-radius:10px;background:var(--wheat-soft);font-size:14px}
+.confirm .row{display:flex;gap:8px;margin-top:10px}
+.btn.solid{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+.btn.warn{background:#B4413A;border-color:#B4413A;color:#fff}
+.fav svg{width:16px;height:16px;vertical-align:-3px;margin-right:6px}
+.fav[aria-pressed="true"]{background:#FBE9E7;border-color:#D9645A;color:#B4413A}
+.fav[aria-pressed="true"] svg{fill:currentColor}
+.rc .heart{color:#D9645A;width:16px;height:16px;fill:currentColor}
+
+/* sign-in screen */
+.auth{min-height:100vh;display:grid;place-items:center;padding-block:32px}
+.auth-card{width:100%;max-width:880px;display:grid;grid-template-columns:1fr 1fr;background:var(--paper);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);overflow:hidden;position:relative}
+.auth-brand{padding:56px 44px 44px;background:linear-gradient(150deg,#2C5A9A,#2E8C93);color:#fff;display:flex;flex-direction:column;gap:18px;position:relative;overflow:hidden}
+.auth-brand::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,transparent 30px,rgba(255,255,255,.1) 31px,transparent 33px);background-size:84px 84px;background-position:-42px -42px}
+.auth-brand > *{position:relative}
+.auth-brand svg{width:56px;height:56px}
+.auth-brand h1{font-size:clamp(40px,6vw,56px);line-height:1}
+.auth-brand p{margin:0;opacity:.88;max-width:32ch}
+.auth-brand .small{margin-top:auto;font-size:13px;letter-spacing:.12em;text-transform:uppercase;opacity:.75}
+.auth-form{padding:44px 40px;display:flex;flex-direction:column;gap:18px}
+.auth-form h2{font-size:30px}
+.auth-form .sub{margin:-8px 0 0;color:var(--muted);font-size:15px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+.field input{padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;font-size:16px}
+.field input:focus{outline:none;border-color:var(--accent);background:var(--paper);box-shadow:0 0 0 3px var(--accent-soft)}
+.profiles{display:flex;flex-direction:column;gap:8px}
+.profile{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--paper);cursor:pointer;text-align:left;font-size:16px;font-weight:500}
+.profile[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.profile .avatar{width:34px;height:34px;font-size:15px;pointer-events:none}
+.primary{padding:13px 18px;border:0;border-radius:10px;background:var(--accent);color:var(--paper);font-weight:600;font-size:16px;cursor:pointer}
+.primary:hover{filter:brightness(1.07)}
+.err{color:#B4413A;font-size:14px;margin:-6px 0 0}
+.switch{font-size:15px;color:var(--muted);text-align:center}
+.link{border:0;background:none;color:var(--accent);font-weight:600;cursor:pointer;padding:0;font-size:inherit}
+.hint{font-size:13px;color:var(--muted);margin:0;line-height:1.5}
+@media (max-width:760px){
+  .auth{padding-block:16px;place-items:start center}
+  .auth-card{grid-template-columns:1fr}
+  .auth-brand{padding:32px 24px 28px;gap:10px}
+  .auth-brand svg{width:40px;height:40px}
+  .auth-brand .small{display:none}
+  .auth-form{padding:28px 22px}
+}
+
+/* online members */
+.offbar{background:var(--wheat-soft);color:var(--ink);font-size:14px;text-align:center;padding:8px max(16px,env(safe-area-inset-left,0px))}
+.avatar{position:relative}
+.avatar .dot{position:absolute;top:-4px;right:-6px;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:#C8473D;color:#fff;font:600 11px/19px var(--body);border:2px solid var(--paper)}
+.menu .n.hot{color:#C8473D;font-weight:600}
+.wait{display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.spin{width:28px;height:28px;border-radius:50%;border:3px solid var(--accent-soft);border-top-color:var(--accent);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.admin{padding-bottom:56px}
+.panel-a{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:20px 22px;margin-bottom:16px}
+.panel-a h3{font-size:21px;display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.count{font:600 12px/1 var(--body);background:#C8473D;color:#fff;border-radius:999px;padding:5px 9px}
+.mlist{list-style:none;margin:0;padding:0}
+.mrow{display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.mrow:first-child{border-top:0}
+.mwho{flex:1;min-width:150px;display:flex;flex-direction:column}
+.mwho b{font-weight:600}
+.mwho span{font-size:13px;color:var(--muted)}
+.macts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tag{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;background:var(--accent-soft);color:var(--accent);padding:2px 7px;border-radius:999px;vertical-align:2px}
+.mempty{margin:6px 0 2px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:var(--ink);color:var(--paper);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:.2s;z-index:20;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+
+</head><body class="out">
+<header class="bar">
+  <div class="wrap">
+    <a class="brand" href="#" aria-label="Gitty's Kitchen home">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14a5 5 0 1 1 3.5-8.6A5 5 0 0 1 22 7a4.5 4.5 0 1 1 1 8.9V25H9z"/><path d="M9 21h14"/></svg>
+      <span>Gitty's Kitchen</span>
+    </a>
+    <div class="search">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="m14 14 4 4" stroke-linecap="round"/></svg>
+      <input id="q" type="search" placeholder="Search recipes or ingredients" aria-label="Search recipes or ingredients" autocomplete="off">
+    </div>
+    <div class="acct" id="acct"></div>
+  </div>
+</header>
+
+<div class="offbar" id="offbar" hidden>You're offline. The recipes still work; favorites need internet.</div>
+<main id="app"><section class="auth wrap"><div class="auth-card"><div class="auth-brand"><h1>Gitty's Kitchen</h1><p>168 family recipes in 11 categories.</p></div><div class="auth-form"><h2>Open this in a browser</h2><p class="sub">This preview can't run the cookbook.</p><p class="hint">On Android, install the Gitty's Kitchen app. On iPhone or iPad, open the cookbook's web link in Safari or Chrome.</p></div></div></section></main>
+<footer class="wrap">Gitty's Kitchen · January 2009</footer>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+const RECIPES=[{"id":"r-bobbys-challah","c":"Bread","t":"Bobby's Challah","by":"","s":[[1,"",["6 lb flour","2 tbsp salt","3 oz yeast","2 eggs + 1 yolk","2¼ cup sugar","1 stick margarine","¼ cup oil","5½ cup water"]],[0,"",["Mix yeast with 1 cup lukewarm water and 1 spoon sugar; let stand in plate","Mix water, margarine, eggs","In mixer put in flour, salt, and oil","Then add the yeast mixture, water, margarine, and eggs","Mix well","Smear oil","Cover with plastic bag and towel","Let rise ½ hour, then punch","Let rise again for about 1 hour","Then braid the dough","Let rise another 1 hour","Put eggs, and poppy/sesame seeds on","Bake on 400°F for 15 minutes","Then bake on 375°F for 1 hour"]]]},{"id":"r-schlesingers-challah","c":"Bread","t":"Schlesinger's Challah","by":"","s":[[1,"",["5 lb flour – sifted","3 eggs","2 oz Yeast","½ cup oil","2 tbsp salt","¼ cup sugar","4½ cups warm water"]],[0,"",["Mix yeast with lukewarm water and sugar, let stand for 15 minutes","Add rest of ingredients in the mixer","Then add the yeast mixture in the mixer","Mix for 5 minutes in mixer","Cover with plastic bag and towel","Let rise 1 hour, then punch","Let rise again for about ½ hour","Then braid the dough","Let rise another 1 hour","Put eggs, and poppy/sesame seeds","Bake on 375°F for 15 minutes","Then bake on 350°F for 30 minutes"]]]},{"id":"r-croissants","c":"Bread","t":"Croissants","by":"","s":[[1,"",["4 oz yeast","2 tsp salt","1½ tbsp sugar","2 cup orange juice or apple juice","2 eggs","6½ -7 (8) cups flour","2 sticks margarine"]],[1,"For brushing",["2 eggs, beaten","Poppy seeds, optional"]],[0,"",["In a big bowl, add yeast. Sprinkle with salt and sugar. Add water. Stir until yeast is dissolved.","Add eggs and flour, a little at a time. Save some flour for rolling dough. Knead until smooth and satiny.","Put dough onto floured surface. Roll to a square, about ½-inch thick.","Slice margarine thinly. Cover half of dough with sliced margarine. Fold other half of dough over. Press together.","Roll dough out again lightly to a rectangle. Fold into twice. Let dough rest in refrigerator for 20 minutes, covered.","After 20 minutes repeat procedure third. Let dough rest in between rolling.","Roll dough out to a rectangle, 8-by-20-inches.","Cut out 5 to 10 squares. Divide each into a triangle by cutting diagonally. Starting at the base, roll each to form a croissant.","Fold tips of croissants slightly. Put on baking sheet. Let rise, covered, in a warm place for about 20 minutes.","Brush croissants with beaten egg. Sprinkle with poppy seeds, if used. Bake at 425°F for 15 minutes, depending on the size."]]]},{"id":"r-challah","c":"Bread","t":"Challah","by":"","s":[[1,"",["6 lb flour – sifted","¾ cup sugar","3oz. yeast","5½ cups water","4 eggs","¾ cup oil","3 tbsp salt"]],[0,"",["Add yeast, water, and sugar and mix them","Put in eggs one at a time","Then add oil and mix it","When dough forms, and salt and mix for 5 minutes","Put into bowl and let rise for 1½ hours","Make a brachah and take Challah. Dived dough, and make Challahs. Egg them","Put into oven at 250°F for 10 minutes","Bake at 400°F for 45 minutes, or until golden brown"]]]},{"id":"r-mock-cheese-flavored-rugelach","c":"Bread","t":"Mock Cheese Flavored Rugelach","by":"Dovy Gluck","s":[[1,"Dough",["7 cups flour","2 Sticks margarine","4 eggs","5 tbsp Yeast","6 tbsp sugar","1 cup water","Salt to taste"]],[1,"Syrup",["3 cups water","2 cups sugar","3 tsp vanilla sugar","¾ cup lemon juice"]],[0,"",["Put dough in refrigerator for 1 hour","Cook syrup and let cool to almost room temperature","Bake for 350°F until a little brown, not more","Dip rugelech in syrup while hot for 1-2 seconds and put on towel to cool and dry","Freeze immediately"]]],"n":"The original page doesn't describe shaping the rugelach. Roll and shape as you usually do before baking."},{"id":"r-challah-kugel","c":"Kugel","t":"Challah Kugel","by":"","s":[[1,"",["1 small challah","¼ cup wine","⅛ tsp pepper","¼ tsp salt","1 apple (optional)","¼ cup sugar"]],[0,"",["Soak challah in water","Squeeze the water out","Then put the water in a bowl","Then add the rest of the ingredients"]]]},{"id":"r-bobby-lukshen-kugel","c":"Kugel","t":"Bobby Lukshen Kugel","by":"","s":[[1,"",["1 pack of thin lushes","7 eggs, separate","¾ cup oil less","Little salt","1 vanilla sugar","1 lemon juice"]],[0,"",["Mix all ingredients except sugar whites from the egg","Put in a bekele","Bake for 1 hour","The n mix now with sugar"]]]},{"id":"r-potato-kugel","c":"Kugel","t":"Potato Kugel","by":"Feta Yoel","s":[[1,"",["20 potatoes","16 eggs","4 tsp salt","1⅓ cup oil","1 cup water","1½ tsp pepper"]],[0,"",["Bake at 550°F until the top is brown","Then turn to 425°F for 2 hours"]]]},{"id":"r-lukshen-kugel","c":"Kugel","t":"Lukshen Kugel","by":"","s":[[1,"",["1 pack thin lukshen","7 eggs separated","¾ cup sugar","¾ cup oil less","Little salt","1 vanilla sugar","1 lemon juice"]],[0,"",["Mix yellow from the egg, with sugar","Shmir oil with bekele","Let bake at 350°F for 1 hour","Mix snow with ¾ cup sugar and lemon juice","1 cup walnuts and 1 cup brezul put on he top","Lat bake another ½ hour"]]]},{"id":"r-apple-kugel","c":"Kugel","t":"Apple Kugel","by":"Reizy Meyer","s":[[1,"",["3 cups flour","¾ cup sugar","1 tsp vanilla sugar","1 egg","1 tsp baking powder","⅔ cup oil"]],[0,"",["Mix toghter","Dived in half put half on the bottom"]],[1,"",["2 green apples","2 red apples"]],[0,"",["Sliced the apple very thin","½ cup sugar (little more)","Put it in 9X13 bekele","Bake on 350°F for 1 hour"]]]},{"id":"r-fruit-soup","c":"Soups","t":"Fruit Soup","by":"","s":[[1,"",["3lb. peaches","2lb. plums","1lb. apricot","1lb. cherries","1lb. strawberries","1lb. grapes","1¾ cup sugar","1 lemon"]],[0,"",["Cut all fruits and take out pits","Cut them in ¼","Cook for 2-3 hours"]]]},{"id":"r-cream-of-broccoli-soup","c":"Soups","t":"Cream of Broccoli Soup","by":"","s":[[1,"",["4 quart pot","1 stick margarine","2 tbsp flour"]],[0,"",["Mix these three ingredients together"]],[1,"",["Water to cover","Broccoli (32 oz)","Salt","Pepper","Chicken flavor"]],[0,"",["Cook for 1½-2 hours","Can add lukshen"]]]},{"id":"r-butternut-squash-soup","c":"Soups","t":"Butternut Squash Soup","by":"","s":[[1,"",["4 squash (don’t peel)","4 potatoes","1 onion (diced)","2-3 garlic","Salt","Pepper"]],[0,"",["Cook for 1 hour","Then blend"]]]},{"id":"r-mushroom-and-barley-soup","c":"Soups","t":"Mushroom and Barley Soup","by":"","s":[[1,"",["2 pack fresh mushrooms (10oz. diced)","4 med. onion (diced)","Black pepper (lot)","Chili power (little)","Salt (lot)","Paprika (lot)"]],[0,"",["Sauté mushrooms, spices","Put the onions in oil for about ½ hour","Then check if there is enough salt","Add water and put in one pack of barley","Let cook for about 2 hours","Put in a 8 quart pot"]]]},{"id":"r-chickpea-soup","c":"Soups","t":"Chickpea Soup","by":"","s":[[1,"",["1 pack of chickpeas","2 onions (diced)","8 quart pot","2 big carrots (grated in)","Salt","Pepper","Curry power","Chili power"]],[0,"",["Fill the pot ¾ with water","Cook for 2-3 hours"]]]},{"id":"r-leftover-chicken-soup","c":"Soups","t":"Leftover Chicken Soup","by":"","s":[[0,"",["Blend all the vegetables from your chicken soup","Sift the chicken soup"]],[1,"Put in",["1 big bag of vegetable blend it ½ way"]],[0,"",["Put it in a 8 quart pot","Fill it up with water"]],[1,"",["Add spices if necessary"]],[0,"",["Cook until vegetables are soft"]]]},{"id":"r-knaidlach","c":"Soups","t":"Knaidlach","by":"","s":[[1,"",["1 egg","½ tbsp oil","Salt","Pepper","1 tbsp sugar","⅛ tsp. baking powder","3 + T matzo meal"]],[0,"",["Chill batter","Put into boiling water","Form balls with your hands (hands should be wet)","Keep the pot covered","Cook"]]]},{"id":"r-chicken-soup","c":"Soups","t":"Chicken Soup","by":"","s":[[1,"",["1 pk. of chicken (cleaned and “krilled”)","1 pk. of turkey bones of drum","1petishka","1 pasternak","2 sticks celery","3 carrots","½ kohlrabi","1 small turnip","1 hand egg tomato","1 small onion","2 cloves garlic","1 tiny piece if ginger","1 piece fresh red pepper"]],[0,"",["Salt to taste (if blood pressure is at healthy level)","Cook chicken for a ½ hour in six quart of water.","Add rest if ingredients and allow to boil for 1 hour (az s’zol zich nisht aristzien dee kraft de vegetables).","Clean skim with Hungarian spoon every so often."]]]},{"id":"r-sweet-and-sour-fish","c":"Fish","t":"Sweet and Sour Fish","by":"","s":[[1,"",["6 slices fish ( white, pike, salmon)","3 big onions","½ cup sugar"]],[0,"",["Sauté until no liquid and onions brown","Add water salt and 1 tbsp vinegar","Cook for 1 hour","Then add bay leaves","Cook for another 10 minutes"]]]},{"id":"r-marinated-sour-fish","c":"Fish","t":"Marinated Sour Fish","by":"Montreal Bobby","s":[[1,"",["6 slices salmon fish","2 medium onions","¾ cup ketchup","¾ cup vinegar","¾ cup water from the fish","1 tbsp pickling spices","½ cup sugar","Little garlic powder"]],[0,"",["Cook fish with onions and salt for 20 minutes","Let cool","Then take off the bones and the skin","Put in a container","Cut the onions thin, put it on top with the rest of the ingredient","Between the fish and the sauce put a net","Make 2 days before using"]]]},{"id":"r-tuna-salad","c":"Fish","t":"Tuna Salad","by":"","s":[[1,"",["2 cans tune","1 hard egg (mashed)","Mayonnaise","1 carrot (grated)","1 celery (diced)","Salt","Pepper"]],[0,"",["Mix all ingredients"]]]},{"id":"r-marinade-for-rainbow-trout","c":"Fish","t":"Marinade for Rainbow Trout","by":"","s":[[1,"",["2 tbsp mustered","2 tbsp honey","2 scallions chapped","1 small onion (grated)","⅓ cup dry white wine","⅓ cup olive oil","¼ cup lemon juice","½ tsp salt","½ tsp pepper"]],[0,"",["Marinate overnight","Bake on 350°F for ½ hour covered"]]]},{"id":"r-dill-sauce-for-fish","c":"Fish","t":"Dill Sauce for Fish","by":"","s":[[1,"",["1 cup mayonnaise","1 bunch fresh dill","2 tbsp vinegar or dill pickle juice","1 tbsp sugar (less)","1 tsp mustard"]],[0,"",["Blend all ingredients in blender or food processor"]]]},{"id":"r-balsamic-glazed-tuna","c":"Fish","t":"Balsamic Glazed Tuna","by":"","s":[[1,"",["3 tuna steaks"]],[1,"Glaze",["½ cup olive oil","¼ cup balsamic vinegar","2 tbsp honey or brown sugar","½ tsp salt","¼ tsp black pepper"]],[0,"",["Combine all ingredients for glaze in a shallow bowl.","Add tuna steaks and toss to coat.","Place in refrigerator for a few hours.","Reserve marinade.","Hart 3 tbsp in oil in skillet over medium hart.","Sauté tuna in hot oil 3 to 4 minutes in each side or until cooked though.","In small saucepan boil reserved marinade.","Drizzle on top pf cooked fish."]]]},{"id":"r-tongue","c":"Meat","t":"Tongue","by":"","s":[[1,"",["2 Tongue- cook for 4 hours in","Water","Salt","Pepper","3 onions"]],[0,"",["Peel when hot, cool, cut into slices and warm in sauce"]],[1,"Sauce",["4-13.5oz. Can tomato sauce","1-12oz. Apricot jam","4-6oz. BBQ sauce"]]]},{"id":"r-untitled-beef-stew-with-asparagus","c":"Meat","t":"Untitled: Beef Stew with Asparagus","by":"","s":[[1,"",["2¼lb. beef stew cut in quarters","¼lb. asparagus","1 Big onion-diced, 3 cloves garlic-diced cook until brown"]],[0,"",["Little olive oil","Put in beef stew","½ tsp Salt","Sprinkle pepper on meat"]],[1,"",["Dash of curry powder","1 tbsp BBQ sauce"]],[0,"",["Mix well","Put in asparagus"]],[1,"",["4 Large cubed potatoes","14 oz Mushrooms cubed"]],[0,"",["Add 3-4 cups water","Cook for 2 hours"]]],"n":"This recipe has no name in the original cookbook."},{"id":"r-apricot-chicken","c":"Meat","t":"Apricot Chicken","by":"","s":[[1,"",["¼ cup mayonnaise","1¼ cup ketchup","¼ cup apricot jam"]],[0,"",["Mix together","Lemon juice, soup mix","Dip 8 chicken pieces in above mixture then in lemon juice and soup mix"]]]},{"id":"r-veal-roast","c":"Meat","t":"Veal Roast","by":"","s":[[1,"",["6lb. veal roast, French roast, breast of beef, chicken","½ cup ketchup","8 oz honey","¼ tsp vinegar","3 heaping T mustard","5 tbsp brown sugar","3 tbsp lemon juice"]],[0,"",["Rinse season with salt, pepper, and garlic, add rest of ingredients","Bake on 350°F for 2½ hours, 400°F for 15 minuets","Prick oven bag before putting in oven"]]]},{"id":"r-spice-ribs","c":"Meat","t":"Spice Ribs","by":"","s":[[1,"",["6lb. breast of veal","½ cup ketchup","8 oz jar honey","3 tbsp mustard","5 tbsp sugar","2 tbsp lemon sugar"]],[0,"",["Rinse breast season with salt, pepper, and garlic","Add remaining ingredients","Bake on 350°F for 2½ hours, 400°F for 15 minutes"]]]},{"id":"r-chicken-with-rice-and-mushrooms","c":"Meat","t":"Chicken with Rice and Mushrooms","by":"","s":[[1,"",["Chicken","½ onion soup mix","4 oz mushrooms","1 cup rice","2 cups water"]],[0,"",["Bake the chicken with all the ingredients for 1 hour"]]]},{"id":"r-layered-potatoes","c":"Meat","t":"Layered Potatoes","by":"","s":[[1,"",["Potatoes- salt (little), pepper","Ketchup","Salami","Mayonnaise","Eggs"]],[0,"",["Mix the ketchup and mayonnaise","Put a layer of potatoes","Salami","Eggs","Ketchup, mayonnaise","Repeat until finished all your ingredients"]]]},{"id":"r-marinate-with-chicken","c":"Meat","t":"Marinate with Chicken","by":"","s":[[1,"",["Vinegar","Fresh garlic","Lemon","Oregon","Salt","Paprika","1 pack of chicken"]]]},{"id":"r-hazel","c":"Meat","t":"Hazel","by":"","s":[[1,"",["Small challa- soak in water, a lot"]],[0,"",["Squeeze 1-2 eggs, garlic, salt pepper, and parsnip twigs mix"]],[1,"",["Hazel"]],[0,"",["Sew up 1 end hazel leave open neck end, and sew again","Bake for 1 hour and 15 min. on 350°F","Cool, cut slices, and fry in oil"]]]},{"id":"r-untitled-chicken-with-frankfurters","c":"Meat","t":"Untitled: Chicken with Frankfurters","by":"","s":[[1,"",["6 garlic","2 onions","Pepper","Chili power","Cumin"]],[0,"",["Put in hot oil","Let cook until it becomes brown"]],[1,"Then add the following",["4 bottoms medium from the chicken","6 Frankfurters","3 Plum tomatoes","Soy sauce","Bank sauce"]],[0,"",["Cook until it’s ready to eat (15-20 minutes)"]]],"n":"This recipe has no name in the original cookbook."},{"id":"r-chicken-with-lukshen","c":"Meat","t":"Chicken with Lukshen","by":"","s":[[1,"",["1 onion (sliced)","2 celery (diced)","Salt","White pepper","Garlic","Paprika","Chili power","White dry wine","2 packs chicken"]],[0,"",["Put everything in pot with oil","Let cook until ready","Sprinkle on the chicken shawarma seasoning (spice)","After chicken is cooked can add lukshen"]]]},{"id":"r-glinglech","c":"Meat","t":"Glinglech","by":"","s":[[0,"",["Use leftover cooked chicken from bones or bottoms and collect in a container until there’s enough to make a dish for your sized family. Chop.","Make a reistel using an even amount of flour and oil. Add crushed garlic (that was chopped on a non-metal grater) to taste. Combine with chopped and boil for several minutes.","Use as a main dish, entrée, or whenever desired."]]]},{"id":"r-china-sun-stir-fry","c":"Side Dish","t":"China Sun Stir-fry","by":"","s":[[1,"",["1 can (20 oz) pineapple chunks","3 tbsp soy sauce","1 tbsp corn starch","1 tsp vinegar","¼ tsp hot red pepper flakes","½ ld. Chicken breasts","1 tbsp vegetable oil","2 cloves garlic (pressed)","1 tsp ginger","1 onion cut in wedges","2 medium carrots (slivered)","2 cups broccoli","1 green or red pepper (slivered)"]],[0,"",["Drain pineapple, reserve 3 tbsp juice","Mix reserved","Juice with ½ cup water, soy sauce, corn starch, vinegar, and pepper flakes set aside","Cut chicken in strips in skillet, brown chicken in hot oil","Add garlic and ginger cook 1 minute","Add onion, carrots and broccoli cook 1 minuet","Stir sauce","Add to skillets with pineapple and pepper","Cook until sauce boils and thickens"]],[1,"",["Makes 4 serving"]]]},{"id":"r-vegetable-stir-fry","c":"Side Dish","t":"Vegetable Stir-fry","by":"","s":[[1,"",["2 tsp corn starch","½ cup soy sauce","1 cup chicken broth","¼ cup mustard","½ tsp ginger","3 tbsp oil","1 cup onions","1 thinly sliced red pepper","1 thinly sliced green pepper","6 oz pea pods"]],[0,"",["Mix corn starch and soy sauce","Then mix it together with chicken broth, mustard, and ginger","Mix oil, onions, and pepper for 3 minutes","Mix in pea pods for 2 minuets","Stir in soy sauce mixture","Bring to a boil","Gently stir in bean spouts","Heat to warm","Serve over rice"]],[1,"",["Makes: 4-6 servings"]]]},{"id":"r-vegetable-salad","c":"Side Dish","t":"Vegetable Salad","by":"","s":[[1,"",["1 pack frozen California style vegetable","Steamed or boil in water 15 minutes","4 oz mushrooms (cut)","1 onion (deiced)","3 sour pickles (sliced)","1 cubash (cut half round)","A pinch of salt","A pinch of black pepper","Mayonnaise"]],[0,"",["Optional: for very tasty can add the wide chow mien (noodles)"]]]},{"id":"r-lukshen-salad","c":"Side Dish","t":"Lukshen Salad","by":"","s":[[0,"",["Cook up 1 lb spiral lukshen and let it cool"]],[1,"",["Dice 3 big onions","8 oz mushrooms (cut)","2 carrots (grated)","¼ tsp salt","½ tsp pepper","1 tbsp vinegar","5 tsp mayonnaise"]],[0,"",["Mix well lukshen and all other ingredients","Refrigerated"]]]},{"id":"r-zucher-bean-salad","c":"Side Dish","t":"Zucher Bean Salad","by":"","s":[[1,"",["8 oz Zucher beans (cooked)"]],[0,"",["Cook up hot water","Steam Mexican blend for 15 minuets","Mix Mexican blend with beans"]],[1,"",["Pinch of salt","Pinch of pepper","Dice onions in circles","1 tsp vinegar","1 tsp BBQ sauce","1½ tbsp mayonnaise"]],[0,"",["Mix well","Chill optional add slivered almonds before serving"]]]},{"id":"r-apple-strudel","c":"Side Dish","t":"Apple Strudel","by":"","s":[[1,"",["1 flaky dough","2 vanilla sugar","1 cup sugar","10 large apples","1 tsp cinnamon"]],[0,"",["Bake at 350°F for 1 hour","Divide flaky dough in half; put ½ on the top and ½ on the bottom"]]]},{"id":"r-broccoli-and-cauliflower-salad","c":"Side Dish","t":"Broccoli and Cauliflower Salad","by":"","s":[[1,"",["1 pack broccoli","1 pack cauliflower","1 can mushrooms (16 oz)","Mayonnaise","1 can baby corn (16 oz)"]],[0,"",["Mix well and refrigerate"]]]},{"id":"r-pineapple-pie","c":"Side Dish","t":"Pineapple Pie","by":"Udi","s":[[1,"",["2 Graham cracker pie crust","4 eggs","½ cup flour","½ cup sugar","½ cup oil","1 tsp baking powder","1 vanilla sugar","1 crushed pineapple (drained)"]],[0,"",["Mix everything together- except the graham cracker pie crust","Can add Cherry or blubbery pie filling on top","Bake on 350°F of 45 minuets"]]]},{"id":"r-oatmeal-cherry-pie","c":"Side Dish","t":"Oatmeal Cherry Pie","by":"Chaya","s":[[1,"",["1 cup flour","1 cup oatmeal (company H-O)","1 stick margarine","½ cup brown sugar","½ tsp cinnamon"]],[0,"",["Crumple them all up"]],[1,"",["1 can cheery pie filling","2 green apples (grated)"]],[0,"",["Bake on 350°F for 1 hour","Put in a 11” pie pan"]]]},{"id":"r-tomato-salad","c":"Side Dish","t":"Tomato Salad","by":"","s":[[1,"",["5 tomatos (diced)","1 small onion (diced)","1½ cup broccoli","Oil","Salt","Pepper"]],[0,"",["Mix together"]]]},{"id":"r-mushroom-with-rice","c":"Side Dish","t":"Mushroom with rice","by":"","s":[[1,"",["1 medium onion (diced)","1 pack fresh mushroom (10oz) (cut in small pieces)","Salt","Pepper","Curry powder","Paprika","Beef flavor (optional)","1 cup rice","2-3 cup water"]],[0,"",["Put oil to boil and then spices","Let cook for 10 min. on a low flame","Then add mushroom","Cook for 20-30 min. (until it is ¾ cook)","Then add rice with water","Cook until ready"]]]},{"id":"r-pastrami-and-salami-salad-1","c":"Side Dish","t":"Pastrami and Salami Salad #1","by":"","s":[[1,"",["1½ heads lettuces","3 plum tomatoes","Pastrami","Salami","Salt","Pepper"]],[1,"Sauce",["Ketchup","Mayonnaise","Lime"]]]},{"id":"r-pastrami-and-salami-salad-2","c":"Side Dish","t":"Pastrami and Salami Salad #2","by":"","s":[[1,"",["1½ heads lettuces","Vegetable mix","Pastrami","Salami","Salt","Pepper"]],[1,"Sauce",["Ketchup","Mayonnaise","Lime"]]]},{"id":"r-salami-dish","c":"Side Dish","t":"Salami Dish","by":"","s":[[1,"",["6 salami","2 frankfurters","1 onion","2 garlic","Eggs (optional)","BBQ sauce","Salt","Pepper","Chili power"]],[0,"",["Heat up a put with oil then put in:","Onion- cook until brown, with spices and garlic","Then add the salami with frankfurters","After the salami and frankfurters are ¾ way cooked then you can add the eggs"]]]},{"id":"r-untitled-sweet-sour-lukshen","c":"Side Dish","t":"Untitled: Sweet & Sour Lukshen","by":"","s":[[1,"",["1 Green Pepper","1 onion","3 Garlic","1 Pack lukshen","2 Cans Tomato Sauce","2 tbsp Grape Jam","5 tbsp Vinegar","1 Can cut pineapple with juice","Chumum powder sprinkle","Pepper and salt sprinkle"]],[0,"",["Meat, Middle East cabab, garlic powder- rub into meat"]]],"n":"This recipe has no name in the original cookbook."},{"id":"r-untitled-mushroom-rice","c":"Side Dish","t":"Untitled: Mushroom Rice","by":"","s":[[1,"",["Stir fry vegetable","1 can of mushrooms (32 oz)","1 onion","2-3 garlic"]],[0,"",["Fry in oil"]],[1,"",["2 tbsp soy sauce","2 tbsp duck sauce","1 cup rice","Salt","Pepper","Garlic"]],[0,"",["Let stand for 10-15 minutes (after the fire is turn off)"]]],"n":"This recipe has no name in the original cookbook."},{"id":"r-untitled-baked-chicken-bottoms","c":"Side Dish","t":"Untitled: Baked Chicken Bottoms","by":"","s":[[1,"",["Chili power","Garlic","Pepper","BBQ sauce","10 minutes_____","6 chicken bottoms","Semi dry wine"]],[0,"",["Bake at 350°F for 3 hours"]]],"n":"This recipe has no name in the original cookbook."},{"id":"r-mushrooms-with-vegetables","c":"Side Dish","t":"Mushrooms with Vegetables","by":"","s":[[1,"",["1 pack fresh mushrooms (10 oz) (Cut in sliced)","1 pt. stir fry vegetable (16 oz)","Salt","Pepper"]],[0,"",["Put oil to boil","Then add the mushrooms","Drain in water"]]]},{"id":"r-stir-fry-vegetables","c":"Side Dish","t":"Stir-Fry Vegetables","by":"","s":[[1,"",["1 pack frozen stir fry vegetable (sauté a few minutes)","1 tbsp corn starch mix with ½ cup water","¼ cup soy sauce","½ tsp ginger"]],[0,"",["Cook for a few minutes"]],[1,"",["Add 1 tbsp sugar (less)","Pepper","Salt","Garlic power"]],[0,"",["Pour mixture onto vegetables and sauté another 10 minutes"]]]},{"id":"r-chow-mein-salad","c":"Side Dish","t":"Chow Mein Salad","by":"got","s":[[1,"",["1 bag lettuce","¾ lb smoked turkey – cut into strips","Thin chow mein noodles"]],[1,"Dressing",["1 tsp salt","½ tsp dry mustard","⅓ cup vinegar","1 tsp poppy seeds","½ cup oil","¼ cup sugar","1 small purple onion"]],[0,"",["Mix together, serve cold"]]]},{"id":"r-mushroom-salad","c":"Side Dish","t":"Mushroom Salad","by":"got","s":[[1,"",["3 big Portobello mushrooms"]],[0,"",["Peeled and cut up in slices","Place mushrooms in a greased pan and bake for 15 minutes"]],[1,"",["1 bag romaine lettuce","1 pack of grape tomatoes","Croutons","Honey glazed almonds"]],[1,"Dressing",["⅓ cup oil","⅛ cup vinegar","1/5 cup ketchup","¼ tsp salt","Less than ⅛ cup sugar","⅛ tsp mustard","1 clove garlic","⅛ tsp paprika"]],[0,"",["Mix together and serve cold"]]]},{"id":"r-shpenut","c":"Side Dish","t":"Shpenut","by":"","s":[[1,"",["1 pack spinach (preferably fresh)"]],[0,"",["Cook with minimal amount of water","In a separate pot make a reistel, even amount of flour and oil. Add 2 cloves of garlic, (grated on a non-metal grater) and allow to brown, mixing constantly with holzerna lefel only. When done, add cold water enough to dissolve the reistel and add to spinach. Season with a bit of salt. Add 1 raw egg and mix, to avoid and curdling.","Variation: for milchige supper, add muenster when rewarming."]]]},{"id":"r-delicious-knishes","c":"Side Dish","t":"Delicious Knishes","by":"got","s":[[1,"Dough",["1 egg","2 cups flour","2½ sticks margarine","¾ cup seltzer","1 tsp salt"]],[1,"Filling",["8 large potatoes","2 large onions","Salt","Pepper"]],[0,"Dough",["Combine room temperature margarine with the other ingredients. Start with ¼ cup less flour than the recipe calls for and add it gradually as needed once the dough is mostly kneaded. Knead until smooth.","Roll out to ⅛” thickness. Rolling between two sheets of waxed paper avoids extra flour, which makes the dough tough and keeps the knishes from staying sealed. Cut into 6” strips for 3” knishes.","Place filling down the long side of each strip, leaving ½ inch along the edge. Moisten the edge, fold the dough over the filling and seal well.","With the blunt edge of a knife, make heavy indentations every 3”. Brush with beaten egg, being careful not to smear the pan. Bake at 400°F for 45 minutes."]],[0,"Filling",["Cook the potatoes in their peels for 45 minutes to 1 hour, until a fork enters easily. Peel as soon as they can be handled (the earlier they're peeled, the easier they mash). Mash well.","Sauté the onions on a high flame, stirring often. Add to the mashed potatoes with salt and pepper to taste.","These knishes freeze very well. Prepare them up to the point of baking, then freeze. To bake, brush with egg and bake in an oven preheated to 350°F until golden brown on top."]]]},{"id":"r-letcho","c":"Side Dish","t":"Letcho","by":"","s":[[1,"",["1 onion","1 red pepper","1 green pepper","2 thin squashes","1 beef tomato"]],[0,"",["Dice all vegetables and sauté in oil (if you cover pot, less oil will be needed) until soft. Add 2 tbsp of rice with ¼ cup of water and salt and pepper to taste. Cook on low flame until rice is tender. Serve as entrée or side dish."]]]},{"id":"r-ferfel","c":"Side Dish","t":"Ferfel","by":"","s":[[1,"",["1 pack Weinstock’s slightly browned ferfel"]],[0,"",["Brown ferfel in oil, mixing constantly with holzerne lefel. In the meantime, bring water to boil in a kettle. Add water, a little at a time until ferfel soaks it all up and then continue adding until food is cooked, mixing constantly. Make sure to keep flame very low and lid covered. Season with salt and pepper to desired taste."]]]},{"id":"r-corn-salad","c":"Side Dish","t":"Corn Salad","by":"","s":[[1,"",["32 oz of frozen corn","1 cup of diced red onions (roughly the size of corn kernels)","2 medium zucchini diced ¼ inch","2 red bell peppers","4 oz cilantro (chopped) (I used parsley because many don’t like cilantro, so I switched to a milder herb)","Juice of 1 lime","Salt, pepper, cumin, to taste","Canola oil, for sautéing"]],[0,"",["Quarter the bell peppers and lay them flat skin side up on a baking sheet. Coat the skin with oil. Set in boiler until it chars (12 minutes). Remove and place on plate. Cover with roasted peppers to match the other ingredients."]]],"n":"The original page ends after step 1."},{"id":"r-cheese-souffl","c":"Dairy","t":"Cheese Soufflé","by":"","s":[[1,"",["3 eggs separate","1 cup sugar","¼ cup butter","2 cup cottage cheese","4 yolks of cooked eggs","½ tsp vanilla sugar","Salt- dash","3 tbsp flour"]],[0,"",["Mix eggs and sugar, butter, cheese and eggs mash mix together","Put all ingredients into a snow","Bake for 300°F for 35-40 minutes"]]]},{"id":"r-cheese-danishes-1","c":"Dairy","t":"Cheese Danishes #1","by":"","s":[[1,"",["2 ½ lb flour","1 ½ oz yeast","1 egg","1+ stick butter","1 tsp salt","½ cup milk + more"]],[0,"",["Grow like challah","1 lb whipped butter room tempter","Smear butter on dough","3X roll out 15 minutes stop"]]]},{"id":"r-cheese-danishes-2","c":"Dairy","t":"Cheese Danishes #2","by":"Jaffe","s":[[1,"Dough",["5lb. flour","2 whipped butter","Small sour cream","4 cups milk","3 oz yeast","3 cups sugar","Pinch of salt","2 eggs","4 yolks"]],[0,"",["Mix everything together"]],[1,"Filling",["1 farmers cheese","4 eggs","½ sour cream","Less than a ½ cup of sugar","2 instant vanilla pudding"]],[0,"",["Mix toghter","Then roll out dough","Then make squares, and then add the filling","Bake on 350°F for minutes"]]]},{"id":"r-untitled-scallion-cheese-bake","c":"Dairy","t":"Untitled: Scallion & Cheese Bake","by":"","s":[[1,"Topping",["1 bunch scallions","1cup farmer’s cheese","1 egg","2 tbsp sugar"]],[0,"",["Bake on 350°F for 1 hour"]],[1,"Base",["1 cup milk","1 cup ____ flour","½ cup flour","2 tbsp sugar","1 tbsp sour cream","1 tbsp butter","1 egg","1 tsp baking powder","Soda","½ cup flour","1 egg"]],[0,"",["Cook for 10-15 minutes"]]],"n":"This recipe has no name in the original cookbook."},{"id":"r-delkech-and-kreplech","c":"Dairy","t":"Delkech and Kreplech","by":"","s":[[1,"",["1 lb farmer’s cheese","½ cup sugar","2 eggs","2 tsp pudding","2 tsp"]]],"n":"The original page for this recipe is incomplete."},{"id":"r-cheese-cake","c":"Dairy","t":"Cheese Cake","by":"Saltzer","s":[[1,"Crust",["1 cup flour","½ cup chopped nuts","6 tbsp brown sugar","6 tbsp butter"]],[0,"",["Put in a 9” pan and bake crust at 375°F for 10 minutes"]],[1,"Cheese layer",["¾ cup ground hazelnuts","2 lb cream cheese","1 tsp vanilla sugar","1 ½ cups sugar","4 eggs","⅛ almond extract","2 oz bittersweet chocolate"]],[0,"",["Mix cream cheese then add vanilla sugar, sugar and eggs one at a time","Take off 2 cups of batter add to it hazelnuts and almond extract pour it on crust","Let freeze for 1 hour","Melt 2 oz chocolate","Add 2 cups of original cheese mixture","Pour on top of nut mixture","Freeze for 20 minutes","Then pour remaining 2 cups of cheese mixture on top","Put it into a 9” pan then into a 10X10 pan with 1” water","Cover the bottom of the 9” pan with aluminum foil","Bake at 350°F for 2 hours","Then cool in oven for 2 hours"]]]},{"id":"r-cheese-cake-chayas","c":"Dairy","t":"Cheese Cake","by":"Chaya’s","s":[[1,"",["2 cups lemon cookies","½ stick butter","2 tbsp brown sugar"]],[0,"",["Mix and out into bottom of bekele"]],[1,"",["1 ½ lb farmer’s cheese","3 eggs","¾ cup sugar","1 vanilla sugar","¼ cinnamon"]],[0,"",["Bake or 25-30 minutes"]],[1,"",["Add 1 large sour cream","3 tbsp sugar","1 vanilla sugar"]],[0,"",["Put on top and bake for another 10-15 minutes"]]]},{"id":"r-gumboats","c":"Dairy","t":"Gumboats","by":"","s":[[1,"",["1 lb farmers cheese","3 eggs","½ cup sugar","1 vanilla sugar","¾ cup farina","Salt"]],[0,"",["Put gumboats in boiling water, do not cover pot","Cook for 20 minutes","Then fry in pot with oil and bread crumbs"]]]},{"id":"r-blueberry-cheese-cake","c":"Dairy","t":"Blueberry Cheese Cake","by":"","s":[[1,"",["1 lb lemon coolies","1 stick butter","2 tbsp sugar"]],[0,"",["Mix by hand divide in ½ and put in bekele","Put 2 cans blueberry on crumbs"]],[1,"",["2 ½ lb farmers cheese","12 eggs separated","1 ½ cups sugar","2 tbsp cornstarch","8 tbsp flour","1 lg. sour cream","2 vanilla sugar"]],[0,"",["Make a snow with the eggs","Then mix everything together and put the other ½ of crumbs on top","Bake on 350°F for 1 hour"]]]},{"id":"r-kreplech-1","c":"Dairy","t":"Kreplech #1","by":"","s":[[0,"",["Cook up 3 potatoes with peels then peel it"]],[1,"",["1 egg","1 tsp oil","2 cups flour","Drop of salt"]],[0,"",["Mix all 5 ingredients for shlishkes stop here","For kreplech roll out dough","Sprinkle with salt and sugar then cut into cookie shape with a glass","Fill with (1) lekvar and bread crumbs or matzo meal or"]],[1,"",["(2) cheese"]],[0,"",["Fold over in half","Put in boiling water and cook for 20 minutes","Then brown with bread crumbs and oil"]]]},{"id":"r-kreplech-2","c":"Dairy","t":"Kreplech #2","by":"","s":[[1,"",["1 small sour cream","Whipped cream cheese","2 eggs","3 ½ cups four","1 tbsp oil"]],[0,"",["Drop of salt"]],[1,"Filling",["1 ¼ lb farmers cheese","2 egg yolk","1 cup confection sugar","½ cup matzo meal"]],[0,"",["Cook in open pot of boiling water for 20-30 minute"]]]},{"id":"r-kreplech-3","c":"Dairy","t":"Kreplech #3","by":"","s":[[1,"",["1 lb farmers cheese","1 lb butter","3 ½ cups flour"]],[0,"",["Knead and refrigerate","Roll out","Then put in filling"]]]},{"id":"r-fritlech","c":"Dairy","t":"Fritlech","by":"","s":[[1,"",["1 cup flour","1 cup milk","½ tsp salt","1 tsp sugar","1 unbeaten egg"]],[0,"",["Mix together","Deep fry in oil"]]]},{"id":"r-delklech","c":"Dairy","t":"Delklech","by":"","s":[[1,"",["2 cups flour","⅛ tsp salt","2 sticks butter"]],[0,"",["Cut with knife","Mix with flour","Add ½ cup sour cream and mix a little","Put it in a plastic bag and refrigerate for 4 hours"]],[1,"Filling",["8 oz J&J cream cheese","1 egg","½ cup sugar","1 tsp vanilla sugar"]],[0,"",["Drop of lemon juice","Dived into 3","Roll out to 9X12","Cut 3X3 squares","Line mini muffin","Bake on 375°F for 20-25 minutes","Put confection sugar","Makes 36 pieces"]]]},{"id":"r-waffle","c":"Dairy","t":"Waffle","by":"","s":[[1,"",["2 eggs","2 tsp sugar","1 pinch of salt","1 cup milk","1 cup flour"]],[0,"",["Mix together","Cool in very hot oil"]]]},{"id":"r-party-shells","c":"Dairy","t":"Party Shells","by":"got","s":[[1,"",["(use Timbale Molds)","1 egg","½ Teaspoon sugar"]],[0,"",["Scant ⅔ cup evaporated milk"]],[1,"",["½ flour","⅛ teaspoon salt"]],[0,"",["Place all ingredients in blender and mix well. Allow batter to stand in refrigerator 1-2 hours before using. Follow instructions for frying Rosettes, making sure that bottom of mold is covered with batter. Makes approximately 22 Party Shells.","Should air bubbles from an bottom of mold, try titling iron slightly as it is plunged into batter before completely lowing mold, giving air a chance to escape up the opposite side of mold. Use same technique when deep frying- tilt iron slightly so mold goes into oil at a slight angle, straightening handle to 90 angle to fry.","*Recipe for Rosette Cookies can also be used for making Party Shells."]]]},{"id":"r-popcorn","c":"Dairy","t":"Popcorn","by":"","s":[[1,"",["Butter","About 1½ cup popcorn seeds"]],[0,"",["Put in a pot","Let pop, but have to keep on mixing it"]]]},{"id":"r-baked-ziti","c":"Dairy","t":"Baked Ziti","by":"","s":[[1,"",["1 pack of ziti lukshen","2 cans pasta sauce","Vodka","1 lb mozzarella cheese"]],[0,"",["Mix together","Bake on 350°F"]]]},{"id":"r-rosette-cookies","c":"Dairy","t":"Rosette Cookies","by":"got","s":[[1,"",["2 eggs, slightly beaten","1 teaspoons sugar","¼ teaspoon salt","1 cup milk","1 cup sifted flour","1 tablespoon lemon extract*"]],[0,"",["Add sugar to eggs, then add milk. Sift flour with salt. Stir into egg mixture and beat until smooth (about consistency of heavy cream). Add flavoring. Fry and cool as directed. Makes approximately 40 Rosettes. When cool, or before serving, sprinkle with confectioners-sugar combination. Serve with cookie face up.","*In place of lemon extract, flavor with vanilla, brandy, anise, or rum extract."]]]},{"id":"r-rosette-crackers","c":"Dairy","t":"Rosette Crackers","by":"got","s":[[1,"",["2 eggs, slightly beaten","1 tsp garlic, onion, or celery salt or a combination of seasonings","¼ tsp milk","1 cup flour"]],[0,"",["Add seasoning, milk and flour to slightly beaten egg. Beat until smooth. Follow instructions for frying Rosettes. Makes approximately 40 crackers. Sprinkle with parmesan cheese."]]]},{"id":"r-1-2-3-pizza","c":"Dairy","t":"1-2-3 Pizza","by":"got","s":[[1,"",["(Can be double, or triple easily)","1 oz yeast","5½ oz apple juice (small can)","1 egg","¼ cup oil","Pinch of salt","2½ cups flour"]],[0,"",["Preheat oven on 375°F","Combine yeast with small amount less than 1 tbsp sugar, until syrup forms. (Yes, it will form a syrup without adding any liquid.)","Add juice, egg, oil and mix well. Then add salt, slowly add flour. Knead until you have smooth, elastic dough.","Very lightly grease 9X13 (or round) pan. Spread dough evenly, forming slightly higher crust at the side.","Spread with sauce and sprinkle with grated cheese.","Bake for 25 minutes, serve hot"]],[1,"Sauce",["1 small can tomato paste","4 tbsp ketchup","Spices (salt, pepper, oregano, garlic, onion power…)","Cheese use grated mozzarella cheese"]]]},{"id":"r-lasagna-roll-ups","c":"Dairy","t":"Lasagna Roll-Ups","by":"got","s":[[1,"",["1 pack lasagna","1 lb farmer cheese","4 oz shredded Mozzarella or American Cheese","3 eggs","¼ tsp salt","⅛ tsp pepper"]],[0,"",["Boil lasagna according to directions on the box. Rinse with cold water. Drain well and pat dry with paper towels.","In large bowl combine farmer cheese, most of the grated hard cheese, eggs, salt and pepper.","Spread about 2 tbsp cheeses mixture on a strip of lasagna. Roll up and place seam side down on lightly greased in a 9X13 bekele","Repeat with remaining lasagna stripes. Pour sauce over roll-ups and sprinkle with leftover cheese","Bake at 350°F for about ½ hour. Serve hot."]],[1,"Sauce",["1 can tomato sauce","1 can tomato paste","1 onion","1 small can mushrooms","1 green pepper","2 tbsp sugar","Garlic power","Onion power","Oregon"]],[0,"",["Dice onion and pepper. Sauté vegetables in a very little oil on a high flame, stirring constantly. When the vegetables are soft, add the tomato sauce and tomato paste. Bring to a boil","Pour on top of the lasagna"]]]},{"id":"r-easy-no-bake-cheesecake","c":"Dairy","t":"Easy No-Bake Cheesecake","by":"got","s":[[1,"Shell",["1¼ cup crushed graham crackers","3 tbsp melted butter"]],[1,"Topping",["1 can pie filling or fresh fruit, sliced and arranged (kiwis, strawberries, bananas (rubbed with lemon juice)"]],[1,"Filling",["1½ – 2 instant vanilla pudding","1½ cups milk","3 oz cream cheese","1 cup sour cream"]],[0,"",["Put crackers in plastic bag and close. Crush with rolling pin until they have a fine consistency. (Crackers can also be put into food processor.) Mix with melted butter. Press firmly into pie pan.","Combine filling ingredients. Using beater, beat until you get a smooth consistency and the mixture is firm, about 10 minutes.","Pour into shell. Let set in refrigerator for 10-15 minutes.","Put one can fruit pie filling on top or garnish with fresh fruit","This also makes very small tarts."]]]},{"id":"r-broccoli-au-gratin","c":"Dairy","t":"Broccoli Au Gratin","by":"got","s":[[1,"",["½ cup breadcrumbs","⅓ cup butter, melted","⅓ cup diced onion","3 tbsp flour","½ tsp salt","Dash pepper","1½ cups milk","1 cup grated American cheese","4 cups cooked, drained bodek broccoli (about 1½ lb)"]],[0,"",["Combine breadcrumbs and 2 tbsp of the butter, set aside.","Add onions to remaining butter. Sauté over low heat. Add flour salt, pepper. Stir in milk. Increase heat to medium; cook until it bubbles and thickens, stirring constantly. Add cheese, stir until smooth.","Stir in broccoli. Spread in shallow 1½ quart dish. Sprinkle with breadcrumb mixture.","Bake on 350°F for about 20 minutes until it bubbles and the breadcrumbs are a golden brown"]],[1,"",["Can try subsisting other vegetables for variety."]]]},{"id":"r-scalloped-potatoes","c":"Dairy","t":"Scalloped Potatoes","by":"got","s":[[1,"",["3 tbsp butter","1 small onion, diced","3 tbsp flour","1 tsp salt","1½ cups milk","¼ lb (1 cup) cheese Cheddar, American, etc. shredded (grated)","5 medium-size potatoes (about 2 lb) peeled, sliced thinly","¼ tsp paprika"]],[0,"",["Preheat oven to 375°F","Cook onion in butter until soft, about 5 minutes. Stir in flour and salt until blended. Gradually stir in milk and cook stirring constantly, until mixture thickens slightly. Take pan off fire, mix in ¼ cup shredded cheese.","In casserole, put half of potato slices and pour half of sauce on top. Sprinkle with half of remaining cheese. Repeat. Sprinkle with paprika.","Bake, covered, for 45 minutes. Uncover and bake 15 minutes longer or until potatoes are tender (soft)."]]]},{"id":"r-cheese-cake-3","c":"Dairy","t":"Cheese Cake","by":"","s":[[1,"Crust",["10 graham crackers (whole)","1 stick margarine"]],[1,"Filling",["1 lb farmers cheese","2 eggs","Less than ⅓ cup sugar","1 tsp vanilla sugar"]],[1,"Topping",["Small sour cream","Less than ⅓ cup sugar"]],[0,"",["Blend crackers to make crumbs","Mix with margarine","Press into pan","Put filling in pan and bake on 350°F for 25-30 minutes","Mix topping and place on top of the filling and bake for additional 15-20 minutes"]]]},{"id":"r-pizza-topping","c":"Dairy","t":"Pizza Topping","by":"","s":[[1,"",["1 (13 oz) mushrooms","1 onion","1 green pepper","5 plum tomatoes","Broccoli – as much as needed","Cheese – as much as needed"]],[0,"",["Cut all the above ingredients into tiny pieces","Then put the ingredients on top of the pizza","Then add cheese on top of the topping/pizza"]]]},{"id":"r-marble-cake","c":"Cakes","t":"Marble Cake","by":"Jaffe","s":[[1,"",["7 eggs (separated)","2 cups sugar","1 vanilla sugar","1 cup orange juice","¾ cup oil","2 tsp baking powder","2 cups flour","4 tsp cocoa"]],[0,"",["Put a little less than 1 cup sugar in the whites and beat until stiff","Put a little less than 1 cup sugar in the yolks and beat until light yellow","Mix the oil in the yolks","Then put the orange juice in the yolks","Last add the baking powder in the flour and mix into the yolk mixture","Mix the snow into the yolk mixture","Bake on 350°F for 1 hour"]]]},{"id":"r-wafer-cake","c":"Cakes","t":"Wafer Cake","by":"","s":[[1,"",["3 packages zebra cookies","2 tbsp sugar","2 tbsp cocoa","2 tbsp coffee","1 vanilla Sugar","1½ cup water"]],[0,"",["Mix all ingredients in plate. Dip zebra cookies in mixture","Place cookies in 5 rows to make checkerboard cookies"]],[1,"",["2½-3 sticks margarine","¾ box confectioner sugar","3 eggs","2 vanilla sugar"]],[0,"",["Mix well and then add in juice of 1 lemon"]]]},{"id":"r-farfel-cake","c":"Cakes","t":"Farfel Cake","by":"","s":[[1,"",["5 cups flour","½ lb margarine","6 yolks","1 cup sugar","1 vanilla sugar","2 tsp baking powder","1 grated lemon"]],[0,"",["Mix all ingredients to form dough put ½ in freezer","Other ½ roll out in a 10X16 bekele","Put 3 tbsp jam on dough"]],[1,"",["6 egg white","1 cup sugar","½ lb grated nuts","1 vanilla sugar","1 tbsp cocoa"]],[0,"",["Mix all ingredients together and put on dough","Grate the other ½ of the dough onto cake (for 3 hours in freezer)","Bake on 350°F for 50-60 minutes"]]]},{"id":"r-chiffon-cake","c":"Cakes","t":"Chiffon Cake","by":"","s":[[1,"",["2 cups flour","1½ cup sugar","3 tsp baking powder","½ cup oil","7 eggs- snow","½ tsp cream of tartan","¾ cup water","2 tsp vanilla sugar"]],[0,"",["Mix all ingredients together and put in a 10” round bekele","Bake on 350°F for 50-60 minutes"]]]},{"id":"r-custard-pineapple","c":"Cakes","t":"Custard Pineapple","by":"","s":[[0,"",["Bake 2 flaky dough (1 pack) on outside of a cookie sheet","App. 20 minutes stick in with a fork"]],[1,"Cake",["6 egg whites make a snow","1 glass sugar less","1 tsp baking powder","1 vanilla sugar"]],[1,"Add",["6 yolks 7 cup flour","2 tbsp orange juice","1 tbsp oil","1 tsp vinegar"]],[0,"",["Bake on 350°F for 25 minutes"]],[1,"Filling",["3 yolks","5 oz nutola"]],[0,"",["Mix in mixer"]],[1,"Cook",["1 cup water","1 cup pineapple juice","1¼ cup sugar"]],[1,"Slowly add",["14 tbsp corn starch (1 cup)","1 cup water"]],[0,"",["Cool ____ add to egg yolk mixture"]],[1,"Assemble",["Flaky dough"]],[1,"Cake",["Filling flaky","Confectioner sugar"]]]},{"id":"r-linzer-cake","c":"Cakes","t":"Linzer Cake","by":"Shindy","s":[[1,"",["8 eggs (make a snow)","1½ cups sugar","¾ cup oil","¾ cup orange juice","2 cups flour","2 tsp baking powder","1 lemon (grated)","¼ lb ground almond"]],[0,"",["Mix yolks, sugar, and oil","Add flour mixture alternate with orange juice","Add rest of ingredients","Bake on 350°F for 10 minutes"]],[1,"Then add",["2-3 oz ground almonds","1 oz sugar"]],[0,"",["Mix toghter, put on top of the cake","Finish baking for 1 hour"]]]},{"id":"r-zebra-wafer-cake","c":"Cakes","t":"Zebra Wafer Cake","by":"Shindy","s":[[1,"",["4-5 pk. cookies – set aside","1 tbsp sugar","2 tbsp cocoa","1 vanilla sugar","1½ cups hot water"]],[0,"",["Mix together","Dip cookies in a little, then let it dry"]],[1,"Cream",["¾ can nutola","¾ cup confectioner’s sugar","3 eggs","2 vanilla sugar","Juice of 1 lemon"]],[0,"",["Put on layer of cream on top of chocolate","Repeat 4-5 times until finish","Put cookies opposite side every time so it looks like a zebra","Put it in a 10X16 bekele"]]]},{"id":"r-pareve-cheese-cake","c":"Cakes","t":"Pareve Cheese Cake","by":"","s":[[1,"",["½ stick margarine","¼ cup sugar","8 whole graham crackers","1½ tsp cinnamon"]],[0,"",["Grate crackers","Combine sugar and cinnamon","Melt margarine and combine","Put into a 9” round bekele","Bake on 350°F for 5 minutes"]],[1,"",["8 oz tofutti cream cheese","¼ cup sugar","2 eggs- separate","1 tbsp flour","1 tsp vanilla sugar","Rind and juice of ½ lemon"]],[0,"",["Beat cream cheese and sugar","Add egg yolks, flour, and sugar","Make snow and fold in","Bake on 350°F for 45 minutes until stiff","The let cool","Spread 6 tbsp tofutti sour cream","Put pie filling","Bake on 350°F for 10 minutes","If putting fresh fruit then first bake sour cream","Then put fruit"]]]},{"id":"r-whipped-cream-cake","c":"Cakes","t":"Whipped Cream Cake","by":"","s":[[1,"",["3 cup flour","1 vanilla sugar","½ cup oil","1 1/21 cup sugar","1 stick margarine"]],[0,"",["Mix and put aside, one cup"]],[1,"To rest add",["3 eggs","2 tsp baking powder","1 whipped cram","3 tsp lemon juice with rind"]],[0,"",["Put in ½ of a 8X12 bekele","Bake at 350°F for 40 minutes"]]]},{"id":"r-truffle-cake","c":"Cakes","t":"Truffle Cake","by":"","s":[[1,"",["12 eggs- make snow","1¼ glass sugar","1½ glass confection sugar"]],[0,"",["Mix snow with sugar"]],[1,"",["12 oz chocolate melt on foil"]],[0,"",["Add 12 yolks"]],[1,"",["3 sticks margarine or 1½ cup nutola","1 glass ground walnuts","1½ glass chopped walnuts"]],[0,"",["Mix chocolate, yolks, margarine and nuts","Add snow by hand","Take off heaping plastic","Soup plate and refrigerate","Line cookie sheet with foil and add everything","Bake on 350°F for ½ hour will break, cool","Then freeze for 2 hours","Cut in half","Put 90% between cakes","Remove silver paper and put 10% of cream"]]]},{"id":"r-banana-cake","c":"Cakes","t":"Banana Cake","by":"","s":[[1,"",["2 cups flour","½ tsp baking powder","¾ tsp baking soda","½ tsp salt"]],[0,"",["Sift the flour"]],[1,"",["½ cup oil","1¼ cup sugar","2 eggs","1 tsp vanilla sugar","¼ cup juice","2 or 3 banana (mashed)"]],[0,"",["Mix dry ingredients into other mixture","Bake on 350°F for 35-40 minutes"]]]},{"id":"r-honey-cake-1","c":"Cakes","t":"Honey Cake #1","by":"","s":[[1,"",["4½ cups flour","7 eggs- separate","1½ cup sugar","2 cup honey","½ cup oil","½ cup orange juice","3 tsp baking powder","1 tsp cinnamon","1 tsp baking soda","1 cup coffee (cooled)"]],[0,"",["Beat white with ½ cup sugar","Beat yolks with 1 cup sugar","Add rest ingredients","Put in 10X16 bekele","Bake at 325°F for 1 hour"]]]},{"id":"r-honey-cake-2","c":"Cakes","t":"Honey Cake #2","by":"Jaffe","s":[[1,"",["1 lb honey","3 cups sugar","10 eggs","½ cup oil","1 tsp baking powder","1 tsp baking soda","1½ cup water","2 tbsp coffee","5 cup flour","1 vanilla sugar","4 oz liquor/whiskey"]],[0,"",["1½ cups sugar with yolk with oil, mix well about 10-15 minutes","1½ cups sugar with snow with little salt","Mix in honey in yolk","Mix together water and coffee","Mix vanilla sugar with coffee in yolk","Baking, flour with yellow of egg","Mix snow in yolk","Line bekele","Bake on 350°F for 1½ hours"]]]},{"id":"r-honey-cake-3","c":"Cakes","t":"Honey Cake #3","by":"got","s":[[1,"",["5 eggs – separated","1 cup sugar","4 tsp honey","(½ tsp ginger)","½ tsp cinnamon","½ baking soda","½ cup oil","2 tsp instant coffee, dissolved in ¾ cup water"]],[0,"",["(1 tbsp should be hot enough to dissolve the coffee the rest most be cold water)"]],[1,"",["2¼ cup flour","2 tsp baking powder"]],[0,"",["Separate eggs, putting whites into clean, large, glass or aluminum bowl and yolks into another large bowl","Add sugar, honey, spices, oil, baking powder, baking soda, coffee and flour to yolks mix well","Beat whites until stiff peaks put","Fold whites into batter","Pour into a tube pan","Bake at 350°F for 55 minutes"]]]},{"id":"r-blueberry-pie","c":"Cakes","t":"Blueberry Pie","by":"","s":[[1,"",["1 graham croaker pie crust","1 can blueberry pie filling"]],[0,"",["Bake on 350°F for 45 minutes","Then add whipped topping"]]]},{"id":"r-chocolate-chiffon","c":"Cakes","t":"Chocolate Chiffon","by":"","s":[[1,"",["¾ cup boiling water","½ cup cocoa","1½ cup flour","1¾ cup sugar","1 tsp baking soda","½ tsp baking powder","Pinch of salt","½ cup oil","2 vanilla sugar","8 eggs- separate"]],[0,"",["Mix water and cocoa together and set aside","Make snow add rest of ingredients","Put in a 10X16 bekele","Bake on 325°F for 1 hour"]]]},{"id":"r-chocolate-cake-1","c":"Cakes","t":"Chocolate Cake #1","by":"Bobby","s":[[1,"",["3½ cup sugar","1⅓ cup oil","4 eggs","1 vanilla sugar","3 tsp baking soda","½ tsp orange juice"]],[0,"",["Alternate flour and juice","Mix together sugar and oil (not the vanilla sugar)"]],[1,"",["1 cup water","1 cup cocoa"]],[0,"",["Mix together","Put in a 10X16 bekele","Bake on 350°F or 1 hour and 10 minutes"]]]},{"id":"r-chocolate-cake-2","c":"Cakes","t":"Chocolate Cake #2","by":"Chgit","s":[[1,"",["5 eggs","3 cups sugar","1½ cups oil","1 tsp baking soda","1 tsp vanilla sugar","1 tsp coffee mix with 1⅓ cup room temperate water","3 cups flour","3 tsp baking powder","1 cup cocoa"]],[0,"",["Mix together eggs and sugar then add rest of ingredients","Put in a 10X16 bekele","Bake on 350°F for 1 hour"]],[1,"Cream",["Small pack of whipped cream","7 oz chocolate"]],[0,"",["Mix on flame","Then put the cream on the cake- when the cake is cold and the cream is hot"]]]},{"id":"r-honey-and-sponge-cake","c":"Cakes","t":"Honey and Sponge Cake","by":"","s":[[1,"",["(Half is sponge and half is honey)","9 eggs- snow","½ lb honey","1 cup sugar","1 tsp brofen","1 tsp liquor","¾ tsp cinnamon","1 tsp baking soda","2½ cup flour"]],[1,"Sponge",["9 eggs- snow","1 cup sugar","1½ cup flour","1 vanilla sugar","1 tsp baking powder"]],[0,"",["Bake on 350°F for 2 hours"]]]},{"id":"r-kokosh-cake-1","c":"Cakes","t":"Kokosh Cake #1","by":"","s":[[1,"",["6 lb flour = 20 cups","8 eggs","12 cup sugar","1½ lb nutola – approx 2 lb margarine","4 oz yeast","1 tbsp salt","2 cups light grape juice","3 cups orange juice"]],[1,"Filing",["2 cups cocoa","4 cups sugar","4 vanilla sugar"]],[0,"",["6 rolls, dived in 2","Bake on 350°F for 1hour"]]]},{"id":"r-kokosh-cake-2","c":"Cakes","t":"Kokosh Cake #2","by":"","s":[[1,"",["6 lb four = 20 cups","8 eggs","1 cup sugar","1½ lb margarine","4 oz yeast","1 tbsp salt","2 cups light grape juice","3 cups orange juice"]],[0,"",["Let rise 1½ hours"]],[1,"Filing",["4 vanilla sugar","2 cups cocoa","4 cups sugar","2 tsp vanilla sugar","1 lemon ¾ cup water"]],[0,"",["Bake on 350°F for 1hour","6 rolls","Put apricot jam then"]],[1,"",["1 tsp cinnamon","½ cup sugar","1 vanilla sugar","1¼ cup cocoa","3 cups sugar","1 whip cream","Vanilla sugar","Lemon juice","Nuts","Sugar"]]]},{"id":"r-brownie-1","c":"Cakes","t":"Brownie #1","by":"Yidis Pollok","s":[[1,"",["3 eggs","2 tbsp coffee, ¼ cup hot water dissolved","½ scoop baking powder","¾ oil","¾ cup sugar","7 heaping T cocoa","1 vanilla sugar"]],[0,"",["Mix with fork in bowl then add:"]],[1,"",["2 cups flour"]],[0,"",["Mix well","Spread out in a 10X16 bekele","Sprinkle chocolate chips","Bake on 350°F for 20-25 minutes","Let cool for 5 minutes","Then cut slices and leave it in the bekele"]]]},{"id":"r-brownie-2","c":"Cakes","t":"Brownie #2","by":"","s":[[1,"",["¾ cup flour","½ tsp baking powder","⅓ cup oil","2 eggs","½ tsp salt","2 square baking chocolate","1 cup sugar","½ cup chopped nuts"]],[0,"",["Melt chocolate, sugar and eggs","Add dry ingredients, nut","Put in a 8X8 bekele","Bake on 350°F for 30-35 minutes","Cool and cut in squares (squares should be 2” = 16 squares)"]]]},{"id":"r-fudge-brownie-3","c":"Cakes","t":"Fudge Brownie #3","by":"bobby","s":[[1,"",["4 oz baking chocolate","2 sticks margarine"]],[0,"",["Melt on flame and watch that it doesn’t burn"]],[1,"",["1½ cups flour","1 tsp baking powder","½ tsp salt"]],[0,"",["Put in a separate bowl"]],[1,"",["1½ cups sugar","4 eggs","1½ tsp vanilla extract sugar"]],[0,"",["Mix together","Then add the chocolate mixture, with a wooden spoon flour mixture"]],[1,"",["2 cups (½ lb) coarsely chopped walnuts"]],[0,"",["Put in a cookies sheet","Bake on 350°F for 30 minutes","Then cool in wire rack for 10 minutes","Then cut in 2½ inch squares","Make 24 brownies"]]]},{"id":"r-super-sponge-cake","c":"Cakes","t":"Super Sponge Cake","by":"got","s":[[1,"",["1½ cups flour","1 cup sugar","6 eggs, separated","1 tbsp oil","⅛ tsp salt","1½ tsp baking powder","⅓ cup orange juice","1 tsp vanilla sugar"]],[0,"",["Separate eggs, putting whites into clean, large, glass or aluminum bowl and yolks into another bowl.","Add flour, sugar, oil, salt, baking powder, orange juice and vanilla to yolk. Mix well.","Beat whites until stiff peaks form.","Fold whites into batter.","Pour batter into greased tube pan or 9X13.","Bake on 325°F for 1 hour and 15 minutes"]]]},{"id":"r-coffee-cake","c":"Cakes","t":"Coffee Cake","by":"Esther Malka","s":[[1,"",["4 Eggs","2 Cups Sugar","¼ Cup coffee diluted ¾ cup hot water (decaf)","2 tbsp vanilla sugar","1 Cup oil","2 cups flour","2 tsp Baking powder","¼ cup cocoa"]],[0,"",["Beat the eggs and sugar until fluffy, then add all the ingredients"]],[0,"",["Mix and pour into 9 x 13 bekele","Bake on 350°F for 50 minutes"]],[1,"Glaze",["1 cup confectioner sugar","1 tsp coofee"]],[0,"",["Mix well add a little water sprinkle on cake when cool"]]],"n":"Double the recipe for an 11 × 16 pan and bake for 1 hour and 15 minutes."},{"id":"r-halva-balls","c":"Cookies","t":"Halva Balls","by":"Bas-Leah","s":[[1,"",["1 cup graham crackers, crushed","2 cups confectioners sugar","3 cups ground walnuts","Less than ½ cup sesame seeds","½ cup coconut","½ cup peanut butter","1½ sticks melted margarine"]],[0,"",["Mix all ingredients","Then make round balls","Melt ½ bar chocolate and dip the balls in chocolate","Then sprinkle, melted white chocolate on top"]]]},{"id":"r-coconut-cookies","c":"Cookies","t":"Coconut Cookies","by":"","s":[[1,"",["1 stick coconut bars","Margarine","½ cup brown sugar","½ cup sugar","3 egg yolks","1 tsp vanilla sugar","1 tsp baking powder","2 cups flour","¼ tsp salt","¼ tsp baking soda"]],[0,"",["Mix and put in cookie sheet"]],[1,"",["12 oz chocolate chips on top","1 cup coconut on top","¾ cup walnuts on top"]],[0,"",["Make a snow of 5 whites with ¾ cup sugar on top","Bake on 350°F for 35 minutes","Snow brown and dry cool cut in square"]]]},{"id":"r-round-cookies","c":"Cookies","t":"Round Cookies","by":"","s":[[1,"",["1 cup flour","½ cup confection sugar","½ cup corn starch","½ tsp vanilla sugar","1½ sticks margarine"]],[0,"",["Bake on 350°F for 30 minutes","Then drizzle on chocolate"]]]},{"id":"r-kindlech","c":"Cookies","t":"Kindlech","by":"","s":[[1,"",["2 cups flour","¼ cup sugar","2 eggs","2 tbsp oil","½ oz yeast","3 tbsp soda"]],[0,"",["Mix yeast with soda","Let rise for 15 minutes- ½ hour","Then mix everything together"]],[1,"",["1 lb walnuts","1 lemon","1½ cups sugar"]],[0,"",["Roll out the dough","Then put the filling on the dough, roll it up","Then cut in slices, and put on cookie sheet","Bake on 350°F for 35-40 minutes","After cool and smear honey/or when served"]]]},{"id":"r-cinnamon-buns","c":"Cookies","t":"Cinnamon Buns","by":"","s":[[1,"",["4½ cups flour","1 tsp salt","½ cup sugar","1 oz yeast","1 cup lukewarm water","2 eggs","1 stick margarine"]],[0,"",["Mix all ingredient","Then roll out the dough on a board","Then add filling"]],[1,"Filling",["½ stick margarine","½ cup sugar","2 tsp cinnamon"]],[0,"",["Roll it up","Then cup to make buns","Bush with egg","Bake on 375°F for 25-30 minutes","Then put icing"]],[1,"Icing",["1 cup confectioners sugar","1 tbsp water","½ tsp vanilla sugar"]]]},{"id":"r-torte","c":"Cookies","t":"Torte","by":"","s":[[1,"",["10 eggs – separate","1½ cup sugar","1 cup ground walnuts","1 cup flour","1 lemon rind and juice","1 tsp baking powder","2 tbsp cocoa"]],[0,"",["Make snow and add ½ cup sugar","Then mix the rest of the ingredients by hand","Grease bekele (3 9”) very well with flour and oil","Bake on 350°F for 1hour"]],[1,"Cream",["1 stick margarine","2 eggs"]],[0,"",["Mix and then add 6 oz chocolate mix very creamy","Put cream between each cake","Divide top of cake into 6 parts","Decorate, put wafer rolls on each side"]]]},{"id":"r-black-and-whites-cookies","c":"Cookies","t":"Black and Whites Cookies","by":"","s":[[1,"",["3 sticks margarine","1½ cup sugar","4 vanilla sugar","Drop of salt","4 eggs","5 cups flour","¼ cup orange juice","Drop of oil"]],[0,"",["Mix all ingredients and shape as a cookie","Bake at 350°F of 12-10 minutes"]],[1,"White",["1 cup confections sugar","¼ tsp vanilla sugar","1 tbsp oil","2 tbsp boiling water","Drop of lemon juice"]],[1,"Chocolate",["¾ cup confections sugar","2 tbsp boiling water","4 tsp cocoa","1 tbsp oil"]],[1,"Any Color",["4 square chocolate (as desire)","¾ cup confections sugar","2 tbsp boiling water","1 tbsp oil"]],[0,"",["Then put what flavor you desire"]]]},{"id":"r-cupcake","c":"Cookies","t":"Cupcake","by":"Jaffe","s":[[1,"",["4 eggs","1 cup sugar","½ cup oil"]],[0,"",["Mix together"]],[1,"",["1 vanilla sugar","½ cup orange juice","2 cups flour","2 tsp baking powder"]],[0,"",["Mix and let stand for ½ hour","Fill ¾ way","Bake on 350°F for 35 minutes"]]]},{"id":"r-brownie-cupcake","c":"Cookies","t":"Brownie Cupcake","by":"Jaffe","s":[[1,"",["1½ cups sugar","½ cup oil","2 eggs","1 vanilla sugar"]],[0,"",["Mix together"]],[1,"",["2¼ cup flour","1½ tsp baking powder","Drop of salt","¾ cup orange juice","½ cup cocoa","½ cup warm water","1 tsp sugar"]],[0,"",["Mix last three ingredients and cool","Salt keeps moist","Fill ¾ way","Bake on 350°F for 35 minutes"]],[1,"",["4 tbsp cocoa","4 tbsp confections sugar","3 tbsp oil","3 tbsp water"]],[0,"",["Put on put and then add sprinkle"]]]},{"id":"r-esthers-kipelech","c":"Cookies","t":"Esther's Kipelech","by":"","s":[[1,"",["1 lb margarine","1 whipped cream","Less than 5 cups flour"]],[0,"",["Mix and let stand for 1-2 hours","Roll out dough","Then put on dough jam and sprinkle flour","Then fill with"]],[1,"",["½ cup cocoa","1½ cups sugar","½ cup confections sugar"]],[0,"",["Bake on 350°F for 20 minutes"]]]},{"id":"r-bobbys-cupcakes","c":"Cookies","t":"Bobby's Cupcakes","by":"","s":[[1,"",["3 eggs","1 cup sugar","¾ cup oil"]],[0,"",["Mix together"]],[1,"",["2 tsp baking powder","2 cups flour","1 vanilla sugar","1 apple grated with peels"]],[0,"",["Bake on 375°F for 20 minutes"]]]},{"id":"r-cupcakes","c":"Cookies","t":"Cupcakes","by":"","s":[[1,"",["1 squash or apple grated","3 eggs","1 cup sugar","¾ cup oil","2 tsp baking powder","2 cups flour","1 vanilla sugar"]],[0,"",["Mix eggs and sugar together","Bake on 375°F for 20 minutes","Makes 18-24 cupcakes"]]]},{"id":"r-sobert-cookies","c":"Cookies","t":"Sobert Cookies","by":"","s":[[1,"",["4 stick margarine","4½ cups flour","1 cup confections sugar","2 vanilla sugar"]],[0,"",["Bake on 350°F for 20 minutes"]]]},{"id":"r-chocolate-chip-cookies","c":"Cookies","t":"Chocolate Chip Cookies","by":"","s":[[1,"",["1 cup shorting","2 eggs","1 cup chopped nuts","1 tsp vanilla sugar","2 tsp baking powder","¾ cup brown sugar","¾ cup sugar","½ lb chocolate","2½ cups flour","¼ tsp salt"]],[0,"",["Mix all ingredients","Bake on 325°F for 20 minutes","Makes 4 dozens"]]]},{"id":"r-presidior-bars","c":"Cookies","t":"Presidior Bars","by":"","s":[[1,"",["3 boxes presidior wafer rolls (parve)","½ lb roasted chopped filberts","½ of small chocolate bar"]],[0,"",["Cut presidior wafers in half","Dip wafers in chocolate and then put nuts"]]]},{"id":"r-mini-muffins","c":"Cookies","t":"Mini Muffins","by":"","s":[[1,"",["2 cups flour","1½ tsp baking powder","¼ tsp salt","1 stick margarine","1 cup sugar","2 eggs","½ coffee whitener","1 tsp vanilla sugar"]],[0,"",["Mix all ingredients together","Fill ¾ full","Bake on 350°F for 20 minutes","Can place in the n/middle chocolate chips, blueberry pie filling or cherry pie filling"]]]},{"id":"r-honey-cookies","c":"Cookies","t":"Honey Cookies","by":"","s":[[1,"",["6-7 cups flour","6 eggs","2 cups sugar","1 cup honey","1¼ cup oil","1 tsp baking powder","2 tsp baking soda","5 oz vodka"]],[0,"",["Pat with fork","Bake on 350°F for 20 minutes until it’s soft on the top and hand on the bottom"]]]},{"id":"r-half-moon-cookies","c":"Cookies","t":"Half Moon Cookies","by":"","s":[[1,"",["2 sticks margarine","1 cup confectioners sugar","1 tsp almond or vanilla extract","2 cups flour","1 cup chopped almonds"]],[0,"",["Mix sugar and margarine","Add rest of ingredients","Refrige for 1 hour","Shape in half moon","Bake on 350°F for 20 minutes","Dip 2 ends in chocolate"]]]},{"id":"r-vanilla-cookies","c":"Cookies","t":"Vanilla Cookies","by":"","s":[[1,"",["5 cups flour","1½ sticks margarine","1½ tsp baking powder","1 cup sugar","½ cup orange juice","1¼ vanilla sugar","2½ eggs"]],[0,"",["Make dough with roll and cut into cookies","Bake on 350°F for minutes"]]]},{"id":"r-peanut-butter-cookies","c":"Cookies","t":"Peanut Butter Cookies","by":"","s":[[1,"",["3 cups flour","1 tsp baking powder","½ tsp salt","1 cup shortening","1 cup sugar","1 cup brown sugar","2 eggs","1 cup peanut butter","1 tsp vanilla sugar"]],[0,"",["Mix all ingredient","Roll out to ¼” thick","Bake on 350°F for 12-15 minutes","Makes 120 cookies"]]]},{"id":"r-roll-out-cookies","c":"Cookies","t":"Roll-Out Cookies","by":"got","s":[[1,"",["2 margarine","½ - ¾ cup sugar","1 egg","1 vanilla sugar","2 tsp baking powder","3 cups flour"]],[0,"",["Cream margarine and sugar","Beat eggs and vanilla sugar","Then add baking powder and flour while mixing","Do not shill dough","Bake on 400°F for 6-7 minutes"]]]},{"id":"r-eggs-free-cookies","c":"Cookies","t":"Eggs Free Cookies","by":"","s":[[1,"",["5 cups flour","4 sticks margarine","3½ tsp baking powder","3 tsp vanilla sugar","⅔ cup seltzer","1 cup sugar"]],[0,"",["Mix all ingredients and form a dough","Roll out, use cookie cutters for desired shape","Bake on 350°F for 15 minutes or until golden brown"]]]},{"id":"r-chocolate-chip-n-walnut-cookies","c":"Cookies","t":"Chocolate Chip ‘n Walnut Cookies","by":"Montreal Bobby","s":[[1,"",["1 cup oil","¼ cup sugar","½ cup brown sugar","5 eggs","2 vanilla sugar","6½ -7 cups whole wheat flour","½ cup orange juice","2 tsp baking soda","1 cup wheat germs","1 cup walnuts","1 (10 oz) chocolate chips"]],[0,"",["Mix eggs, oil, orange juice, sugar then add the rest of ingredient","Bake on 350°F for 18-20 minutes","Makes 16 dozen"]]]},{"id":"r-chanukah-cookies","c":"Cookies","t":"Chanukah Cookies","by":"Yidis Schwartz","s":[[1,"",["4 eggs","4 cups flour","½ box confection sugar","1½ tsp vanilla sugar","1½ baking powder","2 sticks margarine"]],[0,"",["Mix everything together","Then roll out dough and put flour underneath","Bake on 350°F for 15 minutes"]]]},{"id":"r-bosh-cookies","c":"Cookies","t":"Bosh Cookies","by":"","s":[[1,"",["3 lb flour","6 eggs","2 vanilla sugar","2 cups sugar","5 tsp baking powder","1 lb nutola","¾ – 1 cup light wine","Juice from 1 lemon"]],[0,"",["Mix all ingredients with dough hook in mixer","Use cookie attachment to form into desired shape","Bake on 350°F until cookies are slightly brown","This recipe has proven to be a great success"]]]},{"id":"r-snowballs","c":"Cookies","t":"Snowballs","by":"got","s":[[1,"",["1½ tsp vanilla sugar","2 cups flour","¼ tsp salt","1 cup margarine","Less than a ⅓ cup sugar","1 tbsp water","1 cup nuts","½ – 1 cup powered sugar"]],[0,"",["Preheat oven to 350°F","At medium speed, beat margarine, sugar, water, and salt","Add nuts and mix well blended","Mixture may be crumby","Form 1-inch balls about 2 inches apart on ungreased baking sheet","Bake for 12-15 minutes or until set but not browned","Cool cookies on wire racks for 5 minutes","Roll each ball in powered sugar","For a frosted look, roll in sugar again before serving","Makes about 4 dozen"]]]},{"id":"r-no-rise-rugelch","c":"Cookies","t":"No-Rise Rugelch","by":"got","s":[[1,"",["(½ recipe)","6 cups flour 3 cups flour","4 sticks margarine 2 sticks margarine (softened)","1 topping (½ topping)","2 eggs (1 egg)"]],[0,"",["Combine ingredients to form dough. Divide into eight parts. Roll out each piece of dough into a circle and lightly smear with oil.","Sprinkle filling, cut into equal triangles and roll up. Either smear with a little egg of leave is and sprinkle with confectioner sugar after they have been baked","Bake on 350°F for 10-12 minutes"]],[1,"Filling",["¾ cup sugar","4 tsp cocoa or cinnamon"]]]},{"id":"r-chewy-chocolate-chip-cookies","c":"Cookies","t":"Chewy chocolate chip cookies","by":"got","s":[[1,"",["3 eggs","¾ brown sugar","¾ sugar","2 tbsp vanilla sugar","4 sticks margarine","6 cups flour","1½ tsp salt","1½ tsp baking soda","2 12 oz chocolate chips","(optional- walnuts)"]],[0,"",["In large bowl, beat eggs five minutes. (Do not separate.) They will become thick and lemon colored.","In large bowl, cream all three sugars and margarine","In a third bowl combine flour, salt and baking soda","Add eggs to cream sugar, then add dry ingredients","Stir in chocolate chips (and nut)","Line a cookie sheets – do not grease. Roll into balls of equal size (about 1½ -2 inches). If mixture is sticky, chill before using.","Bake between 20 minutes, no longer. Let cool on cookie sheets for 10 minutes before removing. (This is unusual so note and “follow instructions.”)","Yield: 6 dozen delicious, chewy cookies (Idea: for large cookies and uniform shape, use a pareve ice cream scooper to shape cookies!)"]]]},{"id":"r-heart-cookies","c":"Cookies","t":"Heart Cookies","by":"goldy","s":[[1,"",["4 cups flour","¾ cup sugar","2 sticks margarine","2 tsp baking powder","2 eggs","2 tbsp orange juice"]],[0,"",["Wash lemon good and grind the lemon then cut in half and use the juice of ½ lemon"]],[1,"",["1 vanilla sugar"]],[0,"",["Mix everything together","Roll out and make heart shape cookies","Bake on 375°F for 15 minutes ?"]]]},{"id":"r-rosh-hashana-honey-cookies","c":"Cookies","t":"Rosh Hashana Honey Cookies","by":"got","s":[[1,"",["2 sticks margarine (room temperature)","¾ cup brown sugar","2 eggs","½ honey","1 tbsp vanilla sugar","4 cups flour","2 tsp baking soda","Jelly (optional)"]],[0,"",["Cream margarine and brown sugar","Add eggs, one at a time, blend well","Mix in honey and baking soda","Chill dough firm, several hours or overnight (or place in freeze for an hour), covered well.","Form dough into balls, about 1½ inches in diameter.","Bake on ungreased cookies sheet for 12 – 15 minutes until golden-brown and top springs back when lightly touched.","Optional: When cookies are completely cool, put jelly on flat side of one cookies, place second cookies on top “sandwich.”","Yields: Approx. 4 dozen. Freezes well. Easily doubled."]]]},{"id":"r-chocolate-chip-cookies-bobby","c":"Cookies","t":"Chocolate Chip Cookies","by":"bobby","s":[[1,"",["1 cup shorting or 2 sticks margarine","¾ cup brown sugar – firmly pack","½ cup sugar","2 eggs – well beaten","1 cup chopped nuts","½ lb baking chocolate","1 tsp vanilla sugar","2½ cups flour","2 tsp baking powder","¼ tsp salt"]],[0,"",["Mix margarine with sugar","Then add rest of ingredients","Bake on 325°F for 20 minutes","4 dz. Make sure soft"]]]},{"id":"r-big-bites","c":"Cookies","t":"Big Bites","by":"got","s":[[1,"Cookies",["2 cup flour","½ cocoa","1½ tsp baking soda","¼ tsp salt","1 stick (½ cup) margarine (room temperature)","¾ cup sugar","1 egg","1 tbsp vanilla","1 cup orange juice"]],[0,"",["Mix together flour, cocoa, baking soda and salt","Cream together margarine and sugar, add egg and vanilla. Slowly add one cup orange juice","Combine with dry ingredients. Mix well","Let batter stand for 10 minutes to thicken","Spoon batter on very lightly greased cookie sheet, leaving space between spoonful","Bake in preheated over at 425°F for 7 minutes"]],[1,"Cream",["½ cup margarine","2 egg","½ tsp vanilla sugar","2¼ cups confectioner’s sugar"]],[0,"",["Cream together margarine, vanilla sugar and one cup of the confectioner’s sugar","Beat two egg whites until stiff. Slowly add remaining 1¼ cup confectioner’s sugar (Do not pour all the sugar in at one time or you will push out the air you just put in…) make sure whites are almost stiff before starting to add sugar…","Blend two mixtures","When cookies are completely cool spread cream on bottom (flat side) of one cookie and top with another","Refrigerate","(Alternative cream that does not contain margarine is 1-2-3 frosting)"]]]},{"id":"r-rozettes","c":"Cookies","t":"Rozettes","by":"Rivky’s Shveger","s":[[0,"",["Take pot and put in oil and let boil","Then put fritlech in not oil","Then add the ingredients"]],[1,"",["1 cup flour","1 cup water","2 eggs","1 tbsp (less) sugar","Pinch of salt"]],[0,"",["Mix all ingredients together","Pit it in the hot oil, make sure not to dip it all the way (because then it won’t come off)"]]]},{"id":"r-marshmallow-balls","c":"Cookies","t":"Marshmallow Balls","by":"Rivky","s":[[1,"",["1 container marshmallow cream","1 crunchy peanut butter"]],[0,"",["Mix together","Make balls size of a walnut","Put in the refrigerate","Then make"]],[1,"",["1 lg. pk. of baking chocolate","1 noplise (chocolate with the house on it)"]],[0,"",["Melt the chocolate","Then dip the balls in the chocolate","Then put it on a wire rake to dry","When the chocolate is wet you can put on nuts, coconut….."]]]},{"id":"r-date-rolls","c":"Cookies","t":"Date Rolls","by":"Chagit","s":[[1,"",["6 tsp baking powder","1 cup oil","1 cup boiling water","7 oz margarine"]],[0,"",["Begin with less than 7 cups of flour and can add up to 7 cups","Put it in the fright for a few hours","Roll out the dough and put date spread and walnuts","Roll and cut into slices then put eggs on the dough","Bake on 350°F for 15-20 minutes","After bake put on confection sugar"]]]},{"id":"r-boston-cream-pie","c":"Desserts","t":"Boston Cream Pie","by":"","s":[[1,"",["1 cup flour","1 stick margarine","2 tbsp sugar"]],[0,"",["Put in a 9” round pan","Mix the ingredients","Bake on 350°F for 15 minutes","After bake let stand until cooled"]],[1,"",["4 eggs – separate","2 tbsp sugar","6 oz baking chocolate","2 tbsp water"]],[0,"",["Mix white and sugar","Melt baking chocolate, water and yolks","Mix together","Let stand for ½ hour"]],[1,"",["½ whipped cream"]],[0,"",["Whip the cream","Then put on top of the chocolate layer","Then put sprinkles on top of the whip","Then put in freezer"]]]},{"id":"r-halva-ice-cream","c":"Desserts","t":"Halva Ice Cream","by":"","s":[[1,"",["16 oz whip cream","6 egg","⅔ cup sugar","¼ lb marble halva"]],[0,"",["Beat yolks with sugar","Fold in whip","Beat white and put in mixture","Flake halva in ice cream and mix together","Freeze"]]]},{"id":"r-delicious-donuts","c":"Desserts","t":"Delicious Donuts","by":"got","s":[[1,"",["5 cups flour","2 eggs","1 oz yeast","¼ cup oil","1½ cups warm water","2 tsp sugar","1½ tsp vanilla sugar"]],[0,"",["Dissolve yeast in warn water","Add remaining ingredients and knead into dough ¾ inch thick and cut into circles","Allow to rise for another ½ hour","Deep fry until golden brown","Melt chocolate, dip the donuts in","Then put on sprinkles on it","Makes approximately 25 donuts"]]]},{"id":"r-doughnuts","c":"Desserts","t":"Doughnuts","by":"","s":[[1,"",["4 cups flour","1¼ oz yeast","2 eggs","3 oz orange juice","1 tbsp wine","¼ cup water","1 vanilla sugar","5 tbsp sugar"]],[0,"",["Dissolve yeast in water and sugar","Knead out dough on floured surface to a ¼ inch thickness and cover with plastic","Let rise for ¾ of a hour","Heat oil in deep pot and cut out circles with glass","Allow to rise another 10 minutes","Lift circles carefully by touching sides only, and drop in hot oil","Drain on paper towel to adsorb excess oil","Tip: put a piece of carrot in pot to prevent oil from burning","Variation: Fill doughnuts with our favorite jelly, custard or “lekvar”"]]]},{"id":"r-3-layer-ice-cream","c":"Desserts","t":"3 Layer Ice Cream","by":"Malka Leah’s","s":[[1,"Bottom",["½ lb lemon cookies","½ lb chopped roasted almonds","½ stick margarine"]],[0,"",["Roast and put in 10X16 bekele"]],[1,"Cream",["½ lb coffee beans","1 Rosemerry Parve chocolate","2 eggs – separate","7½ tbsp confectioners sugar","1½ sticks margarine","1 vanilla sugar"]],[0,"",["Melt in double boiler","Separate eggs and beat whites","Then add all ingredients","Last the coffee mixture"]],[1,"Ice Cream",["#1 8 eggs – separate","¾ cup confectioners sugar","2 vanilla sugar","2 small whip"]],[0,"",["Beat egg whites, and yolk, sugar","Beat whip and add it in slowly","Mix for 8-10 minutes","Put on cream and freeze overnight"]],[1,"",["#2 Same as #1","Add ¾ cup chopped almonds","1 tbsp coffee diluted in drop water","Cream and freeze overnight","#3 Repeat as #1"]],[0,"",["Add strawberry jell – little more than ½ cream","Decorate with chocolate curls or nuts"]]]},{"id":"r-peanut-butter-layered-ice-cream","c":"Desserts","t":"Peanut Butter Layered Ice Cream","by":"got","s":[[1,"",["1 baked 9” pie crust or graham pie crust","½ cup peanut butter","1 cup confectioner’s sugar","1 instant vanilla pudding","½ cup coffee whitener","1 10oz. non dairy whip topping"]],[0,"",["Mix peanut butter with confectioner’s sugar by hand until crumbly","Place ¾ mixture into pie shell","Mix the vanilla pudding with the coffee whitener","Pour over the crumbs and freeze until firm","Beat whip and spread on top","Pour remaining crumbs over whip","Freeze until firm"]]]},{"id":"r-chocolate-mousse","c":"Desserts","t":"Chocolate Mousse","by":"got","s":[[1,"",["8 eggs – separated","½ cup sugar","8 oz margarine","4 squares baking chocolate","1 10oz. non dairy whip topping","Grated chocolate, Viennese crunch or strawberries"]],[0,"",["Beat egg whites on high speed until stiff","Add ¼+ sugar and continue to mix until stiff","Melt chocolate and margarine over a low flame","Beat egg yolks on high speed for 10 minutes","Combine yolks with remaining sugar and chocolate mixture","Cool mixture and combine with whites","Pour ⅓ of batter into two small round pans","Bake on 350°F for 20 minutes","Cool rest of batter over cooled cakes","Freeze","When frozen, beat whip and spread smoothly on top of frozen batter","Freeze","Decorate as desired"]]]},{"id":"r-esrog","c":"Miscellaneous","t":"Esrog","by":"","s":[[1,"",["4 esrog","½ cup water","2 cup sugar","½ lb dried apricots","4-6 naval oranges peeled and sliced","1-2 quince cut in small pieces"]],[0,"",["Cook esrog whole 3-4X few minutes","Then slice into thin slices","Take out pits","Then cook for other 2 hours with all the ingredients"]]]},{"id":"r-play-dough","c":"Miscellaneous","t":"Play Dough","by":"","s":[[1,"",["1½ sticks margarine","1¾ cup flour","¼ cup sugar","Food coloring"]],[0,"",["Knead dough until it becomes a soft dough","Divide into how many colors you wish","Color each dough","Then start the fun"]]]},{"id":"r-taffy","c":"Miscellaneous","t":"Taffy","by":"","s":[[1,"",["2 boxes confectioners’ sugar","1 stick margarine softened","Food coloring"]],[0,"",["Mix first three ingredients","Divide into as many colors you wish","Color each dough","Then wrap in cellophane and make in shape"]]]},{"id":"r-make-your-own-ice-cream-in-5-minutes","c":"Miscellaneous","t":"Make Your Own Ice Cream in 5 Minutes","by":"got","s":[[1,"",["Ice cubes","1 cup low fat milk","½ tsp vanilla sugar","Resalable sandwich bag","1 gal. resalable freezer bag","Dish towel"]],[0,"",["Fill the gallon bag half full with ice","Add kosher salt","In the sandwich bag, mix milk, sugar, and vanilla","Seal the bag so it won’t leak","To protect your hands from the cold, wrap a dish towel around the large bag","Shake for about 5 minutes of until the mixture turns into ice cream","Wipe the salt off the outside of the small bag"]]]},{"id":"r-eggplant-dip","c":"Miscellaneous","t":"Eggplant Dip","by":"","s":[[1,"",["1 eggplant","2 garlic","Dash of salt","Pepper","1 tsp lemon juice","1 tsp vinegar","2 spoon mayonnaise"]],[0,"",["Bake the eggplant on 350°F for 3 hours","Crush the garlic, and mix all other ingredients","Refrigerate"]]]},{"id":"r-olive-dip","c":"Miscellaneous","t":"Olive Dip","by":"","s":[[1,"",["21 oz olives without pits","2 garlic","Olive oil","Salt","Pepper"]],[0,"",["Slice the garlic and olives","Mix everything toghter","Refrigerate"]]]},{"id":"r-tomato-dip-1","c":"Miscellaneous","t":"Tomato Dip # 1","by":"","s":[[1,"",["3 lb tomato","1 can hot peppers","2 tbsp oil","5 garlic","Vinegar","2 tbsp sugar","1 can tomato sauce"]],[0,"",["Blend all ingredients with spices","Refrigerate"]]]},{"id":"r-tomato-dip-2","c":"Miscellaneous","t":"Tomato Dip # 2","by":"","s":[[1,"",["3 tomatoes","1 can hot peppers","½ green pepper","3 garlic","Salt"]],[0,"",["Blend all ingredients with spices","Refrigerate"]]]},{"id":"r-tomato-dip-3","c":"Miscellaneous","t":"Tomato Dip # 3","by":"","s":[[1,"",["4 tomatoes","1 can hot peppers","1 green pepper","3 hot jalapeños","1 big spoon tomato past","1 tbsp vinegar","¼ tsp salsita (fridge)","Pepper","Cumin","Curry power","Cilantro","Salt"]],[0,"",["Blend all ingredients with spice","Refrigerate"]]]},{"id":"r-sour-pickles","c":"Miscellaneous","t":"Sour Pickles","by":"","s":[[1,"",["Recipe for ½ gallon glass jar"]],[0,"",["Buy only the small and hard Kirby’s. Cut off both ends of Kirby’s and make slits in center. Place vertically in glass jar. Make sure jar is filled to capacity. Dissolve 2 Hungarian serving spoons salt in 2 cups of water and 1 tbsp vinegar. Add 4 springs of dill, a half a slice bread and 8-9 cloves of garlic. Fill rest of jar with tap water. Cover with silver paper. Place in warm spot in the kitchen for 2-3 days. Mix sauce once a day, so that salt doesn’t settle. If you prefer the pickles more sour, place in refrigerator for several days."]]]},{"id":"r-eggplant-spread","c":"Miscellaneous","t":"Eggplant Spread","by":"","s":[[1,"",["2 medium to large eggplant, peeled and cubed to 1 inch cubes","1 large onion, roughly diced","6 cloves garlic, peeled and quartered","22 oz diced canned tomatoes (I use roasted for this recipe, but and should do)","Salt, pepper, cumin to taste","½ tsp smoked paprika (or 1 tsp hot Hungarian paprika could work as well)","1 tbsp of dried Thyme","Extra virgin olive oil, for sautéing","Oven-ready pot"]],[0,"",["Coat the bottom of the with olive oil, and sauté the onions for a few minutes","Add the eggplant cubes, toss to coat with oil, and add plenty of salt","Allow eggplant to reduce and begin to soften, approx. 10 minutes","Season with cumin, thyme, and black pepper","Add garlic, diced tomatoes with juice, and place in 325°F oven for an hour","Using potato masher, roughly mash the contents","Allow to cool","Serve at room temperature","As an aside, the eggplant spread can also be used as a sauce foe pasta","Combine cooked pasta with some eggplant spread, heat and add shredded cheese and serve"]]]}];
+const ORDER=["Bread","Kugel","Soups","Fish","Meat","Side Dish","Dairy","Cakes","Cookies","Desserts","Miscellaneous"];
+const ICONS={
+ "Bread":'<path d="M5 18c0-6 5-9 11-9s11 3 11 9c0 2-1 3-3 3H8c-2 0-3-1-3-3Z"/><path d="M11 13l2 4M16 12v5M21 13l-2 4"/><path d="M4 26h24"/>',
+ "Kugel":'<rect x="4" y="13" width="24" height="11" rx="3"/><path d="M2 15h2M28 15h2M8 13c1-3 4-4 8-4s7 1 8 4"/><path d="M10 18h3M17 18h5"/>',
+ "Soups":'<path d="M5 14h22v3a9 9 0 0 1-9 9h-4a9 9 0 0 1-9-9z"/><path d="M12 10c-1-2 1-3 0-5M17 10c-1-2 1-3 0-5M22 10c-1-2 1-3 0-5"/>',
+ "Fish":'<path d="M4 16c4-6 12-8 18-4l6-4v16l-6-4c-6 4-14 2-18-4Z"/><circle cx="10" cy="15" r="1"/>',
+ "Meat":'<path d="M20 4a8 8 0 0 1 0 16c-2 0-3 1-4 2l-3 3a2 2 0 1 1-3-3l-2 0a2 2 0 1 1 0-3l3-3c1-1 2-2 2-4a7 7 0 0 1 7-8Z"/>',
+ "Side Dish":'<path d="M3 15h26a13 9 0 0 1-26 0Z"/><path d="M9 15c0-3 2-5 4-5M15 15c0-4 3-6 6-6M22 15c0-2 1-3 3-3"/>',
+ "Dairy":'<path d="M4 22 26 10l2 12Z"/><path d="M4 22h24v4H4z"/><circle cx="14" cy="19" r="1.5"/><circle cx="21" cy="16" r="1"/>',
+ "Cakes":'<path d="M5 17h22v9H5z"/><path d="M5 21c3 2 5-2 8 0s5-2 8 0 4-1 6 0"/><path d="M16 17v-5M16 9c-1-1-1-3 0-4 1 1 1 3 0 4Z"/>',
+ "Cookies":'<circle cx="16" cy="16" r="11"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="13" r="1.3"/><circle cx="14" cy="20" r="1.3"/><circle cx="20" cy="20" r="1.3"/>',
+ "Desserts":'<path d="M10 14 16 29l6-15"/><path d="M9 14a7 7 0 1 1 14 0Z"/><path d="M12 11c1-2 3-3 5-3"/>',
+ "Miscellaneous":'<path d="M9 8h14v3H9z"/><path d="M8 11h16v14a3 3 0 0 1-3 3H11a3 3 0 0 1-3-3z"/><path d="M12 17h8M12 21h6"/>'
+};
+const icon = c => `<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[c]||ICONS.Miscellaneous}</svg>`;
+
+const CATS = ORDER.filter(c=>RECIPES.some(r=>r.c===c));
+const app = document.getElementById("app");
+const q = document.getElementById("q");
+let wakeLock = null;
+
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const slug = s => "c-"+s.toLowerCase().replace(/[^a-z0-9]+/g,"-");
+const allText = r => r.s.flatMap(s=>s[2]).join(" ");
+const temps = r => [...new Set((allText(r).match(/\d{3}°F/g)||[]))];
+const nIng = r => r.s.filter(s=>s[0]).reduce((n,s)=>n+s[2].length,0);
+const nSteps = r => r.s.filter(s=>!s[0]).reduce((n,s)=>n+s[2].length,0);
+const isUntitled = r => r.t.startsWith("Untitled: ");
+const titleHTML = r => isUntitled(r) ? `<span class="untitled">${esc(r.t.slice(10))}</span>` : esc(r.t);
+function creditText(by){
+  if(!by) return "";
+  if(by.toLowerCase()==="got") return "Source: got";
+  return "From "+by.replace(/(^|[\s-])([a-z])/g,(m,a,b)=>a+b.toUpperCase());
+}
+const hiTemps = s => esc(s).replace(/(\d{3}°F)/g,'<span class="temp">$1</span>');
+function splitQty(t){
+  const m = t.match(/^((?:\d+[½¼¾⅓⅔⅛]?|[½¼¾⅓⅔⅛])(?:\s?[–-]\s?\d+[½¼¾⅓⅔⅛]?)?(?:\s?(?:lb|oz|cups?|tbsp|tsp|sticks?|cans?|packs?|pk\.|lg\.|glass|squares?|bunch|cloves?|heads?|quart)\b\.?)?)\s+(.*)$/i);
+  return m ? [m[1],m[2]] : ["",t];
+}
+/* ---------- storage (falls back to memory if the browser blocks it) ---------- */
+const MEM = {};
+function store(key,val){
+  if(val===undefined){
+    try{ const v = localStorage.getItem(key); if(v!==null) return JSON.parse(v); }catch(e){}
+    return key in MEM ? MEM[key] : null;
+  }
+  MEM[key]=val;
+  try{ if(val===null) localStorage.removeItem(key); else localStorage.setItem(key,JSON.stringify(val)); }catch(e){}
+}
+
+/* ---------- online accounts (Firebase) ---------- */
+const FIREBASE_CONFIG = /*FIREBASE*/{"apiKey": "AIzaSyC6khY66tYIbhpH7aLSlb68BNopt_cT8DU", "authDomain": "gittys-kitchen.firebaseapp.com", "projectId": "gittys-kitchen", "storageBucket": "gittys-kitchen.firebasestorage.app", "messagingSenderId": "490546783263", "appId": "1:490546783263:web:1241118153141fa97ea12a"};
+const ADMIN_NAME = "Shulem Schlesinger";
+const nameKey = n => String(n).trim().replace(/\s+/g," ").toLowerCase();
+const ADMIN_KEY = nameKey(ADMIN_NAME);
+let auth=null, db=null;
+let me=null;            // signed-in user id
+let profile=null;       // {name, status, favs, created}
+let state="loading";    // loading | setup | offline-first | signedout | pending | denied | removed | error | approved
+let offline=false, pendingCreate=false;
+let unsubMe=null, unsubAll=null, members=[];
+const isAdmin = () => !!profile && nameKey(profile.name)===ADMIN_KEY;
+const myName = () => profile ? profile.name : "";
+const uk = k => "gk-u-"+me+"-"+k;
+const favs = () => (profile && profile.favs) || [];
+const initial = n => (String(n).trim()[0]||"?").toUpperCase();
+const pendingCount = () => members.filter(m=>m.status==="pending").length;
+function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catch(e){for(let i=0;i<12;i++)a[i]=Math.random()*256|0} return [...a].map(b=>b.toString(16).padStart(2,"0")).join(""); }
+const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
+
+function boot(){
+  if(!FIREBASE_CONFIG){ state="setup"; return route(); }
+  if(typeof firebase==="undefined") return goOffline();
+  try{
+    if(!firebase.apps || !firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    auth=firebase.auth(); db=firebase.firestore();
+  }catch(e){ return goOffline(); }
+  auth.onAuthStateChanged(u=>{
+    if(unsubMe){unsubMe();unsubMe=null}
+    if(unsubAll){unsubAll();unsubAll=null;members=[]}
+    if(!u){ me=null; profile=null; offline=false; state="signedout"; renderAcct(); return route(); }
+    me=u.uid;
+    if(!profile){ state="loading"; route(); }
+    unsubMe = db.collection("users").doc(u.uid).onSnapshot(s=>{
+      if(!s.exists){ if(pendingCreate) return; profile=null; store("gk-cache",null); state="removed"; renderAcct(); return route(); }
+      const was=state;
+      profile=s.data(); offline=false;
+      state = profile.status==="approved" ? "approved" : profile.status==="denied" ? "denied" : "pending";
+      cacheProfile(); renderAcct();
+      if(isAdmin() && !unsubAll) watchMembers();
+      if(was!==state || state!=="approved") route();
+    }, ()=>{
+      const c=store("gk-cache");
+      if(c && c.uid===u.uid){ profile=c.profile; offline=true; state=profile.status==="approved"?"approved":"pending"; renderAcct(); route(); }
+      else { state="error"; route(); }
+    });
+  });
+}
+function goOffline(){
+  const c=store("gk-cache");
+  if(c && c.profile && c.profile.status==="approved"){ me=c.uid; profile=c.profile; offline=true; state="approved"; renderAcct(); }
+  else state="offline-first";
+  route();
+}
+function watchMembers(){
+  unsubAll = db.collection("users").onSnapshot(s=>{
+    members = s.docs.map(d=>Object.assign({uid:d.id},d.data())).sort((a,b)=>(b.created||0)-(a.created||0));
+    renderAcct();
+    if(location.hash==="#admin") route();
+  }, ()=>{});
+}
+async function signUp(name,pw){
+  const key=nameKey(name);
+  const taken = await db.collection("names").doc(key).get();
+  if(taken.exists) throw {code:"gk/taken"};
+  pendingCreate=true;
+  try{
+    const cred = await auth.createUserWithEmailAndPassword("m"+newId()+"@gittys-kitchen.app", pw);
+    const uid = cred.user.uid;
+    try{ await db.collection("names").doc(key).set({uid, email:cred.user.email}); }
+    catch(e){ try{ await cred.user.delete(); }catch(_){} throw {code:"gk/taken"}; }
+    profile = {name, status: key===ADMIN_KEY ? "approved" : "pending", created: Date.now(), favs: []};
+    await db.collection("users").doc(uid).set(profile);
+  } finally { pendingCreate=false; }
+}
+async function signIn(name,pw){
+  const n = await db.collection("names").doc(nameKey(name)).get();
+  if(!n.exists) throw {code:"gk/noname"};
+  await auth.signInWithEmailAndPassword(n.data().email, pw);
+}
+async function signOut(){
+  closeMenu(); store("gk-cache",null); location.hash="";
+  if(auth){ try{ await auth.signOut(); }catch(e){} }
+  else { me=null; profile=null; state="offline-first"; route(); }
+}
+function setFavs(list){
+  profile.favs=list; cacheProfile();
+  if(db && !offline) db.collection("users").doc(me).update({favs:list}).catch(()=>{});
+}
+async function setStatus(uid,status){ await db.collection("users").doc(uid).update({status, decided: Date.now()}); }
+async function removeMember(m){
+  await db.collection("users").doc(m.uid).delete();
+  await db.collection("names").doc(nameKey(m.name)).delete().catch(()=>{});
+}
+async function deleteMe(){
+  const u=auth.currentUser, name=myName();
+  try{
+    await db.collection("names").doc(nameKey(name)).delete();
+    pendingCreate=true;
+    await db.collection("users").doc(u.uid).delete();
+    await u.delete();
+  }catch(e){} finally{ pendingCreate=false; }
+  store("gk-cache",null); location.hash=""; try{ await auth.signOut(); }catch(e){}
+}
+function errText(e){
+  const c=(e&&e.code)||"";
+  if(c==="gk/taken"||c==="auth/email-already-in-use") return "That name is already taken. Sign in, or add a last name or initial to make it different.";
+  if(c==="gk/noname") return "There's no member with that name. Check the spelling, or create a profile.";
+  if(c==="auth/wrong-password"||c==="auth/invalid-credential"||c==="auth/invalid-login-credentials") return "That password isn't right. Try again.";
+  if(c==="auth/weak-password") return "Choose a password with at least 6 characters.";
+  if(c==="auth/too-many-requests") return "Too many tries. Wait a few minutes and try again.";
+  if(c==="auth/network-request-failed"||c==="unavailable") return "No internet connection. Connect and try again.";
+  return "Something went wrong. Check your internet connection and try again.";
+}
+const HEART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.4-9.2-8.6C1.2 8.3 3 4.5 6.6 4.5c2.1 0 3.5 1.2 5.4 3.2 1.9-2 3.3-3.2 5.4-3.2 3.6 0 5.4 3.8 3.8 6.9C19 15.6 12 20 12 20Z"/></svg>';
+
+function card(r){
+  const t = temps(r);
+  return `<a class="rc" href="#${r.id}">
+    <div class="top"><span class="chip">${esc(r.c)}</span>${t.length?`<span class="oven">${t.slice(0,2).join(" → ")}</span>`:""}${me&&favs().includes(r.id)?HEART.replace("<svg",'<svg class="heart"'):""}</div>
+    <h3>${titleHTML(r)}</h3>
+    ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}
+    <div class="meta"><span><b>${nIng(r)}</b> ingredients</span><span><b>${nSteps(r)}</b> steps</span></div>
+  </a>`;
+}
+
+function home(){
+  const f = favs().map(id=>RECIPES.find(r=>r.id===id)).filter(Boolean);
+  app.innerHTML = `
+  <section class="cover wrap">
+    <div class="card"><div class="tilestripe"></div>
+      <div>
+        <div class="eyebrow">Welcome back, ${esc(myName())}</div>
+        <h1>Gitty's Kitchen</h1>
+        <p>Challahs, kugels, cakes and cookies, sorted into categories. Tap a recipe to cook from it, checking off ingredients and steps as you go.</p>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>${RECIPES.length}</b><span>Recipes</span></div>
+        <div class="stat"><b>${CATS.length}</b><span>Categories</span></div>
+      </div>
+    </div>
+  </section>
+  ${f.length?`<section class="wrap">
+    <div class="section-head"><h2>Your favorites</h2><p><a class="link" href="#favorites">See all ${f.length}</a></p></div>
+    <div class="grid" style="padding-bottom:36px">${f.slice(0,4).map(card).join("")}</div>
+  </section>`:""}
+  <section class="wrap">
+    <div class="section-head"><h2>Categories</h2><p>Choose a section of the cookbook</p></div>
+    <div class="cats">${CATS.map(c=>{const n=RECIPES.filter(r=>r.c===c).length;
+      return `<a class="cat" href="#${slug(c)}"><div class="ic">${icon(c)}</div><h3>${esc(c)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`}).join("")}</div>
+  </section>`;
+}
+
+function tabs(active){
+  return `<nav class="tabs" aria-label="Categories">${CATS.map(c=>{const n=RECIPES.filter(r=>r.c===c).length;
+    return `<a class="tab" href="#${slug(c)}" ${c===active?'aria-current="page"':""}>${esc(c)} <span class="n">${n}</span></a>`}).join("")}</nav>`;
+}
+
+function category(c){
+  const list = RECIPES.filter(r=>r.c===c);
+  app.innerHTML = `<section class="wrap">${tabs(c)}
+    <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}</p></div>
+    <div class="grid">${list.map(card).join("")}</div></section>`;
+  const a=app.querySelector('.tab[aria-current="page"]'); if(a) a.parentElement.scrollLeft = a.offsetLeft - 16;
+}
+
+function favorites(){
+  const f = favs().map(id=>RECIPES.find(r=>r.id===id)).filter(Boolean);
+  app.innerHTML = `<section class="wrap">${tabs(null)}
+    <div class="section-head"><h2>Your favorites</h2><p>${f.length} ${f.length===1?"recipe":"recipes"}</p></div>
+    <div class="grid">${f.length? f.map(card).join("") : `<div class="empty">No favorites yet. Open any recipe and tap “Save to favorites”.</div>`}</div></section>`;
+}
+
+function results(term){
+  const t = term.toLowerCase();
+  const list = RECIPES.filter(r=>[r.t,r.by,r.c,allText(r)].join(" ").toLowerCase().includes(t));
+  const titleHits = list.filter(r=>r.t.toLowerCase().includes(t));
+  const rest = list.filter(r=>!r.t.toLowerCase().includes(t));
+  app.innerHTML = `<section class="wrap">${tabs(null)}
+    <div class="section-head"><h2>Results for “${esc(term)}”</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}</p></div>
+    <div class="grid">${list.length? [...titleHits,...rest].map(card).join("") : `<div class="empty">No recipes match that search. Try a dish like “challah” or an ingredient like “farmer's cheese”.</div>`}</div></section>`;
+}
+
+function buildParts(r){
+  const parts=[]; let cur=null;
+  r.s.forEach(([isIng,title,items])=>{
+    if(!cur || (isIng && cur.steps.length)){ cur={ing:[],steps:[]}; parts.push(cur); }
+    (isIng?cur.ing:cur.steps).push({title,items});
+  });
+  return parts;
+}
+
+function recipe(r){
+  const saved = store(uk(r.id)) || {i:[],s:[]};
+  const isFav = favs().includes(r.id);
+  const parts = buildParts(r);
+  const multi = parts.length>1;
+  let ik=0, sk=0;
+  const partHTML = parts.map((p,pi)=>{
+    const ing = p.ing.length ? `<div class="col ing"><h2>Ingredients</h2>${p.ing.map(g=>`
+      ${g.title?`<div class="group">${esc(g.title)}</div>`:""}
+      <ul>${g.items.map(t=>{const k=ik++;const [qty,name]=splitQty(t);
+        return `<li><label><input type="checkbox" id="i-${r.id}-${k}" data-k="${k}" ${saved.i.includes(k)?"checked":""}><span>${qty?`<span class="qty">${esc(qty)}</span> `:""}${esc(name)}</span></label></li>`}).join("")}</ul>`).join("")}</div>` : "";
+    const steps = p.steps.length ? `<div class="col"><h2>Method</h2>${p.steps.map(g=>`
+      ${g.title?`<div class="group">${esc(g.title)}</div>`:""}
+      <ol class="steps">${g.items.map(t=>{const k=sk++;const d=saved.s.includes(k);
+        return `<li class="step${d?" done":""}" data-k="${k}" tabindex="0" role="button" aria-pressed="${d}"><span class="num">${k+1}</span><p>${hiTemps(t)}</p></li>`}).join("")}</ol>`).join("")}</div>` : "";
+    const cls = !p.ing.length?" only-steps":(!p.steps.length?" only-ing":"");
+    return `<section class="part${cls}">${multi?`<div class="part-label">Part ${pi+1} of ${parts.length}</div>`:""}${ing}${steps}</section>`;
+  }).join("");
+  const t = temps(r);
+  const list = RECIPES.filter(x=>x.c===r.c), idx = list.indexOf(r);
+  const prev = list[idx-1], next = list[idx+1];
+  app.innerHTML = `
+  <div class="wrap">
+    <a class="back" href="#${slug(r.c)}">← ${esc(r.c)}</a>
+    <section class="rhead"><div class="tilestripe"></div>
+      <span class="chip">${esc(r.c)}</span>
+      <h1>${titleHTML(r)}</h1>
+      ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}
+      <div class="facts">
+        ${t.length?`<div class="fact hot">Oven <b>${t.join(" → ")}</b></div>`:""}
+        <div class="fact"><b>${nIng(r)}</b> ingredients</div>
+        <div class="fact"><b>${nSteps(r)}</b> steps</div>
+      </div>
+      <div class="tools">
+        <button class="btn fav" id="fav" aria-pressed="${isFav}">${HEART}${isFav?"Saved to favorites":"Save to favorites"}</button>
+        <button class="btn" id="wake" aria-pressed="${!!wakeLock}">${wakeLock?"Screen stays on":"Keep screen on"}</button>
+        <button class="btn" id="reset">Clear checkmarks</button>
+      </div>
+    </section>
+    <div class="parts">
+      ${r.n?`<div class="note"><b>Note:</b> ${esc(r.n)}</div>`:""}
+      ${partHTML}
+      <nav class="pager">
+        ${prev?`<a href="#${prev.id}"><small>Previous</small>${esc(prev.t.replace("Untitled: ",""))}</a>`:"<span></span>"}
+        ${next?`<a href="#${next.id}"><small>Next</small>${esc(next.t.replace("Untitled: ",""))}</a>`:""}
+      </nav>
+    </div>
+  </div>`;
+  document.getElementById("fav").onclick=e=>{
+    const b=e.currentTarget, f=favs(), on=!f.includes(r.id);
+    if(offline){ toast("Favorites need internet. Connect and try again."); return; }
+    setFavs(on ? [r.id,...f] : f.filter(x=>x!==r.id));
+    b.setAttribute("aria-pressed",on); b.innerHTML=HEART+(on?"Saved to favorites":"Save to favorites");
+    renderAcct();
+  };
+  const save=()=>store(uk(r.id),{
+    i:[...app.querySelectorAll(".ing input:checked")].map(x=>+x.dataset.k),
+    s:[...app.querySelectorAll(".step.done")].map(x=>+x.dataset.k)});
+  app.querySelectorAll(".ing input").forEach(x=>x.addEventListener("change",save));
+  app.querySelectorAll(".step").forEach(el=>{
+    const tg=()=>{el.classList.toggle("done");el.setAttribute("aria-pressed",el.classList.contains("done"));save()};
+    el.addEventListener("click",tg);
+    el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();tg()}});
+  });
+  document.getElementById("reset").onclick=()=>{store(uk(r.id),{i:[],s:[]});recipe(r)};
+  document.getElementById("wake").onclick=async e=>{
+    const b=e.currentTarget;
+    try{
+      if(wakeLock){await wakeLock.release();wakeLock=null;b.setAttribute("aria-pressed","false");b.textContent="Keep screen on";return}
+      wakeLock=await navigator.wakeLock.request("screen");
+      b.setAttribute("aria-pressed","true");b.textContent="Screen stays on";
+      wakeLock.addEventListener("release",()=>{wakeLock=null;const x=document.getElementById("wake");if(x){x.setAttribute("aria-pressed","false");x.textContent="Keep screen on"}});
+    }catch(err){b.textContent="Not available on this device";b.disabled=true}
+  };
+}
+
+/* ---------- sign-in and waiting screens ---------- */
+const CHEF = '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14a5 5 0 1 1 3.5-8.6A5 5 0 0 1 22 7a4.5 4.5 0 1 1 1 8.9V25H9z"/><path d="M9 21h14"/></svg>';
+let authMode = "signin";
+function shell(inner){
+  app.innerHTML = `<section class="auth wrap">
+    <div class="auth-card">
+      <div class="auth-brand">${CHEF}<h1>Gitty's Kitchen</h1><p>${RECIPES.length} family recipes in ${CATS.length} categories, from challah to rugelach.</p><div class="small">Family recipes · January 2009</div></div>
+      <form class="auth-form" id="authform" novalidate>${inner}</form>
+    </div></section>`;
+  const F=document.getElementById("authform");
+  F.querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>{authMode=b.dataset.mode; gate()});
+  const so=F.querySelector("[data-signout]"); if(so) so.onclick=signOut;
+  return F;
+}
+function gate(msg){
+  const A = esc(ADMIN_NAME);
+  if(state==="loading"){ shell(`<div class="wait"><span class="spin" aria-hidden="true"></span><h2>Opening the cookbook</h2><p class="sub">One moment…</p></div>`); return; }
+  if(state==="setup"){ shell(`<h2>Almost ready</h2><p class="sub">This copy of Gitty's Kitchen isn't connected to its online member list yet.</p><p class="hint">Once the Firebase setup is done and the app is rebuilt with its settings, members can sign up here.</p>`); return; }
+  if(state==="offline-first"){ shell(`<h2>You're offline</h2><p class="sub">Connect to the internet to sign in. After your first sign-in, the recipes also open without internet.</p><button class="primary" type="button" onclick="location.reload()">Try again</button>`); return; }
+  if(state==="error"){ shell(`<h2>Can't reach the member list</h2><p class="sub">Check your internet connection and try again.</p><button class="primary" type="button" onclick="location.reload()">Try again</button><p class="switch"><button type="button" class="link" data-signout>Sign out</button></p>`); return; }
+  if(state==="pending"){ shell(`<div class="wait"><span class="avatar lg">${esc(initial(myName()))}</span>
+      <h2>Waiting for approval</h2>
+      <p class="sub">Thanks, ${esc(myName())}. Your request to join was sent to ${A}. This page opens the cookbook by itself as soon as you're approved.</p></div>
+      <p class="hint">Let ${A} know you signed up so they can approve you sooner.</p>
+      <p class="switch"><button type="button" class="link" data-signout>Sign out</button></p>`); return; }
+  if(state==="denied"){ shell(`<h2>Request not approved</h2><p class="sub">${A} hasn't approved access for ${esc(myName())}. If you think this is a mistake, contact ${A}.</p><button class="btn" type="button" data-signout style="padding:12px">Sign out</button>`); return; }
+  if(state==="removed"){ shell(`<h2>Profile removed</h2><p class="sub">This profile is no longer on the member list. You can sign up again, and ${A} will be asked to approve it.</p><button class="primary" type="button" data-signout>Back to sign in</button>`); return; }
+  authScreen(msg);
+}
+function authScreen(msg){
+  let inner;
+  if(authMode==="create"){
+    inner = `<h2>Ask to join</h2>
+      <p class="sub">Create a profile. ${esc(ADMIN_NAME)} approves every new member.</p>
+      <div class="field"><label for="nm">Your full name</label><input id="nm" type="text" autocomplete="name" maxlength="40" placeholder="e.g. Gitty Schlesinger"></div>
+      <div class="field"><label for="pw">Password</label><input id="pw" type="password" autocomplete="new-password" placeholder="At least 6 characters"></div>
+      <div class="field"><label for="pw2">Confirm password</label><input id="pw2" type="password" autocomplete="new-password"></div>
+      ${msg?`<p class="err" role="alert">${esc(msg)}</p>`:""}
+      <button class="primary" type="submit">Send request</button>
+      <p class="switch">Already a member? <button type="button" class="link" data-mode="signin">Sign in</button></p>`;
+  } else if(authMode==="forgot"){
+    inner = `<h2>Forgot your password?</h2>
+      <p class="sub">Ask ${esc(ADMIN_NAME)} to remove your profile from the member list. Then ask to join again with the same name and a new password.</p>
+      <p class="hint">Your favorites will start fresh. The recipes are not affected.</p>
+      <button class="btn" type="button" data-mode="signin" style="padding:12px">Back to sign in</button>`;
+  } else {
+    inner = `<h2>Sign in</h2>
+      <p class="sub">Members only. Enter the name you joined with.</p>
+      <div class="field"><label for="nm">Your name</label><input id="nm" type="text" autocomplete="username" maxlength="40" value="${esc(store("gk-lastname")||"")}"></div>
+      <div class="field"><label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password"></div>
+      ${msg?`<p class="err" role="alert">${esc(msg)}</p>`:""}
+      <button class="primary" type="submit">Sign in</button>
+      <p class="switch">New here? <button type="button" class="link" data-mode="create">Ask to join</button></p>
+      <p class="switch"><button type="button" class="link" data-mode="forgot">Forgot your password?</button></p>`;
+  }
+  const F = shell(inner);
+  const nm=F.querySelector("#nm"), pw=F.querySelector("#pw");
+  if(nm){ (nm.value ? pw : nm).focus(); }
+  F.onsubmit = async e=>{
+    e.preventDefault();
+    const btn=F.querySelector(".primary"); if(!btn||btn.disabled) return;
+    const name = nm.value.trim().replace(/\s+/g," "), p = pw.value;
+    if(!name) return gate("Enter your name.");
+    if(authMode==="create"){
+      if(name.length<2) return gate("Enter your full name.");
+      if(/[\/]/.test(name)) return gate("Names can't include a slash (/).");
+      if(p.length<6) return gate("Choose a password with at least 6 characters.");
+      if(p!==F.querySelector("#pw2").value) return gate("The two passwords don't match. Type them again.");
+    } else if(!p) return gate("Enter your password.");
+    btn.disabled=true; btn.textContent = authMode==="create" ? "Sending…" : "Signing in…";
+    try{
+      store("gk-lastname", name);
+      authMode==="create" ? await signUp(name,p) : await signIn(name,p);
+      authMode="signin";
+    }catch(err){ gate(errText(err)); }
+  };
+}
+
+/* ---------- admin: approve members ---------- */
+const fmtDate = t => t ? new Date(t).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}) : "";
+function adminPage(){
+  const pend=members.filter(m=>m.status==="pending"), appr=members.filter(m=>m.status==="approved"), den=members.filter(m=>m.status==="denied");
+  const row = (m,acts) => `<li class="mrow"><span class="avatar">${esc(initial(m.name))}</span>
+      <div class="mwho"><b>${esc(m.name)}${nameKey(m.name)===ADMIN_KEY?' <span class="tag">Admin</span>':""}</b><span>${m.status==="pending"?"Asked to join":"Joined"} ${fmtDate(m.created)}</span></div>
+      <div class="macts">${acts}</div></li>`;
+  const btn = (act,m,label,cls) => `<button type="button" class="btn ${cls||""}" data-act="${act}" data-uid="${esc(m.uid)}">${label}</button>`;
+  const list = (arr,f,empty) => arr.length ? `<ul class="mlist">${arr.map(f).join("")}</ul>` : `<p class="hint mempty">${empty}</p>`;
+  app.innerHTML = `<section class="wrap admin">
+    <div class="section-head" style="margin-top:28px"><h2>Approve members</h2><p>${members.length} ${members.length===1?"profile":"profiles"}</p></div>
+    <div class="panel-a"><h3>Waiting for approval ${pend.length?`<span class="count">${pend.length}</span>`:""}</h3>
+      ${list(pend, m=>row(m, btn("approve",m,"Approve","solid")+btn("deny",m,"Deny")), "No one is waiting. New requests appear here right away.")}</div>
+    <div class="panel-a"><h3>Members</h3>
+      ${list(appr, m=>row(m, nameKey(m.name)===ADMIN_KEY ? "" : btn("ask-remove",m,"Remove")), "No members yet.")}</div>
+    ${den.length?`<div class="panel-a"><h3>Not approved</h3>${list(den, m=>row(m, btn("approve",m,"Approve","solid")+btn("ask-remove",m,"Remove")), "")}</div>`:""}
+  </section>`;
+  app.querySelectorAll("[data-act]").forEach(b=>b.onclick=async()=>{
+    const m=members.find(x=>x.uid===b.dataset.uid); if(!m) return;
+    const act=b.dataset.act;
+    if(act==="ask-remove"){
+      const li=b.closest(".mrow");
+      li.querySelector(".macts").innerHTML = `<span class="hint">Remove ${esc(m.name)}?</span>${btn("remove",m,"Remove","warn")}<button type="button" class="btn" data-cancel>Cancel</button>`;
+      li.querySelector("[data-cancel]").onclick=adminPage;
+      li.querySelector('[data-act="remove"]').onclick=async()=>{ try{ await removeMember(m); }catch(e){ toast("Couldn't remove. Check your connection."); } };
+      return;
+    }
+    b.disabled=true;
+    try{ await setStatus(m.uid, act==="approve"?"approved":"denied"); toast(act==="approve"?`${m.name} is approved`:`${m.name} was not approved`); }
+    catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); }
+  });
+}
+function toast(t){
+  let el=document.getElementById("toast");
+  if(!el){ el=document.createElement("div"); el.id="toast"; el.className="toast"; el.setAttribute("role","status"); document.body.appendChild(el); }
+  el.textContent=t; el.classList.add("show"); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove("show"),2600);
+}
+
+/* ---------- account menu ---------- */
+const acct = document.getElementById("acct");
+function closeMenu(){ const m=acct.querySelector(".menu"); if(m) m.remove(); }
+function renderAcct(){
+  const ob=document.getElementById("offbar"); if(ob) ob.hidden = !(offline && state==="approved");
+  if(state!=="approved"){ acct.innerHTML=""; return; }
+  const open=!!acct.querySelector(".menu");
+  const pc = isAdmin() ? pendingCount() : 0;
+  acct.innerHTML = `<button class="avatar" id="avbtn" aria-label="Account menu for ${esc(myName())}${pc?`, ${pc} waiting for approval`:""}" aria-haspopup="true">${esc(initial(myName()))}${pc?`<span class="dot">${pc}</span>`:""}</button>`;
+  document.getElementById("avbtn").onclick = e=>{ e.stopPropagation(); acct.querySelector(".menu") ? closeMenu() : openMenu(); };
+  if(open) openMenu();
+}
+function openMenu(confirming){
+  closeMenu();
+  const pc = pendingCount();
+  const m=document.createElement("div"); m.className="menu"; m.setAttribute("role","menu");
+  m.innerHTML = `<div class="who"><b>${esc(myName())}</b><span>${isAdmin()?"Admin":"Member"}${offline?" · offline":""}</span></div>
+    ${isAdmin()?`<a href="#admin" role="menuitem">Approve members <span class="n${pc?" hot":""}">${pc?pc+" waiting":""}</span></a>`:""}
+    <a href="#favorites" role="menuitem">My favorites <span class="n">${favs().length}</span></a>
+    <button type="button" role="menuitem" id="m-out">Sign out</button>
+    ${isAdmin()||offline ? "" : confirming?`<div class="confirm">Delete your profile and favorites? You'd need to ask to join again.
+      <div class="row"><button type="button" class="btn warn" id="m-yes">Delete</button><button type="button" class="btn" id="m-no">Cancel</button></div></div>`
+      :`<button type="button" role="menuitem" class="danger" id="m-del">Delete my profile</button>`}`;
+  m.onclick=e=>e.stopPropagation();
+  acct.appendChild(m);
+  m.querySelectorAll('a').forEach(a=>a.onclick=closeMenu);
+  m.querySelector('#m-out').onclick=signOut;
+  const del=m.querySelector('#m-del'); if(del) del.onclick=()=>openMenu(true);
+  const yes=m.querySelector('#m-yes'); if(yes){ yes.onclick=()=>{ closeMenu(); deleteMe(); }; m.querySelector('#m-no').onclick=()=>openMenu(false); }
+}
+document.addEventListener("click",closeMenu);
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeMenu(); });
+
+function route(){
+  closeMenu();
+  if(state!=="approved"){ document.body.classList.add("out"); gate(); return; }
+  document.body.classList.remove("out");
+  const h = decodeURIComponent(location.hash.slice(1));
+  if(h==="admin" && isAdmin()){ q.value=""; adminPage(); window.scrollTo(0,0); return; }
+  if(h==="favorites"){ q.value=""; favorites(); window.scrollTo(0,0); return; }
+  const r = RECIPES.find(x=>x.id===h);
+  if(r){ q.value=""; recipe(r); window.scrollTo(0,0); return; }
+  const c = CATS.find(x=>slug(x)===h);
+  if(c){ q.value=""; category(c); window.scrollTo(0,0); return; }
+  if(q.value.trim()) { results(q.value.trim()); return; }
+  home();
+}
+q.addEventListener("input",()=>{
+  const v=q.value.trim();
+  if(location.hash){ history.replaceState(null,"",location.pathname+location.search); }
+  v ? results(v) : home();
+});
+window.addEventListener("hashchange",route);
+boot();
+</script>
+
+</body></html>
