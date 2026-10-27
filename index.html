@@ -389,7 +389,13 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.2";
+const WEB_VERSION = "3.3";
+/* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
+const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
+function notifyAdmin(title, message, hash, tags){
+  const q = new URLSearchParams({title, click: "https://shulem161.github.io/gittys-kitchen/"+(hash||""), tags: tags||"bell", priority: "4"});
+  return fetch("https://ntfy.sh/"+NTFY_TOPIC+"?"+q.toString(), {method:"POST", body: message}).catch(()=>{});
+}
 const SITE = "https://shulem161.github.io/gittys-kitchen/";
 const appBuild = (()=>{ const m=navigator.userAgent.match(/GittysKitchenApp\/(\d+)/); return m ? +m[1] : 0; })();
 let update = null;            // {web, apk, apkUrl, notes}
@@ -484,6 +490,7 @@ async function signUp(name,pw){
     catch(e){ try{ await cred.user.delete(); }catch(_){} throw {code:"gk/taken"}; }
     profile = {name, status: key===ADMIN_KEY ? "approved" : "pending", created: Date.now(), favs: []};
     await db.collection("users").doc(uid).set(profile);
+    if(key!==ADMIN_KEY) notifyAdmin(`${name} asked to join`, "Tap to open Approve members in Gitty's Kitchen.", "#admin", "wave");
   } finally { pendingCreate=false; }
 }
 async function signIn(name,pw){
@@ -820,6 +827,7 @@ function openMenu(confirming){
     ${!offline&&(!isAdmin()||recipesOnline)?`<a href="#new" role="menuitem">Add a recipe <span class="n"></span></a>`:""}
     ${isAdmin()?"":`<a href="#mine" role="menuitem">My recipes <span class="n">${subs.length||""}</span></a>`}
     <a href="#favorites" role="menuitem">My favorites <span class="n">${favs().length}</span></a>
+    ${isAdmin()?`<button type="button" role="menuitem" id="m-ntfy">Send test notification <span class="n"></span></button>`:""}
     <button type="button" role="menuitem" id="m-upd">Check for updates <span class="n">v${WEB_VERSION}</span></button>
     <button type="button" role="menuitem" id="m-out">Sign out</button>
     ${isAdmin()||offline ? "" : confirming?`<div class="confirm">Delete your profile and favorites? You'd need to ask to join again.
@@ -830,6 +838,7 @@ function openMenu(confirming){
   m.querySelectorAll('a').forEach(a=>a.onclick=closeMenu);
   m.querySelector('#m-out').onclick=signOut;
   m.querySelector('#m-upd').onclick=()=>{ closeMenu(); checkUpdates(true); };
+  const nt=m.querySelector('#m-ntfy'); if(nt) nt.onclick=async()=>{ closeMenu(); const r=await notifyAdmin("Test from Gitty's Kitchen","Notifications are working.","","white_check_mark"); toast(r&&r.ok?"Test sent. Check your device.":"Couldn't send. Check your internet connection."); };
   const del=m.querySelector('#m-del'); if(del) del.onclick=()=>openMenu(true);
   const yes=m.querySelector('#m-yes'); if(yes){ yes.onclick=()=>{ closeMenu(); deleteMe(); }; m.querySelector('#m-no').onclick=()=>openMenu(false); }
 }
@@ -969,6 +978,7 @@ function editor(r, cat, sub){
         const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), s, ord:0});
         try{
           await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,s:d.s, uid:me, byName:myName(), status:"pending", created:Date.now()});
+          notifyAdmin(`New recipe from ${myName()}`, `“${t}” is waiting for your approval.`, "#review", "cookie");
           toast(`Sent to ${ADMIN_NAME} for approval`); location.hash="mine";
         }catch(e){ btn0.disabled=false; btn0.textContent="Send for approval"; fail("Couldn't send. Check your internet connection and try again."); }
         return;
