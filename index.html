@@ -213,6 +213,20 @@ button{font:inherit;color:inherit}
 .td-add{display:flex;gap:8px}
 .td-add input{flex:1;min-width:0;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;font-size:16px}
 .td-clear{margin-top:10px;font-size:14px}
+/* Today: compact */
+.panel-a.today{padding:10px 14px 12px;margin-top:14px;margin-bottom:0;border-radius:14px}
+.panel-a.today h3{font-size:18px;margin:0}
+.panel-a.today .g-head{margin-bottom:2px;gap:6px}
+.panel-a.today .td-head-r{display:flex;align-items:baseline;gap:10px;font-size:12.5px;color:var(--muted)}
+.panel-a.today .td-list{margin:2px 0 6px}
+.panel-a.today .td-list label{padding:4px 2px;font-size:15px;gap:10px}
+.panel-a.today .td-list input{width:18px;height:18px}
+.panel-a.today .td-x{width:32px;height:32px;font-size:12px}
+.panel-a.today .td-list .link{font-size:13px}
+.panel-a.today .td-add input{padding:6px 10px;font-size:15px}
+.panel-a.today .td-add .btn{padding:5px 14px;font-size:14px}
+.panel-a.today .td-clear{margin:0;font-size:12.5px}
+.panel-a.today > .hint{margin:2px 0 6px!important;font-size:12.5px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .g-row{display:flex;align-items:center;gap:8px}.g-row label{flex:1;min-width:0}
 .g-hv{flex:none;white-space:nowrap}
@@ -421,6 +435,10 @@ body.out .bar, body.out footer{display:none}
 .dl-sw b{position:absolute;left:6px;right:6px;height:3px;background:var(--c);top:20px;border-radius:2px}
 .dl-sw b+b{top:28px;right:14px;opacity:.6}
 .dlpick .row{display:flex;gap:8px;margin-top:10px}
+.dl-prev{margin:12px 0 0}
+.dl-prev figcaption{font-size:13px;color:var(--muted);margin-bottom:6px}
+.dl-prev img{display:block;width:100%;max-width:420px;height:auto;border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);background:#fff}
+@media (min-width:900px){.dlpick{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:0 20px;align-items:start}.dl-prev{margin:0;grid-column:2;grid-row:1}.dlpick .row{grid-column:1}}
 .permbox{flex-basis:100%;margin:4px 0 4px 52px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
 .perm-h{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--wheat);margin:10px 0 0}
 @media (max-width:640px){.permbox{margin-left:0}}
@@ -910,7 +928,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.57";
+const WEB_VERSION = "3.59";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1205,12 +1223,11 @@ function todayAdd(text, rid){
 function todayHTML(){
   const v=tdStore(), left=v.items.filter(x=>!x.done).length;
   return `<div class="panel-a today" id="today">
-    <div class="g-head"><h3>Today</h3><span class="hint">${new Date().toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"})}${v.items.length?` · ${left} left`:""}</span></div>
+    <div class="g-head"><h3>Today</h3><span class="td-head-r"><span>${new Date().toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})}${v.items.length?` · ${left} left`:""}</span>${v.items.some(x=>x.done)?`<button type="button" class="link td-clear" id="td-clear">Clear finished</button>`:""}</span></div>
     ${v.items.length?`<ul class="td-list">${v.items.map(x=>{ const r=x.rid&&RECIPES.find(y=>y.id===x.rid);
       return `<li class="${x.done?"done":""}"><label><input type="checkbox" data-td="${x.id}" ${x.done?"checked":""}><span>${esc(x.t)}${x.carried&&!x.done?' <small>from before</small>':""}</span></label>${r?`<a class="link" href="#${r.id}">Open</a>`:""}<button type="button" class="td-x" data-tdx="${x.id}" aria-label="Remove ${esc(x.t)}">✕</button></li>`; }).join("")}</ul>`
-      :`<p class="hint" style="margin:4px 0 10px">Nothing planned yet. Add what you want to do today, or open a recipe and tap “Add to today”.</p>`}
-    <form class="td-add" id="td-form"><label class="sr" for="td-new">New task</label><input id="td-new" type="text" maxlength="120" autocomplete="off" placeholder="Add a task, e.g. Take out the chicken"><button class="btn solid" type="submit">Add</button></form>
-    ${v.items.some(x=>x.done)?`<button type="button" class="link td-clear" id="td-clear">Clear finished</button>`:""}
+      :`<p class="hint" style="margin:4px 0 10px">Nothing planned yet. Add a task, or tap “Add to today” on a recipe.</p>`}
+    <form class="td-add" id="td-form"><label class="sr" for="td-new">New task</label><input id="td-new" type="text" maxlength="120" autocomplete="off" placeholder="Add a task…"><button class="btn solid" type="submit">Add</button></form>
   </div>`;
 }
 function wireToday(){
@@ -2493,9 +2510,12 @@ function pickPdfStyle(btn, go){
   const old=document.getElementById("dlpick"); if(old){ old.remove(); if(old._for===btn) return; }
   const cur=pdfStyleKey(), box=document.createElement("div"); box.id="dlpick"; box.className="dlpick"; box._for=btn;
   box.innerHTML=`<fieldset><legend>Choose a design</legend>${Object.entries(PDF_STYLES).map(([k,s])=>`<label class="dl-opt"><input type="radio" name="dlst" value="${k}" ${k===cur?"checked":""}><span class="dl-sw" style="${pdfSwatch(k)}" aria-hidden="true"><i></i><b></b><b></b></span><span><b>${esc(s.name)}</b><small>${esc(s.desc)}</small></span></label>`).join("")}</fieldset>
+    <figure class="dl-prev"><figcaption>Sample: <b id="dl-prev-name">${esc(PDF_STYLES[cur].name)}</b>, on the Challah recipe</figcaption><img id="dl-prev-img" src="pdf-sample-${cur}.jpg" alt="Sample page in the ${esc(PDF_STYLES[cur].name)} design"></figure>
     <div class="row"><button type="button" class="btn solid" id="dl-go">Download</button><button type="button" class="btn" id="dl-cancel">Cancel</button></div>`;
   (btn.closest(".tools, .home-foot, .cat-tools") || btn.parentElement).after(box);
   box.querySelector("#dl-cancel").onclick=()=>box.remove();
+  box.querySelectorAll("input[name=dlst]").forEach(i=>i.onchange=()=>{ const s=PDF_STYLES[i.value], im=box.querySelector("#dl-prev-img");
+    im.src=`pdf-sample-${i.value}.jpg`; im.alt=`Sample page in the ${s.name} design`; box.querySelector("#dl-prev-name").textContent=s.name; });
   box.querySelector("#dl-go").onclick=()=>{ const k=box.querySelector("input:checked").value; store("gk-pdfstyle", k); box.remove(); go(k); };
   box.scrollIntoView({block:"nearest"});
 }

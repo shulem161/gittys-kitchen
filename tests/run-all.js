@@ -95,6 +95,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await B.goto(F + '#r-boston-cream-pie'); await B.waitForTimeout(400);
     await B.click('#dl'); await B.waitForTimeout(200);
     ok('download offers five designs', (await B.locator('#dlpick input[name=dlst]').count()) === 5);
+    await B.check('#dlpick input[value=elegant]'); await B.waitForTimeout(100);
+    ok('picking a design shows its sample page', /pdf-sample-elegant\.jpg$/.test(await B.locator('#dl-prev-img').getAttribute('src')) && /Elegant/.test(await B.locator('#dl-prev-name').innerText()));
     const [dl] = await Promise.all([B.waitForEvent('download'), B.click('#dl-go')]);
     const pdfPath = path.join(os.tmpdir(), 'gk-test.pdf'); await dl.saveAs(pdfPath);
     ok('recipe downloads as a PDF', fs.readFileSync(pdfPath).slice(0, 5).toString() === '%PDF-' && /\.pdf$/.test(dl.suggestedFilename()), dl.suggestedFilename());
