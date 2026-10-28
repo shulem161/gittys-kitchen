@@ -261,6 +261,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     const bc = await A.locator('.rc .nochip').allInnerTexts();
     ok('category lists recipes by code', bc.length >= 2 && bc.every((c, i) => !i || bc[i - 1].localeCompare(c, undefined, {numeric: true}) < 0) && (await A.locator('.rc').first().locator('.nochip').count()) === 1, bc);
     ok('New recipes is first in the category bar', /^New recipes/.test(await A.locator('.tabs .tab').first().innerText()));
+    await A.goto(F + '#profile'); await A.waitForTimeout(400);
+    ok('profile has five designs to choose from', (await A.locator('#lookpanel .look').count()) === 5);
+    await A.click('#lookpanel [data-look="garden"]'); await A.waitForTimeout(200);
+    ok('choosing a design changes the look', await A.evaluate(() => document.documentElement.dataset.look) === 'garden');
+    await A.click('#lookpanel [data-look="classic"]'); await A.waitForTimeout(200);
     // New recipes
     await A.goto(F); await A.waitForTimeout(300);
     ok('New recipes is the first tile on the home page', /New recipes/.test(await A.locator('.cats:not(.tools) .cat').first().innerText()));

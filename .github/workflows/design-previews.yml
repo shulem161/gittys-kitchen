@@ -1,0 +1,29 @@
+# Screenshots of each design, with the real fonts, to help choose a look. Run by hand.
+name: Design previews
+on:
+  workflow_dispatch:
+  push:
+    branches: [design-previews]
+permissions:
+  contents: write
+jobs:
+  shots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm i --no-save playwright@1.48.2 && npx playwright install --with-deps chromium
+      - run: node tools/design-previews.mjs > out.txt 2>&1 || { echo "::error::$(tail -c 700 out.txt | tr '\n' ' ')"; exit 1; }
+      - name: Combine into one sheet per design
+        run: |
+          for l in classic warm garden shabbos modern; do
+            convert previews/$l-*.png -resize 50% +append -bordercolor white -border 20 previews/sheet-$l.png || true
+          done
+      - name: Save screenshots to the design-previews-out branch
+        run: |
+          mkdir -p /tmp/out && cp previews/*-[1-4]-*.png /tmp/out/
+          git config user.name "github-actions" && git config user.email "actions@github.com"
+          git checkout --orphan design-previews-out && git rm -rqf . && cp /tmp/out/*.png . && git add *.png
+          git commit -qm "Design preview screenshots" && git push -f origin design-previews-out
