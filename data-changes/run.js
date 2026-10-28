@@ -11,8 +11,10 @@ const say = (lvl, msg) => console.log(`::${lvl}::${msg}`);
   const metaRef = db.doc('meta/dataChanges');
   const done = ((await metaRef.get()).data() || {}).done || {};
   const files = fs.readdirSync(__dirname).filter(f => /^\d{3}-.+\.js$/.test(f)).sort();
+  const latest = files[files.length - 1];
+  if (done[latest]) say('notice', `Newest change ${latest}: ${done[latest].result}`);
   for (const f of files) {
-    if (done[f]) { say('notice', `${f}: already applied on ${new Date(done[f].at).toISOString().slice(0,10)}`); continue; }
+    if (done[f]) { console.log(`${f}: already applied on ${new Date(done[f].at).toISOString().slice(0,10)}`); continue; }
     const change = require(path.join(__dirname, f));
     const result = await change(db, admin);
     say('notice', `${f}: ${result}`);
