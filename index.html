@@ -676,7 +676,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.43";
+const WEB_VERSION = "3.44";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1369,10 +1369,11 @@ const toDoc = r => ({c:r.c, t:r.t, by:r.by||"", n:r.n||"", pre:r.pre||[], kind:r
   s:r.s.map(([ing,h,items])=>({k:ing?"ing":"step", h:h||"", items:items}))});
 const fromDoc = (id,d) => ({id, c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, pre:d.pre, kind:d.kind||"", time:d.time||"", sec:d.sec||"", no:d.no||0, code:d.code||"", ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[],
   s:(d.s||[]).map(x=>[x.k==="ing"?1:0, x.h||"", x.items||[]])});
-// Recipes are listed A to Z by category, then A to Z by name ("Tomato Dip # 2" comes before "# 10").
+// Recipes are listed A to Z by category, then by recipe code (A001, A002…); any without a code go after, A to Z by name.
 const sortName = r => r.t.replace(/^Untitled:\s*/,"").replace(/^[^A-Za-z0-9]+/,"");
 function sortRecipes(list){
-  return list.sort((a,b)=> byName(a.c,b.c) || sortName(a).localeCompare(sortName(b), undefined, {sensitivity:"base", numeric:true}));
+  return list.sort((a,b)=> byName(a.c,b.c) || (!a.code - !b.code) || (a.code&&b.code ? a.code.localeCompare(b.code, undefined, {numeric:true}) : 0)
+    || sortName(a).localeCompare(sortName(b), undefined, {sensitivity:"base", numeric:true}));
 }
 function setRecipes(list){
   RECIPES = sortRecipes(list);
