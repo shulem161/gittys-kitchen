@@ -73,6 +73,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Pairs of recipes an admin marked "not duplicates".
+    match /meta/dupes {
+      allow get: if isAdmin();
+      allow write: if isAdmin() && request.resource.data.keys().hasOnly(['ignore']) && request.resource.data.ignore is list;
+    }
+
     // What every employee may do (Employee settings).
     match /meta/employees {
       allow get: if signedIn();
