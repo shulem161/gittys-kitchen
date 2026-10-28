@@ -205,6 +205,9 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.selectOption('#ed-k', 'dairy'); await A.click('#edform .primary'); await A.waitForTimeout(800);
     ok('admin can mark a recipe Dairy', /dairy/i.test(await A.locator('.rhead .kchip').innerText().catch(() => '')));
 
+    await A.goto(F); await A.waitForTimeout(400);
+    await A.click('.cats.tools a[href="#scan"]'); await A.waitForTimeout(400);
+    ok('home page Scan a recipe opens the scanner', /Add from a photo or file/.test(await A.locator('main h2').first().innerText()));
     // Kitchen tools: scaling, time, grocery list, calculator, menu ideas
     await A.goto(F + '#r-bobbys-challah'); await A.waitForTimeout(500);
     ok('recipe shows how long it takes', /About \d+ (hr|min)/.test(await A.locator('.facts').innerText()));

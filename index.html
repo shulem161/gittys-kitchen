@@ -100,7 +100,7 @@ button{font:inherit;color:inherit}
 .rhead .kchip{margin-left:6px}
 .rc .chips{display:flex;gap:6px;flex-wrap:wrap;margin-right:auto}
 .rc .meta{flex-wrap:wrap;gap:6px 16px}
-.cats.tools{grid-template-columns:repeat(3,minmax(0,1fr))}
+.cats.tools{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
 .cats.tools .tool-txt span{display:block;margin-top:4px}
 .cats.tools .cat{width:100%;box-sizing:border-box;min-width:0}
 @media (max-width:640px){.cats.tools{grid-template-columns:1fr}.cats.tools .cat{flex-direction:row;align-items:center;gap:14px}.cats.tools .cat .ic{flex:none}}
@@ -610,7 +610,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.34";
+const WEB_VERSION = "3.35";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -872,6 +872,7 @@ const TOOL_IC = {
   menu:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3v8M4 3v4a2 2 0 0 0 4 0V3M6 11v10M16 21V3c-2 1-3 4-3 7s1 4 3 4"/></svg>',
   cart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11h10.2L20 8H7"/><circle cx="9.5" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/></svg>',
   calc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></svg>',
+  scan:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M8 9h8M8 12h8M8 15h5"/></svg>',
   clock:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
 };
 function home(){
@@ -906,6 +907,7 @@ function home(){
   <section class="wrap">
     <div class="section-head"><h2>Kitchen tools</h2><p>Plan, shop and measure</p></div>
     <div class="cats tools">
+      ${offline||(isAdmin()&&!recipesOnline)?"":`<a class="cat" href="#scan"><div class="ic">${TOOL_IC.scan}</div><div class="tool-txt"><h3>Scan a recipe</h3><span>Photo of a paper, PDF or Word</span></div></a>`}
       ${offline?"":`<a class="cat" href="#menu"><div class="ic">${TOOL_IC.menu}</div><div class="tool-txt"><h3>Menu ideas</h3><span>A full menu from the cookbook</span></div></a>`}
       <a class="cat" href="#grocery"><div class="ic">${TOOL_IC.cart}</div><div class="tool-txt"><h3>Grocery list</h3><span>${gStore().items.length?`${gStore().items.length} ${gStore().items.length===1?"recipe":"recipes"} on it`:"Pick recipes, get one list"}</span></div></a>
       <a class="cat" href="#convert"><div class="ic">${TOOL_IC.calc}</div><div class="tool-txt"><h3>Calculator</h3><span>Cups, ounces, grams, °F</span></div></a>
