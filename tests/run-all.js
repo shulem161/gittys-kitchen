@@ -262,6 +262,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('category lists recipes by code', bc.length >= 2 && bc.every((c, i) => !i || bc[i - 1].localeCompare(c, undefined, {numeric: true}) < 0) && (await A.locator('.rc').first().locator('.nochip').count()) === 1, bc);
     ok('New recipes is first in the category bar', /^New recipes/.test(await A.locator('.tabs .tab').first().innerText()));
     // New recipes
+    await A.goto(F); await A.waitForTimeout(300);
+    ok('New recipes is the first tile on the home page', /New recipes/.test(await A.locator('.cats:not(.tools) .cat').first().innerText()));
     await A.goto(F + '#c-cakes'); await A.waitForTimeout(300); await A.selectOption('[data-sortpage]', 'za'); await A.waitForTimeout(300);
     const za = await A.locator('.rc h3').allInnerTexts();
     ok('sort Z to A works', za.length > 2 && za.every((x, i) => !i || za[i - 1].replace(/^Untitled:\s*/, '').localeCompare(x.replace(/^Untitled:\s*/, ''), undefined, {sensitivity: 'base', numeric: true}) >= 0), za.slice(0, 4));

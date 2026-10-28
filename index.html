@@ -116,6 +116,15 @@ button{font:inherit;color:inherit}
 .newchip{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:999px;background:var(--wheat-soft);color:var(--wheat);white-space:nowrap}
 .cat{position:relative}
 .catcode{position:absolute;top:12px;right:12px;font-size:12px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:999px;border:1px solid var(--accent);color:var(--accent);background:var(--paper)}
+/* New recipes: bright so it stands out */
+.cat-new{background:linear-gradient(135deg,#F2B33D,#E07A2E);border-color:transparent;color:#fff}
+.cat-new h3,.cat-new span{color:#fff}
+.cat-new .ic{background:rgba(255,255,255,.22);color:#fff}
+.cat-new .catcode{background:#fff;color:#C2581A;border-color:#fff}
+.cat-new:hover{border-color:transparent;box-shadow:0 10px 28px rgba(224,122,46,.35)}
+.tab.tab-new{background:linear-gradient(135deg,#F2B33D,#E07A2E);border-color:transparent;color:#fff;font-weight:700;position:sticky;left:0;z-index:2;box-shadow:6px 0 10px -4px var(--bg)}
+.tab.tab-new .n{color:#fff;opacity:.9}
+.tab.tab-new[aria-current="page"]{box-shadow:0 0 0 3px var(--paper),0 0 0 5px #E07A2E}
 .sortbar{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--muted);margin:-6px 0 14px}
 .sortbar select{width:auto;padding:8px 32px 8px 12px;font-size:14px;border-radius:999px}
 .nochip{font-size:11px;font-weight:700;letter-spacing:.04em;padding:4px 8px;border-radius:999px;border:1px solid var(--accent);color:var(--accent);font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -678,7 +687,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.46";
+const WEB_VERSION = "3.47";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -975,13 +984,13 @@ function home(){
   ${adminBanner()}
   <section class="wrap">
     <div class="section-head"><h2>Categories</h2><p>Choose a section of the cookbook</p></div>
-    <div class="cats">${CATS.map(c=>{const n=RECIPES.filter(r=>r.c===c).length;
+    <div class="cats">${(()=>{ const d=recentList(864e5).length, w=recentList(7*864e5).length;
+      return `<a class="cat cat-new" href="#recent"><span class="catcode">${w?`${w} new`:"New"}</span><div class="ic">${TOOL_IC.spark}</div><h3>New recipes</h3><span>${d?`${d} added today`:w?`${w} added this week`:"See what's been added"}</span></a>`; })()}${CATS.map(c=>{const n=RECIPES.filter(r=>r.c===c).length;
       return `<a class="cat" href="#${slug(c)}">${CODEMAP.cats[c]?`<span class="catcode" title="Recipe codes start with ${CODEMAP.cats[c]}">${CODEMAP.cats[c]}</span>`:""}<div class="ic">${icon(c)}</div><h3>${esc(c)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`}).join("")}</div>
   </section>
   <section class="wrap">
     <div class="section-head"><h2>Kitchen tools</h2><p>Plan, shop and measure</p></div>
     <div class="cats tools">
-      <a class="cat" href="#recent"><div class="ic">${TOOL_IC.spark}</div><div class="tool-txt"><h3>New recipes</h3><span>${(()=>{ const d=recentList(864e5).length, w=recentList(7*864e5).length; return d?`${d} added today`:w?`${w} added this week`:"See what's been added lately"; })()}</span></div></a>
       ${offline||(isAdmin()&&!recipesOnline)?"":`<a class="cat" href="#scan"><div class="ic">${TOOL_IC.scan}</div><div class="tool-txt"><h3>Scan a recipe</h3><span>Photo of a paper, PDF or Word</span></div></a>`}
       ${offline?"":`<a class="cat" href="#requests"><div class="ic">${TOOL_IC.ask}</div><div class="tool-txt"><h3>${isAdmin()?"Recipe requests":"Request a recipe"}</h3><span>${isAdmin()?(openRequests()?`${openRequests()} waiting`:"What the family is asking for"):"Ask for any recipe, or send a photo"}</span></div></a>`}
       ${offline?"":`<a class="cat" href="#menu"><div class="ic">${TOOL_IC.menu}</div><div class="tool-txt"><h3>Menu ideas</h3><span>A full menu from the cookbook</span></div></a>`}
@@ -1072,7 +1081,7 @@ function category(c){
   const dc=document.getElementById("dl-cat"); if(dc) dc.onclick=()=>downloadBook([c], dc);
   wireSort(()=>category(c));
 
-  const a=app.querySelector('.tab[aria-current="page"]'); if(a) a.parentElement.scrollLeft = a.offsetLeft - 16;
+  const a=app.querySelector('.tab[aria-current="page"]'); if(a) a.parentElement.scrollLeft = a.offsetLeft - (a.classList.contains("tab-new") ? 16 : 16 + (a.parentElement.querySelector(".tab-new")||{offsetWidth:0}).offsetWidth + 10);
 }
 
 function favorites(){
