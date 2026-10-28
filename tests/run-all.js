@@ -256,7 +256,9 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // New recipes
     await A.goto(F + '#recent-day'); await A.waitForTimeout(400);
     ok('new recipes page lists recipes added today', (await A.locator('.rc h3').allInnerTexts()).includes('Test Pesach Kugel'));
-    ok('new recipes has 24h / 7 days / 30 days', (await A.locator('.sec-pill').count()) === 3);
+    ok('new recipes has 6h / 24h / 7 days / 30 days', (await A.locator('.sec-pill').count()) === 4);
+    await A.goto(F + '#recent-6h'); await A.waitForTimeout(300);
+    ok('last 6 hours shows new recipes', (await A.locator('.rc h3').allInnerTexts()).includes('Test Pesach Kugel'));
 
     // Recipe requests
     await V.goto(F + '#requests'); await V.waitForTimeout(400);

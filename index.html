@@ -644,7 +644,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.39";
+const WEB_VERSION = "3.40";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -2885,7 +2885,7 @@ function requestsAdminPage(){
 
 /* ---------- new recipes ---------- */
 const addedAt = r => { const h=(r.history||[]).find(x=>x.a==="added"); return h ? +h.at||0 : 0; };
-const RECENT = [["day","Last 24 hours",864e5],["week","Last 7 days",7*864e5],["month","Last 30 days",30*864e5]];
+const RECENT = [["6h","Last 6 hours",6*36e5],["day","Last 24 hours",864e5],["week","Last 7 days",7*864e5],["month","Last 30 days",30*864e5]];
 const recentList = ms => RECIPES.filter(r=>addedAt(r) > Date.now()-ms).sort((a,b)=>addedAt(b)-addedAt(a) || byName(a.t,b.t));
 function whenText(t){
   const m=Math.round((Date.now()-t)/60000);
@@ -2902,7 +2902,7 @@ function recentPage(which){
     <nav class="sec-nav" aria-label="How far back">${RECENT.map(([k,l,ms])=>`<a class="sec-pill${k===pick[0]?" on":""}" href="#recent-${k}"${k===pick[0]?' aria-current="page"':""}>${l} <span>${recentList(ms).length}</span></a>`).join("")}</nav>
     ${list.length ? (()=>{ let last=""; return list.map(r=>{ const d=new Date(addedAt(r)).toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
         const head = d!==last ? `${last?"</div>":""}<h3 class="sec-title">${esc(d)}</h3><div class="grid">` : ""; last=d; return head+card(r); }).join("")+"</div>"; })()
-      : `<div class="empty">No recipes were added in the ${pick[1].toLowerCase()}.${pick[0]!=="month"?` <a class="link" href="#recent-${pick[0]==="day"?"week":"month"}">See a longer time</a>`:""}</div>`}
+      : `<div class="empty">No recipes were added in the ${pick[1].toLowerCase()}.${pick[0]!=="month"?` <a class="link" href="#recent-${RECENT[RECENT.indexOf(pick)+1][0]}">See a longer time</a>`:""}</div>`}
   </section>`;
 }
 

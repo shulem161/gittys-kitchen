@@ -1,6 +1,6 @@
 {
-  "web": "3.39",
+  "web": "3.40",
   "apk": 8,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New: see recipes added in the last 24 hours, 7 days or 30 days."
+  "notes": "New: see recipes added in the last 6 hours, 24 hours, 7 days or 30 days."
 }
