@@ -12,7 +12,7 @@ await ctx.route(/www\.gstatic\.com\/firebasejs|version\.json|ntfy/, r => r.fulfi
 await ctx.route(/www\.gstatic\.com\/firebasejs\/.*app-compat/, r => r.fulfill({contentType: 'text/javascript', body: FAKE}));
 const p = await ctx.newPage(); p.on('pageerror', e => console.log('::warning::page error ' + e.message));
 await p.goto(F); await p.waitForTimeout(800);
-await p.click('[data-mode=create]'); await p.fill('#nm', 'Shulem'); await p.fill('#pw', 'admin123'); await p.fill('#pw2', 'admin123'); await p.click('.primary'); await p.waitForTimeout(1200);
+await p.click('[data-mode=create]'); await p.fill('#nm', 'Shulem Schlesinger'); await p.fill('#pw', 'admin123'); await p.fill('#pw2', 'admin123'); await p.click('.primary'); await p.waitForTimeout(1200);
 const ib = await p.$('#importbtn'); if (ib) { await ib.click(); await p.waitForTimeout(1500); }
 for (const l of LOOKS) {
   await p.goto(F + '?look=' + l); await p.waitForTimeout(1500);
