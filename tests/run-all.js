@@ -243,14 +243,14 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('fish recipes say Fish', await A.$$eval('.rc', els => els.length > 0 && els.every(e => /\bFish\b/i.test(e.querySelector('.kchip')?.textContent || ''))));
     await A.goto(F + '#new-pesach'); await A.waitForTimeout(400);
     await A.fill('#ed-t', 'Test Pesach Kugel'); await A.fill('#ed-sec', 'Kugel'); await A.locator('.sec-items').nth(0).fill('5 potatoes'); await A.click('#edform .primary'); await A.waitForTimeout(1500);
-    ok('new recipe gets a number', /^#\d+$/.test(await A.locator('.rhead .nochip').innerText().catch(() => '')));
-    const newNo = (await A.locator('.rhead .nochip').innerText().catch(() => '')).slice(1);
+    const newNo = await A.locator('.rhead .nochip').innerText().catch(() => '');
+    ok('new Pesach recipe gets a section code like LA001', /^[A-Z]{2}\d{3}$/.test(newNo), newNo);
     await A.goto(F + '#c-pesach'); await A.waitForTimeout(500);
     ok('Pesach shows section tiles', (await A.locator('.cats .cat h3').allInnerTexts()).some(x => /Kugel/.test(x)));
     await A.locator('.cats .cat', {hasText: 'Kugel'}).click(); await A.waitForTimeout(400);
     ok('a section opens its own page', (await A.locator('.rc h3').allInnerTexts()).includes('Test Pesach Kugel') && /--s-kugel$/.test(await A.evaluate(() => location.hash)));
-    await A.goto(F); await A.waitForTimeout(300); await A.fill('#q', '#' + newNo); await A.waitForTimeout(300);
-    ok('search by recipe number', (await A.locator('.rc h3').allInnerTexts()).join() === 'Test Pesach Kugel');
+    await A.goto(F); await A.waitForTimeout(300); await A.fill('#q', newNo.toLowerCase()); await A.waitForTimeout(300);
+    ok('search by recipe code', (await A.locator('.rc h3').allInnerTexts()).join() === 'Test Pesach Kugel');
     await A.fill('#q', ''); await A.waitForTimeout(200);
 
     await A.goto(F + '#c-pesach'); await A.waitForTimeout(300); await A.locator('.cats .cat', {hasText: 'Kugel'}).click(); await A.waitForTimeout(300);

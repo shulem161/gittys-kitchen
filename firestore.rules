@@ -14,6 +14,12 @@ service cloud.firestore {
             || (!exists(m) && exists(k) && get(k).data.uid == request.auth.uid));
     }
 
+    // Recipe code letters per category, and number blocks per section. Members read, only the admin writes.
+    match /meta/codes {
+      allow get: if signedIn();
+      allow write: if isAdmin();
+    }
+
     // Who the admin is and the name shown for them. Only the admin can change it, and only to themselves.
     match /meta/admin {
       allow get: if true;

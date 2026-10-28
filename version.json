@@ -1,6 +1,6 @@
 {
-  "web": "3.41",
+  "web": "3.42",
   "apk": 8,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New: Pesach label on every Pesach recipe; last 6 hours in New recipes."
+  "notes": "New: recipe codes by category (A101\u2026), Pesach sections LA001\u2026"
 }

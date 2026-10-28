@@ -114,6 +114,8 @@ button{font:inherit;color:inherit}
 .rq-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.rq-acts input,.rq-acts select{flex:1 1 180px;min-width:0}
 .rq-del{font-size:13px;margin-top:6px}
 .newchip{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:999px;background:var(--wheat-soft);color:var(--wheat);white-space:nowrap}
+.cat{position:relative}
+.catcode{position:absolute;top:12px;right:12px;font-size:12px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:999px;border:1px solid var(--accent);color:var(--accent);background:var(--paper)}
 .nochip{font-size:11px;font-weight:700;letter-spacing:.04em;padding:4px 8px;border-radius:999px;border:1px solid var(--accent);color:var(--accent);font-variant-numeric:tabular-nums;white-space:nowrap}
 .rhead .nochip{margin-right:6px}.rhead .chip+.chip{margin-left:6px}
 .sec-nav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px}
@@ -592,8 +594,38 @@ const kindOf = r => (r && (r.kind==="meat"||r.kind==="dairy"||r.kind==="fish"||r
 const KIND_LABEL = {meat:"Meat", dairy:"Dairy", fish:"Fish", other:""};
 const PAREVE = k => k==="other" || k==="fish";   // fish is pareve: it can go with meat or dairy meals
 const kindChip = r => { const k=kindOf(r); return (KIND_LABEL[k]?`<span class="kchip ${k}">${KIND_LABEL[k]}</span>`:"") + (r && /^pesach$/i.test(r.c||"") ? `<span class="kchip pesach">Pesach</span>` : ""); };
-const noText = r => r && r.no ? "No. "+r.no : "";
-const noChip = r => r && r.no ? `<span class="nochip" title="Recipe number">#${r.no}</span>` : "";
+// Recipe codes: a letter per category, then a number from 101 (A101, A102…). In a category with sections each
+// section gets a second letter and numbers from 001 (Pesach: LA001 Family recipes, LB001 Cakes…). Kept in meta/codes.
+let CODEMAP = {cats:{}, secs:{}};   // loaded from storage in boot()
+let usedCodes = new Set();       // every code used online, including deleted recipes
+const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";   // no I or O, so they aren't mistaken for 1 and 0
+const codeOf = r => r && r.code ? r.code : "";
+const noText = r => codeOf(r);
+const noChip = r => codeOf(r) ? `<span class="nochip" title="Recipe code">${esc(codeOf(r))}</span>` : "";
+function codeLetter(c, map){
+  map = map || CODEMAP;
+  if(map.cats[c]) return map.cats[c];
+  const used = new Set(Object.values(map.cats)); const L = [...CODE_LETTERS].find(x=>!used.has(x)) || "Z";
+  map.cats[c] = L; return L;
+}
+function secLetter(c, s, map){
+  map = map || CODEMAP; const m = map.secs[c] = map.secs[c] || {};
+  if(m[s]) return m[s];
+  const used = new Set(Object.values(m)); m[s] = [...CODE_LETTERS].find(x=>!used.has(x)) || "Z"; return m[s];
+}
+const hasSections = c => !!(CODEMAP.secs[c] && Object.keys(CODEMAP.secs[c]).length) || RECIPES.some(r=>r.c===c && r.sec);
+// Next free code for a recipe in category c (and section s). Saves new letters/blocks to meta/codes.
+function nextCode(c, s){
+  const before = JSON.stringify(CODEMAP);
+  const L = codeLetter(c);
+  let pre = L, n = 101, fmt = x => String(x);
+  if(hasSections(c) || s){ pre = L + secLetter(c, s || "Family recipes"); n = 1; fmt = x => String(x).padStart(3,"0"); }
+  while(n<999 && usedCodes.has(pre+fmt(n))) n++;
+  const code = pre + fmt(n);
+  usedCodes.add(code);
+  if(JSON.stringify(CODEMAP)!==before && db && isAdmin()){ store("gk-codemap", CODEMAP); db.collection("meta").doc("codes").set(CODEMAP).catch(()=>{}); }
+  return code;
+}
 const preOf = r => ((r&&r.pre)||[]).map(id=>RECIPES.find(x=>x.id===id)).filter(Boolean);
 const usedIn = r => RECIPES.filter(x=>(x.pre||[]).includes(r.id));
 const unbracket = s => String(s).replace(/\[\[([^\]]+)\]\]/g,"$1");
@@ -644,7 +676,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.41";
+const WEB_VERSION = "3.42";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -701,6 +733,7 @@ async function applyWebUpdate(){
 }
 
 function boot(){
+  CODEMAP = store("gk-codemap") || CODEMAP;
   sortRecipes(RECIPES);
   if(!FIREBASE_CONFIG){ state="setup"; return route(); }
   if(typeof firebase==="undefined") return goOffline();
@@ -716,6 +749,7 @@ function boot(){
     if(unsubMe){unsubMe();unsubMe=null}
     if(unsubAll){unsubAll();unsubAll=null;members=[]}
     if(unsubRecipes){unsubRecipes();unsubRecipes=null}
+    if(unsubCodes){unsubCodes();unsubCodes=null}
     if(unsubSubs){unsubSubs();unsubSubs=null;subs=[]}
     if(unsubPendingPhotos){unsubPendingPhotos();unsubPendingPhotos=null;pendingPhotos=[]}
     if(unsubFeedback){unsubFeedback();unsubFeedback=null;feedback=[]}
@@ -940,7 +974,7 @@ function home(){
   <section class="wrap">
     <div class="section-head"><h2>Categories</h2><p>Choose a section of the cookbook</p></div>
     <div class="cats">${CATS.map(c=>{const n=RECIPES.filter(r=>r.c===c).length;
-      return `<a class="cat" href="#${slug(c)}"><div class="ic">${icon(c)}</div><h3>${esc(c)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`}).join("")}</div>
+      return `<a class="cat" href="#${slug(c)}">${CODEMAP.cats[c]?`<span class="catcode" title="Recipe codes start with ${CODEMAP.cats[c]}">${CODEMAP.cats[c]}</span>`:""}<div class="ic">${icon(c)}</div><h3>${esc(c)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`}).join("")}</div>
   </section>
   <section class="wrap">
     <div class="section-head"><h2>Kitchen tools</h2><p>Plan, shop and measure</p></div>
@@ -993,7 +1027,8 @@ function category(c){
     <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}${!offline&&(!isAdmin()||recipesOnline)?` · <a class="link" href="#new-${slug(c).slice(2)}">+ Add a recipe</a> · <a class="link" href="#scan-${slug(c).slice(2)}">Add from photo or file</a>`:""}</p></div>
     ${list.length?`<div class="cat-tools"><button class="btn" id="dl-cat" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download ${esc(c)}</button></div>`:""}
     ${secs?`<div class="cats">${secs.map(s=>{ const n=list.filter(r=>secOf(r)===s).length;
-      return `<a class="cat" href="#${slug(c)}--${secSlug(s)}"><div class="ic">${icon(SEC_ICON[s]||s)}</div><h3>${esc(s)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`; }).join("")}</div>` : ""}
+      const L=CODEMAP.cats[c], sl=CODEMAP.secs[c]&&CODEMAP.secs[c][s];
+      return `<a class="cat" href="#${slug(c)}--${secSlug(s)}">${L&&sl?`<span class="catcode" title="Recipe codes start with ${L}${sl}">${L}${sl}</span>`:""}<div class="ic">${icon(SEC_ICON[s]||s)}</div><h3>${esc(s)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`; }).join("")}</div>` : ""}
     <div class="grid"${secs?" hidden":""}>${list.length && !secs ? list.map(card).join("") : `<div class="empty">No ${esc(c)} recipes yet.${offline?"":` <a class="link" href="#new-${slug(c).slice(2)}">Add the first one</a>`}</div>`}</div></section>`;
   const dc=document.getElementById("dl-cat"); if(dc) dc.onclick=()=>downloadBook([c], dc);
 
@@ -1010,7 +1045,8 @@ function favorites(){
 function results(term){
   const t = term.toLowerCase();
   const num = (t.match(/^(?:#|no\.?\s*|number\s*)?(\d{1,4})$/)||[])[1];
-  const list = num ? RECIPES.filter(r=>String(r.no)===num) : RECIPES.filter(r=>[r.t,r.by,r.c,r.sec||"",allText(r)].join(" ").toLowerCase().includes(t));
+  const code = (term.trim().toUpperCase().match(/^#?([A-Z]{1,2}\s?\d{3})$/)||[])[1];
+  const list = code ? RECIPES.filter(r=>codeOf(r)===code.replace(/\s/g,"")) : num ? RECIPES.filter(r=>String(r.no)===num) : RECIPES.filter(r=>[r.t,r.by,r.c,r.sec||"",allText(r)].join(" ").toLowerCase().includes(t));
   const titleHits = list.filter(r=>r.t.toLowerCase().includes(t));
   const rest = list.filter(r=>!r.t.toLowerCase().includes(t));
   app.innerHTML = `<section class="wrap">${tabs(null)}
@@ -1323,14 +1359,15 @@ document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeMenu(); });
 
 /* ---------- online recipes ---------- */
 let recipesOnline = false;    // true once the online cookbook has been loaded
+let unsubCodes = null;
 let maxNo = 0;                // highest recipe number used so far
 let onlineIds = new Set();    // every recipe id stored online (including deleted ones)
 let unsubRecipes = null;
 const withHistory = (rec, base, action, by) => { rec.history = [...((base&&base.history)||[]), {a:action, by:by||"a member", at:Date.now()}].slice(-12); return rec; };
 const historyLines = r => (r.history||[]).slice(-6).map(h=>`${h.a==="added"?"Added":"Changed"} by ${h.by} on ${fmtDate(h.at)}`);
-const toDoc = r => ({c:r.c, t:r.t, by:r.by||"", n:r.n||"", pre:r.pre||[], kind:r.kind||"", time:r.time||"", sec:r.sec||"", ...(r.no?{no:r.no}:{}), ord:r.ord||0, deleted:false, updated:Date.now(), ...(r.history?{history:r.history}:{}),
+const toDoc = r => ({c:r.c, t:r.t, by:r.by||"", n:r.n||"", pre:r.pre||[], kind:r.kind||"", time:r.time||"", sec:r.sec||"", ...(r.no?{no:r.no}:{}), ...(r.code?{code:r.code}:{}), ord:r.ord||0, deleted:false, updated:Date.now(), ...(r.history?{history:r.history}:{}),
   s:r.s.map(([ing,h,items])=>({k:ing?"ing":"step", h:h||"", items:items}))});
-const fromDoc = (id,d) => ({id, c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, pre:d.pre, kind:d.kind||"", time:d.time||"", sec:d.sec||"", no:d.no||0, ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[],
+const fromDoc = (id,d) => ({id, c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, pre:d.pre, kind:d.kind||"", time:d.time||"", sec:d.sec||"", no:d.no||0, code:d.code||"", ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[],
   s:(d.s||[]).map(x=>[x.k==="ing"?1:0, x.h||"", x.items||[]])});
 // Recipes are listed A to Z by category, then A to Z by name ("Tomato Dip # 2" comes before "# 10").
 const sortName = r => r.t.replace(/^Untitled:\s*/,"").replace(/^[^A-Za-z0-9]+/,"");
@@ -1344,9 +1381,14 @@ function setRecipes(list){
 (function(){ const c=store("gk-recipes"); if(c && c.length) setRecipes(c); })();
 function watchRecipes(){
   if(unsubRecipes || !db) return;
+  if(!unsubCodes) unsubCodes = db.collection("meta").doc("codes").onSnapshot(s=>{
+    if(!s.exists) return; const d=s.data(); CODEMAP={cats:d.cats||{}, secs:d.secs||{}}; store("gk-codemap", CODEMAP);
+    if(state==="approved" && !document.querySelector(".editor, .prof-head, #rqform, .tools-page")) route();
+  }, ()=>{});
   unsubRecipes = db.collection("recipes").onSnapshot(s=>{
     onlineIds = new Set(s.docs.map(d=>d.id));
     maxNo = s.docs.reduce((m,d)=>Math.max(m, +d.data().no||0), 0);
+    usedCodes = new Set(s.docs.map(d=>d.data().code).filter(Boolean));
     const live = s.docs.filter(d=>!d.data().deleted).map(d=>fromDoc(d.id,d.data()));
     if(s.docs.length){ recipesOnline=true; setRecipes(live); store("gk-recipes", RECIPES); }
     else { recipesOnline=false; setRecipes(BUNDLED.slice()); }
@@ -1496,7 +1538,7 @@ function editor(r, cat, sub, draft){
       if(!recipesOnline) return fail("Put the recipes online first, from the home page.");
       let id = r ? r.id : target ? target.id : "r-"+t.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
       if(!r && !target){ if(id==="r-") id="r-recipe"; let k=2, base=id; while(onlineIds.has(id)) id=base+"-"+(k++); }
-      const rec={id, c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:pre.filter(x=>x!==id), kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), no:(r&&r.no)||(target&&target.no)||(++maxNo), s, ord: r ? (r.ord||0) : target ? (target.ord||0) : Date.now()};
+      const rec={id, c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:pre.filter(x=>x!==id), kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), code:(r&&r.code&&r.c===c&&(r.sec||"")===(F.querySelector("#ed-sec").value.trim()))?r.code:(target&&target.code&&target.c===c)?target.code:nextCode(c, F.querySelector("#ed-sec").value.trim()), s, ord: r ? (r.ord||0) : target ? (target.ord||0) : Date.now()};
       { const base = r || target;
         withHistory(rec, base, sub ? (sub.editOf&&base?"changed":"added") : (base?"changed":"added"), sub ? sub.byName : myName()); }
       const btn=F.querySelector(".primary"); btn.disabled=true; btn.textContent="Saving…";
@@ -1535,7 +1577,8 @@ async function approveSub(sub){
   const tgt = sub.editOf ? RECIPES.find(x=>x.id===sub.editOf) : null;
   const rec = fromDoc(tgt ? tgt.id : newRecipeId(sub.t), sub); rec.ord = tgt ? (tgt.ord||0) : Date.now();
   if(rec.pre===undefined) rec.pre = tgt ? (tgt.pre||[]) : [];
-  rec.no = (tgt&&tgt.no) || (++maxNo); if(!rec.sec && tgt) rec.sec = tgt.sec||"";
+  if(!rec.sec && tgt) rec.sec = tgt.sec||"";
+  rec.code = (tgt && tgt.code && tgt.c===rec.c) ? tgt.code : nextCode(rec.c, rec.sec||"");
   withHistory(rec, tgt, tgt?"changed":"added", sub.byName);
   await db.collection("recipes").doc(rec.id).set(toDoc(rec), {merge:true});
   await db.collection("submissions").doc(sub.id).update({status:"approved", recipeId:rec.id, decided:Date.now()});
@@ -2242,7 +2285,7 @@ function importList(drafts, cat){
       for(const li of rows){
         const d=Object.assign({}, drafts[+li.dataset.i], {c: li.querySelector(".imp-cat").value});
         btn.textContent=`${isAdmin()?"Adding":"Sending"}… ${done+1} of ${rows.length}`;
-        if(isAdmin()){ const rec=Object.assign({}, d, {id:newRecipeId(d.t), ord:Date.now(), no:++maxNo}); withHistory(rec, null, "added", myName());
+        if(isAdmin()){ const rec=Object.assign({}, d, {id:newRecipeId(d.t), ord:Date.now(), code:nextCode(d.c, "")}); withHistory(rec, null, "added", myName());
           await db.collection("recipes").doc(rec.id).set(toDoc(rec), {merge:true}); onlineIds.add(rec.id); }
         else { const doc=toDoc(Object.assign({}, d, {ord:0}));
           await db.collection("submissions").doc("s-"+newId()).set({c:doc.c,t:doc.t,by:doc.by,n:doc.n,s:doc.s, uid:me, byName:myName(), status:"pending", created:Date.now(), editOf:""}); }
