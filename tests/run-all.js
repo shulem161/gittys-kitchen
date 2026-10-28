@@ -132,6 +132,20 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     const P = await page(); await P.fill('#nm', 'Test Member'); await P.fill('#pw', 'member2'); await P.click('.primary'); await P.waitForTimeout(500);
     ok('new password works', (await P.locator('.eyebrow').innerText().catch(() => '')).includes('TEST MEMBER'));
 
+    // Change name
+    await B.goto(F + '#profile'); await B.waitForTimeout(500);
+    await B.fill('#nm-new', 'shulem  schlesinger'); await B.click('#nameform .primary'); await B.waitForTimeout(500);
+    ok("member can't take the admin's name", /already taken/.test(await B.locator('#nm-err').innerText()));
+    await B.fill('#nm-new', 'Test Member Two'); await B.click('#nameform .primary'); await B.waitForTimeout(700);
+    ok('member can change name', (await B.locator('.prof-head h2').innerText()) === 'Test Member Two');
+    ok('admin is told about the new name', notes.some(n => /Test Member is now Test Member Two/.test(n)), notes.slice(-2));
+    const R = await page(); await R.fill('#nm', 'Test Member'); await R.fill('#pw', 'member2'); await R.click('.primary'); await R.waitForTimeout(400);
+    ok('old name no longer signs in', /no member/i.test(await R.locator('.err').innerText()));
+    await R.fill('#nm', 'test member two'); await R.fill('#pw', 'member2'); await R.click('.primary'); await R.waitForTimeout(500);
+    ok('new name signs in', (await R.locator('.eyebrow').innerText().catch(() => '')).includes('TEST MEMBER TWO'));
+    await A.goto(F + '#profile'); await A.waitForTimeout(500);
+    ok("admin's name is locked", await A.locator('#nameform').count() === 0);
+
     // Search
     await B.goto(F); await B.waitForTimeout(300); await B.fill('#q', 'challah'); await B.waitForTimeout(300);
     ok('search finds recipes', await B.locator('.rc').count() >= 3);

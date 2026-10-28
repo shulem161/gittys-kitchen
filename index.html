@@ -518,7 +518,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.28";
+const WEB_VERSION = "3.29";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -665,6 +665,23 @@ async function deleteMe(){
     await u.delete();
   }catch(e){} finally{ pendingCreate=false; }
   store("gk-cache",null); location.hash=""; try{ await auth.signOut(); }catch(e){}
+}
+// Change my name: the new name becomes the one used to sign in; old names are kept so credits still count.
+const cleanName = n => String(n).trim().replace(/\s+/g," ");
+async function renameMe(newName){
+  const old=myName(), name=cleanName(newName), oldKey=nameKey(old), key=nameKey(name);
+  if(key===oldKey){ if(name!==old){ await db.collection("users").doc(me).update({name}); } return; }
+  if(key===ADMIN_KEY) throw {code:"gk/taken"};
+  const taken = await db.collection("names").doc(key).get();
+  if(taken.exists) throw {code:"gk/taken"};
+  const mine = await db.collection("names").doc(oldKey).get();
+  const email = (mine.exists && mine.data().email) || auth.currentUser.email;
+  try{ await db.collection("names").doc(key).set({uid:me, email}); } catch(e){ throw {code:"gk/taken"}; }
+  const was=[...new Set([...(profile.was||[]), old])].slice(-20);
+  try{ await db.collection("users").doc(me).update({name, was}); }
+  catch(e){ await db.collection("names").doc(key).delete().catch(()=>{}); throw e; }
+  await db.collection("names").doc(oldKey).delete().catch(()=>{});
+  notifyAdmin(`${old} is now ${name}`, `${old} changed their name to ${name}. They sign in with the new name.`, "#admin", "pencil2");
 }
 function errText(e){
   const c=(e&&e.code)||"";
@@ -1992,7 +2009,7 @@ function inboxPage(){
 
 /* ---------- my profile ---------- */
 async function profilePage(){
-  const name=myName(), mine=r=>(r.history||[]).filter(h=>h.by===name);
+  const name=myName(), names=new Set([name, ...((profile&&profile.was)||[])]), mine=r=>(r.history||[]).filter(h=>names.has(h.by));
   const added=RECIPES.filter(r=>mine(r).some(h=>h.a==="added"));
   const changed=RECIPES.filter(r=>mine(r).some(h=>h.a==="changed"));
   const stat=(n,label,href)=>`<a class="pstat" href="${href}"><b>${n}</b><span>${label}</span></a>`;
@@ -2010,6 +2027,14 @@ async function profilePage(){
       ${stat(isAdmin()?newFeedback():feedback.length, isAdmin()?"new messages":"messages sent", isAdmin()?"#inbox":"#feedback")}
     </div>
     <div class="panel-a" id="prof-list" hidden></div>
+    ${offline?"":isAdmin()?`<div class="panel-a"><h3>Your name</h3><p class="hint">Your name, ${esc(name)}, is what makes you the admin, so it can't be changed here.</p></div>`
+      :`<div class="panel-a"><h3>Change name</h3>
+      <form id="nameform" class="pw-form" novalidate>
+        <div class="field"><label for="nm-new">Name</label><input id="nm-new" type="text" maxlength="40" autocomplete="name" value="${esc(name)}"></div>
+        <p class="hint">You'll sign in with the new name from now on. Your password stays the same.</p>
+        <p class="err" id="nm-err" role="alert" hidden></p>
+        <div><button class="primary" type="submit">Save name</button></div>
+      </form></div>`}
     ${offline?"":`<div class="panel-a"><h3>Change password</h3>
       <form id="pwform" class="pw-form" novalidate>
         <div class="field"><label for="pw-old">Current password</label><input id="pw-old" type="password" autocomplete="current-password"></div>
@@ -2040,6 +2065,20 @@ async function profilePage(){
   app.querySelector('a[href="#prof-photos"]').onclick=e=>{ e.preventDefault(); list.hidden=false;
     list.innerHTML=`<h3>Photos you shared</h3>${myPhotos.length?`<div class="ph-grid" style="margin-top:10px">${myPhotos.map(p=>`<figure class="ph${p.status==="pending"?" wait":""}"><a href="#${esc(p.recipeId)}"><img src="${p.thumb}" alt="${esc(p.recipeTitle||"")}"></a><figcaption>${esc(p.recipeTitle||"")}${p.status==="pending"?" · waiting for approval":""}</figcaption></figure>`).join("")}</div>`:`<p class="hint mempty">No photos yet. Open a recipe you've made and tap Take a photo.</p>`}`;
     list.scrollIntoView({behavior:"smooth",block:"start"}); };
+  // change name
+  const NF=document.getElementById("nameform");
+  if(NF) NF.onsubmit=async e=>{
+    e.preventDefault();
+    const err=NF.querySelector("#nm-err"), fail=m=>{ err.textContent=m; err.hidden=false; };
+    const nn=cleanName(NF.querySelector("#nm-new").value); err.hidden=true;
+    if(nn.length<2) return fail("Type your name.");
+    if(!/[A-Za-z\u0590-\u05FF]/.test(nn)) return fail("Use letters in your name.");
+    if(nn===myName()) return fail("That's already your name.");
+    const btn=NF.querySelector(".primary"); btn.disabled=true; btn.textContent="Saving…";
+    try{ await renameMe(nn); profile.name=nn; cacheProfile(); renderAcct(); toast("Name changed"); profilePage(); return; }
+    catch(x){ fail(x&&x.code==="gk/taken" ? "That name is already taken. Add a last name or initial to make it different." : errText(x)); }
+    btn.disabled=false; btn.textContent="Save name";
+  };
   // change password
   const F=document.getElementById("pwform");
   if(F) F.onsubmit=async e=>{
