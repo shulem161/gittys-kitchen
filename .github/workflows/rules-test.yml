@@ -4,7 +4,8 @@ name: Test Firebase rules
 on:
   workflow_dispatch:
   push:
-    branches: [rules-check]
+    branches: [main]
+    paths: [firestore.rules, tests/rules-test.mjs]
   pull_request:
     paths: [firestore.rules, tests/rules-test.mjs]
 
