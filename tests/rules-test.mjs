@@ -46,4 +46,5 @@ await check('admin still recognised by name', assertSucceeds(getDoc(doc(A, 'user
 
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
+console.log(`::notice::Rule checks: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
