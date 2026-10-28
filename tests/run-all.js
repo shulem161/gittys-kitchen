@@ -205,6 +205,29 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.selectOption('#ed-k', 'dairy'); await A.click('#edform .primary'); await A.waitForTimeout(800);
     ok('admin can mark a recipe Dairy', /dairy/i.test(await A.locator('.rhead .kchip').innerText().catch(() => '')));
 
+    // Kitchen tools: scaling, time, grocery list, calculator, menu ideas
+    await A.goto(F + '#r-bobbys-challah'); await A.waitForTimeout(500);
+    ok('recipe shows how long it takes', /About \d+ (hr|min)/.test(await A.locator('.facts').innerText()));
+    await A.click('[data-sx="2"]'); await A.waitForTimeout(300);
+    ok('doubling the recipe doubles amounts', /^12 lb\b/.test(await A.locator('.col.ing li').first().innerText()), await A.locator('.col.ing li').first().innerText());
+    await A.click('[data-sx="0.5"]'); await A.waitForTimeout(300);
+    ok('halving the recipe halves amounts', /^3 lb\b/.test(await A.locator('.col.ing li').first().innerText()));
+    await A.click('#groc'); await A.waitForTimeout(300);
+    await A.goto(F + '#r-chicken-soup'); await A.waitForTimeout(400); await A.click('#groc'); await A.waitForTimeout(300);
+    await A.goto(F + '#grocery'); await A.waitForTimeout(500);
+    ok('grocery list has both recipes', (await A.locator('.g-rec').count()) === 2);
+    ok('grocery list adds up the half challah', /^3 lb/.test((await A.locator('.glist li', {hasText: 'flour'}).first().innerText()).trim()), await A.locator('.glist li', {hasText: 'flour'}).first().innerText());
+    await A.locator('.glist input').first().check(); await A.waitForTimeout(200);
+    ok('grocery items can be ticked off', (await A.locator('.glist li.have').count()) === 1);
+    await A.goto(F + '#convert'); await A.waitForTimeout(400);
+    ok('calculator converts a cup', /16\s*tbsp/.test(await A.locator('#cv-out').innerText()) && /237\s*ml/.test(await A.locator('#cv-out').innerText()));
+    await A.fill('#cv-n', '350'); await A.selectOption('#cv-u', '°F'); await A.waitForTimeout(100);
+    ok('calculator converts oven temperature', /177\s*°C/.test(await A.locator('#cv-out').innerText()));
+    await A.goto(F + '#menu'); await A.waitForTimeout(400); await A.click('[data-mq="Beef"]'); await A.click('#mnform .primary'); await A.waitForTimeout(2500);
+    const mn = await A.locator('.mn-list li').count();
+    ok('menu ideas gives a full menu', mn === 6, mn);
+    ok('menu never mixes meat and dairy', !/mixes meat and dairy/.test(await A.locator('.mn-result').innerText()));
+
     // Search
     await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);
     ok('search finds recipes', await V.locator('.rc').count() >= 3);

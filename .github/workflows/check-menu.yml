@@ -4,7 +4,7 @@ name: Check menu ideas
 on:
   workflow_dispatch:
   push:
-    branches: [main, menu-check]
+    branches: [main]
     paths:
       - tools/check-menu.mjs
       - .github/workflows/check-menu.yml
