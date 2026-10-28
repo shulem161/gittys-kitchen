@@ -166,6 +166,9 @@ await check("employee allowed to edit can't approve suggestions", assertFails(up
 await check("employees can't grant themselves permissions", assertFails(updateDoc(doc(EMP, 'users', 'emp'), { perms: { edit: true } })));
 await check('admin can grant one employee a permission', assertSucceeds(updateDoc(doc(ADM, 'users', 'emp'), { perms: { inbox: true } })));
 await check('…and then that employee can read comments', assertSucceeds(getDoc(doc(EMP, 'feedback', 'f1'))));
+// Duplicate recipes: only admins
+await check('admin can mark recipes as not duplicates', assertSucceeds(setDoc(doc(ADM, 'meta', 'dupes'), { ignore: ['r-a|r-b'] })));
+await check("employees can't see or change the duplicates list", assertFails(getDoc(doc(EMP, 'meta', 'dupes'))));
 // Employee settings for all employees
 await check("employees can't change Employee settings", assertFails(setDoc(doc(EMP, 'meta', 'employees'), { allow: { edit: true } })));
 await check('admin can change Employee settings', assertSucceeds(setDoc(doc(ADM, 'meta', 'employees'), { allow: { answer: true, photos: false } })));

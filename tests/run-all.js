@@ -65,7 +65,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await B.goto(F + '#mine'); await B.waitForTimeout(400);
     ok('member recipe approved', /Approved/.test(await B.locator('.mrow').first().innerText()));
     await B.goto(F + '#r-test-kugel'); await B.waitForTimeout(400);
-    ok('recipe shows who added it', /Added by Test Member/.test(await B.locator('.byline').innerText().catch(() => '')));
+    await A.goto(F + '#r-test-kugel'); await A.waitForTimeout(400);
+    ok('admin sees who added it', /Added by Test Member/.test(await A.locator('.byline').innerText().catch(() => '')));
 
     // Member suggests changes → admin approves
     await B.goto(F + '#edit-r-challah'); await B.waitForTimeout(300); await B.fill('#ed-n', 'Test note'); await B.click('text=Send for approval'); await B.waitForTimeout(600);
@@ -74,7 +75,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#review'); await A.waitForTimeout(500); await A.locator('.sub-card', {hasText: 'Challah'}).locator('[data-sact=approve]').click(); await A.waitForTimeout(800);
     await B.goto(F + '#r-challah'); await B.waitForTimeout(400);
     ok('suggested change live after approval', await B.locator('text=Test note').count() === 1);
-    ok('recipe shows who changed it', /Changed by Test Member/.test(await B.locator('.byline').innerText().catch(() => '')));
+    await A.goto(F + '#r-challah'); await A.waitForTimeout(400);
+    ok('admin sees who changed it', /Changed by Test Member/.test(await A.locator('.byline').innerText().catch(() => '')));
 
     // Photos
     await B.goto(F + '#r-bobbys-challah'); await B.waitForTimeout(400); await B.setInputFiles('#ph-file', IMG); await B.waitForTimeout(1500);
@@ -97,6 +99,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('download goes straight to a PDF, no design choice', (await B.locator('#dlpick').count()) === 0);
     const pdfPath = path.join(os.tmpdir(), 'gk-test.pdf'); await dl.saveAs(pdfPath);
     ok('recipe downloads as a PDF', fs.readFileSync(pdfPath).slice(0, 5).toString() === '%PDF-' && /\.pdf$/.test(dl.suggestedFilename()), dl.suggestedFilename());
+    ok("downloads never say who added or changed a recipe", !/(Added|Changed) by/.test(fs.readFileSync(pdfPath).toString('latin1')));
     ok('every download uses the Recipe card design', await B.evaluate(() => { store('gk-pdfstyle', 'large'); return pdfStyleKey() === 'card'; }));
 
     // Scan a recipe from a photo (AI stand-in)
@@ -424,6 +427,28 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('account menu is grouped and short', (await A.locator('.menu .mgroup').count()) === 3 && !/Grocery list|Kitchen calculator|Menu ideas/.test(menuTxt) && /Employee settings/.test(menuTxt), menuTxt.slice(0, 300));
     await A.click('#avbtn');
     ok('home has no shortcuts that are already in the bottom bar', (await A.locator('.cats.tools a[href="#timers"], .cats.tools a[href="#grocery"]').count()) === 0);
+    // Who added / changed: admins only, plus the Activity page
+    await V.goto(F + '#r-croissants'); await V.waitForTimeout(400);
+    await A.goto(F + '#r-croissants'); await A.waitForTimeout(400);
+    ok('only admins see who added or changed a recipe', (await V.locator('.byline').count()) === 0 && /Changed by/.test(await A.locator('.byline').innerText().catch(() => '')));
+    await A.goto(F + '#activity'); await A.waitForTimeout(400);
+    ok('Activity page lists changes by person, with charts', (await A.locator('.act-feed li').count()) > 0 && (await A.locator('.act-bar').count()) > 0 && (await A.locator('.act-col').count()) > 0);
+    await A.locator('.act-bar').first().click(); await A.waitForTimeout(200);
+    const who = await A.locator('#act-who').inputValue();
+    ok('tapping a person shows only their changes', who !== '' && (await A.locator('.act-feed li b').allInnerTexts()).every(x => x === who), who);
+    await V.goto(F + '#activity'); await V.waitForTimeout(300);
+    ok("employees don't get the Activity page", (await V.locator('.act-feed, .act-bars').count()) === 0);
+    // Duplicate recipes (admins)
+    await A.goto(F); await A.waitForTimeout(500);
+    ok('admin sees the duplicate recipes box', /Possible duplicate recipes/.test(await A.locator('.dup-note').innerText().catch(() => '')));
+    ok('employees never see it', (await V.locator('.dup-note').count()) === 0);
+    await A.goto(F + '#dupes'); await A.waitForTimeout(400);
+    const nd = await A.locator('.dup').count();
+    ok('duplicates page lists pairs with how alike they are', nd >= 1 && /\d+%/.test(await A.locator('.dup-pct').first().innerText()), nd);
+    await A.locator('.dup [data-dupok]').first().click(); await A.waitForTimeout(600);
+    ok('"Not duplicates" hides the pair', (await A.locator('.dup').count()) === nd - 1);
+    await A.click('#dup-unhide'); await A.waitForTimeout(500);
+    ok('hidden pairs can be shown again', (await A.locator('.dup').count()) === nd);
 
     ok('sources show without page numbers', await A.evaluate(() => creditText('The Haimishe Kitchen – Pesach Cookbook, page 22') === 'From The Haimishe Kitchen – Pesach Cookbook' && creditText('Bobby') === 'From Bobby'));
 

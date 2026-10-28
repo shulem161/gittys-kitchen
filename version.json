@@ -1,6 +1,6 @@
 {
-  "web": "3.61",
+  "web": "3.62",
   "apk": 11,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New: Employee settings for all employees, a shorter account menu in groups, and a cleaner home page."
+  "notes": "Admins: duplicate recipe finder and an Activity page. Who added or changed a recipe is now shown only to admins."
 }

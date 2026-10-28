@@ -451,6 +451,41 @@ body.out .bar, body.out footer{display:none}
 @media (min-width:900px){.dlpick{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:0 20px;align-items:start}.dl-prev{margin:0;grid-column:2;grid-row:1}.dlpick .row{grid-column:1}}
 .permbox{flex-basis:100%;margin:4px 0 4px 52px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
 .perm-h{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--wheat);margin:10px 0 0}
+.act-filters{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+.act-filters label{display:flex;gap:8px;align-items:center;font-size:14px;font-weight:600;color:var(--muted)}
+.act-filters select{padding:8px 30px 8px 12px;border:1px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink);font:inherit;font-size:14px}
+.act-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:16px}
+.act-stats div{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center}
+.act-stats b{display:block;font-size:26px;color:var(--accent);font-variant-numeric:tabular-nums}.act-stats span{font-size:12.5px;color:var(--muted)}
+.act-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:0 16px}
+.act-bars{display:grid;gap:6px;margin-top:8px}
+.act-bar{display:grid;grid-template-columns:minmax(0,110px) 1fr 34px;gap:10px;align-items:center;border:0;background:none;padding:4px 0;cursor:pointer;text-align:left;font:inherit}
+.act-name{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.act-track{display:flex;height:16px;border-radius:4px;background:var(--bg);overflow:hidden}
+.act-track i,.act-key i{display:block;height:100%}
+i.added,span.added{background:#C2581A}i.changed,span.changed{background:var(--accent)}
+.act-n{font-size:13px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.act-key{display:flex;gap:14px;font-size:12.5px;color:var(--muted);margin:10px 0 0}.act-key span{display:flex;gap:6px;align-items:center}.act-key i{width:12px;height:12px;border-radius:3px}
+.act-cols{display:flex;align-items:flex-end;gap:2px;height:140px;margin-top:10px;border-bottom:1px solid var(--line)}
+.act-col{flex:1;height:100%;display:flex;flex-direction:column-reverse;min-width:3px}
+.act-col span{display:block;width:100%}
+.act-col span.changed{border-radius:0 0 0 0}.act-col span:last-child{border-radius:3px 3px 0 0}
+.act-axis{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:4px}
+.act-day{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--wheat);margin:14px 0 4px}
+.act-feed{list-style:none;margin:0;padding:0}
+.act-feed li{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.act-feed small{color:var(--muted);margin-left:4px}
+.act-time{color:var(--muted);font-size:12.5px;min-width:62px;font-variant-numeric:tabular-nums}
+.act-dot{width:9px;height:9px;border-radius:50%;flex:none;transform:translateY(-1px)}.act-dot.added{background:#C2581A}.act-dot.changed{background:var(--accent)}
+@media (max-width:520px){.act-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.dup-note{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.dup-pct{font-size:14px;color:var(--muted);margin-bottom:8px}.dup-pct b{font-size:20px;color:#C2581A}
+.dup-pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px}
+.dup-side{display:grid;gap:6px;align-content:start;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.dup-t{font-weight:700;font-size:16px;color:var(--ink);text-decoration:none}
+.dup-acts{display:flex;flex-wrap:wrap;gap:6px}
+.dup-diff{margin-top:10px}.dup-diff summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:14px;padding:6px 0}
+.dup-only{margin-top:6px;font-size:14px}.dup-only ul{margin:4px 0 0;padding-left:18px}
 .perm-own{font-size:11px;font-weight:700;color:var(--wheat);margin-left:6px;white-space:nowrap}
 @media (max-width:640px){.permbox{margin-left:0}}
 .pub-btns{display:flex;gap:6px}
@@ -945,7 +980,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.61";
+const WEB_VERSION = "3.62";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1023,6 +1058,7 @@ function boot(){
     if(unsubLook){unsubLook();unsubLook=null}
     if(unsubPub){unsubPub();unsubPub=null}
     if(unsubEmp){unsubEmp();unsubEmp=null}
+    if(unsubDupes){unsubDupes();unsubDupes=null;DUP_IGNORE=new Set()}
     if(unsubSubs){unsubSubs();unsubSubs=null;subs=[]}
     if(unsubPendingPhotos){unsubPendingPhotos();unsubPendingPhotos=null;pendingPhotos=[]}
     if(unsubFeedback){unsubFeedback();unsubFeedback=null;feedback=[]}
@@ -1041,6 +1077,7 @@ function boot(){
       state = profile.status==="approved" ? "approved" : profile.status==="denied" ? "denied" : "pending";
       cacheProfile(); renderAcct();
       if(isAdmin() && !unsubAll) watchMembers();
+      if(isAdmin()) watchDupes();
       if(state==="approved"){ watchRecipes(); watchSubs(); watchPendingPhotos(); watchFeedback(); watchRequests(); if(!update){ lastUpdCheck=Date.now(); checkUpdates(false); } else renderUpdateBar(); }
       if(was!==state || state!=="approved") route();
     }, ()=>{
@@ -1283,6 +1320,7 @@ function home(){
     ${todayHTML()}
   </section>
   ${adminBanner()}
+  ${dupBanner()}
   <section class="wrap home">
     ${nw.length?`<div class="section-head"><h2>New this week</h2><p><a class="link" href="#recent">See all ${nw.length}</a></p></div>
     <div class="grid">${nw.slice(0,4).map(card).join("")}</div>`:""}
@@ -1481,7 +1519,7 @@ function recipe(r){
       ${r.n?`<div class="note"><b>Note:</b> ${linkify(esc(r.n))}</div>`:""}
       ${partHTML}
       ${offline||!can("feedback")?"":`<p class="fb-link vnotes"><a class="link" href="#feedback-${r.id}">Comment on this recipe</a></p>`}
-      ${historyLines(r).length?`<div class="byline vnotes">${historyLines(r).map(l=>`<span>${esc(l)}</span>`).join("")}</div>`:""}
+      ${isAdmin()&&historyLines(r).length?`<div class="byline vnotes">${historyLines(r).map(l=>`<span>${esc(l)}</span>`).join("")}</div>`:""}
       <nav class="pager">
         ${prev?`<a href="#${prev.id}"><small>Previous</small>${esc(prev.t.replace("Untitled: ",""))}</a>`:"<span></span>"}
         ${next?`<a href="#${next.id}"><small>Next</small>${esc(next.t.replace("Untitled: ",""))}</a>`:""}
@@ -1811,6 +1849,143 @@ function renderAcct(){
   document.getElementById("avbtn").onclick = e=>{ e.stopPropagation(); acct.querySelector(".menu") ? closeMenu() : openMenu(); };
   if(open) openMenu();
 }
+/* ---------- duplicate recipes (admins): whole recipes compared, not only names ---------- */
+const DUP_STOP = new Set("a an and the of to in on with for or at by it its into then until about over from as is be are this that each your you add mix put let".split(" "));
+let DUP_IGNORE = new Set(), unsubDupes = null, _dupMemo = null;
+function dupWords(lines){
+  return lines.join(" ").toLowerCase().replace(/½/g," 1/2").replace(/¼/g," 1/4").replace(/¾/g," 3/4").replace(/⅓/g," 1/3").replace(/⅔/g," 2/3")
+    .replace(/\[\[|\]\]/g," ").replace(/[^a-z0-9/ ]+/g," ").split(/\s+/).filter(w=>w && !DUP_STOP.has(w));
+}
+// A recipe as word counts: ingredients count double, steps once
+function dupVector(r){
+  const v=new Map(), add=(w,k)=>v.set(w,(v.get(w)||0)+k);
+  for(const [ing,,items] of r.s||[]) for(const w of dupWords(items||[])) add(w, ing?2:1);
+  let n=0; v.forEach(x=>n+=x*x); return {v, n:Math.sqrt(n)};
+}
+function dupSim(a,b){
+  if(!a.n || !b.n) return 0;
+  const [s,l] = a.v.size<b.v.size ? [a,b] : [b,a]; let dot=0;
+  s.v.forEach((x,w)=>{ const y=l.v.get(w); if(y) dot+=x*y; });
+  return dot/(a.n*b.n);
+}
+const dupKey = (a,b) => [a,b].sort().join("|");
+// Every pair at least `min` alike (0.9 = 90%), most alike first
+function findDupes(min){
+  if(!_dupMemo || _dupMemo.list!==RECIPES){
+    const vs=RECIPES.map(r=>({r, ...dupVector(r)})).filter(x=>x.v.size>=4), pairs=[];
+    for(let i=0;i<vs.length;i++) for(let j=i+1;j<vs.length;j++){ const s=dupSim(vs[i],vs[j]); if(s>=0.8) pairs.push({a:vs[i].r, b:vs[j].r, s}); }
+    pairs.sort((x,y)=>y.s-x.s); _dupMemo={list:RECIPES, pairs};
+  }
+  return _dupMemo.pairs.filter(p=>p.s>=min && !DUP_IGNORE.has(dupKey(p.a.id,p.b.id)));
+}
+function watchDupes(){
+  if(unsubDupes || !db || !isAdmin()) return;
+  unsubDupes = db.collection("meta").doc("dupes").onSnapshot(s=>{ DUP_IGNORE = new Set((s.exists && s.data().ignore) || []);
+    if(state==="approved" && /^#?(dupes)?$/.test(location.hash) && !document.querySelector(".editor, .tools-page, #td-new:focus")) route(); }, ()=>{});
+}
+function dupBanner(){
+  if(!isAdmin() || offline || !recipesOnline) return "";
+  const n=findDupes(0.9).length; if(!n) return "";
+  return `<section class="wrap"><div class="note setup dup-note"><div><b>Possible duplicate recipes</b>
+    <p>${n} ${n===1?"pair of recipes is":"pairs of recipes are"} 90% or more alike: same ingredients and steps, not only the name.</p></div>
+    <a class="btn solid" href="#dupes">Review</a></div></section>`;
+}
+// Lines in one recipe and not the other (compared without spaces, case or punctuation)
+function dupDiff(a,b,ing){
+  const norm=s=>String(s).toLowerCase().replace(/[^a-z0-9½¼¾⅓⅔]+/g,"");
+  const lines=r=>(r.s||[]).filter(x=>!!x[0]===ing).flatMap(x=>x[2]||[]);
+  const A=lines(a), B=lines(b), nb=new Set(B.map(norm)), na=new Set(A.map(norm));
+  return {onlyA:A.filter(l=>!nb.has(norm(l))), onlyB:B.filter(l=>!na.has(norm(l))), same:A.filter(l=>nb.has(norm(l))).length};
+}
+let dupMin = 0.9;
+function dupesPage(){
+  const list=findDupes(dupMin), hidden=_dupMemo ? _dupMemo.pairs.filter(p=>p.s>=dupMin && DUP_IGNORE.has(dupKey(p.a.id,p.b.id))).length : 0;
+  const side = r => `<div class="dup-side"><a class="dup-t" href="#${r.id}">${esc(r.t.replace(/^Untitled: /,""))}</a>
+    <div class="rc-meta">${noChip(r)}<span class="chip">${esc(r.sec||r.c)}</span>${kindChip(r)}</div>
+    <span class="hint">${nIng(r)} ingredients · ${nSteps(r)} steps${r.by?" · "+esc(creditText(r.by)):""}${addedAt(r)?" · added "+fmtDate(addedAt(r)):""}</span>
+    <div class="dup-acts"><a class="btn sm" href="#${r.id}">Open</a><a class="btn sm" href="#edit-${r.id}">Edit</a><button type="button" class="btn sm danger-btn" data-dupdel="${esc(r.id)}">Delete this one</button></div></div>`;
+  const diffList = (t,arr) => arr.length ? `<div class="dup-only"><b>${t}</b><ul>${arr.slice(0,12).map(l=>`<li>${esc(unbracket(l))}</li>`).join("")}${arr.length>12?`<li>…and ${arr.length-12} more</li>`:""}</ul></div>` : "";
+  app.innerHTML = `<section class="wrap admin tools-page">
+    <div class="section-head" style="margin-top:28px"><h2>Duplicate recipes</h2><p>${list.length} ${list.length===1?"pair":"pairs"}</p></div>
+    <div class="panel-a"><p class="hint" style="margin:0 0 10px">Recipes are compared by their whole text: ingredients and steps, not only the name. For each pair, delete the extra one, edit them so they're different, or mark them as not duplicates.</p>
+      <label class="sortbar" style="margin:0">Show pairs at least <select id="dup-min">${[0.8,0.85,0.9,0.95,0.99].map(x=>`<option value="${x}" ${x===dupMin?"selected":""}>${Math.round(x*100)}% alike</option>`).join("")}</select></label>
+      ${hidden?`<p class="hint" style="margin-top:8px">${hidden} ${hidden===1?"pair is":"pairs are"} hidden because you marked them as not duplicates. <button type="button" class="link" id="dup-unhide">Show them again</button></p>`:""}
+    </div>
+    ${list.length ? list.map(p=>{ const di=dupDiff(p.a,p.b,true), ds=dupDiff(p.a,p.b,false);
+      return `<div class="panel-a dup" data-dup="${esc(dupKey(p.a.id,p.b.id))}"><div class="dup-pct"><b>${Math.floor(p.s*100)}%</b> alike</div>
+        <div class="dup-pair">${side(p.a)}${side(p.b)}</div>
+        <details class="dup-diff"><summary>Compare: ${di.same} ingredients the same${di.onlyA.length||di.onlyB.length?`, ${di.onlyA.length+di.onlyB.length} different`:""}${ds.onlyA.length||ds.onlyB.length?`; ${ds.onlyA.length+ds.onlyB.length} steps different`:"; steps the same"}</summary>
+          <div class="dup-pair">${`<div>${diffList("Ingredients only here", di.onlyA)}${diffList("Steps only here", ds.onlyA)}</div><div>${diffList("Ingredients only here", di.onlyB)}${diffList("Steps only here", ds.onlyB)}</div>`}</div></details>
+        <div class="dup-acts" style="margin-top:10px"><button type="button" class="btn" data-dupok="${esc(dupKey(p.a.id,p.b.id))}">Not duplicates: keep both</button></div><div class="dup-confirm"></div></div>`; }).join("")
+      : `<div class="panel-a"><p class="hint" style="margin:0">No duplicate recipes at this level. Nice and tidy.</p></div>`}
+  </section>`;
+  document.getElementById("dup-min").onchange=e=>{ dupMin=+e.target.value; dupesPage(); };
+  const un=document.getElementById("dup-unhide"); if(un) un.onclick=async()=>{ try{ await db.collection("meta").doc("dupes").set({ignore:[]}); DUP_IGNORE=new Set(); dupesPage(); }catch(e){ toast("Couldn't save. Check your connection."); } };
+  app.querySelectorAll("[data-dupok]").forEach(b=>b.onclick=async()=>{ const k=b.dataset.dupok, ig=[...new Set([...DUP_IGNORE,k])];
+    b.disabled=true; try{ await db.collection("meta").doc("dupes").set({ignore:ig}); DUP_IGNORE=new Set(ig); toast("Marked as not duplicates"); const y=window.scrollY; dupesPage(); window.scrollTo(0,y); }
+    catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); } });
+  app.querySelectorAll("[data-dupdel]").forEach(b=>b.onclick=()=>{ const r=RECIPES.find(x=>x.id===b.dataset.dupdel); if(!r) return;
+    const box=b.closest(".dup").querySelector(".dup-confirm");
+    box.innerHTML=`<div class="confirm">Delete “${esc(r.t)}” (${esc(codeOf(r)||r.c)})? The other recipe stays.<div class="row"><button type="button" class="btn warn" data-dupyes>Delete</button><button type="button" class="btn" data-dupno>Cancel</button></div></div>`;
+    box.scrollIntoView({block:"nearest"});
+    box.querySelector("[data-dupno]").onclick=()=>{ box.innerHTML=""; };
+    box.querySelector("[data-dupyes]").onclick=async e=>{ e.target.disabled=true;
+      try{ await db.collection("recipes").doc(r.id).update({deleted:true, updated:Date.now()}); toast(`“${r.t}” was deleted`); }
+      catch(err){ e.target.disabled=false; toast("Couldn't delete. Check your connection."); } }; });
+}
+
+/* ---------- activity (admins): every recipe added or changed, by whom, with charts ---------- */
+let actFilter = {who:"", days:30, kind:""};
+function activityItems(){
+  const out=[];
+  for(const r of RECIPES) for(const h of r.history||[]) if(h && h.at) out.push({r, a:h.a==="added"?"added":"changed", by:h.by||"a member", at:+h.at});
+  return out.sort((x,y)=>y.at-x.at);
+}
+function activityPage(){
+  const all=activityItems(), since = actFilter.days ? Date.now()-actFilter.days*864e5 : 0;
+  const people=[...new Set(all.map(x=>x.by))].sort(byName);
+  const list=all.filter(x=>x.at>=since && (!actFilter.who||x.by===actFilter.who) && (!actFilter.kind||x.a===actFilter.kind));
+  // chart 1: changes per person
+  const per={}; list.forEach(x=>{ per[x.by]=per[x.by]||{added:0,changed:0}; per[x.by][x.a]++; });
+  const rows=Object.entries(per).sort((a,b)=>(b[1].added+b[1].changed)-(a[1].added+a[1].changed)), maxP=Math.max(1,...rows.map(([,v])=>v.added+v.changed));
+  // chart 2: per day (or week) over the chosen time
+  const span = actFilter.days || Math.max(30, Math.ceil((Date.now()-(all.length?all[all.length-1].at:Date.now()))/864e5)+1);
+  const step = span<=31 ? 1 : 7, nb=Math.min(60, Math.ceil(span/step)), day0=new Date(); day0.setHours(0,0,0,0);
+  const bins=Array.from({length:nb},(_,i)=>({start: day0.getTime()-(nb-1-i)*step*864e5, added:0, changed:0}));
+  list.forEach(x=>{ const i=nb-1-Math.floor((day0.getTime()+864e5-1-x.at)/(step*864e5)); if(bins[i]) bins[i][x.a]++; });
+  const maxB=Math.max(1,...bins.map(b=>b.added+b.changed));
+  const fmtD = ms => new Date(ms).toLocaleDateString(undefined,{month:"short",day:"numeric"});
+  let lastDay="", feed="";
+  for(const x of list.slice(0,300)){ const d=new Date(x.at).toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+    if(d!==lastDay){ feed+=`${lastDay?"</ul>":""}<h4 class="act-day">${esc(d)}</h4><ul class="act-feed">`; lastDay=d; }
+    feed+=`<li><span class="act-dot ${x.a}"></span><span class="act-time">${new Date(x.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}</span><span><b>${esc(x.by)}</b> ${x.a==="added"?"added":"changed"} <a class="link" href="#${x.r.id}">${esc(x.r.t.replace(/^Untitled: /,""))}</a> <small>${esc(codeOf(x.r)||x.r.c)}</small></span></li>`; }
+  if(feed) feed+="</ul>";
+  app.innerHTML = `<section class="wrap admin tools-page">
+    <div class="section-head" style="margin-top:28px"><h2>Activity</h2><p>Recipes added and changed, and by whom</p></div>
+    <div class="panel-a act-filters">
+      <label>Who <select id="act-who"><option value="">Everyone</option>${people.map(p=>`<option ${p===actFilter.who?"selected":""}>${esc(p)}</option>`).join("")}</select></label>
+      <label>When <select id="act-days">${[[7,"Last 7 days"],[30,"Last 30 days"],[90,"Last 3 months"],[365,"Last year"],[0,"All time"]].map(([v,l])=>`<option value="${v}" ${v===actFilter.days?"selected":""}>${l}</option>`).join("")}</select></label>
+      <label>What <select id="act-kind"><option value="">Added and changed</option><option value="added" ${actFilter.kind==="added"?"selected":""}>Added</option><option value="changed" ${actFilter.kind==="changed"?"selected":""}>Changed</option></select></label>
+    </div>
+    <div class="act-stats"><div><b>${list.length}</b><span>changes</span></div><div><b>${list.filter(x=>x.a==="added").length}</b><span>recipes added</span></div><div><b>${list.filter(x=>x.a==="changed").length}</b><span>edits</span></div><div><b>${rows.length}</b><span>${rows.length===1?"person":"people"}</span></div></div>
+    <div class="act-charts">
+      <div class="panel-a"><h3>Who made the changes</h3>
+        ${rows.length?`<div class="act-bars">${rows.map(([p,v])=>`<button type="button" class="act-bar" data-actwho="${esc(p)}" title="Show only ${esc(p)}"><span class="act-name">${esc(p)}</span><span class="act-track"><i class="added" style="width:${v.added/maxP*100}%"></i><i class="changed" style="width:${v.changed/maxP*100}%"></i></span><span class="act-n">${v.added+v.changed}</span></button>`).join("")}</div>`:`<p class="hint">Nothing in this time.</p>`}
+        <p class="act-key"><span><i class="added"></i>Added</span><span><i class="changed"></i>Changed</span></p></div>
+      <div class="panel-a"><h3>${step===1?"Changes per day":"Changes per week"}</h3>
+        <div class="act-cols" role="img" aria-label="${list.length} changes over time">${bins.map(b=>`<div class="act-col" title="${fmtD(b.start)}${step>1?" week":""}: ${b.added} added, ${b.changed} changed"><span class="changed" style="height:${b.changed/maxB*100}%"></span><span class="added" style="height:${b.added/maxB*100}%"></span></div>`).join("")}</div>
+        <div class="act-axis"><span>${fmtD(bins[0].start)}</span><span>Today</span></div></div>
+    </div>
+    <div class="panel-a"><h3>Every change</h3>${feed||`<p class="hint">No changes in this time.</p>`}${list.length>300?`<p class="hint">Showing the newest 300.</p>`:""}
+      <p class="hint" style="margin-top:12px">The cookbook keeps the last 12 changes for each recipe.</p></div>
+  </section>`;
+  const set=(k,v)=>{ actFilter[k]=v; activityPage(); };
+  document.getElementById("act-who").onchange=e=>set("who", e.target.value);
+  document.getElementById("act-days").onchange=e=>set("days", +e.target.value);
+  document.getElementById("act-kind").onchange=e=>set("kind", e.target.value);
+  app.querySelectorAll("[data-actwho]").forEach(b=>b.onclick=()=>set("who", actFilter.who===b.dataset.actwho?"":b.dataset.actwho));
+}
+
 const menuOpen = new Set(["manage"]);   // which menu groups are open
 function openMenu(confirming){
   if(confirming) menuOpen.add("app");
@@ -1825,6 +2000,8 @@ function openMenu(confirming){
     may("review") ? item("#review","Approve recipes &amp; photos", waitSubs?waitSubs+" waiting":"", waitSubs) : "",
     !offline&&may("answer") ? item("#requests","Recipe requests", openRequests()?openRequests()+" waiting":"", openRequests()) : "",
     may("inbox") ? item("#inbox","Suggestions &amp; comments", newFeedback()?newFeedback()+" new":"", newFeedback()) : "",
+    isAdmin()&&recipesOnline ? item("#activity","Activity") : "",
+    isAdmin()&&recipesOnline ? item("#dupes","Duplicate recipes", findDupes(0.9).length?findDupes(0.9).length+" pairs":"", findDupes(0.9).length) : "",
     isAdmin() ? item("#employees","Employee settings") : "",
     isAdmin() ? item("#public","Public portal settings") : "",
   ].filter(Boolean);
@@ -2462,8 +2639,7 @@ async function drawRecipe(doc, r, opts){
       doc.y+=10;
     }
   });
-  const hl = historyLines(r);
-  if(hl.length){ doc.need(hl.length*14+16,footer); doc.rule(doc.y, C.line, 0.5); doc.y+=16; hl.forEach(l=>{ doc.text(l, M, doc.y, 9, "F1", C.muted); doc.y+=13; }); }
+  // Who added or changed a recipe is for admins only, so it's never printed in downloads
 }
 // The thin colored stripe at the top of each page, for designs that have one
 const pdfStripe = doc => { if(doc.S.head==="strip") doc.rect(0,0,doc.W,8,doc.C.accent); else if(doc.S.head==="center") doc.rect(0,0,doc.W,4,doc.C.ink); };
@@ -3949,6 +4125,8 @@ function routePage(){
   const h = decodeURIComponent(location.hash.slice(1));
   if(h==="admin" && isAdmin()){ q.value=""; adminPage(); window.scrollTo(0,0); return; }
   if(h==="public" && isAdmin()){ q.value=""; publicPage(); window.scrollTo(0,0); return; }
+  if(h==="activity" && isAdmin()){ q.value=""; activityPage(); window.scrollTo(0,0); return; }
+  if(h==="dupes" && isAdmin()){ q.value=""; dupesPage(); window.scrollTo(0,0); return; }
   if(h==="employees" && isAdmin()){ q.value=""; employeesPage(); window.scrollTo(0,0); return; }
   if(isPublic() && ((/^(new|edit-|review)/.test(h) && !can("suggest")) || (/^scan/.test(h) && !(can("ai")&&can("suggest"))) || (h==="menu" && !can("ai")) || (h==="requests" && !can("requests")) || (/^feedback/.test(h) && !can("feedback")))){
     q.value=""; toast("That isn't available in your portal."); history.replaceState(null,"",location.pathname+location.search); home(); return; }
