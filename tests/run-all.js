@@ -93,22 +93,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
 
     // Download a recipe as PDF
     await B.goto(F + '#r-boston-cream-pie'); await B.waitForTimeout(400);
-    await B.click('#dl'); await B.waitForTimeout(200);
-    ok('download offers five designs', (await B.locator('#dlpick input[name=dlst]').count()) === 5);
-    await B.check('#dlpick input[value=elegant]'); await B.waitForTimeout(100);
-    ok('picking a design shows its sample page', /pdf-sample-elegant\.jpg$/.test(await B.locator('#dl-prev-img').getAttribute('src')) && /Elegant/.test(await B.locator('#dl-prev-name').innerText()));
-    const [dl] = await Promise.all([B.waitForEvent('download'), B.click('#dl-go')]);
+    const [dl] = await Promise.all([B.waitForEvent('download'), B.click('#dl')]);
+    ok('download goes straight to a PDF, no design choice', (await B.locator('#dlpick').count()) === 0);
     const pdfPath = path.join(os.tmpdir(), 'gk-test.pdf'); await dl.saveAs(pdfPath);
     ok('recipe downloads as a PDF', fs.readFileSync(pdfPath).slice(0, 5).toString() === '%PDF-' && /\.pdf$/.test(dl.suggestedFilename()), dl.suggestedFilename());
-    let styled = 0;
-    for (const k of ['classic', 'card', 'elegant', 'print', 'large']) {
-      await B.goto(F + '#r-challah'); await B.waitForTimeout(300); await B.click('#dl'); await B.check(`#dlpick input[value=${k}]`);
-      const [d2] = await Promise.all([B.waitForEvent('download'), B.click('#dl-go')]);
-      const p2 = path.join(os.tmpdir(), `gk-style-${k}.pdf`); await d2.saveAs(p2);
-      if (fs.readFileSync(p2).slice(0, 5).toString() === '%PDF-') styled++;
-    }
-    ok('every design makes a PDF, and the choice is remembered', styled === 5 && await B.evaluate(() => pdfStyleKey()) === 'large');
-    ok('Recipe card is the default and listed first', await B.evaluate(() => { const k = store('gk-pdfstyle'); store('gk-pdfstyle', null); const d = pdfStyleKey(); store('gk-pdfstyle', k); return d === 'card' && Object.keys(PDF_STYLES)[0] === 'card'; }));
+    ok('every download uses the Recipe card design', await B.evaluate(() => { store('gk-pdfstyle', 'large'); return pdfStyleKey() === 'card'; }));
 
     // Scan a recipe from a photo (AI stand-in)
     await B.goto(F + '#scan'); await B.waitForTimeout(300); await B.setInputFiles('#scan-file', IMG); await B.waitForTimeout(1200); await B.click('#scan-read'); await B.waitForTimeout(2000);
@@ -119,8 +108,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
 
     // Whole cookbook download
     await B.goto(F); await B.waitForTimeout(400);
-    await B.click('#dl-book'); await B.waitForTimeout(200); await B.check('#dlpick input[value=classic]');
-    const [bk] = await Promise.all([B.waitForEvent('download', {timeout: 120000}), B.click('#dl-go')]);
+    const [bk] = await Promise.all([B.waitForEvent('download', {timeout: 120000}), B.click('#dl-book')]);
     const bookPath = path.join(os.tmpdir(), 'gk-book.pdf'); await bk.saveAs(bookPath);
     const bookBytes = fs.readFileSync(bookPath);
     ok('whole cookbook downloads as one PDF', bookBytes.slice(0, 5).toString() === '%PDF-' && (bookBytes.toString('latin1').match(/\/Type \/Page\b/g) || []).length > 100);
@@ -424,6 +412,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.locator('[data-pk=photos]').check(); await A.waitForTimeout(400); await A.locator('[data-pk=edit]').uncheck(); await A.waitForTimeout(1500);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
     ok('taking a permission away works', /Suggest changes/.test(await V.locator('.rhead').innerText()) && (await V.locator('.ph-add').count()) > 0);
+
+    ok('sources show without page numbers', await A.evaluate(() => creditText('The Haimishe Kitchen – Pesach Cookbook, page 22') === 'From The Haimishe Kitchen – Pesach Cookbook' && creditText('Bobby') === 'From Bobby'));
 
     // Search
     await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);

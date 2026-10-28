@@ -791,7 +791,10 @@ const nIng = r => r.s.filter(s=>s[0]).reduce((n,s)=>n+s[2].length,0);
 const nSteps = r => r.s.filter(s=>!s[0]).reduce((n,s)=>n+s[2].length,0);
 const isUntitled = r => r.t.startsWith("Untitled: ");
 const titleHTML = r => isUntitled(r) ? `<span class="untitled">${esc(r.t.slice(10))}</span>` : esc(r.t);
+// Where a recipe comes from, without page numbers (owner's request)
+const noPage = s => String(s||"").replace(/[,;·–-]?\s*\(?\b(?:pages?|pg\.?|pp?\.)\s*\d+(?:\s*[-–]\s*\d+)?\)?\s*$/i, "").trim();
 function creditText(by){
+  by = noPage(by);
   if(!by) return "";
   if(by.toLowerCase()==="got") return "Source: got";
   return "From "+by.replace(/(^|[\s-])([a-z])/g,(m,a,b)=>a+b.toUpperCase());
@@ -928,7 +931,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.59";
+const WEB_VERSION = "3.60";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -2328,7 +2331,7 @@ const PDF_STYLES = {
   large:   {name:"Large print", desc:"Bigger letters, easy to read in the kitchen", C:PDF_COLORS, head:"strip", twoCol:false, photo:true, body:14, lead:19.5, title:32, cover:["#2C5A9A","#2E8C93"]},
 };
 PDF_STYLES.card = PDF_STYLES.card2; delete PDF_STYLES.card2;
-const pdfStyleKey = () => { const k=store("gk-pdfstyle"); return PDF_STYLES[k] ? k : "card"; };   // Recipe card is the default (owner's choice)
+const pdfStyleKey = () => "card";   // Every download uses the Recipe card design (owner's choice); the other designs stay here unused
 
 // Top of a recipe page in each design
 function pdfHead(doc, r){
@@ -2521,14 +2524,14 @@ function pickPdfStyle(btn, go){
 }
 const pdfSwatch = k => ({classic:"--a:#2C5A9A;--b:#FFFFFF;--c:#B7862F", card:"--a:#2C5A9A;--b:#E9EFF8;--c:#2C5A9A", elegant:"--a:#1A2340;--b:#FFFFFF;--c:#A8822F", print:"--a:#000000;--b:#FFFFFF;--c:#777777", large:"--a:#2C5A9A;--b:#FFFFFF;--c:#1B2638"})[k];
 async function downloadRecipe(r, btn, styleKey){
-  if(!styleKey) return pickPdfStyle(btn, k=>downloadRecipe(r, btn, k));
+  styleKey = pdfStyleKey();
   const label=btn.innerHTML; btn.disabled=true; btn.textContent="Preparing…";
   try{ toast(await saveBytes(await makeRecipePdf(r, styleKey), fileName("Gittys Kitchen - "+r.t.replace(/^Untitled: /,"")))); }
   catch(e){ toast("Couldn't make the download. Try again."); }
   btn.disabled=false; btn.innerHTML=label;
 }
 async function downloadBook(cats, btn, styleKey){
-  if(!styleKey) return pickPdfStyle(btn, k=>downloadBook(cats, btn, k));
+  styleKey = pdfStyleKey();
   const label=btn.innerHTML; btn.disabled=true; btn.textContent="Making your cookbook…";
   try{
     const bytes=await makeBookPdf(cats, (d,n)=>{ btn.textContent=`Making your cookbook… ${Math.round(d/n*100)}%`; }, styleKey);

@@ -1,6 +1,6 @@
 {
-  "web": "3.59",
+  "web": "3.60",
   "apk": 11,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New: see a sample page of each download design before you choose, and a smaller Today list."
+  "notes": "Recipe sources show without page numbers; downloads always use the Recipe card design."
 }
