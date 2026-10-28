@@ -116,6 +116,8 @@ button{font:inherit;color:inherit}
 .newchip{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:999px;background:var(--wheat-soft);color:var(--wheat);white-space:nowrap}
 .cat{position:relative}
 .catcode{position:absolute;top:12px;right:12px;font-size:12px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:999px;border:1px solid var(--accent);color:var(--accent);background:var(--paper)}
+.sortbar{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--muted);margin:-6px 0 14px}
+.sortbar select{width:auto;padding:8px 32px 8px 12px;font-size:14px;border-radius:999px}
 .nochip{font-size:11px;font-weight:700;letter-spacing:.04em;padding:4px 8px;border-radius:999px;border:1px solid var(--accent);color:var(--accent);font-variant-numeric:tabular-nums;white-space:nowrap}
 .rhead .nochip{margin-right:6px}.rhead .chip+.chip{margin-left:6px}
 .sec-nav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px}
@@ -676,7 +678,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.45";
+const WEB_VERSION = "3.46";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1003,6 +1005,39 @@ function tabs(active){
     return `<a class="tab" href="#${slug(c)}" ${c===active?'aria-current="page"':""}>${esc(c)} <span class="n">${n}</span></a>`}).join("")}</nav>`;
 }
 
+/* ---------- sorting lists ---------- */
+const SO_CAT = ["code","az","za","newest","oldest","quick","few"], SO_ALL = ["newest","oldest","code","az","za","cat","quick","few"];
+const SORT_OPTS = {best:"Best match", newest:"Newest first", oldest:"Oldest first", code:"By code", az:"Name A–Z", za:"Name Z–A", cat:"By category", quick:"Quickest to make", few:"Fewest ingredients"};
+const minsOf = r => r.time ? 9e9 : estMinutes(r).total;   // recipes with a typed-in time go last
+function sortList(list, mode){
+  const L = list.slice(), nm = (a,b)=>sortName(a).localeCompare(sortName(b), undefined, {sensitivity:"base", numeric:true});
+  const byCode = (a,b)=> (!a.code - !b.code) || (a.code&&b.code ? a.code.localeCompare(b.code, undefined, {numeric:true}) : 0) || nm(a,b);
+  if(mode==="newest") return L.sort((a,b)=>addedAt(b)-addedAt(a) || byCode(a,b));
+  if(mode==="oldest") return L.sort((a,b)=>(addedAt(a)||Infinity)-(addedAt(b)||Infinity) || byCode(a,b));
+  if(mode==="az") return L.sort(nm);
+  if(mode==="za") return L.sort((a,b)=>nm(b,a));
+  const secIx = s => { const i=SEC_ORDER.indexOf(s||"Family recipes"); return i<0?99:i; };
+  if(mode==="cat") return L.sort((a,b)=>byName(a.c,b.c) || secIx(a.sec)-secIx(b.sec) || byCode(a,b));
+  if(mode==="quick") return L.sort((a,b)=>minsOf(a)-minsOf(b) || nm(a,b));
+  if(mode==="few") return L.sort((a,b)=>nIng(a)-nIng(b) || nm(a,b));
+  if(mode==="code") return L.sort(byCode);
+  return L;   // best match: keep the order given
+}
+// Sort menu for a page; the choice is remembered per page type
+function sortChoice(page, opts, dflt){ const v=store("gk-sort-"+page); return opts.includes(v) ? v : dflt; }
+const sortBar = (page, opts, cur) => `<label class="sortbar">Sort <select data-sortpage="${page}" aria-label="Sort recipes">${opts.map(o=>`<option value="${o}" ${o===cur?"selected":""}>${SORT_OPTS[o]}</option>`).join("")}</select></label>`;
+function wireSort(redraw){ const s=app.querySelector("[data-sortpage]"); if(s) s.onchange=()=>{ store("gk-sort-"+s.dataset.sortpage, s.value); const y=window.scrollY; redraw(); window.scrollTo(0, Math.min(y, 200)); }; }
+// Cards, grouped under headings when the sort has natural groups (day added, or category)
+function sortedCards(list, mode, emptyHTML){
+  if(!list.length) return `<div class="grid">${emptyHTML||""}</div>`;
+  const head = mode==="newest"||mode==="oldest" ? r=>addedAt(r) ? new Date(addedAt(r)).toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"}) : "Added earlier"
+    : mode==="cat" ? r=>r.c+(r.sec?" · "+r.sec:"") : null;
+  if(!head) return `<div class="grid">${list.map(card).join("")}</div>`;
+  let last=null, out="";
+  for(const r of list){ const h=head(r); if(h!==last){ out += `${last!==null?"</div>":""}<h3 class="sec-title">${esc(h)}</h3><div class="grid">`; last=h; } out += card(r); }
+  return out+"</div>";
+}
+
 const SEC_ORDER = ["Family recipes","Cakes & Frostings","Fish","Soups & Accompaniments","Meat","Side Dishes, Vegetables & Salads","Kugel","Milchig","Drinks & Desserts","Miscellaneous"];
 const secOf = r => r.sec || "Family recipes";
 function sectionsOf(list){
@@ -1013,34 +1048,40 @@ const secSlug = s => "s-"+s.toLowerCase().replace(/[^a-z0-9]+/g,"-");
 const SEC_ICON = {"Family recipes":"Pesach","Cakes & Frostings":"Cakes","Soups & Accompaniments":"Soups","Side Dishes, Vegetables & Salads":"Side Dish","Milchig":"Dairy","Drinks & Desserts":"Desserts"};
 // One section inside a category (e.g. Pesach → Kugel)
 function sectionPage(c, s){
-  const all = RECIPES.filter(r=>r.c===c), secs = sectionsOf(all), list = all.filter(r=>secOf(r)===s);
+  const all = RECIPES.filter(r=>r.c===c), secs = sectionsOf(all), list = all.filter(r=>secOf(r)===s), so = sortChoice("cat", SO_CAT, "code");
   app.innerHTML = `<section class="wrap">${tabs(c)}
     <a class="back" href="#${slug(c)}">← ${esc(c)}</a>
     <nav class="sec-nav" aria-label="Sections in ${esc(c)}">${secs.map(x=>`<a class="sec-pill${x===s?" on":""}" href="#${slug(c)}--${secSlug(x)}"${x===s?' aria-current="page"':""}>${esc(x)} <span>${all.filter(r=>secOf(r)===x).length}</span></a>`).join("")}</nav>
     <div class="section-head"><h2>${esc(s)}</h2><p>${esc(c)} · ${list.length} ${list.length===1?"recipe":"recipes"}</p></div>
-    <div class="grid">${list.map(card).join("")||`<div class="empty">No recipes here yet.</div>`}</div></section>`;
+    ${list.length>1?sortBar("cat", SO_CAT, so):""}
+    ${sortedCards(sortList(list, so), so, `<div class="empty">No recipes here yet.</div>`)}</section>`;
+  wireSort(()=>sectionPage(c, s));
   const on=app.querySelector(".sec-pill.on"); if(on) on.scrollIntoView({block:"nearest",inline:"center"});
 }
 function category(c){
   const list = RECIPES.filter(r=>r.c===c);
-  const secs = list.some(r=>r.sec) ? sectionsOf(list) : null;
+  const secs = list.some(r=>r.sec) ? sectionsOf(list) : null, so = sortChoice("cat", SO_CAT, "code");
   app.innerHTML = `<section class="wrap">${tabs(c)}
     <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}${!offline&&(!isAdmin()||recipesOnline)?` · <a class="link" href="#new-${slug(c).slice(2)}">+ Add a recipe</a> · <a class="link" href="#scan-${slug(c).slice(2)}">Add from photo or file</a>`:""}</p></div>
     ${list.length?`<div class="cat-tools"><button class="btn" id="dl-cat" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download ${esc(c)}</button></div>`:""}
     ${secs?`<div class="cats">${secs.map(s=>{ const n=list.filter(r=>secOf(r)===s).length;
       const L=CODEMAP.cats[c], sl=CODEMAP.secs[c]&&CODEMAP.secs[c][s];
       return `<a class="cat" href="#${slug(c)}--${secSlug(s)}">${L&&sl?`<span class="catcode" title="Recipe codes start with ${L}${sl}">${L}${sl}</span>`:""}<div class="ic">${icon(SEC_ICON[s]||s)}</div><h3>${esc(s)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`; }).join("")}</div>` : ""}
-    <div class="grid"${secs?" hidden":""}>${list.length && !secs ? list.map(card).join("") : `<div class="empty">No ${esc(c)} recipes yet.${offline?"":` <a class="link" href="#new-${slug(c).slice(2)}">Add the first one</a>`}</div>`}</div></section>`;
+    ${!secs && list.length>1 ? sortBar("cat", SO_CAT, so) : ""}
+    <div class="grid"${secs?" hidden":""}>${list.length && !secs ? sortList(list, so).map(card).join("") : `<div class="empty">No ${esc(c)} recipes yet.${offline?"":` <a class="link" href="#new-${slug(c).slice(2)}">Add the first one</a>`}</div>`}</div></section>`;
   const dc=document.getElementById("dl-cat"); if(dc) dc.onclick=()=>downloadBook([c], dc);
+  wireSort(()=>category(c));
 
   const a=app.querySelector('.tab[aria-current="page"]'); if(a) a.parentElement.scrollLeft = a.offsetLeft - 16;
 }
 
 function favorites(){
-  const f = favs().map(id=>RECIPES.find(r=>r.id===id)).filter(Boolean);
+  const f = favs().map(id=>RECIPES.find(r=>r.id===id)).filter(Boolean), so = sortChoice("fav", SO_ALL, "cat");
   app.innerHTML = `<section class="wrap">${tabs(null)}
     <div class="section-head"><h2>Your favorites</h2><p>${f.length} ${f.length===1?"recipe":"recipes"}</p></div>
-    <div class="grid">${f.length? f.map(card).join("") : `<div class="empty">No favorites yet. Open any recipe and tap “Save to favorites”.</div>`}</div></section>`;
+    ${f.length>1?sortBar("fav", SO_ALL, so):""}
+    ${sortedCards(sortList(f, so), so, `<div class="empty">No favorites yet. Open any recipe and tap “Save to favorites”.</div>`)}</section>`;
+  wireSort(favorites);
 }
 
 function results(term){
@@ -1048,11 +1089,13 @@ function results(term){
   const num = (t.match(/^(?:#|no\.?\s*|number\s*)?(\d{1,4})$/)||[])[1];
   const code = (term.trim().toUpperCase().match(/^#?([A-Z]{1,2}\s?\d{3})$/)||[])[1];
   const list = code ? RECIPES.filter(r=>codeOf(r)===code.replace(/\s/g,"")) : num ? RECIPES.filter(r=>String(r.no)===num) : RECIPES.filter(r=>[r.t,r.by,r.c,r.sec||"",allText(r)].join(" ").toLowerCase().includes(t));
-  const titleHits = list.filter(r=>r.t.toLowerCase().includes(t));
+  const titleHits = list.filter(r=>r.t.toLowerCase().includes(t)), so = sortChoice("search", ["best",...SO_ALL], "best");
   const rest = list.filter(r=>!r.t.toLowerCase().includes(t));
   app.innerHTML = `<section class="wrap">${tabs(null)}
     <div class="section-head"><h2>Results for “${esc(term)}”</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}</p></div>
-    <div class="grid">${list.length? [...titleHits,...rest].map(card).join("") : `<div class="empty">No recipes match that search. Try a dish like “challah” or an ingredient like “farmer's cheese”.</div>`}</div></section>`;
+    ${list.length>1?sortBar("search", ["best",...SO_ALL], so):""}
+    <div class="grid">${list.length? (so==="best"?"":"")+(()=>{ const L=sortList([...titleHits,...rest], so); return so==="cat"||so==="newest"||so==="oldest" ? `</div>${sortedCards(L, so)}<div class="grid">` : L.map(card).join(""); })() : `<div class="empty">No recipes match that search. Try a dish like “challah” or an ingredient like “farmer's cheese”.</div>`}</div></section>`;
+  wireSort(()=>results(term));
 }
 
 function buildParts(r){
@@ -2941,14 +2984,15 @@ function whenText(t){
 function recentPage(which){
   const pick = RECENT.find(x=>x[0]===which) || RECENT[1];
   store("gk-recent", pick[0]);
-  const list = recentList(pick[2]);
+  const list = recentList(pick[2]), so = sortChoice("recent", SO_ALL, "newest");
   app.innerHTML = `<section class="wrap">${tabs("__new")}
     <div class="section-head"><h2>New recipes</h2><p>${list.length} ${list.length===1?"recipe":"recipes"} added</p></div>
     <nav class="sec-nav" aria-label="How far back">${RECENT.map(([k,l,ms])=>`<a class="sec-pill${k===pick[0]?" on":""}" href="#recent-${k}"${k===pick[0]?' aria-current="page"':""}>${l} <span>${recentList(ms).length}</span></a>`).join("")}</nav>
-    ${list.length ? (()=>{ let last=""; return list.map(r=>{ const d=new Date(addedAt(r)).toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
-        const head = d!==last ? `${last?"</div>":""}<h3 class="sec-title">${esc(d)}</h3><div class="grid">` : ""; last=d; return head+card(r); }).join("")+"</div>"; })()
+    ${list.length>1?sortBar("recent", SO_ALL, so):""}
+    ${list.length ? sortedCards(sortList(list, so), so)
       : `<div class="empty">No recipes were added in the ${pick[1].toLowerCase()}.${pick[0]!=="month"?` <a class="link" href="#recent-${RECENT[RECENT.indexOf(pick)+1][0]}">See a longer time</a>`:""}</div>`}
   </section>`;
+  wireSort(()=>recentPage(pick[0]));
 }
 
 /* ---------- my profile ---------- */

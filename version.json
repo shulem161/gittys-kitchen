@@ -1,6 +1,6 @@
 {
-  "web": "3.45",
+  "web": "3.46",
   "apk": 8,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New recipes button first in the category bar."
+  "notes": "New: sort recipes by newest, name, category, code, quickest or fewest ingredients."
 }

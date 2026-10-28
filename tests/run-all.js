@@ -262,6 +262,12 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('category lists recipes by code', bc.length >= 2 && bc.every((c, i) => !i || bc[i - 1].localeCompare(c, undefined, {numeric: true}) < 0) && (await A.locator('.rc').first().locator('.nochip').count()) === 1, bc);
     ok('New recipes is first in the category bar', /^New recipes/.test(await A.locator('.tabs .tab').first().innerText()));
     // New recipes
+    await A.goto(F + '#c-cakes'); await A.waitForTimeout(300); await A.selectOption('[data-sortpage]', 'za'); await A.waitForTimeout(300);
+    const za = await A.locator('.rc h3').allInnerTexts();
+    ok('sort Z to A works', za.length > 2 && za.every((x, i) => !i || za[i - 1].replace(/^Untitled:\s*/, '').localeCompare(x.replace(/^Untitled:\s*/, ''), undefined, {sensitivity: 'base', numeric: true}) >= 0), za.slice(0, 4));
+    await A.selectOption('[data-sortpage]', 'code'); await A.waitForTimeout(300);
+    await A.goto(F + '#recent-week'); await A.waitForTimeout(300);
+    ok('new recipes can sort by category', (await A.locator('[data-sortpage] option[value=cat]').count()) === 1);
     await A.goto(F + '#recent-day'); await A.waitForTimeout(400);
     ok('new recipes page lists recipes added today', (await A.locator('.rc h3').allInnerTexts()).includes('Test Pesach Kugel'));
     ok('new recipes has 6h / 24h / 7 days / 30 days', (await A.locator('.sec-pill').count()) === 4);
