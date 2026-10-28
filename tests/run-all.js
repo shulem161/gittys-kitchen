@@ -253,6 +253,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('search by recipe number', (await A.locator('.rc h3').allInnerTexts()).join() === 'Test Pesach Kugel');
     await A.fill('#q', ''); await A.waitForTimeout(200);
 
+    await A.goto(F + '#c-pesach'); await A.waitForTimeout(300); await A.locator('.cats .cat', {hasText: 'Kugel'}).click(); await A.waitForTimeout(300);
+    ok('Pesach recipes say Pesach', await A.$$eval('.rc', els => els.length > 0 && els.every(e => /Pesach/i.test([...e.querySelectorAll('.kchip')].map(k => k.textContent).join(' ')))));
     // New recipes
     await A.goto(F + '#recent-day'); await A.waitForTimeout(400);
     ok('new recipes page lists recipes added today', (await A.locator('.rc h3').allInnerTexts()).includes('Test Pesach Kugel'));

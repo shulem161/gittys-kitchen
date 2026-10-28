@@ -591,7 +591,7 @@ function autoKind(r){
 const kindOf = r => (r && (r.kind==="meat"||r.kind==="dairy"||r.kind==="fish"||r.kind==="other")) ? r.kind : autoKind(r||{});
 const KIND_LABEL = {meat:"Meat", dairy:"Dairy", fish:"Fish", other:""};
 const PAREVE = k => k==="other" || k==="fish";   // fish is pareve: it can go with meat or dairy meals
-const kindChip = r => { const k=kindOf(r); return KIND_LABEL[k]?`<span class="kchip ${k}">${KIND_LABEL[k]}</span>`:""; };
+const kindChip = r => { const k=kindOf(r); return (KIND_LABEL[k]?`<span class="kchip ${k}">${KIND_LABEL[k]}</span>`:"") + (r && /^pesach$/i.test(r.c||"") ? `<span class="kchip pesach">Pesach</span>` : ""); };
 const noText = r => r && r.no ? "No. "+r.no : "";
 const noChip = r => r && r.no ? `<span class="nochip" title="Recipe number">#${r.no}</span>` : "";
 const preOf = r => ((r&&r.pre)||[]).map(id=>RECIPES.find(x=>x.id===id)).filter(Boolean);
@@ -644,7 +644,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.40";
+const WEB_VERSION = "3.41";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -896,7 +896,7 @@ function card(r){
   const t = temps(r);
   return `<a class="rc${r.cover?" has-img":""}" href="#${r.id}">
     ${r.cover?`<div class="rc-img" style="background-image:url('${r.cover}')" role="img" aria-label="Photo of ${esc(r.t)}"></div>`:""}
-    <div class="top"><span class="chips">${noChip(r)}<span class="chip">${esc(r.sec||r.c)}</span>${kindChip(r)}${addedAt(r)>Date.now()-7*864e5?'<span class="newchip">New</span>':""}</span>${t.length?`<span class="oven">${t.slice(0,2).join(" → ")}</span>`:""}${me&&favs().includes(r.id)?HEART.replace("<svg",'<svg class="heart"'):""}</div>
+    <div class="top"><span class="chips">${noChip(r)}${(r.sec||!/^pesach$/i.test(r.c)) && (r.sec||r.c).toLowerCase()!==(KIND_LABEL[kindOf(r)]||"").toLowerCase()?`<span class="chip">${esc(r.sec||r.c)}</span>`:""}${kindChip(r)}${addedAt(r)>Date.now()-7*864e5?'<span class="newchip">New</span>':""}</span>${t.length?`<span class="oven">${t.slice(0,2).join(" → ")}</span>`:""}${me&&favs().includes(r.id)?HEART.replace("<svg",'<svg class="heart"'):""}</div>
     <h3>${titleHTML(r)}</h3>
     ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}
     <div class="meta"><span><b>${nIng(r)}</b> ingredients</span><span><b>${nSteps(r)}</b> steps</span><span>${TOOL_IC.clock}<b>${esc(timeShort(r))}</b></span></div>
@@ -1053,7 +1053,7 @@ function recipe(r){
   <div class="wrap">
     <a class="back" href="#${slug(r.c)}">← ${esc(r.c)}</a>
     <section class="rhead"><div class="tilestripe"></div>
-      ${noChip(r)}<span class="chip">${esc(r.c)}</span>${r.sec?`<span class="chip">${esc(r.sec)}</span>`:""}${kindChip(r)}
+      ${noChip(r)}${/^pesach$/i.test(r.c)?"":`<span class="chip">${esc(r.c)}</span>`}${r.sec?`<span class="chip">${esc(r.sec)}</span>`:""}${kindChip(r)}
       <h1>${titleHTML(r)}</h1>
       ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}
       <div class="facts">
@@ -1812,7 +1812,7 @@ async function drawRecipe(doc, r, opts){
   const C=PDF_COLORS, M=doc.M, CW=doc.CW, footer=opts.footer;
   doc.text("GITTY'S KITCHEN  ·  "+r.c.toUpperCase(), M, doc.y, 9, "F2", C.wheat); doc.y+=26;
   for(const l of wrap(r.t.replace(/^Untitled: /,""), 26, CW, true, true)){ doc.text(l, M, doc.y, 26, "F3", C.ink); doc.y+=30; }
-  const meta=[KIND_LABEL[kindOf(r)]||"", r.by?creditText(r.by):"", temps(r).length?"Oven "+temps(r).join(" -> "):"", `${nIng(r)} ingredients`, `${nSteps(r)} steps`].filter(Boolean).join("   ·   ");
+  const meta=[[KIND_LABEL[kindOf(r)], /^pesach$/i.test(r.c)?"Pesach":""].filter(Boolean).join(", "), r.by?creditText(r.by):"", temps(r).length?"Oven "+temps(r).join(" -> "):"", `${nIng(r)} ingredients`, `${nSteps(r)} steps`].filter(Boolean).join("   ·   ");
   doc.text(meta, M, doc.y, 10, "F1", C.muted); doc.y+=16;
   const ph = opts.bigPhoto ? await photoForPdf(r) : (r.cover||"");
   if(ph && ph.startsWith("data:image/jpeg")){
