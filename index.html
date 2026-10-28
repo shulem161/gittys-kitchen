@@ -368,6 +368,20 @@ body.out .ptr{top:calc(env(safe-area-inset-top,0px) + 16px)}
 .err-detail{font-size:13px;color:var(--muted)}
 .err-detail code{display:block;white-space:pre-wrap;word-break:break-word;margin-top:6px;padding:8px;background:var(--bg);border-radius:8px}
 .rlink{color:var(--accent);font-weight:600;text-decoration:underline;text-underline-offset:2px}
+.menu a.who{display:block;padding:10px 12px 12px;border-radius:8px 8px 0 0}
+.avatar.xl{width:72px;height:72px;font-size:32px;flex-shrink:0}
+.prof-head{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.prof-head h2{font-size:30px}
+.prof-head .hint{margin:4px 0 0}
+.pstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px}
+.pstat{display:flex;flex-direction:column;gap:2px;padding:16px;background:var(--paper);border:1px solid var(--line);border-radius:14px;text-decoration:none;color:var(--ink)}
+.pstat:hover{border-color:var(--accent)}
+.pstat b{font-family:var(--display);font-weight:400;font-size:30px;color:var(--accent);line-height:1.1}
+.pstat span{font-size:13px;color:var(--muted)}
+.pstat b span{font:inherit;color:inherit;margin:0}
+.pw-form{display:flex;flex-direction:column;gap:12px;max-width:420px;margin-top:8px}
+.prof-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.prof-actions #prof-confirm{flex-basis:100%}
 /* recipe editor */
 .note.setup{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:28px}
 .note.setup p{margin:4px 0 0;color:var(--muted)}
@@ -504,7 +518,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.27";
+const WEB_VERSION = "3.28";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -971,7 +985,7 @@ function openMenu(confirming){
   closeMenu();
   const pc = pendingCount();
   const m=document.createElement("div"); m.className="menu"; m.setAttribute("role","menu");
-  m.innerHTML = `<div class="who"><b>${esc(myName())}</b><span>${isAdmin()?"Admin":"Member"}${offline?" · offline":""}</span></div>
+  m.innerHTML = `<a class="who" href="#profile" role="menuitem"><b>${esc(myName())}</b><span>${isAdmin()?"Admin":"Member"}${offline?" · offline":""} · My profile</span></a>
     ${isAdmin()?(()=>{const mp=members.filter(m=>m.status==="pending").length;return `<a href="#admin" role="menuitem">Approve members <span class="n${mp?" hot":""}">${mp?mp+" waiting":""}</span></a>`})():""}
     ${isAdmin()?`<a href="#review" role="menuitem">Approve recipes &amp; photos <span class="n${pendingSubs().length+pendingPhotos.length?" hot":""}">${pendingSubs().length+pendingPhotos.length?(pendingSubs().length+pendingPhotos.length)+" waiting":""}</span></a>`:""}
     ${!offline&&(!isAdmin()||recipesOnline)?`<a href="#new" role="menuitem">Add a recipe <span class="n"></span></a><a href="#scan" role="menuitem">Add from photo or file <span class="n"></span></a>`:""}
@@ -1976,6 +1990,84 @@ function inboxPage(){
   });
 }
 
+/* ---------- my profile ---------- */
+async function profilePage(){
+  const name=myName(), mine=r=>(r.history||[]).filter(h=>h.by===name);
+  const added=RECIPES.filter(r=>mine(r).some(h=>h.a==="added"));
+  const changed=RECIPES.filter(r=>mine(r).some(h=>h.a==="changed"));
+  const stat=(n,label,href)=>`<a class="pstat" href="${href}"><b>${n}</b><span>${label}</span></a>`;
+  app.innerHTML = `<section class="wrap admin">
+    <div class="panel-a prof-head" style="margin-top:28px">
+      <span class="avatar xl">${esc(initial(name))}</span>
+      <div><h2>${esc(name)}</h2>
+        <p class="hint">${isAdmin()?"Admin":"Member"}${profile&&profile.created?` · joined ${fmtDate(profile.created)}`:""}${offline?" · offline":""}</p></div>
+    </div>
+    <div class="pstats">
+      ${stat(favs().length, favs().length===1?"favorite":"favorites", "#favorites")}
+      ${stat(added.length, added.length===1?"recipe added":"recipes added", "#prof-added")}
+      ${stat(changed.length, changed.length===1?"recipe changed":"recipes changed", "#prof-changed")}
+      ${stat('<span id="prof-phn">…</span>', '<span id="prof-phl">photos shared</span>', "#prof-photos")}
+      ${stat(isAdmin()?newFeedback():feedback.length, isAdmin()?"new messages":"messages sent", isAdmin()?"#inbox":"#feedback")}
+    </div>
+    <div class="panel-a" id="prof-list" hidden></div>
+    ${offline?"":`<div class="panel-a"><h3>Change password</h3>
+      <form id="pwform" class="pw-form" novalidate>
+        <div class="field"><label for="pw-old">Current password</label><input id="pw-old" type="password" autocomplete="current-password"></div>
+        <div class="field"><label for="pw-new">New password</label><input id="pw-new" type="password" autocomplete="new-password" placeholder="At least 6 characters"></div>
+        <div class="field"><label for="pw-new2">Confirm new password</label><input id="pw-new2" type="password" autocomplete="new-password"></div>
+        <p class="err" id="pw-err" role="alert" hidden></p>
+        <div><button class="primary" type="submit">Change password</button></div>
+      </form></div>`}
+    <div class="panel-a prof-actions">
+      <button type="button" class="btn" id="prof-out">Sign out</button>
+      ${isAdmin()||offline?"":`<button type="button" class="btn danger-btn" id="prof-del">Delete my profile</button>`}
+      <div id="prof-confirm"></div>
+    </div>
+  </section>`;
+  // the recipe lists behind the numbers
+  const list=document.getElementById("prof-list");
+  const showList=(title, recs)=>{ list.hidden=false; list.innerHTML=`<h3>${title}</h3>${recs.length?`<div class="grid" style="padding:10px 0 0">${recs.map(card).join("")}</div>`:`<p class="hint mempty">Nothing here yet.</p>`}`; list.scrollIntoView({behavior:"smooth",block:"start"}); };
+  app.querySelector('a[href="#prof-added"]').onclick=e=>{ e.preventDefault(); showList("Recipes you added", added); };
+  app.querySelector('a[href="#prof-changed"]').onclick=e=>{ e.preventDefault(); showList("Recipes you changed", changed); };
+  // photos shared (approved and waiting)
+  let myPhotos=[];
+  if(db && !offline){
+    db.collection("photos").where("uid","==",me).get().then(s=>{
+      myPhotos=s.docs.map(d=>Object.assign({id:d.id},d.data())).filter(p=>p.status!=="rejected");
+      const el=document.getElementById("prof-phn"); if(el) el.textContent=myPhotos.length; const pl=document.getElementById("prof-phl"); if(pl) pl.textContent=myPhotos.length===1?"photo shared":"photos shared";
+    }).catch(()=>{ const el=document.getElementById("prof-phn"); if(el) el.textContent="–"; });
+  } else { const el=document.getElementById("prof-phn"); if(el) el.textContent="–"; }
+  app.querySelector('a[href="#prof-photos"]').onclick=e=>{ e.preventDefault(); list.hidden=false;
+    list.innerHTML=`<h3>Photos you shared</h3>${myPhotos.length?`<div class="ph-grid" style="margin-top:10px">${myPhotos.map(p=>`<figure class="ph${p.status==="pending"?" wait":""}"><a href="#${esc(p.recipeId)}"><img src="${p.thumb}" alt="${esc(p.recipeTitle||"")}"></a><figcaption>${esc(p.recipeTitle||"")}${p.status==="pending"?" · waiting for approval":""}</figcaption></figure>`).join("")}</div>`:`<p class="hint mempty">No photos yet. Open a recipe you've made and tap Take a photo.</p>`}`;
+    list.scrollIntoView({behavior:"smooth",block:"start"}); };
+  // change password
+  const F=document.getElementById("pwform");
+  if(F) F.onsubmit=async e=>{
+    e.preventDefault();
+    const err=F.querySelector("#pw-err"), fail=m=>{ err.textContent=m; err.hidden=false; };
+    const oldp=F.querySelector("#pw-old").value, np=F.querySelector("#pw-new").value, np2=F.querySelector("#pw-new2").value;
+    err.hidden=true;
+    if(!oldp) return fail("Enter your current password.");
+    if(np.length<6) return fail("Choose a new password with at least 6 characters.");
+    if(np!==np2) return fail("The two new passwords don't match. Type them again.");
+    if(np===oldp) return fail("The new password is the same as the current one.");
+    const btn=F.querySelector(".primary"); btn.disabled=true; btn.textContent="Changing…";
+    try{
+      const u=auth.currentUser;
+      await u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email, oldp));
+      await u.updatePassword(np);
+      F.reset(); toast("Password changed");
+    }catch(x){ const c=(x&&x.code)||""; fail(/wrong-password|invalid-credential|invalid-login/.test(c) ? "Your current password isn't right." : errText(x)); }
+    btn.disabled=false; btn.textContent="Change password";
+  };
+  document.getElementById("prof-out").onclick=signOut;
+  const del=document.getElementById("prof-del");
+  if(del) del.onclick=()=>{ const box=document.getElementById("prof-confirm");
+    box.innerHTML=`<div class="confirm">Delete your profile and favorites? You'd need to ask to join again.<div class="row"><button type="button" class="btn warn" id="pd-yes">Delete</button><button type="button" class="btn" id="pd-no">Cancel</button></div></div>`;
+    document.getElementById("pd-no").onclick=()=>{ box.innerHTML=""; };
+    document.getElementById("pd-yes").onclick=()=>deleteMe(); };
+}
+
 function route(){
   closeMenu(); stopRecipePhotos();
   if(state!=="approved"){ document.body.classList.add("out"); gate(); return; }
@@ -1983,6 +2075,7 @@ function route(){
   const h = decodeURIComponent(location.hash.slice(1));
   if(h==="admin" && isAdmin()){ q.value=""; adminPage(); window.scrollTo(0,0); return; }
   if(!offline && h.startsWith("edit-")){ const er=RECIPES.find(x=>x.id===h.slice(5)); if(er){ q.value=""; editor(er); window.scrollTo(0,0); return; } }
+  if(h==="profile"){ q.value=""; profilePage(); window.scrollTo(0,0); return; }
   if(h==="inbox" && isAdmin()){ q.value=""; inboxPage(); window.scrollTo(0,0); return; }
   if(h==="feedback" || h.startsWith("feedback-")){ q.value=""; feedbackPage(h.startsWith("feedback-")?h.slice(9):""); window.scrollTo(0,0); return; }
   if(h==="review" && isAdmin()){ q.value=""; reviewPage(); window.scrollTo(0,0); return; }

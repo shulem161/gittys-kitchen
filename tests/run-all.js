@@ -120,6 +120,18 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await B.goto(F + '#favorites'); await B.waitForTimeout(300);
     ok('favorites work', await B.locator('.rc').count() === 1);
 
+    // My profile
+    await B.goto(F); await B.waitForTimeout(300); await B.click('#avbtn'); await B.click('.menu a.who'); await B.waitForTimeout(700);
+    ok('menu opens my profile', /Test Member/.test(await B.locator('.prof-head').innerText()));
+    const pst = (await B.locator('.pstat').allInnerTexts()).join(' | ');
+    ok('profile shows my activity', /1\s+favorite\b/.test(pst) && /photos? shared/.test(pst) && !/…/.test(pst), pst);
+    await B.fill('#pw-old', 'nope99'); await B.fill('#pw-new', 'member2'); await B.fill('#pw-new2', 'member2'); await B.click('#pwform .primary'); await B.waitForTimeout(400);
+    ok('profile refuses wrong current password', /isn't right/.test(await B.locator('#pw-err').innerText()));
+    await B.fill('#pw-old', 'member1'); await B.click('#pwform .primary'); await B.waitForTimeout(500);
+    ok('member can change password', /Password changed/.test(await B.locator('#toast').innerText()));
+    const P = await page(); await P.fill('#nm', 'Test Member'); await P.fill('#pw', 'member2'); await P.click('.primary'); await P.waitForTimeout(500);
+    ok('new password works', (await P.locator('.eyebrow').innerText().catch(() => '')).includes('TEST MEMBER'));
+
     // Search
     await B.goto(F); await B.waitForTimeout(300); await B.fill('#q', 'challah'); await B.waitForTimeout(300);
     ok('search finds recipes', await B.locator('.rc').count() >= 3);

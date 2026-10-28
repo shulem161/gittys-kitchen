@@ -1,6 +1,6 @@
 {
-  "web": "3.27",
+  "web": "3.28",
   "apk": 8,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Recipes can now link to each other."
+  "notes": "New: My profile, with your activity and password change."
 }
