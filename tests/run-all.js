@@ -246,10 +246,21 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('new recipe gets a number', /^#\d+$/.test(await A.locator('.rhead .nochip').innerText().catch(() => '')));
     const newNo = (await A.locator('.rhead .nochip').innerText().catch(() => '')).slice(1);
     await A.goto(F + '#c-pesach'); await A.waitForTimeout(500);
-    ok('Pesach shows sections', (await A.locator('.sec-pill').allInnerTexts()).some(x => /Kugel/.test(x)) && (await A.locator('.sec-title').count()) >= 2);
+    ok('Pesach shows section tiles', (await A.locator('.cats .cat h3').allInnerTexts()).some(x => /Kugel/.test(x)));
+    await A.locator('.cats .cat', {hasText: 'Kugel'}).click(); await A.waitForTimeout(400);
+    ok('a section opens its own page', (await A.locator('.rc h3').allInnerTexts()).includes('Test Pesach Kugel') && /--s-kugel$/.test(await A.evaluate(() => location.hash)));
     await A.goto(F); await A.waitForTimeout(300); await A.fill('#q', '#' + newNo); await A.waitForTimeout(300);
     ok('search by recipe number', (await A.locator('.rc h3').allInnerTexts()).join() === 'Test Pesach Kugel');
     await A.fill('#q', ''); await A.waitForTimeout(200);
+
+    // Recipe requests
+    await V.goto(F + '#requests'); await V.waitForTimeout(400);
+    await V.fill('#rq-text', 'Potato kugel\nQuince tagine with saffron'); await V.click('#rqform .primary'); await V.waitForTimeout(1500);
+    const rqt = await V.locator('.rq-result').innerText().catch(() => '');
+    ok('request finds recipes in the cookbook', /Potato Kugel/.test(rqt), rqt.slice(0, 200));
+    ok('request not in the cookbook goes to the admin', /Sent to/.test(rqt) && notes.some(n => /asking for a recipe/.test(n)), [rqt, notes.slice(-3)]);
+    await A.goto(F + '#requests'); await A.waitForTimeout(600);
+    ok('admin sees the request', /Quince tagine/.test(await A.locator('.rq-list').first().innerText().catch(() => '')));
 
     // Search
     await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);

@@ -1,6 +1,6 @@
 {
-  "web": "3.37",
+  "web": "3.38",
   "apk": 8,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New: 211 Pesach recipes in sections, a number on every recipe, and a Fish label."
+  "notes": "New: Request a recipe (with a photo), and Pesach sections as tiles."
 }

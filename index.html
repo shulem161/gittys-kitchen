@@ -99,12 +99,28 @@ button{font:inherit;color:inherit}
 .kchip{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:4px 9px;border-radius:999px;background:var(--accent);color:var(--paper);white-space:nowrap}
 .rhead .kchip{margin-left:6px}
 .rc .chips{display:flex;gap:6px;flex-wrap:wrap;margin-right:auto}
+.rq-photo{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:-4px 0 12px}
+.rq-thumb{position:relative;margin:0}.rq-thumb img{width:90px;height:90px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.rq-thumb .btn{position:absolute;top:-8px;right:-8px;padding:2px 7px}
+.rq-res,.rq-list{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:10px}
+.rq-res li{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--bg)}
+.rq-ask{font-weight:700;margin-bottom:6px}
+.rq-hits{display:grid;gap:6px}
+.rq-hit{display:flex;flex-wrap:wrap;align-items:center;gap:6px;color:var(--ink);text-decoration:none;padding:8px 10px;border-radius:10px;background:var(--paper);border:1px solid var(--line)}
+.rq-hit span:last-child{color:var(--muted);font-size:13px;margin-left:auto}
+.rq-item{display:flex;gap:12px;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:10px}
+.rq-img{width:64px;height:64px;object-fit:cover;border-radius:10px;flex:none}
+.rq-what{font-weight:700}
+.rq-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.rq-acts input,.rq-acts select{flex:1 1 180px;min-width:0}
+.rq-del{font-size:13px;margin-top:6px}
 .nochip{font-size:11px;font-weight:700;letter-spacing:.04em;padding:4px 8px;border-radius:999px;border:1px solid var(--accent);color:var(--accent);font-variant-numeric:tabular-nums;white-space:nowrap}
 .rhead .nochip{margin-right:6px}.rhead .chip+.chip{margin-left:6px}
 .sec-nav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px}
 .sec-pill{padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink);text-decoration:none;font-size:14px}
 .sec-pill span{color:var(--muted);font-size:12px;margin-left:2px}
 .sec-pill:hover{border-color:var(--accent)}
+.sec-pill.on{background:var(--accent);border-color:var(--accent);color:var(--paper)}.sec-pill.on span{color:var(--paper)}
+.sec-nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}.sec-nav::-webkit-scrollbar{display:none}.sec-pill{white-space:nowrap}
 .sec-title{font-family:var(--display);font-weight:400;font-size:24px;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--accent-soft);scroll-margin-top:80px}
 .rc .meta{flex-wrap:wrap;gap:6px 16px}
 .cats.tools{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
@@ -622,12 +638,12 @@ const myName = () => profile ? profile.name : "";
 const uk = k => "gk-u-"+me+"-"+k;
 const favs = () => (profile && profile.favs) || [];
 const initial = n => (String(n).trim()[0]||"?").toUpperCase();
-const pendingCount = () => members.filter(m=>m.status==="pending").length + (isAdmin()?subs.filter(s=>s.status==="pending").length+pendingPhotos.length+newFeedback():0);
+const pendingCount = () => members.filter(m=>m.status==="pending").length + (isAdmin()?subs.filter(s=>s.status==="pending").length+pendingPhotos.length+newFeedback()+openRequests():0);
 function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catch(e){for(let i=0;i<12;i++)a[i]=Math.random()*256|0} return [...a].map(b=>b.toString(16).padStart(2,"0")).join(""); }
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.37";
+const WEB_VERSION = "3.38";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -702,6 +718,7 @@ function boot(){
     if(unsubSubs){unsubSubs();unsubSubs=null;subs=[]}
     if(unsubPendingPhotos){unsubPendingPhotos();unsubPendingPhotos=null;pendingPhotos=[]}
     if(unsubFeedback){unsubFeedback();unsubFeedback=null;feedback=[]}
+    if(unsubRequests){unsubRequests();unsubRequests=null;requests=[]}
     if(!u){ me=null; profile=null; offline=false; state="signedout"; renderAcct(); return route(); }
     me=u.uid;
     if(!profile){ state="loading"; route(); }
@@ -714,7 +731,7 @@ function boot(){
       state = profile.status==="approved" ? "approved" : profile.status==="denied" ? "denied" : "pending";
       cacheProfile(); renderAcct();
       if(isAdmin() && !unsubAll) watchMembers();
-      if(state==="approved"){ watchRecipes(); watchSubs(); watchPendingPhotos(); watchFeedback(); if(!update){ lastUpdCheck=Date.now(); checkUpdates(false); } else renderUpdateBar(); }
+      if(state==="approved"){ watchRecipes(); watchSubs(); watchPendingPhotos(); watchFeedback(); watchRequests(); if(!update){ lastUpdCheck=Date.now(); checkUpdates(false); } else renderUpdateBar(); }
       if(was!==state || state!=="approved") route();
     }, ()=>{
       const c=store("gk-cache");
@@ -890,6 +907,8 @@ const TOOL_IC = {
   cart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11h10.2L20 8H7"/><circle cx="9.5" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/></svg>',
   calc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></svg>',
   scan:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M8 9h8M8 12h8M8 15h5"/></svg>',
+  ask:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M9.6 9.5a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5M12 16h.01"/></svg>',
+  cam:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
   clock:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
 };
 function home(){
@@ -925,6 +944,7 @@ function home(){
     <div class="section-head"><h2>Kitchen tools</h2><p>Plan, shop and measure</p></div>
     <div class="cats tools">
       ${offline||(isAdmin()&&!recipesOnline)?"":`<a class="cat" href="#scan"><div class="ic">${TOOL_IC.scan}</div><div class="tool-txt"><h3>Scan a recipe</h3><span>Photo of a paper, PDF or Word</span></div></a>`}
+      ${offline?"":`<a class="cat" href="#requests"><div class="ic">${TOOL_IC.ask}</div><div class="tool-txt"><h3>${isAdmin()?"Recipe requests":"Request a recipe"}</h3><span>${isAdmin()?(openRequests()?`${openRequests()} waiting`:"What the family is asking for"):"Ask for any recipe, or send a photo"}</span></div></a>`}
       ${offline?"":`<a class="cat" href="#menu"><div class="ic">${TOOL_IC.menu}</div><div class="tool-txt"><h3>Menu ideas</h3><span>A full menu from the cookbook</span></div></a>`}
       <a class="cat" href="#grocery"><div class="ic">${TOOL_IC.cart}</div><div class="tool-txt"><h3>Grocery list</h3><span>${gStore().items.length?`${gStore().items.length} ${gStore().items.length===1?"recipe":"recipes"} on it`:"Pick recipes, get one list"}</span></div></a>
       <a class="cat" href="#convert"><div class="ic">${TOOL_IC.calc}</div><div class="tool-txt"><h3>Calculator</h3><span>Cups, ounces, grams, °F</span></div></a>
@@ -952,17 +972,28 @@ function sectionsOf(list){
   return names.sort((a,b)=>{ const i=SEC_ORDER.indexOf(a), j=SEC_ORDER.indexOf(b); return (i<0?99:i)-(j<0?99:j) || byName(a,b); });
 }
 const secSlug = s => "s-"+s.toLowerCase().replace(/[^a-z0-9]+/g,"-");
+const SEC_ICON = {"Family recipes":"Pesach","Cakes & Frostings":"Cakes","Soups & Accompaniments":"Soups","Side Dishes, Vegetables & Salads":"Side Dish","Milchig":"Dairy","Drinks & Desserts":"Desserts"};
+// One section inside a category (e.g. Pesach → Kugel)
+function sectionPage(c, s){
+  const all = RECIPES.filter(r=>r.c===c), secs = sectionsOf(all), list = all.filter(r=>secOf(r)===s);
+  app.innerHTML = `<section class="wrap">${tabs(c)}
+    <a class="back" href="#${slug(c)}">← ${esc(c)}</a>
+    <nav class="sec-nav" aria-label="Sections in ${esc(c)}">${secs.map(x=>`<a class="sec-pill${x===s?" on":""}" href="#${slug(c)}--${secSlug(x)}"${x===s?' aria-current="page"':""}>${esc(x)} <span>${all.filter(r=>secOf(r)===x).length}</span></a>`).join("")}</nav>
+    <div class="section-head"><h2>${esc(s)}</h2><p>${esc(c)} · ${list.length} ${list.length===1?"recipe":"recipes"}</p></div>
+    <div class="grid">${list.map(card).join("")||`<div class="empty">No recipes here yet.</div>`}</div></section>`;
+  const on=app.querySelector(".sec-pill.on"); if(on) on.scrollIntoView({block:"nearest",inline:"center"});
+}
 function category(c){
   const list = RECIPES.filter(r=>r.c===c);
   const secs = list.some(r=>r.sec) ? sectionsOf(list) : null;
   app.innerHTML = `<section class="wrap">${tabs(c)}
     <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}${!offline&&(!isAdmin()||recipesOnline)?` · <a class="link" href="#new-${slug(c).slice(2)}">+ Add a recipe</a> · <a class="link" href="#scan-${slug(c).slice(2)}">Add from photo or file</a>`:""}</p></div>
     ${list.length?`<div class="cat-tools"><button class="btn" id="dl-cat" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download ${esc(c)}</button></div>`:""}
-    ${secs?`<nav class="sec-nav" aria-label="Sections">${secs.map(s=>{ const n=list.filter(r=>secOf(r)===s).length; return `<a class="sec-pill" href="#${slug(c)}" data-sec="${secSlug(s)}">${esc(s)} <span>${n}</span></a>`; }).join("")}</nav>`
-      + secs.map(s=>`<h3 class="sec-title" id="${secSlug(s)}">${esc(s)}</h3><div class="grid">${list.filter(r=>secOf(r)===s).map(card).join("")}</div>`).join("") : ""}
+    ${secs?`<div class="cats">${secs.map(s=>{ const n=list.filter(r=>secOf(r)===s).length;
+      return `<a class="cat" href="#${slug(c)}--${secSlug(s)}"><div class="ic">${icon(SEC_ICON[s]||s)}</div><h3>${esc(s)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`; }).join("")}</div>` : ""}
     <div class="grid"${secs?" hidden":""}>${list.length && !secs ? list.map(card).join("") : `<div class="empty">No ${esc(c)} recipes yet.${offline?"":` <a class="link" href="#new-${slug(c).slice(2)}">Add the first one</a>`}</div>`}</div></section>`;
   const dc=document.getElementById("dl-cat"); if(dc) dc.onclick=()=>downloadBook([c], dc);
-  app.querySelectorAll("[data-sec]").forEach(a=>a.onclick=e=>{ e.preventDefault(); const el=document.getElementById(a.dataset.sec); if(el) el.scrollIntoView({behavior:"smooth",block:"start"}); });
+
   const a=app.querySelector('.tab[aria-current="page"]'); if(a) a.parentElement.scrollLeft = a.offsetLeft - 16;
 }
 
@@ -1264,6 +1295,7 @@ function openMenu(confirming){
     ${isAdmin()?"":`<a href="#mine" role="menuitem">My recipes <span class="n">${subs.length||""}</span></a>`}
     ${isAdmin()?`<a href="#inbox" role="menuitem">Suggestions &amp; comments <span class="n${newFeedback()?" hot":""}">${newFeedback()?newFeedback()+" new":""}</span></a>`:`<a href="#feedback" role="menuitem">Suggestions &amp; comments <span class="n"></span></a>`}
     <a href="#favorites" role="menuitem">My favorites <span class="n">${favs().length}</span></a>
+    ${offline?"":isAdmin()?`<a href="#requests" role="menuitem">Recipe requests <span class="n${openRequests()?" hot":""}">${openRequests()?openRequests()+" waiting":""}</span></a>`:`<a href="#requests" role="menuitem">Request a recipe <span class="n"></span></a>`}
     <a href="#grocery" role="menuitem">Grocery list <span class="n">${gStore().items.length||""}</span></a>
     ${offline?"":`<a href="#menu" role="menuitem">Menu ideas <span class="n"></span></a>`}
     <a href="#convert" role="menuitem">Kitchen calculator <span class="n"></span></a>
@@ -1314,7 +1346,7 @@ function watchRecipes(){
     const live = s.docs.filter(d=>!d.data().deleted).map(d=>fromDoc(d.id,d.data()));
     if(s.docs.length){ recipesOnline=true; setRecipes(live); store("gk-recipes", RECIPES); }
     else { recipesOnline=false; setRecipes(BUNDLED.slice()); }
-    if(state==="approved" && !document.querySelector(".editor, .prof-head")) route();
+    if(state==="approved" && !document.querySelector(".editor, .prof-head, #rqform, .tools-page")) route();
   }, ()=>{});
 }
 const missingBundled = () => BUNDLED.filter(r=>!onlineIds.has(r.id));
@@ -1354,13 +1386,15 @@ function editor(r, cat, sub, draft){
   const catList = CATS.includes(catNow) || !catNow ? CATS : [...CATS, catNow];
   const pre = ((src && src.pre!==undefined ? src.pre : target && target.pre)||[]).filter(id=>RECIPES.some(x=>x.id===id));
   const selfId = r ? r.id : target ? target.id : "";
+  const rqDraft = (!r && !sub && isAdmin()) ? store("gk-rq-draft") : null;
+  if(rqDraft) store("gk-rq-draft", null);
   const draw = () => {
     app.innerHTML = `<section class="wrap editor">
       <a class="back" href="${sub?"#review":r?"#"+r.id:"#"+(catNow&&CATS.includes(catNow)?slug(catNow):"")}">← Cancel</a>
       <form class="panel-a ed" id="edform" novalidate>
         <h2>${sub?(sub.editOf?"Review changes":"Review recipe"):!isNew?(suggest?"Suggest changes":"Edit recipe"):"Add a recipe"}</h2>
         ${sub?`<p class="sub">${sub.editOf?`Changes to “${esc(target?target.t:sub.t)}”`:"New recipe"} sent by ${esc(sub.byName||"a member")} on ${fmtDate(sub.created)}. Fix anything you like, then approve it.</p>`:suggest?`<p class="sub">${esc(ADMIN_NAME)} will look it over before it appears for everyone.</p>`:""}
-        <div class="field"><label for="ed-t">Recipe name</label><input id="ed-t" type="text" maxlength="80" value="${esc(src?src.t:"")}" placeholder="e.g. Potato Kugel"></div>
+        <div class="field"><label for="ed-t">Recipe name</label><input id="ed-t" type="text" maxlength="80" value="${esc(src?src.t:(rqDraft&&rqDraft.t)||"")}" placeholder="e.g. Potato Kugel"></div>
         <div class="row2">
           <div class="field"><label for="ed-c">Category</label>
             <select id="ed-c">${catList.map(c=>`<option ${c===catNow?"selected":""}>${esc(c)}</option>`).join("")}<option value="__new">New category…</option></select>
@@ -1465,6 +1499,7 @@ function editor(r, cat, sub, draft){
       try{
         await db.collection("recipes").doc(id).set(toDoc(rec), {merge:true});
         if(sub) await db.collection("submissions").doc(sub.id).update({status:"approved", recipeId:id, decided:Date.now()});
+        if(rqDraft && rqDraft.id) db.collection("requests").doc(rqDraft.id).update({status:"done", recipeId:id, decided:Date.now()}).catch(()=>{});
         toast(sub?"Recipe approved and published":r?"Changes saved":"Recipe added"); location.hash=id;
       }
       catch(e){ btn.disabled=false; btn.textContent=sub?"Approve and publish":r?"Save changes":"Add recipe"; fail("Couldn't save. Check your internet connection and try again."); }
@@ -2699,6 +2734,151 @@ function showMenu(menu, opts, via){
   document.getElementById("mn-again").onclick=()=>makeMenu([...(lastMenu&&lastMenu.avoid||[]), ...recs.map(r=>r.id)].slice(-30));
 }
 
+/* ---------- recipe requests ----------
+   A member asks for recipes ("I need a recipe for…", one per line) and can add a photo of the dish.
+   The cookbook is searched first (and the AI looks at the photo); anything not found goes to the admin. */
+let requests = [];            // admin: everyone's; member: their own
+let unsubRequests = null;
+const openRequests = () => isAdmin() ? requests.filter(r=>r.status==="open").length : 0;
+function watchRequests(){
+  if(unsubRequests || !db || !me) return;
+  const q = isAdmin() ? db.collection("requests") : db.collection("requests").where("uid","==",me);
+  unsubRequests = q.onSnapshot(s=>{
+    requests = s.docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(b.created||0)-(a.created||0));
+    renderAcct();
+    if(!/^#requests/.test(location.hash)) return;
+    if(isAdmin()){ if(!document.activeElement?.matches?.("textarea,input,select")) route(); }
+    else { const box=document.getElementById("rq-mine"); if(box) box.innerHTML=mineHTML(); }
+  }, ()=>{});
+}
+const REQ_STOP = new Set("a an the for of and with to in on my me i need want recipe recipes some please like how make making".split(" "));
+const reqWords = s => String(s).toLowerCase().replace(/[^a-z0-9 ]+/g," ").split(/\s+/).filter(w=>w.length>1 && !REQ_STOP.has(w)).map(w=>w.replace(/(ies)$/,"y").replace(/(es|s)$/,""));
+// Cookbook recipes whose name matches what was asked for, best first
+function findInBook(ask){
+  const want = reqWords(ask); if(!want.length) return [];
+  return RECIPES.map(r=>{
+    const title = reqWords(r.t), body = reqWords([r.c, r.sec||"", (r.s||[]).filter(x=>x[0]).flatMap(x=>x[2]).join(" ")].join(" "));
+    const inTitle = want.filter(w=>title.some(t=>t===w || t.startsWith(w) || w.startsWith(t))).length;
+    const inBody = want.filter(w=>body.includes(w)).length;
+    return {r, score: inTitle*3 + inBody*0.5, all: inTitle===want.length};
+  }).filter(x=>x.all || x.score>=3*Math.max(1,want.length-1)).sort((a,b)=>b.score-a.score).slice(0,4).map(x=>x.r);
+}
+function requestsPage(){
+  if(isAdmin()) return requestsAdminPage();
+  const mine = requests;
+  app.innerHTML = `<section class="wrap admin">
+    <div class="section-head" style="margin-top:28px"><h2>Request a recipe</h2><p>We'll look in the cookbook first</p></div>
+    <form class="panel-a" id="rqform" novalidate>
+      <div class="field"><label for="rq-text">What recipes do you need?</label>
+        <textarea id="rq-text" rows="4" maxlength="800" placeholder="One per line, for example:&#10;Potato kugel&#10;Chocolate cake without nuts&#10;Something with salmon"></textarea></div>
+      <div class="rq-photo">
+        <label class="btn" for="rq-file">${TOOL_IC.cam||"📷"} Add a photo of the dish</label>
+        <input id="rq-file" type="file" accept="image/*" hidden>
+        <div id="rq-prev"></div>
+      </div>
+      <p class="err" id="rq-err" role="alert" hidden></p>
+      <div><button class="primary" type="submit">Find recipes</button></div>
+    </form>
+    <div id="rq-out" aria-live="polite"></div>
+    <div id="rq-mine">${mineHTML()}</div>
+  </section>`;
+  let photo=null;
+  const F=document.getElementById("rqform"), file=F.querySelector("#rq-file");
+  file.onchange=async()=>{ const f=file.files[0]; if(!f) return;
+    try{ photo=await shrink(f); F.querySelector("#rq-prev").innerHTML=`<figure class="rq-thumb"><img src="${photo.thumb}" alt="Your photo"><button type="button" class="btn sm" id="rq-x" aria-label="Remove photo">✕</button></figure>`;
+      F.querySelector("#rq-x").onclick=()=>{ photo=null; file.value=""; F.querySelector("#rq-prev").innerHTML=""; }; }
+    catch(e){ toast("Couldn't use that picture."); } };
+  F.onsubmit=async e=>{
+    e.preventDefault();
+    const err=F.querySelector("#rq-err"); err.hidden=true;
+    const asks=F.querySelector("#rq-text").value.split(/\n|;/).map(s=>s.replace(/^[-•*\d.)\s]+/,"").trim()).filter(Boolean).slice(0,10);
+    if(!asks.length && !photo){ err.textContent="Write what you need, or add a photo."; err.hidden=false; return; }
+    const btn=F.querySelector(".primary"); btn.disabled=true; btn.textContent="Looking…";
+    const out=document.getElementById("rq-out"); out.innerHTML=`<div class="panel-a"><p class="hint"><span class="spin" aria-hidden="true"></span> Looking in the cookbook…</p></div>`;
+    // 1. the cookbook itself; 2. the AI, for the photo and anything not found by name
+    let items = asks.map(a=>({ask:a, found:findInBook(a).map(r=>r.id)}));
+    if(!offline && FIREBASE_CONFIG && (photo || items.some(i=>!i.found.length))){
+      try{
+        const parts=[`A family cookbook app. A member asked for recipes${photo?" and sent a photo of a dish":""}.
+Requests: ${JSON.stringify(asks)}
+For each request${photo?", and for the photo (as one more request named after the dish you see)":""}, list the ids of cookbook recipes that are the same dish or a very close match (at most 4, best first). Only use ids from the CATALOG; return [] if nothing fits.
+Return ONLY JSON: {"items":[{"ask":"the request, or for the photo a short name of the dish","found":["id",...]}]}
+CATALOG (id | name | category | meat/dairy/fish/other | main ingredients):
+${menuCatalog(RECIPES)}`];
+        if(photo) parts.push({inlineData:{data:photo.img.split(",")[1], mimeType:"image/jpeg"}});
+        const res=await askReader(parts);
+        const j=JSON.parse(res.response.text().trim().replace(/^```(?:json)?\s*/,"").replace(/```$/,""));
+        for(const ai of (j.items||[])){
+          const ids=(ai.found||[]).filter(id=>RECIPES.some(r=>r.id===id));
+          const same=items.find(i=>i.ask.toLowerCase()===String(ai.ask||"").toLowerCase());
+          if(same){ same.found=[...new Set([...same.found, ...ids])].slice(0,4); }
+          else if(photo && ai.ask) items.push({ask:String(ai.ask).slice(0,80), found:ids.slice(0,4), photo:true});
+        }
+      }catch(x){ /* the cookbook search above still stands */ }
+    }
+    if(photo && !items.some(i=>i.photo)) items.push({ask:"The dish in the photo", found:[], photo:true});
+    const missing=items.filter(i=>!i.found.length);
+    btn.disabled=false; btn.textContent="Find recipes";
+    const show = sent => {
+      out.innerHTML=`<div class="panel-a rq-result"><h3>What we found</h3>
+        <ul class="rq-res">${items.map(i=>`<li><div class="rq-ask">${i.photo?"📷 ":""}${esc(i.ask)}</div>
+          ${i.found.length?`<div class="rq-hits">${i.found.map(id=>{ const r=RECIPES.find(x=>x.id===id); return r?`<a class="rq-hit" href="#${r.id}">${noChip(r)} ${esc(r.t)} <span>${esc(r.sec||r.c)}</span></a>`:""; }).join("")}</div>`
+          :`<p class="hint">${sent?`Not in the cookbook yet. Sent to ${esc(ADMIN_NAME)}.`:"Not in the cookbook yet."}</p>`}</li>`).join("")}</ul>
+        ${sent?"":`<div class="row mn-actions"><button type="button" class="btn${missing.length?" solid":""}" id="rq-send">${missing.length?`Ask ${esc(ADMIN_NAME)} for ${missing.length===1?"it":"them"}`:`None of these — ask ${esc(ADMIN_NAME)}`}</button></div>`}
+      </div>`;
+      const sb=document.getElementById("rq-send");
+      if(sb) sb.onclick=()=>send(missing.length?missing:items);
+    };
+    const send = async list => {
+      const b=document.getElementById("rq-send"); if(b){ b.disabled=true; b.textContent="Sending…"; }
+      try{
+        await db.collection("requests").doc("q-"+newId()).set({uid:me, byName:myName(), items:list.map(i=>({ask:i.ask, found:i.found})),
+          text:asks.join("\n").slice(0,800), photo:photo?photo.thumb:"", status:"open", reply:"", recipeId:"", created:Date.now()});
+        notifyAdmin(`${myName()} is asking for a recipe`, `${myName()} wants a recipe for ${list.map(i=>i.ask).join(", ")}.`, "#requests", "cookie");
+        F.reset(); photo=null; F.querySelector("#rq-prev").innerHTML="";
+        toast(`Sent to ${ADMIN_NAME}`); items.forEach(i=>{ if(list.includes(i)) i.sent=true; }); show(true);
+      }catch(x){ if(b){ b.disabled=false; b.textContent="Try again"; } toast("Couldn't send. Check your connection."); }
+    };
+    // Anything not found goes to the admin straight away
+    if(missing.length) await send(missing); else show(false);
+  };
+}
+const mineHTML = () => requests.length?`<div class="panel-a"><h3>Your requests</h3><ul class="rq-list">${requests.map(reqItem).join("")}</ul></div>`:"";
+const RQ_STATUS = {open:"Waiting", done:"Added", closed:"Answered"};
+function reqItem(q){
+  const rec = q.recipeId && RECIPES.find(r=>r.id===q.recipeId);
+  return `<li class="rq-item">
+    ${q.photo?`<img class="rq-img" src="${q.photo}" alt="">`:""}
+    <div><div class="rq-what">${(q.items||[]).map(i=>esc(i.ask)).join(" · ")}</div>
+      <div class="hint">${isAdmin()?`From ${esc(q.byName||"a member")} · `:""}${fmtDate(q.created)} · <span class="pill ${q.status==="open"?"wait":"ok"}">${RQ_STATUS[q.status]||"Waiting"}</span></div>
+      ${rec?`<a class="link" href="#${rec.id}">${esc(rec.t)}</a>`:""}
+      ${q.reply?`<div class="fb-reply"><b>${esc(ADMIN_NAME)}:</b> ${esc(q.reply)}</div>`:""}
+      ${isAdmin()&&q.status==="open"?`<div class="rq-acts">
+        <a class="btn sm solid" href="#new" data-rqnew="${esc(q.id)}">Add the recipe</a>
+        <input class="rq-reply" data-rqid="${esc(q.id)}" type="text" maxlength="300" placeholder="Reply (optional)">
+        <select class="rq-link" data-rqid="${esc(q.id)}"><option value="">Link a recipe (optional)</option>${RECIPES.slice().sort((a,b)=>byName(a.t,b.t)).map(r=>`<option value="${r.id}">${esc(r.t)}</option>`).join("")}</select>
+        <button type="button" class="btn sm" data-rqdone="${esc(q.id)}">Mark answered</button></div>`:""}
+      ${isAdmin()?`<button type="button" class="link rq-del" data-rqdel="${esc(q.id)}">Delete</button>`:""}
+    </div></li>`;
+}
+function requestsAdminPage(){
+  const open=requests.filter(q=>q.status==="open"), old=requests.filter(q=>q.status!=="open");
+  app.innerHTML = `<section class="wrap admin">
+    <div class="section-head" style="margin-top:28px"><h2>Recipe requests</h2><p>${open.length} waiting</p></div>
+    <div class="panel-a"><h3>Waiting ${open.length?`<span class="count">${open.length}</span>`:""}</h3>
+      ${open.length?`<ul class="rq-list">${open.map(reqItem).join("")}</ul>`:`<p class="hint mempty">No requests waiting. When someone asks for a recipe that isn't in the cookbook, it shows up here.</p>`}</div>
+    ${old.length?`<div class="panel-a"><h3>Answered</h3><ul class="rq-list">${old.map(reqItem).join("")}</ul></div>`:""}
+  </section>`;
+  const done = async (id, status, recipeId) => {
+    const reply = (app.querySelector(`.rq-reply[data-rqid="${id}"]`)||{}).value||"";
+    try{ await db.collection("requests").doc(id).update({status, reply:reply.trim(), recipeId:recipeId||"", decided:Date.now()}); toast("Answered"); }
+    catch(e){ toast("Couldn't save. Check your connection."); }
+  };
+  app.querySelectorAll("[data-rqdone]").forEach(b=>b.onclick=()=>{ const id=b.dataset.rqdone, link=(app.querySelector(`.rq-link[data-rqid="${id}"]`)||{}).value||""; done(id, link?"done":"closed", link); });
+  app.querySelectorAll("[data-rqnew]").forEach(a=>a.onclick=()=>{ const q=requests.find(x=>x.id===a.dataset.rqnew); store("gk-rq-draft", q?{id:q.id, t:(q.items&&q.items[0]&&q.items[0].ask)||""}:null); });
+  app.querySelectorAll("[data-rqdel]").forEach(b=>b.onclick=async()=>{ try{ await db.collection("requests").doc(b.dataset.rqdel).delete(); }catch(e){ toast("Couldn't delete."); } });
+}
+
 /* ---------- my profile ---------- */
 async function profilePage(){
   const name=myName(), names=new Set([name, ...((profile&&profile.was)||[])]), mine=r=>(r.history||[]).filter(h=>names.has(h.by));
@@ -2829,11 +3009,14 @@ function route(){
   if(!offline && (h==="scan" || h.startsWith("scan-"))){ q.value=""; scanPage(CATS.find(x=>slug(x)==="c-"+h.slice(5))); window.scrollTo(0,0); return; }
   if(!offline && (h==="new" || h.startsWith("new-"))){ q.value=""; editor(null, CATS.find(x=>slug(x)==="c-"+h.slice(4))); window.scrollTo(0,0); return; }
   if(h==="favorites"){ q.value=""; favorites(); window.scrollTo(0,0); return; }
+  if(h==="requests" && !offline){ q.value=""; requestsPage(); window.scrollTo(0,0); return; }
   if(h==="convert" || h.startsWith("convert-")){ q.value=""; calcPage(h.slice(8)); window.scrollTo(0,0); return; }
   if(h==="grocery"){ q.value=""; groceryPage(); window.scrollTo(0,0); return; }
   if(h==="menu"){ q.value=""; menuPage(); window.scrollTo(0,0); return; }
   const r = RECIPES.find(x=>x.id===h);
   if(r){ q.value=""; recipe(r); window.scrollTo(0,0); return; }
+  if(h.includes("--")){ const [ch,sh]=h.split("--"); const c2=CATS.find(x=>slug(x)===ch);
+    if(c2){ const s2=sectionsOf(RECIPES.filter(r=>r.c===c2)).find(x=>secSlug(x)===sh); if(s2){ q.value=""; sectionPage(c2,s2); window.scrollTo(0,0); return; } } }
   const c = CATS.find(x=>slug(x)===h);
   if(c){ q.value=""; category(c); window.scrollTo(0,0); return; }
   if(q.value.trim()) { results(q.value.trim()); return; }
