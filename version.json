@@ -1,6 +1,6 @@
 {
-  "web": "3.54",
+  "web": "3.55",
   "apk": 9,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Downloads now use the Recipe card design unless you pick another."
+  "notes": "New members join as public; an admin moves them up to employee or admin by hand."
 }

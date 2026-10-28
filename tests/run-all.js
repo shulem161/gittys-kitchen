@@ -40,6 +40,9 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('new member waits for approval', (await B.locator('h2').innerText()) === 'Waiting for approval');
     ok('admin is notified of join request', notes.some(n => /asked to join/.test(n)), notes);
     await A.goto(F + '#admin'); await A.waitForTimeout(400); await A.click('[data-act=approve]'); await A.waitForTimeout(700);
+    ok('a newly approved member starts as public', await B.evaluate(() => myRole()) === 'public');
+    await A.locator('.mrow', {hasText: 'Test Member'}).locator('[data-role]').selectOption('employee'); await A.waitForTimeout(1500);
+    ok('an admin moves them up to employee by hand', await B.evaluate(() => myRole()) === 'employee');
     ok('approved member gets in by themselves', (await B.locator('.eyebrow').innerText().catch(() => '')).includes('TEST MEMBER'));
     const C = await page();
     await C.fill('#nm', 'Test Member'); await C.fill('#pw', 'wrong1'); await C.click('.primary'); await C.waitForTimeout(400);
@@ -351,7 +354,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // Portals: owner/admin, employee, public
     const PP = await page(); await join(PP, 'Public Pat', 'pub123');
     await A.goto(F + '#admin'); await A.waitForTimeout(400);
-    await A.locator('.mrow', {hasText: 'Public Pat'}).locator('[data-act=approve-public]').click(); await A.waitForTimeout(800);
+    await A.locator('.mrow', {hasText: 'Public Pat'}).locator('[data-act=approve]').click(); await A.waitForTimeout(800);
     ok('approved as public', /PUBLIC PAT/.test(await PP.locator('.eyebrow').innerText().catch(() => '')) && await PP.evaluate(() => myRole()) === 'public');
     ok('public member sees recipes', await PP.evaluate(() => RECIPES.length) > 50);
     await A.goto(F + '#public'); await A.waitForTimeout(400);

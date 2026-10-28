@@ -900,7 +900,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.54";
+const WEB_VERSION = "3.55";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1625,11 +1625,12 @@ function adminPage(){
   app.innerHTML = `<section class="wrap admin">
     <div class="section-head" style="margin-top:28px"><h2>Approve members</h2><p>${members.length} ${members.length===1?"profile":"profiles"}</p></div>
     <div class="panel-a"><h3>Waiting for approval ${pend.length?`<span class="count">${pend.length}</span>`:""}</h3>
-      ${list(pend, m=>row(m, btn("approve",m,"Approve as employee","solid")+btn("approve-public",m,"Approve as public")+btn("deny",m,"Deny")), "No one is waiting. New requests appear here right away.")}</div>
+      <p class="hint">New members join as public. To give someone more, change their role under Members, or use Permissions for an employee.</p>
+      ${list(pend, m=>row(m, btn("approve",m,"Approve","solid")+btn("deny",m,"Deny")), "No one is waiting. New requests appear here right away.")}</div>
     <div class="panel-a"><h3>Members</h3>
       <p class="hint" style="margin-bottom:6px"><b>Employee</b>: everything members could always do. <b>Public</b>: only what you allow in <a class="link" href="#public">Public portal settings</a>. <b>Admin</b>: everything you can do, except changing you or other admins${isOwner()?" (only you make admins)":""}.</p>
       ${list(appr.slice().sort((a,b)=>order[roleOf(a)]-order[roleOf(b)]), m=>row(m, manage(m) ? roleSel(m)+(roleOf(m)==="employee"?btn("perms",m,"Permissions"+(Object.keys(m.perms||{}).length?" ✓":"")):"")+btn("reset",m,"Reset password")+btn("ask-remove",m,"Remove") : "")+(openPerms.has(m.uid)&&roleOf(m)==="employee"&&manage(m)?permsBox(m):""), "No members yet.")}</div>
-    ${den.length?`<div class="panel-a"><h3>Not approved</h3>${list(den, m=>row(m, btn("approve",m,"Approve as employee","solid")+btn("approve-public",m,"Approve as public")+btn("ask-remove",m,"Remove")), "")}</div>`:""}
+    ${den.length?`<div class="panel-a"><h3>Not approved</h3>${list(den, m=>row(m, btn("approve",m,"Approve","solid")+btn("ask-remove",m,"Remove")), "")}</div>`:""}
   </section>`;
   app.querySelectorAll("[data-pk]").forEach(c=>c.onchange=async()=>{ const m=members.find(x=>x.uid===c.dataset.pu); if(!m) return;
     const k=c.dataset.pk, perms=Object.assign({}, m.perms||{});
@@ -1659,7 +1660,8 @@ function adminPage(){
       return;
     }
     b.disabled=true;
-    try{ await setStatus(m.uid, act==="deny"?"denied":"approved", act==="approve-public"?"public":act==="approve"?"employee":undefined); toast(act==="deny"?`${m.name} was not approved`:`${m.name} is approved as ${act==="approve-public"?"public":"an employee"}`); }
+    // Everyone joins as public; an admin moves them up to employee (or the owner to admin) afterwards.
+    try{ await setStatus(m.uid, act==="deny"?"denied":"approved", act==="approve"?"public":undefined); toast(act==="deny"?`${m.name} was not approved`:`${m.name} is approved as public. Change their role below to give more.`); }
     catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); }
   });
 }

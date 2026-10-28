@@ -1,5 +1,5 @@
 // Gitty's Kitchen offline support: keeps a copy of the cookbook for use without internet.
-const CACHE = "gk-v3.54";
+const CACHE = "gk-v3.55";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
