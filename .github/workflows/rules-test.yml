@@ -1,0 +1,26 @@
+# Tests firestore.rules in the Firestore emulator. Touches no live data and deploys nothing.
+name: Test Firebase rules
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [rules-check]
+  pull_request:
+    paths: [firestore.rules, tests/rules-test.mjs]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install test tools
+        run: npm i --no-save firebase-tools@13 @firebase/rules-unit-testing@3 firebase@10
+      - name: Run the rule checks
+        run: npx firebase emulators:exec --only firestore --project demo-gk "node tests/rules-test.mjs"

@@ -86,7 +86,17 @@ service cloud.firestore {
       allow update: if isAdmin()
         || (signedIn() && request.auth.uid == uid
             && resource.data.status == 'approved'
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favs']));
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favs']))
+        // a member changing their own name: the new name must already point to them
+        || (signedIn() && request.auth.uid == uid
+            && resource.data.status == 'approved'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'was'])
+            && request.resource.data.name is string
+            && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 40
+            && request.resource.data.name.lower() != 'shulem schlesinger'
+            && resource.data.name.lower() != 'shulem schlesinger'
+            && (!('was' in request.resource.data) || (request.resource.data.was is list && request.resource.data.was.size() <= 20))
+            && get(/databases/$(database)/documents/names/$(request.resource.data.name.lower())).data.uid == request.auth.uid);
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
     }
   }
