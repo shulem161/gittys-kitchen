@@ -1,0 +1,25 @@
+# Screenshots of each design, with the real fonts, to help choose a look. Run by hand.
+name: Design previews
+on:
+  workflow_dispatch:
+  push:
+    branches: [design-previews]
+jobs:
+  shots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm i --no-save playwright@1.48.2 && npx playwright install --with-deps chromium
+      - run: node tools/design-previews.mjs
+      - name: Combine into one sheet per design
+        run: |
+          for l in classic warm garden shabbos modern; do
+            convert previews/$l-*.png -resize 50% +append -bordercolor white -border 20 previews/sheet-$l.png || true
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: design-previews
+          path: previews/sheet-*.png

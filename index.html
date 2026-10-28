@@ -12,7 +12,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600;700&family=Playfair+Display:wght@500;700&family=Lora:wght@400;600&family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Nunito:wght@400;600;700&family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&display=swap">
 <style>
 /* Layout: porcelain-tile kitchen backdrop; sticky top bar; home = cover card + category tiles; category = recipe card grid; recipe = parts, each with ingredients beside method */
 :root{
@@ -30,6 +30,29 @@
   --bg:#111824;--tile:#18212F;--paper:#18212F;--ink:#E6EBF2;--muted:#A0AABA;--line:#2A3547;
   --accent:#8EB1E6;--accent-2:#6CC3C9;--accent-soft:#1F2B40;--wheat:#DDB46A;--wheat-soft:#2B2618;--done:#5E6879;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);color-scheme:dark}
+
+/* ---------- Designs (chosen in My profile; the admin can set one for everyone) ---------- */
+:root[data-look="warm"]{ --bg:#FBF6EE; --tile:#F1E5D2; --paper:#FFFDF9; --ink:#3A2A1E; --muted:#7A6555; --line:#EADCC8;
+  --accent:#B5532F; --accent-2:#C98A2E; --accent-soft:#F7E3D7; --wheat:#A86E23; --wheat-soft:#F6E7CF; --done:#B9A897;
+  --display:"Playfair Display",Georgia,serif; --body:"Lora",Georgia,serif; }
+:root[data-look="garden"]{ --bg:#F2F6EF; --tile:#DFE9D6; --paper:#FFFFFF; --ink:#1F2B22; --muted:#5D6B60; --line:#D6E2CF;
+  --accent:#3E7B4F; --accent-2:#7A9A3A; --accent-soft:#E2EFE2; --wheat:#9A7B2D; --wheat-soft:#F2ECD6; --done:#9DAE9F;
+  --display:"Fraunces",Georgia,serif; --body:"Nunito",system-ui,sans-serif; }
+:root[data-look="shabbos"]{ --bg:#F5F1E8; --tile:#E9E0CC; --paper:#FFFDF8; --ink:#1A2340; --muted:#5E6378; --line:#E2D9C4;
+  --accent:#1E2A55; --accent-2:#B08D3C; --accent-soft:#E6E8F2; --wheat:#A8822F; --wheat-soft:#F3EAD3; --done:#A3A6B5;
+  --display:"DM Serif Display",Georgia,serif; --body:"Figtree",system-ui,sans-serif; }
+:root[data-look="modern"]{ --bg:#F6F6F4; --tile:#F6F6F4; --paper:#FFFFFF; --ink:#111111; --muted:#666666; --line:#E4E4E0;
+  --accent:#111111; --accent-2:#444444; --accent-soft:#EFEFEC; --wheat:#B4572B; --wheat-soft:#F7ECE5; --done:#AAAAAA;
+  --display:"Inter",system-ui,sans-serif; --body:"Inter",system-ui,sans-serif; }
+:root[data-look="modern"] h1,:root[data-look="modern"] h2,:root[data-look="modern"] h3{font-weight:800;letter-spacing:-.02em}
+:root[data-look="modern"] body{background-image:none}
+:root[data-look="shabbos"] .tilestripe{background:repeating-linear-gradient(90deg,var(--accent-2) 0 24px,var(--accent) 24px 48px)}
+@media (prefers-color-scheme:dark){
+  :root[data-look="warm"]:not([data-theme="light"]){ --bg:#1C1612;--tile:#261E18;--paper:#261E18;--ink:#F1E7DB;--muted:#BFAE9C;--line:#3A2E25;--accent:#E7926C;--accent-soft:#3A251B;--wheat:#E2B36B;--wheat-soft:#33281A; }
+  :root[data-look="garden"]:not([data-theme="light"]){ --bg:#121A14;--tile:#1A241C;--paper:#1A241C;--ink:#E4EEE5;--muted:#A3B5A6;--line:#2A382D;--accent:#8CCB9B;--accent-soft:#1E3324;--wheat:#D8BE73;--wheat-soft:#2C2A19; }
+  :root[data-look="shabbos"]:not([data-theme="light"]){ --bg:#0F1326;--tile:#161B33;--paper:#161B33;--ink:#EDE8DA;--muted:#ABAFC2;--line:#262C48;--accent:#D9B865;--accent-soft:#262A42;--wheat:#D9B865;--wheat-soft:#2B2717; }
+  :root[data-look="modern"]:not([data-theme="light"]){ --bg:#111111;--tile:#111111;--paper:#1B1B1B;--ink:#F2F2F2;--muted:#A8A8A8;--line:#2C2C2C;--accent:#F2F2F2;--accent-soft:#262626;--wheat:#E59A6E;--wheat-soft:#2E231C; }
+}
 
 *{box-sizing:border-box}
 body{
@@ -125,6 +148,14 @@ button{font:inherit;color:inherit}
 .tab.tab-new{background:linear-gradient(135deg,#F2B33D,#E07A2E);border-color:transparent;color:#fff;font-weight:700;position:sticky;left:0;z-index:2;box-shadow:6px 0 10px -4px var(--bg)}
 .tab.tab-new .n{color:#fff;opacity:.9}
 .tab.tab-new[aria-current="page"]{box-shadow:0 0 0 3px var(--paper),0 0 0 5px #E07A2E}
+.looks{display:grid;gap:10px;margin:10px 0 4px}
+.look{display:flex;gap:14px;align-items:center;text-align:left;padding:10px;border:2px solid var(--line);border-radius:14px;background:var(--paper);cursor:pointer;color:var(--ink)}
+.look.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.look-sw{position:relative;flex:none;width:64px;height:52px;border-radius:10px;border:1px solid rgba(0,0,0,.1);display:grid;place-items:center;overflow:hidden}
+.look-sw i{position:absolute;inset:0 0 auto;height:8px}
+.look-sw b{font-size:24px;font-weight:700;margin-top:6px}
+.look-txt{display:grid;gap:2px}.look-txt small{color:var(--muted);font-size:13px}
+.look-txt em{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
 .sortbar{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--muted);margin:-6px 0 14px}
 .sortbar select{width:auto;padding:8px 32px 8px 12px;font-size:14px;border-radius:999px}
 .nochip{font-size:11px;font-weight:700;letter-spacing:.04em;padding:4px 8px;border-radius:999px;border:1px solid var(--accent);color:var(--accent);font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -687,7 +718,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.47";
+const WEB_VERSION = "3.48";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -745,6 +776,7 @@ async function applyWebUpdate(){
 
 function boot(){
   CODEMAP = store("gk-codemap") || CODEMAP;
+  siteLook = store("gk-sitelook") || "classic"; applyLook();
   sortRecipes(RECIPES);
   if(!FIREBASE_CONFIG){ state="setup"; return route(); }
   if(typeof firebase==="undefined") return goOffline();
@@ -761,6 +793,7 @@ function boot(){
     if(unsubAll){unsubAll();unsubAll=null;members=[]}
     if(unsubRecipes){unsubRecipes();unsubRecipes=null}
     if(unsubCodes){unsubCodes();unsubCodes=null}
+    if(unsubLook){unsubLook();unsubLook=null}
     if(unsubSubs){unsubSubs();unsubSubs=null;subs=[]}
     if(unsubPendingPhotos){unsubPendingPhotos();unsubPendingPhotos=null;pendingPhotos=[]}
     if(unsubFeedback){unsubFeedback();unsubFeedback=null;feedback=[]}
@@ -1412,7 +1445,7 @@ document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeMenu(); });
 
 /* ---------- online recipes ---------- */
 let recipesOnline = false;    // true once the online cookbook has been loaded
-let unsubCodes = null;
+let unsubCodes = null, unsubLook = null;
 let maxNo = 0;                // highest recipe number used so far
 let onlineIds = new Set();    // every recipe id stored online (including deleted ones)
 let unsubRecipes = null;
@@ -1435,6 +1468,10 @@ function setRecipes(list){
 (function(){ const c=store("gk-recipes"); if(c && c.length) setRecipes(c); })();
 function watchRecipes(){
   if(unsubRecipes || !db) return;
+  if(!unsubLook) unsubLook = db.collection("meta").doc("look").onSnapshot(s=>{
+    const l = s.exists && LOOKS.some(x=>x[0]===s.data().look) ? s.data().look : "classic";
+    if(l!==siteLook){ siteLook=l; store("gk-sitelook", l); applyLook(); }
+  }, ()=>{});
   if(!unsubCodes) unsubCodes = db.collection("meta").doc("codes").onSnapshot(s=>{
     if(!s.exists) return; const d=s.data(); CODEMAP={cats:d.cats||{}, secs:d.secs||{}}; store("gk-codemap", CODEMAP);
     if(state==="approved" && !document.querySelector(".editor, .prof-head, #rqform, .tools-page")) route();
@@ -3004,6 +3041,37 @@ function recentPage(which){
   wireSort(()=>recentPage(pick[0]));
 }
 
+/* ---------- designs ---------- */
+const LOOKS = [
+  ["classic","Classic Blue","Blue and white, like kitchen tiles","#2C5A9A","#EEF2F7","Young Serif"],
+  ["warm","Warm Kitchen","Cream and terracotta, like Bubby's kitchen","#B5532F","#FBF6EE","Playfair Display"],
+  ["garden","Fresh Garden","Soft greens and herbs","#3E7B4F","#F2F6EF","Fraunces"],
+  ["shabbos","Shabbos Table","Navy and gold, festive and elegant","#1E2A55","#F5F1E8","DM Serif Display"],
+  ["modern","Clean & Modern","Simple black and white","#111111","#F6F6F4","Inter"],
+];
+let siteLook = "classic";       // the admin's choice for everyone (meta/look)
+const myLook = () => { const q=(location.search.match(/[?&]look=(\w+)/)||[])[1]; return LOOKS.some(l=>l[0]===q) ? q : (store("gk-look") || siteLook); };
+function applyLook(){ const l=myLook(); if(l==="classic") delete document.documentElement.dataset.look; else document.documentElement.dataset.look=l;
+  const m=document.querySelector('meta[name="theme-color"]'); const L=LOOKS.find(x=>x[0]===l); if(m&&L) m.content=L[3]; }
+function lookPanel(){
+  const cur=myLook(), mine=store("gk-look");
+  return `<div class="panel-a" id="lookpanel"><h3>Design</h3>
+    <p class="hint">Choose how the cookbook looks on this device.${isAdmin()?" You can also make it the design for everyone.":""}</p>
+    <div class="looks">${LOOKS.map(([k,n,d,acc,bg,font])=>`<button type="button" class="look${k===cur?" on":""}" data-look="${k}" aria-pressed="${k===cur}">
+      <span class="look-sw" style="background:${bg}"><i style="background:${acc}"></i><b style="font-family:'${font}',serif;color:${acc}">Aa</b></span>
+      <span class="look-txt"><strong>${n}</strong><small>${d}</small>${k===siteLook?`<em>Everyone's design</em>`:""}</span></button>`).join("")}</div>
+    <div class="row mn-actions">${mine&&mine!==siteLook?`<button type="button" class="btn" id="look-reset">Use everyone's design</button>`:""}${isAdmin()&&cur!==siteLook?`<button type="button" class="btn solid" id="look-all">Make ${esc((LOOKS.find(l=>l[0]===cur)||[])[1]||"")} the design for everyone</button>`:""}</div></div>`;
+}
+function wireLooks(){
+  const P=document.getElementById("lookpanel"); if(!P) return;
+  const redraw=()=>{ P.outerHTML=lookPanel(); wireLooks(); };
+  P.querySelectorAll("[data-look]").forEach(b=>b.onclick=()=>{ store("gk-look", b.dataset.look===siteLook?null:b.dataset.look); applyLook(); redraw(); });
+  const r=document.getElementById("look-reset"); if(r) r.onclick=()=>{ store("gk-look", null); applyLook(); redraw(); };
+  const a=document.getElementById("look-all"); if(a) a.onclick=async()=>{ const l=myLook(); a.disabled=true;
+    try{ await db.collection("meta").doc("look").set({look:l, by:myName(), at:Date.now()}); siteLook=l; store("gk-sitelook", l); store("gk-look", null); applyLook(); toast("Everyone now gets this design"); redraw(); }
+    catch(e){ a.disabled=false; toast("Couldn't save. Check your connection."); } };
+}
+
 /* ---------- my profile ---------- */
 async function profilePage(){
   const name=myName(), names=new Set([name, ...((profile&&profile.was)||[])]), mine=r=>(r.history||[]).filter(h=>names.has(h.by));
@@ -3031,6 +3099,7 @@ async function profilePage(){
         <p class="err" id="nm-err" role="alert" hidden></p>
         <div><button class="primary" type="submit">Save name</button></div>
       </form></div>`}
+    ${lookPanel()}
     ${offline?"":`<div class="panel-a" id="rcpanel"><h3>Recovery code</h3>
       <div id="rcbody">${profile.rc?`<p class="hint">You made a recovery code on ${fmtDate(profile.rcAt)}. If you've lost it, make a new one. The old one stops working.</p><button type="button" class="btn" id="rc-make">Make a new code</button>`
         :`<p class="hint">Make a recovery code so you can set a new password yourself if you ever forget it.</p><button type="button" class="primary" id="rc-make">Make a recovery code</button>`}</div></div>`}
@@ -3064,6 +3133,7 @@ async function profilePage(){
   app.querySelector('a[href="#prof-photos"]').onclick=e=>{ e.preventDefault(); list.hidden=false;
     list.innerHTML=`<h3>Photos you shared</h3>${myPhotos.length?`<div class="ph-grid" style="margin-top:10px">${myPhotos.map(p=>`<figure class="ph${p.status==="pending"?" wait":""}"><a href="#${esc(p.recipeId)}"><img src="${p.thumb}" alt="${esc(p.recipeTitle||"")}"></a><figcaption>${esc(p.recipeTitle||"")}${p.status==="pending"?" · waiting for approval":""}</figcaption></figure>`).join("")}</div>`:`<p class="hint mempty">No photos yet. Open a recipe you've made and tap Take a photo.</p>`}`;
     list.scrollIntoView({behavior:"smooth",block:"start"}); };
+  wireLooks();
   // recovery code
   const rcb=document.getElementById("rc-make");
   if(rcb) rcb.onclick=async()=>{
