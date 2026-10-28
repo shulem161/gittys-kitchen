@@ -156,9 +156,43 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await Q.fill('#nm', 'shulem'); await Q.fill('#pw', 'admin123'); await Q.click('.primary'); await Q.waitForTimeout(800);
     ok('admin signs in with the new name on a new device and is still admin', await Q.evaluate(() => isAdmin()));
 
+    // Reset codes and recovery codes
+    const R0 = await R.evaluate(() => me);
+    await A.goto(F + '#admin'); await A.waitForTimeout(500);
+    await A.locator('.mrow', {hasText: 'Test Member Two'}).locator('[data-act=reset]').click(); await A.waitForTimeout(600);
+    const rcode = await A.locator('.codebox b').first().innerText();
+    ok('admin can make a reset code', /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(rcode), rcode);
+    const W = await page(); await W.click('[data-mode=forgot]'); await W.waitForTimeout(200);
+    await W.fill('#nm', 'Test Member Two'); await W.fill('#code', 'AAAA-BBBB'); await W.fill('#pw', 'member3'); await W.fill('#pw2', 'member3'); await W.click('.primary'); await W.waitForTimeout(500);
+    ok('wrong reset code refused', /doesn't match/.test(await W.locator('.err').innerText()));
+    await W.fill('#code', rcode); await W.fill('#pw', 'member3'); await W.fill('#pw2', 'member3'); await W.click('.primary'); await W.waitForTimeout(1200);
+    ok('reset code lets the member back in', (await W.locator('.eyebrow').innerText().catch(() => '')).includes('TEST MEMBER TWO'));
+    ok('favorites survive a reset', await W.evaluate(() => favs().includes('r-croissants')));
+    ok('admin is told about the reset', notes.some(n => /set a new password/.test(n)), notes.slice(-2));
+    await A.waitForTimeout(800);
+    await A.waitForTimeout(5000);
+    ok('member list has no duplicate after reset', (await A.locator('.mwho b').allInnerTexts()).filter(x => /Test Member Two/.test(x)).length === 1, await A.locator('.mwho b').allInnerTexts());
+    ok("member's messages follow them", await A.evaluate(o => Object.values(JSON.parse(localStorage.__fakedb).feedback).every(x => x.uid !== o), R0));
+    await W.goto(F + '#profile'); await W.waitForTimeout(500); await W.click('#rc-make'); await W.waitForTimeout(600);
+    const own = await W.locator('.codebox.big b').innerText();
+    ok('member can make a recovery code', /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(own), own);
+    const V = await page(); await V.click('[data-mode=forgot]'); await V.waitForTimeout(200);
+    await V.fill('#nm', 'test member two'); await V.fill('#code', own); await V.fill('#pw', 'member4'); await V.fill('#pw2', 'member4'); await V.click('.primary'); await V.waitForTimeout(1200);
+    ok('recovery code works', (await V.locator('.eyebrow').innerText().catch(() => '')).includes('TEST MEMBER TWO'));
+    const V2 = await page(); await V2.click('[data-mode=forgot]'); await V2.fill('#nm', 'Test Member Two'); await V2.fill('#code', own); await V2.fill('#pw', 'member5'); await V2.fill('#pw2', 'member5'); await V2.click('.primary'); await V2.waitForTimeout(600);
+    ok('a used code stops working', /doesn't match/.test(await V2.locator('.err').innerText()));
+
+    // Linked recipes
+    await A.goto(F + '#edit-r-croissants'); await A.waitForTimeout(500);
+    await A.fill('#ed-pre-q', "bobby's challah"); await A.waitForTimeout(200); await A.locator('.pre-opt').first().click(); await A.waitForTimeout(200);
+    await A.click('#edform .primary'); await A.waitForTimeout(800);
+    ok('recipe shows Make first link', /Make first:\s*Bobby's Challah/.test(await A.locator('.links-box').innerText().catch(() => '')));
+    await A.goto(F + '#r-bobbys-challah'); await A.waitForTimeout(500);
+    ok('linked recipe shows Use it in', /Use it in:\s*Croissants/i.test(await A.locator('.links-box').innerText().catch(() => '')));
+
     // Search
-    await B.goto(F); await B.waitForTimeout(300); await B.fill('#q', 'challah'); await B.waitForTimeout(300);
-    ok('search finds recipes', await B.locator('.rc').count() >= 3);
+    await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);
+    ok('search finds recipes', await V.locator('.rc').count() >= 3);
 
     // Phone layout
     const M = await ctx.newPage(); await M.setViewportSize({width: 390, height: 844}); await M.goto(F); await M.waitForTimeout(500);

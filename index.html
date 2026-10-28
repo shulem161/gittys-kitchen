@@ -146,6 +146,14 @@ button{font:inherit;color:inherit}
 .step.done .num{background:var(--accent);color:var(--paper)}
 .step.done p{color:var(--done);text-decoration:line-through}
 .note{padding:14px 18px;border-radius:12px;background:var(--wheat-soft);font-size:15px}
+.links-box{padding:12px 18px;border-radius:12px;border:1px solid var(--line);background:var(--paper);font-size:15px;display:grid;gap:4px;margin-bottom:12px}
+.links-box a{color:var(--accent);font-weight:600}
+.pre-chips{display:flex;flex-wrap:wrap;gap:6px}.pre-chips:not(:empty){margin-bottom:8px}
+.pre-chip{display:inline-flex;align-items:center;gap:6px}
+.pre-chip button{border:0;background:none;cursor:pointer;color:inherit;font-size:12px;padding:0 2px}
+.pre-sugg{display:grid;gap:4px;margin-top:6px}
+.pre-opt{text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--paper);font:inherit;color:var(--ink);cursor:pointer}
+.pre-opt span{color:var(--muted);font-size:13px;margin-left:6px}
 .note b{color:var(--wheat)}
 .pager{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .pager a{color:var(--accent);text-decoration:none;font-weight:600;font-size:15px;max-width:48%}
@@ -379,6 +387,11 @@ body.out .ptr{top:calc(env(safe-area-inset-top,0px) + 16px)}
 .pstat b{font-family:var(--display);font-weight:400;font-size:30px;color:var(--accent);line-height:1.1}
 .pstat span{font-size:13px;color:var(--muted)}
 .pstat b span{font:inherit;color:inherit;margin:0}
+.codebox{margin-top:10px;padding:12px 14px;border:1px dashed var(--accent);border-radius:12px;background:var(--paper);flex-basis:100%}
+.codebox b{font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:.08em;font-size:17px;color:var(--ink)}
+.codebox .hint{margin:6px 0 0}
+.codebox.big{text-align:center}.codebox.big b{font-size:24px}
+.mrow{flex-wrap:wrap}
 .pw-form{display:flex;flex-direction:column;gap:12px;max-width:420px;margin-top:8px}
 .prof-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .prof-actions #prof-confirm{flex-basis:100%}
@@ -476,6 +489,10 @@ function creditText(by){
   return "From "+by.replace(/(^|[\s-])([a-z])/g,(m,a,b)=>a+b.toUpperCase());
 }
 // [[Recipe name]] in recipe text becomes a link to that recipe (or plain text if there's no such recipe).
+// Linked recipes: "make first" is saved on the recipe; "use it in" is worked out from the other side.
+const preOf = r => ((r&&r.pre)||[]).map(id=>RECIPES.find(x=>x.id===id)).filter(Boolean);
+const usedIn = r => RECIPES.filter(x=>(x.pre||[]).includes(r.id));
+const unbracket = s => String(s).replace(/\[\[([^\]]+)\]\]/g,"$1");
 const linkify = html => html.replace(/\[\[([^\]]+)\]\]/g, (m, name) => {
   const key = name.replace(/&amp;/g,"&").replace(/&#39;|&apos;/g,"'").trim().toLowerCase();
   const r = RECIPES.find(x => x.t.replace(/^Untitled: /,"").toLowerCase() === key);
@@ -523,7 +540,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.30";
+const WEB_VERSION = "3.31";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -590,7 +607,7 @@ function boot(){
   }catch(e){ return goOffline(); }
   const adminDoc = db.collection("meta").doc("admin");
   adminReady = Promise.race([adminDoc.get().then(s=>{ if(s.exists) setAdminInfo(s.data()); }).catch(()=>{}), new Promise(r=>setTimeout(r,4000))]);
-  try{ adminDoc.onSnapshot(s=>{ if(!s.exists) return; const was=adminUid; setAdminInfo(s.data()); renderAcct(); if(was!==adminUid && me) route(); }, ()=>{}); }catch(e){}
+  try{ adminDoc.onSnapshot(s=>{ if(!s.exists) return; const was=adminUid; setAdminInfo(s.data()); renderAcct(); if(was && was!==adminUid && me===adminUid) return location.reload(); if(was!==adminUid && me) route(); }, ()=>{}); }catch(e){}
   auth.onAuthStateChanged(u=>{
     if(unsubMe){unsubMe();unsubMe=null}
     if(unsubAll){unsubAll();unsubAll=null;members=[]}
@@ -629,6 +646,8 @@ function goOffline(){
 function watchMembers(){
   unsubAll = db.collection("users").onSnapshot(s=>{
     members = s.docs.map(d=>Object.assign({uid:d.id},d.data())).sort((a,b)=>(b.created||0)-(a.created||0));
+    // give the member's own reset a few seconds to finish before tidying up after it
+    members.filter(m=>m.from && !m.moved && !migrating.has(m.uid)).forEach(m=>{ migrating.add(m.uid); setTimeout(()=>{ migrating.delete(m.uid); migrateMember(m); }, 4000); });
     renderAcct();
     if(location.hash==="#admin") route();
   }, ()=>{});
@@ -695,8 +714,69 @@ async function renameMe(newName){
   if(oldKey!==ADMIN_KEY) await db.collection("names").doc(oldKey).delete().catch(()=>{});
   if(!isAdmin()) notifyAdmin(`${old} is now ${name}`, `${old} changed their name to ${name}. They sign in with the new name.`, "#admin", "pencil2");
 }
+/* ---------- password reset codes ----------
+   Firebase can't change someone else's password from the app, so a code lets the person make a fresh
+   sign-in under the same name: their profile (favorites, approval, history) moves over to it. */
+const CODE_ABC="ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+function makeCode(n){ const a=new Uint32Array(n); crypto.getRandomValues(a); return Array.from(a,x=>CODE_ABC[x%CODE_ABC.length]).join(""); }
+const fmtCode = c => c.match(/.{1,4}/g).join("-");
+const cleanCode = c => String(c||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+async function issueReset(m){
+  const code=makeCode(8);
+  await db.collection("resets").doc(code).set({key:nameKey(m.name), uid:m.uid, by:"admin", created:Date.now(), expires:Date.now()+2*86400000});
+  return code;
+}
+async function makeRecoveryCode(){
+  const code=makeCode(12), old=profile.rc;
+  await db.collection("resets").doc(code).set({key:nameKey(myName()), uid:me, by:"self", created:Date.now(), expires:null});
+  await db.collection("users").doc(me).update({rc:code, rcAt:Date.now()});
+  profile.rc=code; profile.rcAt=Date.now(); cacheProfile();
+  if(old) db.collection("resets").doc(old).delete().catch(()=>{});
+  return code;
+}
+async function recoverAccount(name, code, pw){
+  const key=nameKey(name);
+  const r = await db.collection("resets").doc(code).get();
+  if(!r.exists || r.data().key!==key) throw {code:"gk/badcode"};
+  const R=r.data();
+  if(R.expires && R.expires<Date.now()) throw {code:"gk/oldcode"};
+  const n = await db.collection("names").doc(key).get();
+  if(!n.exists || n.data().uid!==R.uid) throw {code:"gk/badcode"};
+  pendingCreate=true;
+  try{
+    const cred = await auth.createUserWithEmailAndPassword("m"+newId()+"@gittys-kitchen.app", pw);
+    const uid = cred.user.uid;
+    try{ await db.collection("names").doc(key).set({uid, email:cred.user.email, code}); }
+    catch(e){ try{ await cred.user.delete(); }catch(_){} throw {code:"gk/badcode"}; }
+    let old=null; try{ const o=await db.collection("users").doc(R.uid).get(); if(o.exists) old=o.data(); }catch(e){}
+    profile = old ? {name:old.name, status:old.status, created:old.created||Date.now(), favs:old.favs||[], was:old.was||[], from:R.uid}
+                  : {name, status:"pending", created:Date.now(), favs:[]};
+    await db.collection("users").doc(uid).set(profile);
+    if(old){
+      await db.collection("users").doc(R.uid).delete().catch(()=>{});
+      if(old.rc && old.rc!==code) await db.collection("resets").doc(old.rc).delete().catch(()=>{});
+    }
+    await db.collection("resets").doc(code).delete().catch(()=>{});
+    if(adminUid && adminUid===R.uid){ await db.collection("meta").doc("admin").set({uid, name:profile.name}); }
+    else notifyAdmin(`${profile.name} set a new password`, `${profile.name} used ${R.by==="admin"?"your reset code":"their recovery code"} to get back into their account.`, "#admin", "key");
+  } finally { pendingCreate=false; }
+}
+// Admin: after someone uses a code, point their old recipes, photos and messages at the new sign-in.
+const migrating=new Set();
+async function migrateMember(m){
+  if(migrating.has(m.uid)) return; migrating.add(m.uid);
+  try{
+    for(const col of ["submissions","photos","feedback"]){
+      const s=await db.collection(col).where("uid","==",m.from).get();
+      for(const d of s.docs) await db.collection(col).doc(d.id).update({uid:m.uid});
+    }
+    await db.collection("users").doc(m.uid).update({moved:true});
+  }catch(e){ migrating.delete(m.uid); }
+}
 function errText(e){
   const c=(e&&e.code)||"";
+  if(c==="gk/badcode") return "That code doesn't match this name. Check both and try again.";
+  if(c==="gk/oldcode") return "That code has expired. Ask "+ADMIN_NAME+" for a new one.";
   if(c==="gk/taken"||c==="auth/email-already-in-use") return "That name is already taken. Sign in, or add a last name or initial to make it different.";
   if(c==="gk/noname") return "There's no member with that name. Check the spelling, or create a profile.";
   if(c==="auth/wrong-password"||c==="auth/invalid-credential"||c==="auth/invalid-login-credentials") return "That password isn't right. Try again.";
@@ -841,6 +921,9 @@ function recipe(r){
     </section>
     ${photosSection(r)}
     <div class="parts">
+      ${preOf(r).length||usedIn(r).length?`<div class="links-box">
+        ${preOf(r).length?`<div><b>Make first:</b> ${preOf(r).map(x=>`<a href="#${x.id}">${esc(x.t)}</a>`).join(", ")}</div>`:""}
+        ${usedIn(r).length?`<div><b>Use it in:</b> ${usedIn(r).map(x=>`<a href="#${x.id}">${esc(x.t)}</a>`).join(", ")}</div>`:""}</div>`:""}
       ${r.n?`<div class="note"><b>Note:</b> ${linkify(esc(r.n))}</div>`:""}
       ${partHTML}
       ${offline?"":`<p class="fb-link"><a class="link" href="#feedback-${r.id}">Comment on this recipe</a></p>`}
@@ -924,9 +1007,15 @@ function authScreen(msg){
       <p class="switch">Already a member? <button type="button" class="link" data-mode="signin">Sign in</button></p>`;
   } else if(authMode==="forgot"){
     inner = `<h2>Forgot your password?</h2>
-      <p class="sub">Ask ${esc(ADMIN_NAME)} to remove your profile from the member list. Then ask to join again with the same name and a new password.</p>
-      <p class="hint">Your favorites will start fresh. The recipes are not affected.</p>
-      <button class="btn" type="button" data-mode="signin" style="padding:12px">Back to sign in</button>`;
+      <p class="sub">Use a reset code from ${esc(ADMIN_NAME)}, or your own recovery code, to choose a new password. Your favorites and everything else stay.</p>
+      <div class="field"><label for="nm">Your name</label><input id="nm" type="text" autocomplete="username" maxlength="40" value="${esc(store("gk-lastname")||"")}"></div>
+      <div class="field"><label for="code">Code</label><input id="code" type="text" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="20" placeholder="e.g. 7KQ2-M9XD"></div>
+      <div class="field"><label for="pw">New password</label><input id="pw" type="password" autocomplete="new-password" placeholder="At least 6 characters"></div>
+      <div class="field"><label for="pw2">Confirm new password</label><input id="pw2" type="password" autocomplete="new-password"></div>
+      ${msg?`<p class="err" role="alert">${esc(msg)}</p>`:""}
+      <button class="primary" type="submit">Set new password</button>
+      <p class="hint" id="askwrap">No code? <button type="button" class="link" id="askcode">Ask ${esc(ADMIN_NAME)} for one</button></p>
+      <p class="switch"><button type="button" class="link" data-mode="signin">Back to sign in</button></p>`;
   } else {
     inner = `<h2>Sign in</h2>
       <p class="sub">Members only. Enter the name you joined with.</p>
@@ -939,12 +1028,30 @@ function authScreen(msg){
   }
   const F = shell(inner);
   const nm=F.querySelector("#nm"), pw=F.querySelector("#pw");
-  if(nm){ (nm.value ? pw : nm).focus(); }
+  if(nm){ (nm.value ? (F.querySelector("#code")||pw) : nm).focus(); }
+  const ask=F.querySelector("#askcode");
+  if(ask) ask.onclick=()=>{
+    const name=nm.value.trim().replace(/\s+/g," ");
+    if(!name) return gate("Enter your name first, so "+ADMIN_NAME+" knows who it's for.");
+    store("gk-lastname", name);
+    notifyAdmin(`${name} forgot their password`, `Open Approve members and tap Reset password next to ${name} to make a code for them.`, "#admin", "key");
+    F.querySelector("#askwrap").innerHTML = `Sent. ${esc(ADMIN_NAME)} will give you a code.`;
+  };
   F.onsubmit = async e=>{
     e.preventDefault();
     const btn=F.querySelector(".primary"); if(!btn||btn.disabled) return;
     const name = nm.value.trim().replace(/\s+/g," "), p = pw.value;
     if(!name) return gate("Enter your name.");
+    if(authMode==="forgot"){
+      const code=cleanCode(F.querySelector("#code").value);
+      if(code.length<8) return gate("Enter the code. It has 8 or 12 letters and numbers.");
+      if(p.length<6) return gate("Choose a new password with at least 6 characters.");
+      if(p!==F.querySelector("#pw2").value) return gate("The two passwords don't match. Type them again.");
+      btn.disabled=true; btn.textContent="Saving…";
+      try{ store("gk-lastname", name); await recoverAccount(name, code, p); authMode="signin"; setTimeout(()=>toast("New password saved"),600); }
+      catch(err){ gate(errText(err)); }
+      return;
+    }
     if(authMode==="create"){
       if(name.length<2) return gate("Enter your full name.");
       if(/[\/]/.test(name)) return gate("Names can't include a slash (/).");
@@ -962,11 +1069,12 @@ function authScreen(msg){
 
 /* ---------- admin: approve members ---------- */
 const fmtDate = t => t ? new Date(t).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}) : "";
+const shownCodes={};
 function adminPage(){
   const pend=members.filter(m=>m.status==="pending"), appr=members.filter(m=>m.status==="approved"), den=members.filter(m=>m.status==="denied");
   const row = (m,acts) => `<li class="mrow"><span class="avatar">${esc(initial(m.name))}</span>
       <div class="mwho"><b>${esc(m.name)}${isAdminMember(m)?' <span class="tag">Admin</span>':""}</b><span>${m.status==="pending"?"Asked to join":"Joined"} ${fmtDate(m.created)}</span></div>
-      <div class="macts">${acts}</div></li>`;
+      <div class="macts">${acts}</div>${shownCodes[m.uid]?`<div class="codebox"><div>Reset code for ${esc(m.name)}: <b>${fmtCode(shownCodes[m.uid])}</b> <button type="button" class="btn" data-copy="${shownCodes[m.uid]}">Copy</button></div><p class="hint">Works once, for 2 days. On the sign-in page they tap “Forgot your password?” and enter their name, this code and a new password. Their favorites and everything else stay.</p></div>`:""}</li>`;
   const btn = (act,m,label,cls) => `<button type="button" class="btn ${cls||""}" data-act="${act}" data-uid="${esc(m.uid)}">${label}</button>`;
   const list = (arr,f,empty) => arr.length ? `<ul class="mlist">${arr.map(f).join("")}</ul>` : `<p class="hint mempty">${empty}</p>`;
   app.innerHTML = `<section class="wrap admin">
@@ -974,12 +1082,19 @@ function adminPage(){
     <div class="panel-a"><h3>Waiting for approval ${pend.length?`<span class="count">${pend.length}</span>`:""}</h3>
       ${list(pend, m=>row(m, btn("approve",m,"Approve","solid")+btn("deny",m,"Deny")), "No one is waiting. New requests appear here right away.")}</div>
     <div class="panel-a"><h3>Members</h3>
-      ${list(appr, m=>row(m, isAdminMember(m) ? "" : btn("ask-remove",m,"Remove")), "No members yet.")}</div>
+      ${list(appr, m=>row(m, isAdminMember(m) ? "" : btn("reset",m,"Reset password")+btn("ask-remove",m,"Remove")), "No members yet.")}</div>
     ${den.length?`<div class="panel-a"><h3>Not approved</h3>${list(den, m=>row(m, btn("approve",m,"Approve","solid")+btn("ask-remove",m,"Remove")), "")}</div>`:""}
   </section>`;
+  app.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>copyText(fmtCode(b.dataset.copy)));
   app.querySelectorAll("[data-act]").forEach(b=>b.onclick=async()=>{
     const m=members.find(x=>x.uid===b.dataset.uid); if(!m) return;
     const act=b.dataset.act;
+    if(act==="reset"){
+      b.disabled=true;
+      try{ shownCodes[m.uid]=await issueReset(m); adminPage(); }
+      catch(e){ b.disabled=false; toast("Couldn't make a code. Check your connection."); }
+      return;
+    }
     if(act==="ask-remove"){
       const li=b.closest(".mrow");
       li.querySelector(".macts").innerHTML = `<span class="hint">Remove ${esc(m.name)}?</span>${btn("remove",m,"Remove","warn")}<button type="button" class="btn" data-cancel>Cancel</button>`;
@@ -991,6 +1106,12 @@ function adminPage(){
     try{ await setStatus(m.uid, act==="approve"?"approved":"denied"); toast(act==="approve"?`${m.name} is approved`:`${m.name} was not approved`); }
     catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); }
   });
+}
+function copyText(s){
+  const done=()=>toast("Copied");
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(done,()=>fallback());
+  else fallback();
+  function fallback(){ const ta=document.createElement("textarea"); ta.value=s; document.body.appendChild(ta); ta.select(); try{ document.execCommand("copy"); done(); }catch(e){ toast(s); } ta.remove(); }
 }
 function toast(t){
   let el=document.getElementById("toast");
@@ -1045,9 +1166,9 @@ let onlineIds = new Set();    // every recipe id stored online (including delete
 let unsubRecipes = null;
 const withHistory = (rec, base, action, by) => { rec.history = [...((base&&base.history)||[]), {a:action, by:by||"a member", at:Date.now()}].slice(-12); return rec; };
 const historyLines = r => (r.history||[]).slice(-6).map(h=>`${h.a==="added"?"Added":"Changed"} by ${h.by} on ${fmtDate(h.at)}`);
-const toDoc = r => ({c:r.c, t:r.t, by:r.by||"", n:r.n||"", ord:r.ord||0, deleted:false, updated:Date.now(), ...(r.history?{history:r.history}:{}),
+const toDoc = r => ({c:r.c, t:r.t, by:r.by||"", n:r.n||"", pre:r.pre||[], ord:r.ord||0, deleted:false, updated:Date.now(), ...(r.history?{history:r.history}:{}),
   s:r.s.map(([ing,h,items])=>({k:ing?"ing":"step", h:h||"", items:items}))});
-const fromDoc = (id,d) => ({id, c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[],
+const fromDoc = (id,d) => ({id, c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, pre:d.pre, ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[],
   s:(d.s||[]).map(x=>[x.k==="ing"?1:0, x.h||"", x.items||[]])});
 // Recipes are listed A to Z by category, then A to Z by name ("Tomato Dip # 2" comes before "# 10").
 const sortName = r => r.t.replace(/^Untitled:\s*/,"").replace(/^[^A-Za-z0-9]+/,"");
@@ -1066,7 +1187,7 @@ function watchRecipes(){
     const live = s.docs.filter(d=>!d.data().deleted).map(d=>fromDoc(d.id,d.data()));
     if(s.docs.length){ recipesOnline=true; setRecipes(live); store("gk-recipes", RECIPES); }
     else { recipesOnline=false; setRecipes(BUNDLED.slice()); }
-    if(state==="approved" && !document.querySelector(".editor")) route();
+    if(state==="approved" && !document.querySelector(".editor, .prof-head")) route();
   }, ()=>{});
 }
 const missingBundled = () => BUNDLED.filter(r=>!onlineIds.has(r.id));
@@ -1104,6 +1225,8 @@ function editor(r, cat, sub, draft){
                  : [{ing:true,h:"",items:""},{ing:false,h:"",items:""}];
   const catNow = src ? src.c : (cat || CATS[0] || "");
   const catList = CATS.includes(catNow) || !catNow ? CATS : [...CATS, catNow];
+  const pre = ((src && src.pre!==undefined ? src.pre : target && target.pre)||[]).filter(id=>RECIPES.some(x=>x.id===id));
+  const selfId = r ? r.id : target ? target.id : "";
   const draw = () => {
     app.innerHTML = `<section class="wrap editor">
       <a class="back" href="${sub?"#review":r?"#"+r.id:"#"+(catNow&&CATS.includes(catNow)?slug(catNow):"")}">← Cancel</a>
@@ -1118,6 +1241,11 @@ function editor(r, cat, sub, draft){
           <div class="field"><label for="ed-by">From (optional)</label><input id="ed-by" type="text" maxlength="40" value="${esc(src?src.by:(suggest?myName():""))}" placeholder="e.g. Bobby"></div>
         </div>
         <div class="field"><label for="ed-n">Note (optional)</label><textarea id="ed-n" rows="2">${esc(src&&src.n?src.n:"")}</textarea></div>
+        <div class="field"><label for="ed-pre-q">Make first (optional)</label>
+          <div class="pre-chips" id="ed-pre">${pre.map(id=>{ const x=RECIPES.find(y=>y.id===id); return `<span class="chip pre-chip">${esc(x.t)}<button type="button" data-unpre="${esc(id)}" aria-label="Remove ${esc(x.t)}">✕</button></span>`; }).join("")}</div>
+          <input id="ed-pre-q" type="text" autocomplete="off" placeholder="Type a recipe name to link it…">
+          <div class="pre-sugg" id="ed-pre-sugg" role="listbox"></div>
+          <p class="hint">Recipes to make before this one, like a dough, a starter or a filling. Each one shows “Make first” here and “Use it in” on the other recipe.</p></div>
         <h3>Ingredients and steps</h3>
         <p class="hint">Write one ingredient or one step per line. Add more parts for things like a dough, a filling or a topping. To link to another recipe, put its name in double brackets, like [[Basic Sourdough Starter]].</p>
         <div id="ed-secs">${secs.map((s,i)=>`
@@ -1146,6 +1274,18 @@ function editor(r, cat, sub, draft){
     sel.onchange=()=>{ cn.hidden = sel.value!=="__new"; if(!cn.hidden) cn.focus(); };
     const sync=()=>{ F.querySelectorAll(".sec").forEach((el,i)=>{ secs[i].ing = el.querySelector(".sec-k").value==="ing"; secs[i].h=el.querySelector(".sec-h").value; secs[i].items=el.querySelector(".sec-items").value; }); };
     const keep=()=>({t:F.querySelector("#ed-t").value, c:sel.value, cn:cn.value, by:F.querySelector("#ed-by").value, n:F.querySelector("#ed-n").value});
+    // linked recipes picker
+    const pq=F.querySelector("#ed-pre-q"), ps=F.querySelector("#ed-pre-sugg");
+    const showSugg=()=>{
+      const q=pq.value.trim().toLowerCase();
+      if(!q){ ps.innerHTML=""; return; }
+      const hits=RECIPES.filter(x=>x.id!==selfId && !pre.includes(x.id) && x.t.toLowerCase().includes(q)).slice(0,6);
+      ps.innerHTML = hits.length ? hits.map(x=>`<button type="button" class="pre-opt" role="option" data-pre="${esc(x.id)}">${esc(x.t)} <span>${esc(x.c)}</span></button>`).join("") : `<p class="hint">No recipe with that name.</p>`;
+      ps.querySelectorAll("[data-pre]").forEach(b=>b.onclick=()=>{ pre.push(b.dataset.pre); redraw(); const q2=document.getElementById("ed-pre-q"); if(q2) q2.focus(); });
+    };
+    pq.oninput=showSugg;
+    pq.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=ps.querySelector("[data-pre]"); if(b) b.click(); } };
+    F.querySelectorAll("[data-unpre]").forEach(b=>b.onclick=()=>{ pre.splice(pre.indexOf(b.dataset.unpre),1); redraw(); });
     const redraw=()=>{ const k=keep(); sync(); draw(); const G=document.getElementById("edform");
       G.querySelector("#ed-t").value=k.t; G.querySelector("#ed-by").value=k.by; G.querySelector("#ed-n").value=k.n;
       const s2=G.querySelector("#ed-c"); s2.value=k.c; if(k.c==="__new"){ const c2=G.querySelector("#ed-cn"); c2.hidden=false; c2.value=k.cn; } };
@@ -1174,9 +1314,9 @@ function editor(r, cat, sub, draft){
       const btn0=F.querySelector(".primary");
       if(suggest){
         btn0.disabled=true; btn0.textContent="Sending…";
-        const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), s, ord:0});
+        const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], s, ord:0});
         try{
-          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,s:d.s, uid:me, byName:myName(), status:"pending", created:Date.now(), editOf});
+          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,s:d.s, uid:me, byName:myName(), status:"pending", created:Date.now(), editOf});
           if(editOf) notifyAdmin(`${myName()} suggested changes`, `Changes to “${r?r.t:t}” are waiting for your approval.`, "#review", "pencil2");
           else notifyAdmin(`New recipe from ${myName()}`, `“${t}” is waiting for your approval.`, "#review", "cookie");
           toast(`Sent to ${ADMIN_NAME} for approval`); location.hash="mine";
@@ -1186,7 +1326,7 @@ function editor(r, cat, sub, draft){
       if(!recipesOnline) return fail("Put the recipes online first, from the home page.");
       let id = r ? r.id : target ? target.id : "r-"+t.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
       if(!r && !target){ if(id==="r-") id="r-recipe"; let k=2, base=id; while(onlineIds.has(id)) id=base+"-"+(k++); }
-      const rec={id, c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), s, ord: r ? (r.ord||0) : target ? (target.ord||0) : Date.now()};
+      const rec={id, c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:pre.filter(x=>x!==id), s, ord: r ? (r.ord||0) : target ? (target.ord||0) : Date.now()};
       { const base = r || target;
         withHistory(rec, base, sub ? (sub.editOf&&base?"changed":"added") : (base?"changed":"added"), sub ? sub.byName : myName()); }
       const btn=F.querySelector(".primary"); btn.disabled=true; btn.textContent="Saving…";
@@ -1223,6 +1363,7 @@ async function approveSub(sub){
   if(!recipesOnline){ toast("Put the recipes online first, from the home page."); return; }
   const tgt = sub.editOf ? RECIPES.find(x=>x.id===sub.editOf) : null;
   const rec = fromDoc(tgt ? tgt.id : newRecipeId(sub.t), sub); rec.ord = tgt ? (tgt.ord||0) : Date.now();
+  if(rec.pre===undefined) rec.pre = tgt ? (tgt.pre||[]) : [];
   withHistory(rec, tgt, tgt?"changed":"added", sub.byName);
   await db.collection("recipes").doc(rec.id).set(toDoc(rec), {merge:true});
   await db.collection("submissions").doc(sub.id).update({status:"approved", recipeId:rec.id, decided:Date.now()});
@@ -1508,7 +1649,9 @@ async function drawRecipe(doc, r, opts){
       doc.y+=6; doc.image(doc.addImage(ph,sz[0],sz[1]), M, doc.y, iw, ih); doc.y+=ih+8; }
   }
   doc.y+=6; doc.rule(doc.y, C.line); doc.y+=22;
-  if(r.n){ for(const l of wrap("Note: "+r.n, 11, CW)){ doc.need(16,footer); doc.text(l, M, doc.y, 11, "F1", C.wheat); doc.y+=15; } doc.y+=8; }
+  for(const [lab,list] of [["Make first: ",preOf(r)],["Use it in: ",usedIn(r)]]) if(list.length){
+    for(const l of wrap(lab+list.map(x=>x.t).join(", "), 11, CW)){ doc.need(16,footer); doc.text(l, M, doc.y, 11, "F2", C.accent); doc.y+=15; } doc.y+=6; }
+  if(r.n){ for(const l of wrap("Note: "+unbracket(r.n), 11, CW)){ doc.need(16,footer); doc.text(l, M, doc.y, 11, "F1", C.wheat); doc.y+=15; } doc.y+=8; }
   const parts=buildParts(r); let stepNo=0;
   parts.forEach((p,pi)=>{
     if(parts.length>1){ doc.need(40,footer); doc.text(`PART ${pi+1} OF ${parts.length}`, M, doc.y, 9, "F2", C.muted); doc.y+=18; }
@@ -1516,7 +1659,7 @@ async function drawRecipe(doc, r, opts){
       doc.need(40,footer); doc.text("Ingredients", M, doc.y, 14, "F3", C.ink); doc.y+=20;
       p.ing.forEach(g=>{
         if(g.title){ doc.need(30,footer); doc.text(g.title.toUpperCase(), M, doc.y, 9, "F2", C.wheat); doc.y+=15; }
-        g.items.forEach(it=>{ const ls=wrap(it, 11, CW-16); doc.need(ls.length*15+2,footer);
+        g.items.forEach(it=>{ const ls=wrap(unbracket(it), 11, CW-16); doc.need(ls.length*15+2,footer);
           doc.text("•", M+2, doc.y, 11, "F1", C.accent); ls.forEach(l=>{ doc.text(l, M+16, doc.y, 11, "F1", C.ink); doc.y+=15; }); doc.y+=2; });
       });
       doc.y+=10;
@@ -1525,7 +1668,7 @@ async function drawRecipe(doc, r, opts){
       doc.need(40,footer); doc.text("Method", M, doc.y, 14, "F3", C.ink); doc.y+=20;
       p.steps.forEach(g=>{
         if(g.title){ doc.need(30,footer); doc.text(g.title.toUpperCase(), M, doc.y, 9, "F2", C.wheat); doc.y+=15; }
-        g.items.forEach(it=>{ stepNo++; const ls=wrap(it, 11, CW-26); doc.need(ls.length*15+6,footer);
+        g.items.forEach(it=>{ stepNo++; const ls=wrap(unbracket(it), 11, CW-26); doc.need(ls.length*15+6,footer);
           doc.text(stepNo+".", M, doc.y, 11, "F2", C.accent); ls.forEach(l=>{ doc.text(l, M+26, doc.y, 11, "F1", C.ink); doc.y+=15; }); doc.y+=6; });
       });
       doc.y+=10;
@@ -2046,6 +2189,9 @@ async function profilePage(){
         <p class="err" id="nm-err" role="alert" hidden></p>
         <div><button class="primary" type="submit">Save name</button></div>
       </form></div>`}
+    ${offline?"":`<div class="panel-a" id="rcpanel"><h3>Recovery code</h3>
+      <div id="rcbody">${profile.rc?`<p class="hint">You made a recovery code on ${fmtDate(profile.rcAt)}. If you've lost it, make a new one. The old one stops working.</p><button type="button" class="btn" id="rc-make">Make a new code</button>`
+        :`<p class="hint">Make a recovery code so you can set a new password yourself if you ever forget it.</p><button type="button" class="primary" id="rc-make">Make a recovery code</button>`}</div></div>`}
     ${offline?"":`<div class="panel-a"><h3>Change password</h3>
       <form id="pwform" class="pw-form" novalidate>
         <div class="field"><label for="pw-old">Current password</label><input id="pw-old" type="password" autocomplete="current-password"></div>
@@ -2076,6 +2222,18 @@ async function profilePage(){
   app.querySelector('a[href="#prof-photos"]').onclick=e=>{ e.preventDefault(); list.hidden=false;
     list.innerHTML=`<h3>Photos you shared</h3>${myPhotos.length?`<div class="ph-grid" style="margin-top:10px">${myPhotos.map(p=>`<figure class="ph${p.status==="pending"?" wait":""}"><a href="#${esc(p.recipeId)}"><img src="${p.thumb}" alt="${esc(p.recipeTitle||"")}"></a><figcaption>${esc(p.recipeTitle||"")}${p.status==="pending"?" · waiting for approval":""}</figcaption></figure>`).join("")}</div>`:`<p class="hint mempty">No photos yet. Open a recipe you've made and tap Take a photo.</p>`}`;
     list.scrollIntoView({behavior:"smooth",block:"start"}); };
+  // recovery code
+  const rcb=document.getElementById("rc-make");
+  if(rcb) rcb.onclick=async()=>{
+    rcb.disabled=true;
+    try{
+      const code=await makeRecoveryCode();
+      document.getElementById("rcbody").innerHTML=`<div class="codebox big"><b>${fmtCode(code)}</b></div>
+        <p class="hint">Keep this somewhere safe, like a note or a photo. If you forget your password, tap “Forgot your password?” on the sign-in page and enter your name, this code and a new password. Each code works once, and anyone with it and your name could change your password.</p>
+        <div class="row"><button type="button" class="btn" id="rc-copy">Copy</button></div>`;
+      document.getElementById("rc-copy").onclick=()=>copyText(fmtCode(code));
+    }catch(e){ rcb.disabled=false; toast("Couldn't make a code. Check your connection."); }
+  };
   // change name
   const NF=document.getElementById("nameform");
   if(NF) NF.onsubmit=async e=>{

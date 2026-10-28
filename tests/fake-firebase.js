@@ -1,5 +1,5 @@
 (function(){
-const L=()=>{const d=JSON.parse(localStorage.getItem("__fakedb")||'{"users":{},"names":{},"accounts":{}}');d.recipes=d.recipes||{};d.submissions=d.submissions||{};d.photos=d.photos||{};d.feedback=d.feedback||{};d.meta=d.meta||{};return d};
+const L=()=>{const d=JSON.parse(localStorage.getItem("__fakedb")||'{"users":{},"names":{},"accounts":{}}');d.recipes=d.recipes||{};d.submissions=d.submissions||{};d.photos=d.photos||{};d.feedback=d.feedback||{};d.meta=d.meta||{};d.resets=d.resets||{};return d};
 const W=d=>{localStorage.setItem("__fakedb",JSON.stringify(d));fire()};
 let subs=[];function fire(){setTimeout(()=>subs.forEach(s=>s()),0)}
 window.addEventListener("storage",e=>{if(e.key==="__fakedb")fire()});
@@ -16,7 +16,7 @@ const authObj={get currentUser(){return mkUser(cur)},
  async signOut(){setCur(null)}};
 function doc(col,id){return{_col:col,_id:id,
  async get(){const v=L()[col][id];return{exists:!!v,data:()=>v}},
- async set(o,opt){const d=L();if(col==="names"&&d.names[id])throw{code:"permission-denied"};const v=JSON.parse(JSON.stringify(o));d[col][id]=opt&&opt.merge&&d[col][id]?Object.assign(d[col][id],v):v;W(d)},
+ async set(o,opt){const d=L();if(col==="names"&&d.names[id]){const rs=o.code&&d.resets[o.code];if(!(rs&&rs.key===id&&rs.uid===d.names[id].uid&&(!rs.expires||rs.expires>Date.now())))throw{code:"permission-denied"}}const v=JSON.parse(JSON.stringify(o));d[col][id]=opt&&opt.merge&&d[col][id]?Object.assign(d[col][id],v):v;W(d)},
  async update(o){const d=L();if(!d[col][id])throw{code:"not-found"};Object.assign(d[col][id],o);W(d)},
  async delete(){const d=L();delete d[col][id];W(d)},
  onSnapshot(cb){let last;const s=()=>{const v=L()[col][id];const k=JSON.stringify(v);if(k===last)return;last=k;cb({exists:!!v,data:()=>v&&JSON.parse(k)})};subs.push(s);setTimeout(s,5);return()=>{subs=subs.filter(x=>x!==s)}}}}
