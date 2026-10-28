@@ -17,7 +17,9 @@ service cloud.firestore {
     // Who the admin is and the name shown for them. Only the admin can change it, and only to themselves.
     match /meta/admin {
       allow get: if true;
-      allow write: if isAdmin()
+      allow write: if (isAdmin()
+            || (signedIn() && exists(/databases/$(database)/documents/meta/admin)
+                && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.from == get(/databases/$(database)/documents/meta/admin).data.uid))
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.keys().hasOnly(['uid', 'name'])
         && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 40;
@@ -31,6 +33,36 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.keys().hasOnly(['uid', 'email']);
       allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      // Forgot password: a valid reset or recovery code moves the name to a new sign-in.
+      allow update: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'code'])
+        && request.resource.data.code is string
+        && exists(/databases/$(database)/documents/resets/$(request.resource.data.code))
+        && get(/databases/$(database)/documents/resets/$(request.resource.data.code)).data.key == key
+        && get(/databases/$(database)/documents/resets/$(request.resource.data.code)).data.uid == resource.data.uid
+        && (get(/databases/$(database)/documents/resets/$(request.resource.data.code)).data.expires == null
+            || get(/databases/$(database)/documents/resets/$(request.resource.data.code)).data.expires > request.time.toMillis());
+    }
+
+    // Reset codes (from the admin, 2 days) and recovery codes (made by the member, no end date).
+    // The code itself is the document id and the secret: it can be read only by someone who knows it.
+    match /resets/{code} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if code.size() >= 8
+        && request.resource.data.keys().hasOnly(['key', 'uid', 'by', 'created', 'expires'])
+        && exists(/databases/$(database)/documents/names/$(request.resource.data.key))
+        && get(/databases/$(database)/documents/names/$(request.resource.data.key)).data.uid == request.resource.data.uid
+        && ((isAdmin() && request.resource.data.by == 'admin'
+              && request.resource.data.expires is int
+              && request.resource.data.expires <= request.time.toMillis() + 3 * 86400000)
+            || (signedIn() && request.resource.data.by == 'self' && code.size() >= 12
+              && request.resource.data.uid == request.auth.uid
+              && request.resource.data.expires == null));
+      allow delete: if isAdmin()
+        || (signedIn() && (resource.data.uid == request.auth.uid
+            || get(/databases/$(database)/documents/names/$(resource.data.key)).data.uid == request.auth.uid));
     }
 
     // Recipes: approved members can read, only the admin can add, edit or delete.
@@ -87,17 +119,24 @@ service cloud.firestore {
     // Member profiles. New members always start as "pending";
     // only the admin can approve, deny or remove them.
     match /users/{uid} {
-      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin()
+        // after a reset, the new sign-in may read the old profile to copy it
+        || get(/databases/$(database)/documents/names/$(resource.data.name.lower())).data.uid == request.auth.uid);
       allow list: if isAdmin();
       allow create: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['name', 'status', 'created', 'favs'])
         && get(/databases/$(database)/documents/names/$(request.resource.data.name.lower())).data.uid == request.auth.uid
-        && (request.resource.data.status == 'pending'
-            || (request.resource.data.status == 'approved' && isAdmin()));
+        && ((request.resource.data.keys().hasOnly(['name', 'status', 'created', 'favs'])
+             && (request.resource.data.status == 'pending'
+                 || (request.resource.data.status == 'approved' && isAdmin())))
+          // after a reset: copy of the old profile, same name and same approval
+          || (request.resource.data.keys().hasOnly(['name', 'status', 'created', 'favs', 'was', 'from'])
+             && request.resource.data.from is string
+             && get(/databases/$(database)/documents/users/$(request.resource.data.from)).data.name == request.resource.data.name
+             && get(/databases/$(database)/documents/users/$(request.resource.data.from)).data.status == request.resource.data.status));
       allow update: if isAdmin()
         || (signedIn() && request.auth.uid == uid
             && resource.data.status == 'approved'
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favs']))
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favs', 'rc', 'rcAt']))
         // a member changing their own name: the new name must already point to them
         || (signedIn() && request.auth.uid == uid
             && resource.data.status == 'approved'
@@ -108,7 +147,8 @@ service cloud.firestore {
             && resource.data.name.lower() != 'shulem schlesinger'
             && (!('was' in request.resource.data) || (request.resource.data.was is list && request.resource.data.was.size() <= 20))
             && get(/databases/$(database)/documents/names/$(request.resource.data.name.lower())).data.uid == request.auth.uid);
-      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid)
+        || (signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.from == uid);
     }
   }
 }

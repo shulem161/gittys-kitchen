@@ -59,6 +59,54 @@ await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(),
 await check('owning the old admin name no longer makes you admin', assertFails(setDoc(doc(M, 'recipes', 'r-test2'), { t: 'X', c: 'Cakes' })));
 await check("members still can't edit recipes", assertFails(setDoc(doc(G, 'recipes', 'r-test3'), { t: 'X', c: 'Cakes' })));
 
+// ---------- Password reset and recovery codes ----------
+await env.clearFirestore();
+const DAY = 86400000, now = Date.now();
+await env.withSecurityRulesDisabled(async c => {
+  const d = c.firestore();
+  const u = (uid, name, status, extra) => Promise.all([setDoc(doc(d, 'users', uid), Object.assign({ name, status, created: 1, favs: ['r-a'] }, extra || {})), setDoc(doc(d, 'names', name.toLowerCase()), { uid, email: uid + '@x' })]);
+  await setDoc(doc(d, 'meta', 'admin'), { uid: 'admin', name: 'Shulem' });
+  await u('admin', 'Shulem', 'approved'); await u('rivky', 'Rivky', 'approved'); await u('other', 'Other', 'approved'); await u('pend', 'Pend', 'pending');
+  await setDoc(doc(d, 'resets', 'OLDCODE2'), { key: 'other', uid: 'other', by: 'admin', created: 1, expires: 1 });
+  await setDoc(doc(d, 'resets', 'ADMINSELFCODE'), { key: 'shulem', uid: 'admin', by: 'self', created: 1, expires: null });
+  await setDoc(doc(d, 'resets', 'PENDCODE'), { key: 'pend', uid: 'pend', by: 'admin', created: 1, expires: now + DAY });
+});
+const as = uid => env.authenticatedContext(uid).firestore();
+const AD = as('admin'), RV = as('rivky'), OT = as('other');
+const code = (key, uid, by, expires) => ({ key, uid, by, created: now, expires });
+await check('admin can make a reset code', assertSucceeds(setDoc(doc(AD, 'resets', 'ABCDEFGH'), code('rivky', 'rivky', 'admin', now + 2 * DAY))));
+await check("admin code can't last more than 3 days", assertFails(setDoc(doc(AD, 'resets', 'LONGLONG'), code('rivky', 'rivky', 'admin', now + 10 * DAY))));
+await check("admin code must match the member's name", assertFails(setDoc(doc(AD, 'resets', 'MISMATCH'), code('rivky', 'other', 'admin', now + DAY))));
+await check("members can't make reset codes for others", assertFails(setDoc(doc(OT, 'resets', 'OTHERCODE'), code('rivky', 'rivky', 'admin', now + DAY))));
+await check("members can't make recovery codes for others", assertFails(setDoc(doc(OT, 'resets', 'SELFFOROTHER'), code('rivky', 'rivky', 'self', null))));
+await check('member can make own recovery code', assertSucceeds(setDoc(doc(RV, 'resets', 'RIVKYSELFCODE'), code('rivky', 'rivky', 'self', null))));
+await check('recovery codes must be long', assertFails(setDoc(doc(RV, 'resets', 'SHORT123'), code('rivky', 'rivky', 'self', null))));
+await check('member can note their recovery code', assertSucceeds(updateDoc(doc(RV, 'users', 'rivky'), { rc: 'RIVKYSELFCODE', rcAt: now })));
+await check('a code can be checked by someone who knows it', assertSucceeds(getDoc(doc(env.unauthenticatedContext().firestore(), 'resets', 'ABCDEFGH'))));
+await check("codes can't be listed", assertFails((await import('firebase/firestore')).getDocs((await import('firebase/firestore')).collection(env.unauthenticatedContext().firestore(), 'resets'))));
+const R2 = as('rivky2');
+await check('wrong code is refused', assertFails(setDoc(doc(R2, 'names', 'rivky'), { uid: 'rivky2', email: 'r2@x', code: 'WRONGCODE' })));
+await check("another member's code is refused", assertFails(setDoc(doc(R2, 'names', 'rivky'), { uid: 'rivky2', email: 'r2@x', code: 'OLDCODE2' })));
+await check('valid code moves the name to the new sign-in', assertSucceeds(setDoc(doc(R2, 'names', 'rivky'), { uid: 'rivky2', email: 'r2@x', code: 'ABCDEFGH' })));
+await check('new sign-in can read the old profile', assertSucceeds(getDoc(doc(R2, 'users', 'rivky'))));
+await check("someone else can't copy the profile", assertFails(setDoc(doc(as('x'), 'users', 'x'), { name: 'Rivky', status: 'approved', created: 1, favs: [], was: [], from: 'rivky' })));
+await check('new sign-in copies the profile, still approved', assertSucceeds(setDoc(doc(R2, 'users', 'rivky2'), { name: 'Rivky', status: 'approved', created: 1, favs: ['r-a'], was: [], from: 'rivky' })));
+await check('new sign-in removes the old profile', assertSucceeds(deleteDoc(doc(R2, 'users', 'rivky'))));
+await check('new sign-in clears the used code', assertSucceeds(deleteDoc(doc(R2, 'resets', 'ABCDEFGH'))));
+await check('old recovery code no longer works after a reset', assertFails(setDoc(doc(as('rivky3'), 'names', 'rivky'), { uid: 'rivky3', email: 'r3@x', code: 'RIVKYSELFCODE' })));
+await check('expired code is refused', assertFails(setDoc(doc(as('other2'), 'names', 'other'), { uid: 'other2', email: 'o2@x', code: 'OLDCODE2' })));
+const P2 = as('pend2');
+await check('waiting member can use a code', assertSucceeds(setDoc(doc(P2, 'names', 'pend'), { uid: 'pend2', email: 'p2@x', code: 'PENDCODE' })));
+await check("a reset can't approve someone", assertFails(setDoc(doc(P2, 'users', 'pend2'), { name: 'Pend', status: 'approved', created: 1, favs: [], was: [], from: 'pend' })));
+await check('a reset keeps them waiting', assertSucceeds(setDoc(doc(P2, 'users', 'pend2'), { name: 'Pend', status: 'pending', created: 1, favs: [], was: [], from: 'pend' })));
+const A2 = as('admin2');
+await check('admin can use own recovery code', assertSucceeds(setDoc(doc(A2, 'names', 'shulem'), { uid: 'admin2', email: 'a2@x', code: 'ADMINSELFCODE' })));
+await check('admin copies own profile', assertSucceeds(setDoc(doc(A2, 'users', 'admin2'), { name: 'Shulem', status: 'approved', created: 1, favs: [], was: [], from: 'admin' })));
+await check("a random member can't take over admin", assertFails(setDoc(doc(OT, 'meta', 'admin'), { uid: 'other', name: 'Other' })));
+await check('admin moves admin to the new sign-in', assertSucceeds(setDoc(doc(A2, 'meta', 'admin'), { uid: 'admin2', name: 'Shulem' })));
+await check('admin has full rights on the new sign-in', assertSucceeds(updateDoc(doc(A2, 'users', 'other'), { status: 'approved' })));
+await check('the old admin sign-in is no longer admin', assertFails(setDoc(doc(AD, 'recipes', 'r-z'), { t: 'X', c: 'Cakes' })));
+
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(`::notice::Rule checks: ${pass} passed, ${fail} failed`);
