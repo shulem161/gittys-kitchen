@@ -1,6 +1,6 @@
 {
-  "web": "3.42",
+  "web": "3.43",
   "apk": 8,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New: recipe codes by category (A101\u2026), Pesach sections LA001\u2026"
+  "notes": "Recipe codes now start at 001 (A001, B001\u2026)."
 }

@@ -255,6 +255,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
 
     await A.goto(F + '#c-pesach'); await A.waitForTimeout(300); await A.locator('.cats .cat', {hasText: 'Kugel'}).click(); await A.waitForTimeout(300);
     ok('Pesach recipes say Pesach', await A.$$eval('.rc', els => els.length > 0 && els.every(e => /Pesach/i.test([...e.querySelectorAll('.kchip')].map(k => k.textContent).join(' ')))));
+    await A.goto(F + '#new-bread'); await A.waitForTimeout(300); await A.fill('#ed-t', 'Test Bread Code'); await A.locator('.sec-items').nth(0).fill('2 cups flour'); await A.click('#edform .primary'); await A.waitForTimeout(1500);
+    ok('category codes start at 001', /^[A-Z]\d{3}$/.test(await A.locator('.rhead .nochip').innerText().catch(() => '')) && !/1\d\d$/.test(await A.locator('.rhead .nochip').innerText().catch(() => '')), await A.locator('.rhead .nochip').innerText().catch(() => ''));
     // New recipes
     await A.goto(F + '#recent-day'); await A.waitForTimeout(400);
     ok('new recipes page lists recipes added today', (await A.locator('.rc h3').allInnerTexts()).includes('Test Pesach Kugel'));

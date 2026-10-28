@@ -594,7 +594,7 @@ const kindOf = r => (r && (r.kind==="meat"||r.kind==="dairy"||r.kind==="fish"||r
 const KIND_LABEL = {meat:"Meat", dairy:"Dairy", fish:"Fish", other:""};
 const PAREVE = k => k==="other" || k==="fish";   // fish is pareve: it can go with meat or dairy meals
 const kindChip = r => { const k=kindOf(r); return (KIND_LABEL[k]?`<span class="kchip ${k}">${KIND_LABEL[k]}</span>`:"") + (r && /^pesach$/i.test(r.c||"") ? `<span class="kchip pesach">Pesach</span>` : ""); };
-// Recipe codes: a letter per category, then a number from 101 (A101, A102…). In a category with sections each
+// Recipe codes: a letter per category, then a number from 001 (A001, A002…). In a category with sections each
 // section gets a second letter and numbers from 001 (Pesach: LA001 Family recipes, LB001 Cakes…). Kept in meta/codes.
 let CODEMAP = {cats:{}, secs:{}};   // loaded from storage in boot()
 let usedCodes = new Set();       // every code used online, including deleted recipes
@@ -618,8 +618,8 @@ const hasSections = c => !!(CODEMAP.secs[c] && Object.keys(CODEMAP.secs[c]).leng
 function nextCode(c, s){
   const before = JSON.stringify(CODEMAP);
   const L = codeLetter(c);
-  let pre = L, n = 101, fmt = x => String(x);
-  if(hasSections(c) || s){ pre = L + secLetter(c, s || "Family recipes"); n = 1; fmt = x => String(x).padStart(3,"0"); }
+  let pre = L, n = 1; const fmt = x => String(x).padStart(3,"0");
+  if(hasSections(c) || s) pre = L + secLetter(c, s || "Family recipes");
   while(n<999 && usedCodes.has(pre+fmt(n))) n++;
   const code = pre + fmt(n);
   usedCodes.add(code);
@@ -676,7 +676,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.42";
+const WEB_VERSION = "3.43";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
