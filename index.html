@@ -390,6 +390,16 @@ body.out .bar, body.out footer{display:none}
 .avatar{position:relative}
 .avatar .dot{position:absolute;top:-4px;right:-6px;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:#C8473D;color:#fff;font:600 11px/19px var(--body);border:2px solid var(--paper)}
 .menu .n.hot{color:#C8473D;font-weight:600}
+.mgroup{border-top:1px solid var(--line)}
+.mgroup summary{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);list-style:none;border-radius:8px}
+.mgroup summary::-webkit-details-marker{display:none}
+.mgroup summary::after{content:"";width:8px;height:8px;border:solid var(--muted);border-width:0 2px 2px 0;transform:rotate(45deg);margin:-4px 2px 0 auto}
+.mgroup[open] summary::after{transform:rotate(-135deg);margin-top:4px}
+.mgroup summary .n{letter-spacing:0;text-transform:none;font-size:12px}
+.mgroup summary:hover{background:var(--bg)}
+.mgroup a,.mgroup button{padding-left:18px}
+.menu .m-out{border-top:1px solid var(--line);border-radius:0 0 8px 8px;margin-top:2px}
+.menu{max-height:calc(100vh - 90px);overflow-y:auto}
 .wait{display:flex;flex-direction:column;gap:12px;align-items:flex-start}
 .spin{width:28px;height:28px;border-radius:50%;border:3px solid var(--accent-soft);border-top-color:var(--accent);animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -441,6 +451,7 @@ body.out .bar, body.out footer{display:none}
 @media (min-width:900px){.dlpick{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:0 20px;align-items:start}.dl-prev{margin:0;grid-column:2;grid-row:1}.dlpick .row{grid-column:1}}
 .permbox{flex-basis:100%;margin:4px 0 4px 52px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
 .perm-h{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--wheat);margin:10px 0 0}
+.perm-own{font-size:11px;font-weight:700;color:var(--wheat);margin-left:6px;white-space:nowrap}
 @media (max-width:640px){.permbox{margin-left:0}}
 .pub-btns{display:flex;gap:6px}
 .pub-btns .btn.on{background:var(--accent);border-color:var(--accent);color:var(--paper)}
@@ -914,7 +925,10 @@ let PUB = {allow:{}, cats:{}};
 // the extras are off unless granted. Public members all share the Public portal settings. Admins can do everything.
 const EXTRA_PERMS = [["edit","Add and edit recipes directly, without approval"],["review","Approve suggested recipes and photos"],["answer","Answer recipe requests"],["inbox","Read and answer suggestions & comments"]];
 const isExtra = k => EXTRA_PERMS.some(x=>x[0]===k);
-const permOf = (m,k) => { const p=(m&&m.perms)||{}; return isExtra(k) ? p[k]===true : p[k]!==false; };
+// Employee settings (meta/employees) apply to every employee; a person's own Permissions override them.
+let EMP = {allow:{}};
+const empDefault = k => EMP.allow[k]!==undefined ? EMP.allow[k]===true : !isExtra(k);
+const permOf = (m,k) => { const p=(m&&m.perms)||{}; return p[k]!==undefined ? p[k]===true : empDefault(k); };
 const may = k => { if(isAdmin()) return true; if(!profile) return false;
   if(isPublic()) return !isExtra(k) && PUB.allow[k]!==false;
   return permOf(profile, k); };
@@ -931,7 +945,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.60";
+const WEB_VERSION = "3.61";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1008,6 +1022,7 @@ function boot(){
     if(unsubCodes){unsubCodes();unsubCodes=null}
     if(unsubLook){unsubLook();unsubLook=null}
     if(unsubPub){unsubPub();unsubPub=null}
+    if(unsubEmp){unsubEmp();unsubEmp=null}
     if(unsubSubs){unsubSubs();unsubSubs=null;subs=[]}
     if(unsubPendingPhotos){unsubPendingPhotos();unsubPendingPhotos=null;pendingPhotos=[]}
     if(unsubFeedback){unsubFeedback();unsubFeedback=null;feedback=[]}
@@ -1273,10 +1288,8 @@ function home(){
     <div class="grid">${nw.slice(0,4).map(card).join("")}</div>`:""}
     ${f.length?`<div class="section-head"><h2>Your favorites</h2><p><a class="link" href="#favorites">See all ${f.length}</a></p></div>
     <div class="grid">${f.slice(0,4).map(card).join("")}</div>`:""}
-    <div class="section-head"><h2>Kitchen tools</h2><p>Plan, shop, measure and time</p></div>
+    <div class="section-head"><h2>Kitchen tools</h2><p>Measure, plan and ask</p></div>
     <div class="cats tools">
-      <a class="cat" href="#timers"><div class="ic">${TIMER_IC}</div><div class="tool-txt"><h3>Timers</h3><span>${tm?`${tm} running`:"For cooking and baking"}</span></div></a>
-      <a class="cat" href="#grocery"><div class="ic">${TOOL_IC.cart}</div><div class="tool-txt"><h3>Grocery list</h3><span>${gStore().items.length?`${gStore().items.length} ${gStore().items.length===1?"recipe":"recipes"} on it`:"Pick recipes, get one list"}</span></div></a>
       <a class="cat" href="#convert"><div class="ic">${TOOL_IC.calc}</div><div class="tool-txt"><h3>Calculator</h3><span>Double, halve, convert</span></div></a>
       ${offline||!can("ai")?"":`<a class="cat" href="#menu"><div class="ic">${TOOL_IC.menu}</div><div class="tool-txt"><h3>Menu ideas</h3><span>A full menu from the cookbook</span></div></a>`}
       ${offline||(may("edit")&&!recipesOnline)||!can("ai")||!can("suggest")?"":`<a class="cat" href="#scan"><div class="ic">${TOOL_IC.scan}</div><div class="tool-txt"><h3>Scan a recipe</h3><span>Photo, PDF or Word</span></div></a>`}
@@ -1657,23 +1670,27 @@ function adminPage(){
   const manage = m => m.uid!==me && !isAdminMember(m) && (isOwner() || roleOf(m)!=="admin");
   const roleSel = m => `<label class="rolesel"><span class="sr">Role for ${esc(m.name)}</span><select data-role="${esc(m.uid)}">${(isOwner()?["public","employee","admin"]:["public","employee"]).map(r=>`<option value="${r}" ${roleOf(m)===r?"selected":""}>${ROLE_LABEL[r]}</option>`).join("")}</select></label>`;
   const order = {owner:0, admin:1, employee:2, public:3};
-  const permsBox = m => `<div class="permbox" data-pbox="${esc(m.uid)}"><p class="hint">What ${esc(m.name)} may do. Only this person changes.</p>
-    <div class="perm-h">Everyday (on unless you switch them off)</div>${PUB_ALLOW.map(([k,l])=>`<label class="pub-row"><input type="checkbox" data-pk="${k}" data-pu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span>${esc(l)}</span></label>`).join("")}
-    <div class="perm-h">Extra (off unless you allow them)</div>${EXTRA_PERMS.map(([k,l])=>`<label class="pub-row"><input type="checkbox" data-pk="${k}" data-pu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span>${esc(l)}</span></label>`).join("")}</div>`;
+  const permRow = (m,[k,l]) => `<label class="pub-row"><input type="checkbox" data-pk="${k}" data-pu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span>${esc(l)}${(m.perms||{})[k]!==undefined?' <small class="perm-own">only for this person</small>':""}</span></label>`;
+  const permsBox = m => `<div class="permbox" data-pbox="${esc(m.uid)}"><p class="hint">What ${esc(m.name)} may do. Starts from <a class="link" href="#employees">Employee settings</a>; changes here are only for this person.</p>
+    <div class="perm-h">Everyday</div>${PUB_ALLOW.map(x=>permRow(m,x)).join("")}
+    <div class="perm-h">Extra</div>${EXTRA_PERMS.map(x=>permRow(m,x)).join("")}
+    ${Object.keys(m.perms||{}).length?`<button type="button" class="link" data-preset="${esc(m.uid)}" style="margin-top:6px;font-size:13px">Use Employee settings for everything</button>`:""}</div>`;
   app.innerHTML = `<section class="wrap admin">
     <div class="section-head" style="margin-top:28px"><h2>Approve members</h2><p>${members.length} ${members.length===1?"profile":"profiles"}</p></div>
     <div class="panel-a"><h3>Waiting for approval ${pend.length?`<span class="count">${pend.length}</span>`:""}</h3>
       <p class="hint">New members join as public. To give someone more, change their role under Members, or use Permissions for an employee.</p>
       ${list(pend, m=>row(m, btn("approve",m,"Approve","solid")+btn("deny",m,"Deny")), "No one is waiting. New requests appear here right away.")}</div>
     <div class="panel-a"><h3>Members</h3>
-      <p class="hint" style="margin-bottom:6px"><b>Employee</b>: everything members could always do. <b>Public</b>: only what you allow in <a class="link" href="#public">Public portal settings</a>. <b>Admin</b>: everything you can do, except changing you or other admins${isOwner()?" (only you make admins)":""}.</p>
+      <p class="hint" style="margin-bottom:6px"><b>Employee</b>: what you set in <a class="link" href="#employees">Employee settings</a>, plus anything you change for one person with Permissions. <b>Public</b>: only what you allow in <a class="link" href="#public">Public portal settings</a>. <b>Admin</b>: everything you can do, except changing you or other admins${isOwner()?" (only you make admins)":""}.</p>
       ${list(appr.slice().sort((a,b)=>order[roleOf(a)]-order[roleOf(b)]), m=>row(m, manage(m) ? roleSel(m)+(roleOf(m)==="employee"?btn("perms",m,"Permissions"+(Object.keys(m.perms||{}).length?" ✓":"")):"")+btn("reset",m,"Reset password")+btn("ask-remove",m,"Remove") : "")+(openPerms.has(m.uid)&&roleOf(m)==="employee"&&manage(m)?permsBox(m):""), "No members yet.")}</div>
     ${den.length?`<div class="panel-a"><h3>Not approved</h3>${list(den, m=>row(m, btn("approve",m,"Approve","solid")+btn("ask-remove",m,"Remove")), "")}</div>`:""}
   </section>`;
+  app.querySelectorAll("[data-preset]").forEach(b=>b.onclick=async()=>{ const m=members.find(x=>x.uid===b.dataset.preset); if(!m) return;
+    try{ await db.collection("users").doc(m.uid).update({perms:{}}); m.perms={}; toast(`${m.name} now follows Employee settings`); adminPage(); }catch(e){ toast("Couldn't save. Check your connection."); } });
   app.querySelectorAll("[data-pk]").forEach(c=>c.onchange=async()=>{ const m=members.find(x=>x.uid===c.dataset.pu); if(!m) return;
     const k=c.dataset.pk, perms=Object.assign({}, m.perms||{});
-    if(c.checked === (isExtra(k) ? false : true)) delete perms[k]; else perms[k]=c.checked;   // store only what differs from normal
-    try{ await db.collection("users").doc(m.uid).update({perms}); m.perms=perms; toast(`${m.name}: ${c.checked?"allowed":"not allowed"}`); }
+    if(c.checked === empDefault(k)) delete perms[k]; else perms[k]=c.checked;   // store only what differs from Employee settings
+    try{ await db.collection("users").doc(m.uid).update({perms}); m.perms=perms; toast(`${m.name}: ${c.checked?"allowed":"not allowed"}`); adminPage(); }
     catch(e){ c.checked=!c.checked; toast("Couldn't save. Check your connection."); } });
   app.querySelectorAll("[data-role]").forEach(s=>s.onchange=async()=>{ const m=members.find(x=>x.uid===s.dataset.role); if(!m) return;
     s.disabled=true;
@@ -1702,6 +1719,22 @@ function adminPage(){
     try{ await setStatus(m.uid, act==="deny"?"denied":"approved", act==="approve"?"public":undefined); toast(act==="deny"?`${m.name} was not approved`:`${m.name} is approved as public. Change their role below to give more.`); }
     catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); }
   });
+}
+function employeesPage(){
+  const emps = members.filter(m=>m.status==="approved" && roleOf(m)==="employee"), own = emps.filter(m=>Object.keys(m.perms||{}).length);
+  const row = ([k,l]) => `<label class="pub-row"><input type="checkbox" data-ea="${k}" ${empDefault(k)?"checked":""}><span>${esc(l)}</span></label>`;
+  app.innerHTML = `<section class="wrap admin tools-page">
+    <div class="section-head" style="margin-top:28px"><h2>Employee settings</h2><p>${emps.length} ${emps.length===1?"employee":"employees"} · <a class="link" href="#admin">Members</a></p></div>
+    <div class="panel-a"><h3>What every employee may do</h3>
+      <p class="hint">These apply to all employees. To change something for one person only, use Permissions next to their name in Members.</p>
+      <div class="perm-h">Everyday</div><div class="pub-allow">${PUB_ALLOW.map(row).join("")}</div>
+      <div class="perm-h">Extra</div><div class="pub-allow">${EXTRA_PERMS.map(row).join("")}</div>
+    </div>
+    ${own.length?`<div class="panel-a"><h3>Employees with their own permissions</h3><p class="hint">${own.map(m=>esc(m.name)).join(", ")}. What's set for them personally stays as it is.</p></div>`:""}
+  </section>`;
+  app.querySelectorAll("[data-ea]").forEach(c=>c.onchange=async()=>{ const d={allow:Object.assign({},EMP.allow,{[c.dataset.ea]:c.checked})};
+    try{ await db.collection("meta").doc("employees").set(d); EMP=d; toast(c.checked?"All employees can do this now":"Employees can't do this now"); }
+    catch(e){ c.checked=!c.checked; toast("Couldn't save. Check your connection."); } });
 }
 const pubOpen = new Set();   // categories left open in Public portal settings
 function publicPage(){
@@ -1778,29 +1811,43 @@ function renderAcct(){
   document.getElementById("avbtn").onclick = e=>{ e.stopPropagation(); acct.querySelector(".menu") ? closeMenu() : openMenu(); };
   if(open) openMenu();
 }
+const menuOpen = new Set(["manage"]);   // which menu groups are open
 function openMenu(confirming){
+  if(confirming) menuOpen.add("app");
   closeMenu();
   const pc = pendingCount();
   const m=document.createElement("div"); m.className="menu"; m.setAttribute("role","menu");
+  // Grouped and short: tools that live on the home page or the bottom bar aren't repeated here
+  const item = (href,label,n,hot) => `<a href="${href}" role="menuitem">${label} <span class="n${hot?" hot":""}">${n||""}</span></a>`;
+  const waitSubs = pendingSubs().length+pendingPhotos.length, mp = members.filter(x=>x.status==="pending").length;
+  const manage = [
+    isAdmin() ? item("#admin","Members", mp?mp+" waiting":"", mp) : "",
+    may("review") ? item("#review","Approve recipes &amp; photos", waitSubs?waitSubs+" waiting":"", waitSubs) : "",
+    !offline&&may("answer") ? item("#requests","Recipe requests", openRequests()?openRequests()+" waiting":"", openRequests()) : "",
+    may("inbox") ? item("#inbox","Suggestions &amp; comments", newFeedback()?newFeedback()+" new":"", newFeedback()) : "",
+    isAdmin() ? item("#employees","Employee settings") : "",
+    isAdmin() ? item("#public","Public portal settings") : "",
+  ].filter(Boolean);
+  const manageN = (isAdmin()?mp:0)+(may("review")?waitSubs:0)+(may("answer")?openRequests():0)+(may("inbox")?newFeedback():0);
+  const recipes = [
+    !offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit")) ? item("#new","Add a recipe")+(can("ai")?item("#scan","Add from photo or file"):"") : "",
+    may("edit")||(!can("suggest")&&!subs.length) ? "" : item("#mine","My recipes", subs.length||""),
+    item("#favorites","My favorites", favs().length||""),
+    !offline&&can("requests")&&!may("answer") ? item("#requests","Request a recipe") : "",
+    !may("inbox")&&can("feedback") ? item("#feedback","Suggestions &amp; comments") : "",
+  ].filter(Boolean);
+  const group = (key,title,items,n) => items.length ? `<details class="mgroup" data-mg="${key}" ${menuOpen.has(key)?"open":""}><summary>${title}<span class="n${n?" hot":""}">${n?n+" waiting":""}</span></summary>${items.join("")}</details>` : "";
   m.innerHTML = `<a class="who" href="#profile" role="menuitem"><b>${esc(myName())}</b><span>${ROLE_LABEL[myRole()]}${offline?" · offline":""} · My profile</span></a>
-    ${isAdmin()?(()=>{const mp=members.filter(m=>m.status==="pending").length;return `<a href="#admin" role="menuitem">Approve members <span class="n${mp?" hot":""}">${mp?mp+" waiting":""}</span></a>`})():""}
-    ${isAdmin()?`<a href="#public" role="menuitem">Public portal settings <span class="n"></span></a>`:""}
-    ${may("review")?`<a href="#review" role="menuitem">Approve recipes &amp; photos <span class="n${pendingSubs().length+pendingPhotos.length?" hot":""}">${pendingSubs().length+pendingPhotos.length?(pendingSubs().length+pendingPhotos.length)+" waiting":""}</span></a>`:""}
-    ${!offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit"))?`<a href="#new" role="menuitem">Add a recipe <span class="n"></span></a>${can("ai")?`<a href="#scan" role="menuitem">Add from photo or file <span class="n"></span></a>`:""}`:""}
-    ${may("edit")||(!can("suggest")&&!subs.length)?"":`<a href="#mine" role="menuitem">My recipes <span class="n">${subs.length||""}</span></a>`}
-    ${may("inbox")?`<a href="#inbox" role="menuitem">Suggestions &amp; comments <span class="n${newFeedback()?" hot":""}">${newFeedback()?newFeedback()+" new":""}</span></a>`:can("feedback")?`<a href="#feedback" role="menuitem">Suggestions &amp; comments <span class="n"></span></a>`:""}
-    <a href="#favorites" role="menuitem">My favorites <span class="n">${favs().length}</span></a>
-    ${offline||!(can("requests")||may("answer"))?"":may("answer")?`<a href="#requests" role="menuitem">Recipe requests <span class="n${openRequests()?" hot":""}">${openRequests()?openRequests()+" waiting":""}</span></a>`:`<a href="#requests" role="menuitem">Request a recipe <span class="n"></span></a>`}
-    <a href="#recent" role="menuitem">New recipes <span class="n">${recentList(7*864e5).length||""}</span></a>
-    <a href="#grocery" role="menuitem">Grocery list <span class="n">${gStore().items.length||""}</span></a>
-    ${offline||!can("ai")?"":`<a href="#menu" role="menuitem">Menu ideas <span class="n"></span></a>`}
-    <a href="#convert" role="menuitem">Kitchen calculator <span class="n"></span></a>
-    ${isAdmin()?`<button type="button" role="menuitem" id="m-ntfy">Send test notification <span class="n"></span></button>`:""}
-    <button type="button" role="menuitem" id="m-upd">Check for updates <span class="n">v${WEB_VERSION}</span></button>
-    <button type="button" role="menuitem" id="m-out">Sign out</button>
-    ${isAdmin()||offline ? "" : confirming?`<div class="confirm">Delete your profile and favorites? You'd need to ask to join again.
-      <div class="row"><button type="button" class="btn warn" id="m-yes">Delete</button><button type="button" class="btn" id="m-no">Cancel</button></div></div>`
-      :`<button type="button" role="menuitem" class="danger" id="m-del">Delete my profile</button>`}`;
+    ${group("manage","Manage", manage, manageN)}
+    ${group("recipes","Recipes", recipes, 0)}
+    ${group("app","App", [
+      isAdmin()?`<button type="button" role="menuitem" id="m-ntfy">Send test notification <span class="n"></span></button>`:"",
+      `<button type="button" role="menuitem" id="m-upd">Check for updates <span class="n">v${WEB_VERSION}</span></button>`,
+      isAdmin()||offline ? "" : confirming?`<div class="confirm">Delete your profile and favorites? You'd need to ask to join again.
+        <div class="row"><button type="button" class="btn warn" id="m-yes">Delete</button><button type="button" class="btn" id="m-no">Cancel</button></div></div>`
+        :`<button type="button" role="menuitem" class="danger" id="m-del">Delete my profile</button>`].filter(Boolean), 0)}
+    <button type="button" role="menuitem" id="m-out" class="m-out">Sign out</button>`;
+  m.querySelectorAll(".mgroup").forEach(d=>d.addEventListener("toggle",()=>{ d.open ? menuOpen.add(d.dataset.mg) : menuOpen.delete(d.dataset.mg); }));
   m.onclick=e=>e.stopPropagation();
   acct.appendChild(m);
   m.querySelectorAll('a').forEach(a=>a.onclick=closeMenu);
@@ -1815,7 +1862,7 @@ document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeMenu(); });
 
 /* ---------- online recipes ---------- */
 let recipesOnline = false;    // true once the online cookbook has been loaded
-let unsubCodes = null, unsubLook = null, unsubPub = null;
+let unsubCodes = null, unsubLook = null, unsubPub = null, unsubEmp = null;
 let maxNo = 0;                // highest recipe number used so far
 let onlineIds = new Set();    // every recipe id stored online (including deleted ones)
 let unsubRecipes = null;
@@ -1844,6 +1891,10 @@ function watchRecipes(){
   }, ()=>{});
   if(!unsubCodes) unsubCodes = db.collection("meta").doc("codes").onSnapshot(s=>{
     if(!s.exists) return; const d=s.data(); CODEMAP={cats:d.cats||{}, secs:d.secs||{}}; store("gk-codemap", CODEMAP);
+    if(state==="approved" && !document.querySelector(".editor, .prof-head, #rqform, .tools-page, #td-new:focus")) route();
+  }, ()=>{});
+  if(!unsubEmp) unsubEmp = db.collection("meta").doc("employees").onSnapshot(s=>{
+    const d = s.exists ? s.data() : {}; EMP = {allow:d.allow||{}};
     if(state==="approved" && !document.querySelector(".editor, .prof-head, #rqform, .tools-page, #td-new:focus")) route();
   }, ()=>{});
   if(!unsubPub) unsubPub = db.collection("meta").doc("public").onSnapshot(s=>{
@@ -3898,6 +3949,7 @@ function routePage(){
   const h = decodeURIComponent(location.hash.slice(1));
   if(h==="admin" && isAdmin()){ q.value=""; adminPage(); window.scrollTo(0,0); return; }
   if(h==="public" && isAdmin()){ q.value=""; publicPage(); window.scrollTo(0,0); return; }
+  if(h==="employees" && isAdmin()){ q.value=""; employeesPage(); window.scrollTo(0,0); return; }
   if(isPublic() && ((/^(new|edit-|review)/.test(h) && !can("suggest")) || (/^scan/.test(h) && !(can("ai")&&can("suggest"))) || (h==="menu" && !can("ai")) || (h==="requests" && !can("requests")) || (/^feedback/.test(h) && !can("feedback")))){
     q.value=""; toast("That isn't available in your portal."); history.replaceState(null,"",location.pathname+location.search); home(); return; }
   if(!offline && h.startsWith("edit-")){ const er=RECIPES.find(x=>x.id===h.slice(5)); if(er){ q.value=""; editor(er); window.scrollTo(0,0); return; } }

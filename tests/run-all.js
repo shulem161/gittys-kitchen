@@ -412,6 +412,18 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.locator('[data-pk=photos]').check(); await A.waitForTimeout(400); await A.locator('[data-pk=edit]').uncheck(); await A.waitForTimeout(1500);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
     ok('taking a permission away works', /Suggest changes/.test(await V.locator('.rhead').innerText()) && (await V.locator('.ph-add').count()) > 0);
+    await A.goto(F + '#employees'); await A.waitForTimeout(400);
+    await A.locator('[data-ea=answer]').check(); await A.waitForTimeout(1500);
+    await V.goto(F); await V.waitForTimeout(500);
+    ok('Employee settings give every employee a permission', await V.evaluate(() => may('answer')) && /Recipe requests/.test(await V.evaluate(() => { openMenu(); const t = document.querySelector('.menu').innerText; closeMenu(); return t; })));
+    await A.locator('[data-ea=answer]').uncheck(); await A.waitForTimeout(1500);
+    await V.goto(F); await V.waitForTimeout(500);
+    ok('…and take it away again', await V.evaluate(() => !may('answer')));
+    await A.goto(F); await A.waitForTimeout(400); await A.click('#avbtn'); await A.waitForTimeout(200);
+    const menuTxt = await A.locator('.menu').innerText();
+    ok('account menu is grouped and short', (await A.locator('.menu .mgroup').count()) === 3 && !/Grocery list|Kitchen calculator|Menu ideas/.test(menuTxt) && /Employee settings/.test(menuTxt), menuTxt.slice(0, 300));
+    await A.click('#avbtn');
+    ok('home has no shortcuts that are already in the bottom bar', (await A.locator('.cats.tools a[href="#timers"], .cats.tools a[href="#grocery"]').count()) === 0);
 
     ok('sources show without page numbers', await A.evaluate(() => creditText('The Haimishe Kitchen – Pesach Cookbook, page 22') === 'From The Haimishe Kitchen – Pesach Cookbook' && creditText('Bobby') === 'From Bobby'));
 

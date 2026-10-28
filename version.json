@@ -1,6 +1,6 @@
 {
-  "web": "3.60",
+  "web": "3.61",
   "apk": 11,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Recipe sources show without page numbers; downloads always use the Recipe card design."
+  "notes": "New: Employee settings for all employees, a shorter account menu in groups, and a cleaner home page."
 }

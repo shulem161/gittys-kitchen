@@ -166,6 +166,15 @@ await check("employee allowed to edit can't approve suggestions", assertFails(up
 await check("employees can't grant themselves permissions", assertFails(updateDoc(doc(EMP, 'users', 'emp'), { perms: { edit: true } })));
 await check('admin can grant one employee a permission', assertSucceeds(updateDoc(doc(ADM, 'users', 'emp'), { perms: { inbox: true } })));
 await check('…and then that employee can read comments', assertSucceeds(getDoc(doc(EMP, 'feedback', 'f1'))));
+// Employee settings for all employees
+await check("employees can't change Employee settings", assertFails(setDoc(doc(EMP, 'meta', 'employees'), { allow: { edit: true } })));
+await check('admin can change Employee settings', assertSucceeds(setDoc(doc(ADM, 'meta', 'employees'), { allow: { answer: true, photos: false } })));
+await check('a setting for all employees gives everyone that permission', assertSucceeds(updateDoc(doc(EMP, 'requests', 'q8'), { reply: 'Done by an employee' })));
+await check('switching an everyday permission off for all employees blocks it', assertFails(setDoc(doc(EMP, 'photos', 'p6'), { uid: 'emp', status: 'pending', img: 'x', thumb: 'x', recipeId: 'r-pub' })));
+await check("one person's own permission beats Employee settings", (async () => {
+  await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'users', 'rev'), { perms: { review: true, photos: true } }, { merge: true }); });
+  await assertSucceeds(setDoc(doc(REV, 'photos', 'p5'), { uid: 'rev', status: 'pending', img: 'x', thumb: 'x', recipeId: 'r-pub' }));
+})());
 await check('public member can suggest (allowed)', assertSucceeds(setDoc(doc(PUB, 'submissions', 's2'), sub('pub'))));
 await check("public member can't request (switched off)", assertFails(setDoc(doc(PUB, 'requests', 'q9'), rq('pub'))));
 await check("public member can't send photos (switched off)", assertFails(setDoc(doc(PUB, 'photos', 'p9'), { uid: 'pub', status: 'pending', img: 'x', thumb: 'x', recipeId: 'r-pub' })));
