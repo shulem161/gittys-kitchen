@@ -1,6 +1,6 @@
 {
-  "web": "3.55",
-  "apk": 9,
+  "web": "3.57",
+  "apk": 10,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New members join as public; an admin moves them up to employee or admin by hand."
+  "notes": "Stopping a timer on the phone also clears it in the app (app update). Categories as compact rows, Stop cooking button, and Clear list fixed."
 }

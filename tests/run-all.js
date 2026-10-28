@@ -246,6 +246,14 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.locator('.glist li', {hasText: 'flour'}).first().locator('.g-hv').click(); await A.waitForTimeout(150);
     await A.fill('#ghv-n', '5'); await A.click('.g-hvbox .solid'); await A.waitForTimeout(300);
     ok('having enough counts as ticked', (await A.locator('.glist li.have', {hasText: 'flour'}).count()) === 1);
+    await A.setViewportSize({width: 390, height: 844}); await A.goto(F + '#grocery'); await A.waitForTimeout(500);
+    await A.click('#g-clear'); await A.waitForTimeout(300);
+    const yesVisible = await A.locator('#g-yes').evaluate(el => { const b = el.getBoundingClientRect(); return b.top >= 0 && b.bottom <= innerHeight - 90; });
+    ok('Clear list asks right where you tapped, on a phone', yesVisible);
+    await A.click('#g-yes'); await A.waitForTimeout(300);
+    ok('Clear list empties the grocery list', (await A.locator('.glist li').count()) === 0 && await A.evaluate(() => gStore().items.length) === 0);
+    await A.setViewportSize({width: 1100, height: 900});
+    await A.goto(F + '#r-croissants'); await A.waitForTimeout(300); await A.click('#groc'); await A.waitForTimeout(300);
     // Today's to-do list
     await A.goto(F); await A.waitForTimeout(300);
     await A.fill('#td-new', 'Take out the chicken'); await A.click('#td-form .solid'); await A.waitForTimeout(200);
@@ -311,6 +319,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('bottom bar marks Categories', (await A.locator('#tabbar [aria-current=page]').innerText()).includes('Categories'));
     await A.goto(F + '#r-challah'); await A.waitForTimeout(300);
     ok('recipe page hides the bottom bar and shows Start cooking', !(await A.locator('#tabbar').isVisible()) && await A.locator('#cook').isVisible());
+    await A.click('#cook'); await A.waitForTimeout(200);
+    const cookOn = (await A.locator('#cook').innerText()).trim();
+    await A.click('#cook'); await A.waitForTimeout(200);
+    ok('Start cooking turns into Stop cooking, and back', cookOn === 'Stop cooking' && (await A.locator('#cook').innerText()).trim() === 'Start cooking', cookOn);
     ok('steps with a time get a timer button', (await A.locator('.tbtn').count()) >= 1);
     await A.locator('.tbtn').first().click({force: true}); await A.waitForTimeout(300);
     ok('timer button starts a timer and does not tick the step', (await A.evaluate(() => TIMERS.length)) === 1 && (await A.locator('.step.done').count()) === 0);
@@ -328,6 +340,12 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.locator('.tm [data-ta=pause]').click(); await A.waitForTimeout(200);
     const al = await A.evaluate(() => __al);
     ok('app timers go to the phone alarm, and pausing cancels it', al.includes('set Phone kugel') && al.includes('cancel'), al);
+    await A.evaluate(() => { window.__stopped = '0'; GKApp.lastStopped = () => __stopped; });
+    await A.locator('.tm [data-ta=resume]').click(); await A.waitForTimeout(200);
+    await A.evaluate(() => { TIMERS.find(x => x.label === 'Phone kugel').end = Date.now() - 500; }); await A.waitForTimeout(1500);
+    const ringingNow = await A.locator('#talarm').isVisible();
+    await A.evaluate(() => { __stopped = String(Date.now()); }); await A.waitForTimeout(1500);
+    ok('Stop on the phone clears the alarm in the app too', ringingNow && !(await A.locator('#talarm').isVisible()) && await A.evaluate(() => TIMERS.every(x => !x.rang || x.ack)));
     await A.evaluate(() => { delete window.GKApp; TIMERS = []; store('gk-native-alarms', []); saveTimers(); afterTimerChange(); });
     await A.goto(F); await A.waitForTimeout(300);
     await A.goto(F + '#c-cakes'); await A.waitForTimeout(300); await A.selectOption('[data-sortpage]', 'za'); await A.waitForTimeout(300);

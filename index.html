@@ -625,6 +625,15 @@ body.out .tabbar,body.on-recipe .tabbar{display:none}
 .home .cats.tools .cat{flex-direction:column;align-items:flex-start;gap:10px;padding:14px}
 @media (max-width:640px){.home .cats.tools{grid-template-columns:repeat(2,minmax(0,1fr))}.home .cats.tools .cat{flex-direction:column;align-items:flex-start;gap:8px}}
 .cats.tools .cat .ic{width:40px;height:40px}
+/* Categories as compact rows, like the recipe lists */
+.cats.rows{grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:6px}
+.cats.rows .cat{display:grid;grid-template-columns:40px minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:12px;row-gap:1px;align-items:center;padding:8px 12px 8px 8px;border-radius:12px}
+.cats.rows .cat:hover{transform:none}
+.cats.rows .cat .ic{grid-column:1;grid-row:1/3;width:40px;height:40px;border-radius:10px}
+.cats.rows .cat .ic svg{width:24px;height:24px}
+.cats.rows .cat h3{grid-column:2;grid-row:1;align-self:end;font-family:var(--body);font-weight:700;font-size:16px;line-height:1.25}
+.cats.rows .cat>span:last-child{grid-column:2;grid-row:2;align-self:start;margin:0;font-size:12.5px}
+.cats.rows .catcode{position:static;grid-column:3;grid-row:1/3;align-self:center;font-size:11px;padding:2px 8px}
 .cats.tools h3{font-family:var(--body);font-weight:700;font-size:15px;line-height:1.25}
 .cats.tools .tool-txt span{font-size:12.5px;margin-top:2px}
 /* recipe rows */
@@ -657,6 +666,7 @@ body.out .toast{bottom:calc(20px + env(safe-area-inset-bottom,0px))}
 .ractions{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--paper);border-top:1px solid var(--line);padding:10px max(16px,env(safe-area-inset-left,0px)) calc(10px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;gap:10px}
 .ractions .btn{flex:1;max-width:280px;min-height:50px;border-radius:14px;font-size:15.5px;font-weight:600;display:inline-flex;align-items:center;justify-content:center}
 .ractions .btn.solid{flex:1.4}
+.ractions .btn.cooking{background:#C2581A;border-color:#C2581A;color:#fff}
 .sbody p{margin:4px 0 0}
 .tbtns{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .tbtn{display:inline-flex;align-items:center;gap:5px;min-height:34px;padding:4px 12px;border-radius:999px;border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer}
@@ -900,7 +910,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.55";
+const WEB_VERSION = "3.57";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1221,7 +1231,7 @@ const DL_IC = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" strok
 function categoriesPage(){
   app.innerHTML = `<section class="wrap">
     <div class="section-head" style="margin-top:26px"><h2>Categories</h2><p>${RECIPES.length} recipes in ${CATS.length} categories</p></div>
-    <div class="cats" style="padding-bottom:18px">${catTiles()}</div>
+    <div class="cats rows" style="padding-bottom:18px">${catTiles()}</div>
     <div class="home-foot" style="margin-bottom:32px"><button class="btn" id="dl-book" type="button">${DL_IC}Download the whole cookbook</button></div>
   </section>`;
   const db0=document.getElementById("dl-book"); if(db0) db0.onclick=()=>downloadBook(CATS.filter(c=>RECIPES.some(r=>r.c===c)), db0);
@@ -1330,7 +1340,7 @@ function category(c){
   app.innerHTML = `<section class="wrap">${tabs(c)}
     <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}${!offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit"))?` · <a class="link" href="#new-${slug(c).slice(2)}">+ Add a recipe</a>${can("ai")?` · <a class="link" href="#scan-${slug(c).slice(2)}">Add from photo or file</a>`:""}`:""}</p></div>
     ${list.length?`<div class="cat-tools"><button class="btn" id="dl-cat" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download ${esc(c)}</button></div>`:""}
-    ${secs?`<div class="cats">${secs.map(s=>{ const n=list.filter(r=>secOf(r)===s).length;
+    ${secs?`<div class="cats rows">${secs.map(s=>{ const n=list.filter(r=>secOf(r)===s).length;
       const L=CODEMAP.cats[c], sl=CODEMAP.secs[c]&&CODEMAP.secs[c][s];
       return `<a class="cat" href="#${slug(c)}--${secSlug(s)}">${L&&sl?`<span class="catcode" title="Recipe codes start with ${L}${sl}">${L}${sl}</span>`:""}<div class="ic">${icon(SEC_ICON[s]||s)}</div><h3>${esc(s)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`; }).join("")}</div>` : ""}
     ${!secs && list.length>1 ? sortBar("cat", SO_CAT, so) : ""}
@@ -1448,7 +1458,7 @@ function recipe(r){
   </div>
   <div class="ractions">
     <button class="btn" id="groc" type="button" aria-pressed="${inList}">${TOOL_IC.cart.replace('<svg','<svg width="18" height="18" style="margin-right:6px"')}${inList?"On the list ✓":"Add to list"}</button>
-    <button class="btn solid" id="cook" type="button">${view==="steps"&&wakeLock?"Cooking · screen on":"Start cooking"}</button>
+    <button class="btn solid${cookingNow===r.id?" cooking":""}" id="cook" type="button" aria-pressed="${cookingNow===r.id}">${cookingNow===r.id?"Stop cooking":"Start cooking"}</button>
   </div>`;
   loadPhotos(r);
   app.querySelectorAll("a.rlink").forEach(a=>a.addEventListener("click", e=>e.stopPropagation()));
@@ -1482,10 +1492,18 @@ function recipe(r){
     app.querySelectorAll(".rtabs [data-view]").forEach(b=>b.setAttribute("aria-selected", b.dataset.view===v)); };
   app.querySelectorAll(".rtabs [data-view]").forEach(b=>b.onclick=()=>{ setView(b.dataset.view); const tb=app.querySelector(".rtabs"); if(tb.getBoundingClientRect().top<0||window.scrollY>tb.offsetTop) window.scrollTo(0, tb.offsetTop-70); });
   document.getElementById("cook").onclick=async e=>{
-    const b=e.currentTarget; setView("steps");
-    const on = await screenOn(true); const w=document.getElementById("wake");
+    const b=e.currentTarget, w=document.getElementById("wake");
+    if(cookingNow===r.id){   // Stop cooking: the screen may turn off again (unless a timer is running)
+      cookingNow=null; wakeByUser=false;
+      if(wakeLock && !timersRunning()){ await wakeLock.release().catch(()=>{}); wakeLock=null; if(w){ w.setAttribute("aria-pressed","false"); w.textContent="Keep screen on"; } }
+      b.textContent="Start cooking"; b.classList.remove("cooking"); b.setAttribute("aria-pressed","false");
+      toast(timersRunning() ? "Stopped cooking. The screen stays on while your timer runs." : "Stopped cooking. The screen can turn off again.");
+      return;
+    }
+    cookingNow=r.id; setView("steps");
+    const on = await screenOn(true);
     if(on && w){ w.setAttribute("aria-pressed","true"); w.textContent="Screen stays on"; }
-    b.textContent = on ? "Cooking · screen on" : "Cooking";
+    b.textContent="Stop cooking"; b.classList.add("cooking"); b.setAttribute("aria-pressed","true");
     const tb=app.querySelector(".rtabs"), first=app.querySelector(".step:not(.done)");
     if(tb && getComputedStyle(tb).display!=="none") window.scrollTo(0, tb.offsetTop-70); else if(first) first.scrollIntoView({block:"center"});
     toast(on ? "Screen stays on while you cook. Tap a step when it's done." : "Tap a step when it's done.");
@@ -3165,12 +3183,13 @@ function groceryPage(){
         <div class="g-tools"><button type="button" class="btn sm" id="g-hide" aria-pressed="${hideHave}">${hideHave?"Show all":"Hide what I have"}</button>
         <button type="button" class="btn sm" id="g-copy">Copy</button>${navigator.share?`<button type="button" class="btn sm" id="g-share">Share</button>`:""}
         <button type="button" class="btn sm" id="g-clear">Clear list</button></div></div>
+      <div id="g-confirm"></div>
       <p class="hint">Tick what you already have. Have only part of it? Tap “I have some” and write how much; the list shows what's left to buy. ${haveN?`${haveN} of ${lines.length} covered.`:`${lines.length} items.`}</p>
       ${AISLE_ORDER.map(a=>{ const ls=lines.filter(l=>l.aisle===a).sort((x,y)=>x.name.localeCompare(y.name)); if(!ls.length) return "";
         return `<div class="g-aisle"><h4>${a}</h4><ul class="glist">${ls.map(l=>{ const h=g.have.includes(l.key)||l.enough; if(h&&hideHave) return "";
           const part=l.haveAmt!==undefined;
           return `<li class="${h?"have":""}${part?" g-partial":""}"><div class="g-row"><label><input type="checkbox" data-gk="${esc(l.key)}" ${h?"checked":""}><span class="g-q">${esc(part&&!h?l.buy:l.qty)}</span><span class="g-n">${esc(l.name)}${part?`<small class="g-part">${l.enough?`Have ${esc(l.haveTxt)}, that's enough`:`Need ${esc(l.qty)} · have ${esc(l.haveTxt)}`}</small>`:""}${l.from.size>1||g.items.length>1?`<small>${esc([...l.from].join(", "))}</small>`:""}</span></label>${l.grp!=="none"&&!g.have.includes(l.key)?`<button type="button" class="btn sm g-hv" data-ghv="${esc(l.key)}">${part?"Change":"I have some"}</button>`:""}</div></li>`; }).join("")}</ul></div>`; }).join("")}
-      <div id="g-confirm"></div></div>`:""}
+      </div>`:""}
   </section>`;
   const $=id=>document.getElementById(id);
   app.querySelectorAll("[data-gx]").forEach(s=>s.onchange=()=>{ const v=gStore(); const it=v.items.find(i=>i.id===s.dataset.gx); if(it){ it.x=+s.value; gSave(v); groceryPage(); } });
@@ -3202,8 +3221,8 @@ function groceryPage(){
   const hb=$("g-hide"); if(hb) hb.onclick=()=>{ store("gk-hidehave", !store("gk-hidehave")); groceryPage(); };
   const cp=$("g-copy"); if(cp) cp.onclick=()=>copyText(groceryText(lines, gStore().have));
   const sh=$("g-share"); if(sh) sh.onclick=()=>navigator.share({title:"Grocery list", text:groceryText(lines, gStore().have)}).catch(()=>{});
-  const cl=$("g-clear"); if(cl) cl.onclick=()=>{ $("g-confirm").innerHTML=`<div class="confirm">Clear the whole grocery list? <div class="row"><button type="button" class="btn warn" id="g-yes">Clear</button><button type="button" class="btn" id="g-no">Cancel</button></div></div>`;
-    $("g-no").onclick=()=>{ $("g-confirm").innerHTML=""; }; $("g-yes").onclick=()=>{ gSave({items:[],have:[],part:{}}); renderAcct(); groceryPage(); }; };
+  const cl=$("g-clear"); if(cl) cl.onclick=()=>{ setTimeout(()=>$("g-confirm").scrollIntoView({block:"nearest"}),0); $("g-confirm").innerHTML=`<div class="confirm">Clear the whole grocery list? <div class="row"><button type="button" class="btn warn" id="g-yes">Clear</button><button type="button" class="btn" id="g-no">Cancel</button></div></div>`;
+    $("g-no").onclick=()=>{ $("g-confirm").innerHTML=""; }; $("g-yes").onclick=()=>{ gSave({items:[],have:[],part:{}}); renderAcct(); groceryPage(); window.scrollTo(0,0); toast("Grocery list cleared"); }; };
 }
 
 /* ---------- menu ideas ---------- */
@@ -3636,7 +3655,8 @@ async function profilePage(){
 /* ---------- timers (kept on this device; several can run at once) ---------- */
 const TIMER_IC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg>';
 const BELL_IC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>';
-const viewNow = {};                       // recipe id → which tab is showing (ing / steps / notes)
+const viewNow = {};
+let cookingNow = null;                    // recipe id while "Start cooking" is on                       // recipe id → which tab is showing (ing / steps / notes)
 let wakeByUser=false, wakeByTimer=false;
 async function screenOn(user){
   if(user) wakeByUser=true; else wakeByTimer=true;
@@ -3753,6 +3773,12 @@ function tickTimers(){
     x.rang=true; x.doneAt=x.end; x.ack = now-x.end > 10*60e3;   // finished long ago while the app was closed: show it as done, don't ring
     x.end=null; x.left=0; changed=true; if(!x.ack) notifyDone(x); }
   if(changed){ saveTimers(); drawTimers(); }
+  // Stopped on the phone itself (the notification's Stop, or swiped away): clear it here too
+  if(nativeAlarm() && typeof GKApp.lastStopped==="function" && TIMERS.some(x=>x.rang && !x.ack)){
+    let st=0; try{ st=+GKApp.lastStopped()||0; }catch(e){}
+    const hit=TIMERS.filter(x=>x.rang && !x.ack && st >= (x.doneAt||0));
+    if(hit.length){ hit.forEach(x=>x.ack=true); saveTimers(); drawTimers(); }
+  }
   const ringing = TIMERS.filter(x=>x.rang && !x.ack);
   if(ringing.length && alarmIv && now-alarmAt > 5*60e3){ silenceAll(); return; }   // rang 5 minutes with nobody there
   if(ringing.length && state==="approved") startAlarm(ringing); else stopAlarm();
