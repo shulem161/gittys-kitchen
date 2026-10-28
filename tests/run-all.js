@@ -190,6 +190,25 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#r-bobbys-challah'); await A.waitForTimeout(500);
     ok('linked recipe shows Use it in', /Use it in:\s*Croissants/i.test(await A.locator('.links-box').innerText().catch(() => '')));
 
+    // Meat / dairy colors
+    await A.goto(F); await A.waitForTimeout(400);
+    const tileBgs = await A.$$eval('.cat', els => [...new Set(els.map(e => getComputedStyle(e).backgroundColor))]);
+    ok('main menu tiles are all the same gray', tileBgs.length === 1, tileBgs);
+    await A.goto(F + '#c-meat'); await A.waitForTimeout(400);
+    ok('meat recipes are red', await A.$$eval('.rc', els => els.length > 0 && els.every(e => e.classList.contains('k-meat'))));
+    await A.goto(F + '#c-dairy'); await A.waitForTimeout(400);
+    ok('dairy recipes are blue', await A.$$eval('.rc', els => els.length > 0 && els.every(e => e.classList.contains('k-dairy'))));
+    await A.goto(F + '#c-cookies'); await A.waitForTimeout(400);
+    const ck = await A.$$eval('.rc', els => els.map(e => e.className));
+    ok('other recipes are gray', ck.filter(c => /k-other/.test(c)).length > ck.length * 0.8, ck.slice(0, 3));
+    const bg = c => A.$eval('.rc.' + c, e => getComputedStyle(e).backgroundColor).catch(() => '');
+    await A.goto(F + '#c-side-dish'); await A.waitForTimeout(400);
+    const [bm, bo] = [await bg('k-meat'), await bg('k-other')];
+    ok('red and gray really differ', bm && bo && bm !== bo, [bm, bo]);
+    await A.goto(F + '#edit-r-bobbys-challah'); await A.waitForTimeout(500);
+    await A.selectOption('#ed-k', 'dairy'); await A.click('#edform .primary'); await A.waitForTimeout(800);
+    ok('admin can mark a recipe dairy', await A.$eval('.rhead', e => e.classList.contains('k-dairy')));
+
     // Search
     await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);
     ok('search finds recipes', await V.locator('.rc').count() >= 3);

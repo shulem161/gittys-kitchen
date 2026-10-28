@@ -1,6 +1,6 @@
 {
-  "web": "3.31",
+  "web": "3.32",
   "apk": 8,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New: Forgot password codes, recovery codes, and linking recipes (Make first / Use it in)."
+  "notes": "New: meat recipes are red, dairy blue, everything else gray."
 }
