@@ -116,6 +116,20 @@ service cloud.firestore {
       allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
     }
 
+    // Recipe requests from members ("I need a recipe for…", optional small photo). Only the admin sees them all.
+    match /requests/{id} {
+      allow create: if approvedMember()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'open'
+        && request.resource.data.reply == '' && request.resource.data.recipeId == ''
+        && request.resource.data.items is list && request.resource.data.items.size() <= 12
+        && request.resource.data.text is string && request.resource.data.text.size() <= 800
+        && request.resource.data.photo is string && request.resource.data.photo.size() < 120000;
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+    }
+
     // Member profiles. New members always start as "pending";
     // only the admin can approve, deny or remove them.
     match /users/{uid} {

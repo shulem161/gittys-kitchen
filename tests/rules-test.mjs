@@ -107,6 +107,17 @@ await check('admin moves admin to the new sign-in', assertSucceeds(setDoc(doc(A2
 await check('admin has full rights on the new sign-in', assertSucceeds(updateDoc(doc(A2, 'users', 'other'), { status: 'approved' })));
 await check('the old admin sign-in is no longer admin', assertFails(setDoc(doc(AD, 'recipes', 'r-z'), { t: 'X', c: 'Cakes' })));
 
+// ---------- Recipe requests ----------
+const rq = (uid, extra) => Object.assign({ uid, byName: 'X', items: [{ ask: 'kugel', found: [] }], text: 'kugel', photo: '', status: 'open', reply: '', recipeId: '', created: 1 }, extra || {});
+await check('member can ask for a recipe', assertSucceeds(setDoc(doc(OT, 'requests', 'q1'), rq('other'))));
+await check("can't ask in someone else's name", assertFails(setDoc(doc(OT, 'requests', 'q2'), rq('rivky2'))));
+await check("can't send a request already answered", assertFails(setDoc(doc(OT, 'requests', 'q3'), rq('other', { status: 'done' }))));
+await check("can't send a huge photo", assertFails(setDoc(doc(OT, 'requests', 'q4'), rq('other', { photo: 'x'.repeat(130000) }))));
+await check("other members can't read it", assertFails(getDoc(doc(as('rivky2'), 'requests', 'q1'))));
+await check('admin can read and answer it', assertSucceeds(updateDoc(doc(A2, 'requests', 'q1'), { status: 'done', reply: 'Added!' })));
+await check("member can't mark it answered", assertFails(updateDoc(doc(OT, 'requests', 'q1'), { status: 'done' })));
+await check('member can delete own request', assertSucceeds(deleteDoc(doc(OT, 'requests', 'q1'))));
+
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(`::notice::Rule checks: ${pass} passed, ${fail} failed`);
