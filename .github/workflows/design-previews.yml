@@ -13,7 +13,7 @@ jobs:
         with:
           node-version: 20
       - run: npm i --no-save playwright@1.48.2 && npx playwright install --with-deps chromium
-      - run: node tools/design-previews.mjs
+      - run: node tools/design-previews.mjs > out.txt 2>&1 || { echo "::error::$(tail -c 700 out.txt | tr '\n' ' ')"; exit 1; }
       - name: Combine into one sheet per design
         run: |
           for l in classic warm garden shabbos modern; do
