@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [design-previews]
+permissions:
+  contents: write
 jobs:
   shots:
     runs-on: ubuntu-latest
@@ -19,7 +21,9 @@ jobs:
           for l in classic warm garden shabbos modern; do
             convert previews/$l-*.png -resize 50% +append -bordercolor white -border 20 previews/sheet-$l.png || true
           done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: design-previews
-          path: previews/*.png
+      - name: Save screenshots to the design-previews-out branch
+        run: |
+          mkdir -p /tmp/out && cp previews/*-[1-4]-*.png /tmp/out/
+          git config user.name "github-actions" && git config user.email "actions@github.com"
+          git checkout --orphan design-previews-out && git rm -rqf . && cp /tmp/out/*.png . && git add *.png
+          git commit -qm "Design preview screenshots" && git push -f origin design-previews-out
