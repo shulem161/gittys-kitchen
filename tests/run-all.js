@@ -447,6 +447,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('duplicates page lists pairs with how alike they are', nd >= 1 && /\d+%/.test(await A.locator('.dup-pct').first().innerText()), nd);
     await A.locator('.dup [data-dupok]').first().click(); await A.waitForTimeout(600);
     ok('"Not duplicates" hides the pair', (await A.locator('.dup').count()) === nd - 1);
+    await A.reload(); await A.waitForTimeout(1200);
+    ok('…and it stays hidden after refreshing the page', (await A.locator('.dup').count()) === nd - 1, await A.locator('.dup').count());
+    await A.evaluate(() => store('gk-dupes-ignore', null)); await A.reload(); await A.waitForTimeout(1200);
+    ok('…even on a device that never saw it (loaded from the cookbook)', (await A.locator('.dup').count()) === nd - 1, await A.locator('.dup').count());
     await A.click('#dup-unhide'); await A.waitForTimeout(500);
     ok('hidden pairs can be shown again', (await A.locator('.dup').count()) === nd);
     ok('Duplicate recipes is under Recipes in the menu', await A.evaluate(() => { openMenu(); const ok = !!document.querySelector('.mgroup[data-mg=recipes] a[href="#dupes"]') && !document.querySelector('.mgroup[data-mg=manage] a[href="#dupes"]'); closeMenu(); return ok; }));

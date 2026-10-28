@@ -980,7 +980,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.63";
+const WEB_VERSION = "3.64";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1851,7 +1851,7 @@ function renderAcct(){
 }
 /* ---------- duplicate recipes (admins): whole recipes compared, not only names ---------- */
 const DUP_STOP = new Set("a an and the of to in on with for or at by it its into then until about over from as is be are this that each your you add mix put let".split(" "));
-let DUP_IGNORE = new Set(), unsubDupes = null, _dupMemo = null;
+let DUP_IGNORE = new Set(store("gk-dupes-ignore")||[]), unsubDupes = null, _dupMemo = null;   // kept on the device too, so hidden pairs stay hidden while it loads
 function dupWords(lines){
   return lines.join(" ").toLowerCase().replace(/½/g," 1/2").replace(/¼/g," 1/4").replace(/¾/g," 3/4").replace(/⅓/g," 1/3").replace(/⅔/g," 2/3")
     .replace(/\[\[|\]\]/g," ").replace(/[^a-z0-9/ ]+/g," ").split(/\s+/).filter(w=>w && !DUP_STOP.has(w));
@@ -1880,8 +1880,13 @@ function findDupes(min){
 }
 function watchDupes(){
   if(unsubDupes || !db || !isAdmin()) return;
-  unsubDupes = db.collection("meta").doc("dupes").onSnapshot(s=>{ DUP_IGNORE = new Set((s.exists && s.data().ignore) || []);
-    if(state==="approved" && /^#?(dupes)?$/.test(location.hash) && !document.querySelector(".editor, .tools-page, #td-new:focus")) route(); }, ()=>{});
+  unsubDupes = db.collection("meta").doc("dupes").onSnapshot(s=>{
+    const list=(s.exists && s.data().ignore) || [], changed = list.length!==DUP_IGNORE.size || list.some(k=>!DUP_IGNORE.has(k));
+    DUP_IGNORE = new Set(list); store("gk-dupes-ignore", list);
+    if(!changed || state!=="approved") return;
+    if(location.hash==="#dupes"){ const y=window.scrollY; dupesPage(); window.scrollTo(0,y); }   // redraw the duplicates page once the saved list arrives
+    else if(/^#?$/.test(location.hash) && !document.querySelector(".editor, .tools-page, #td-new:focus")) route();
+  }, ()=>{});
 }
 function dupBanner(){
   if(!isAdmin() || offline || !recipesOnline) return "";
@@ -1920,9 +1925,9 @@ function dupesPage(){
       : `<div class="panel-a"><p class="hint" style="margin:0">No duplicate recipes at this level. Nice and tidy.</p></div>`}
   </section>`;
   document.getElementById("dup-min").onchange=e=>{ dupMin=+e.target.value; dupesPage(); };
-  const un=document.getElementById("dup-unhide"); if(un) un.onclick=async()=>{ try{ await db.collection("meta").doc("dupes").set({ignore:[]}); DUP_IGNORE=new Set(); dupesPage(); }catch(e){ toast("Couldn't save. Check your connection."); } };
+  const un=document.getElementById("dup-unhide"); if(un) un.onclick=async()=>{ try{ await db.collection("meta").doc("dupes").set({ignore:[]}); DUP_IGNORE=new Set(); store("gk-dupes-ignore", []); dupesPage(); }catch(e){ toast("Couldn't save. Check your connection."); } };
   app.querySelectorAll("[data-dupok]").forEach(b=>b.onclick=async()=>{ const k=b.dataset.dupok, ig=[...new Set([...DUP_IGNORE,k])];
-    b.disabled=true; try{ await db.collection("meta").doc("dupes").set({ignore:ig}); DUP_IGNORE=new Set(ig); toast("Marked as not duplicates"); const y=window.scrollY; dupesPage(); window.scrollTo(0,y); }
+    b.disabled=true; try{ await db.collection("meta").doc("dupes").set({ignore:ig}); DUP_IGNORE=new Set(ig); store("gk-dupes-ignore", ig); toast("Marked as not duplicates"); const y=window.scrollY; dupesPage(); window.scrollTo(0,y); }
     catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); } });
   app.querySelectorAll("[data-dupdel]").forEach(b=>b.onclick=()=>{ const r=RECIPES.find(x=>x.id===b.dataset.dupdel); if(!r) return;
     const box=b.closest(".dup").querySelector(".dup-confirm");

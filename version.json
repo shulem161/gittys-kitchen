@@ -1,6 +1,6 @@
 {
-  "web": "3.63",
+  "web": "3.64",
   "apk": 11,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Duplicate recipes moved to the Recipes part of the menu."
+  "notes": "Fix: recipes marked Not duplicates stay hidden after refreshing."
 }
