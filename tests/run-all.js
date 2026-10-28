@@ -33,7 +33,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('admin is let in right away', (await A.locator('.eyebrow').innerText()).includes('SHULEM'));
     ok('admin sees "put recipes online"', await A.locator('#importbtn').count() === 1);
     await A.click('#importbtn'); await A.waitForTimeout(900);
-    const total = +(await A.locator('.stat b').first().innerText());
+    await A.goto(F + '#categories'); await A.waitForTimeout(300);
+    const total = parseInt(await A.locator('.section-head p').first().innerText());
     ok('recipes go online', total > 100, total);
     const B = await page(); await join(B, 'Test Member', 'member1');
     ok('new member waits for approval', (await B.locator('h2').innerText()) === 'Waiting for approval');
@@ -268,7 +269,25 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.click('#lookpanel [data-look="classic"]'); await A.waitForTimeout(200);
     // New recipes
     await A.goto(F); await A.waitForTimeout(300);
-    ok('New recipes is the first tile on the home page', /New recipes/.test(await A.locator('.cats:not(.tools) .cat').first().innerText()));
+    ok('New recipes is the first button on the home page', /New recipes/.test(await A.locator('.home .tabs .tab').first().innerText()));
+    await A.goto(F + '#categories'); await A.waitForTimeout(300);
+    ok('New recipes is the first tile in Categories', /New recipes/.test(await A.locator('.cats .cat').first().innerText()));
+    // Bottom tab bar and timers
+    ok('bottom bar marks Categories', (await A.locator('#tabbar [aria-current=page]').innerText()).includes('Categories'));
+    await A.goto(F + '#r-challah'); await A.waitForTimeout(300);
+    ok('recipe page hides the bottom bar and shows Start cooking', !(await A.locator('#tabbar').isVisible()) && await A.locator('#cook').isVisible());
+    ok('steps with a time get a timer button', (await A.locator('.tbtn').count()) >= 1);
+    await A.locator('.tbtn').first().click({force: true}); await A.waitForTimeout(300);
+    ok('timer button starts a timer and does not tick the step', (await A.evaluate(() => TIMERS.length)) === 1 && (await A.locator('.step.done').count()) === 0);
+    ok('running timer shows in the pill', await A.locator('#tpill').isVisible());
+    await A.goto(F + '#timers'); await A.waitForTimeout(300); await A.fill('#tm-name', 'Test kugel'); await A.click('[data-tq="600"]'); await A.waitForTimeout(300);
+    ok('timers page lists both timers', (await A.locator('.tm').count()) === 2 && /Test kugel/.test(await A.locator('#tm-list').innerText()));
+    await A.evaluate(() => { TIMERS.find(x => x.label === 'Test kugel').end = Date.now() - 500; }); await A.waitForTimeout(1500);
+    ok('finished timer rings', await A.locator('#talarm').isVisible() && /Test kugel/.test(await A.locator('#talarm').innerText()));
+    await A.click('#talarm-stop'); await A.waitForTimeout(300);
+    ok('Stop silences the alarm', !(await A.locator('#talarm').isVisible()));
+    await A.evaluate(() => { TIMERS = []; saveTimers(); afterTimerChange(); });
+    await A.goto(F); await A.waitForTimeout(300);
     await A.goto(F + '#c-cakes'); await A.waitForTimeout(300); await A.selectOption('[data-sortpage]', 'za'); await A.waitForTimeout(300);
     const za = await A.locator('.rc h3').allInnerTexts();
     ok('sort Z to A works', za.length > 2 && za.every((x, i) => !i || za[i - 1].replace(/^Untitled:\s*/, '').localeCompare(x.replace(/^Untitled:\s*/, ''), undefined, {sensitivity: 'base', numeric: true}) >= 0), za.slice(0, 4));

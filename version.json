@@ -1,6 +1,6 @@
 {
-  "web": "3.48",
+  "web": "3.49",
   "apk": 8,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New: choose a design for the cookbook in My profile."
+  "notes": "New look: a menu bar at the bottom, recipes as a list, Ingredients / Steps / Notes tabs, and kitchen timers."
 }
