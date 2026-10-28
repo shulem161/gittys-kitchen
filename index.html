@@ -499,16 +499,21 @@ function store(key,val){
 
 /* ---------- online accounts (Firebase) ---------- */
 const FIREBASE_CONFIG = /*FIREBASE*/{"apiKey": "AIzaSyC6khY66tYIbhpH7aLSlb68BNopt_cT8DU", "authDomain": "gittys-kitchen.firebaseapp.com", "projectId": "gittys-kitchen", "storageBucket": "gittys-kitchen.firebasestorage.app", "messagingSenderId": "490546783263", "appId": "1:490546783263:web:1241118153141fa97ea12a"};
-const ADMIN_NAME = "Shulem Schlesinger";
+// The admin is the account saved in meta/admin (uid + name). Before that existed, it was whoever owned
+// the name "Shulem Schlesinger"; that name stays reserved for the admin and is the fallback.
 const nameKey = n => String(n).trim().replace(/\s+/g," ").toLowerCase();
-const ADMIN_KEY = nameKey(ADMIN_NAME);
+const ADMIN_KEY = "shulem schlesinger";
+const _adm = store("gk-admin") || {};
+let ADMIN_NAME = _adm.name || "Shulem Schlesinger", adminUid = _adm.uid || null;
+function setAdminInfo(d){ if(!d || !d.uid) return; adminUid=d.uid; ADMIN_NAME=d.name||ADMIN_NAME; store("gk-admin",{uid:adminUid,name:ADMIN_NAME}); }
+const isAdminMember = m => adminUid ? m.uid===adminUid : nameKey(m.name)===ADMIN_KEY;
 let auth=null, db=null;
 let me=null;            // signed-in user id
 let profile=null;       // {name, status, favs, created}
 let state="loading";    // loading | setup | offline-first | signedout | pending | denied | removed | error | approved
 let offline=false, pendingCreate=false;
-let unsubMe=null, unsubAll=null, members=[];
-const isAdmin = () => !!profile && nameKey(profile.name)===ADMIN_KEY;
+let unsubMe=null, unsubAll=null, members=[], adminReady=Promise.resolve();
+const isAdmin = () => !!profile && (adminUid ? me===adminUid : nameKey(profile.name)===ADMIN_KEY);
 const myName = () => profile ? profile.name : "";
 const uk = k => "gk-u-"+me+"-"+k;
 const favs = () => (profile && profile.favs) || [];
@@ -518,7 +523,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.29";
+const WEB_VERSION = "3.30";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -583,6 +588,9 @@ function boot(){
     auth=firebase.auth(); db=firebase.firestore();
     try{ db.enablePersistence({synchronizeTabs:true}).catch(()=>{}); }catch(e){}
   }catch(e){ return goOffline(); }
+  const adminDoc = db.collection("meta").doc("admin");
+  adminReady = Promise.race([adminDoc.get().then(s=>{ if(s.exists) setAdminInfo(s.data()); }).catch(()=>{}), new Promise(r=>setTimeout(r,4000))]);
+  try{ adminDoc.onSnapshot(s=>{ if(!s.exists) return; const was=adminUid; setAdminInfo(s.data()); renderAcct(); if(was!==adminUid && me) route(); }, ()=>{}); }catch(e){}
   auth.onAuthStateChanged(u=>{
     if(unsubMe){unsubMe();unsubMe=null}
     if(unsubAll){unsubAll();unsubAll=null;members=[]}
@@ -593,6 +601,8 @@ function boot(){
     if(!u){ me=null; profile=null; offline=false; state="signedout"; renderAcct(); return route(); }
     me=u.uid;
     if(!profile){ state="loading"; route(); }
+    const myUid=u.uid;
+    adminReady.then(()=>{ if(me!==myUid || unsubMe) return;
     unsubMe = db.collection("users").doc(u.uid).onSnapshot(s=>{
       if(!s.exists){ if(pendingCreate) return; profile=null; store("gk-cache",null); state="removed"; renderAcct(); return route(); }
       const was=state;
@@ -606,6 +616,7 @@ function boot(){
       const c=store("gk-cache");
       if(c && c.uid===u.uid){ profile=c.profile; offline=true; state=profile.status==="approved"?"approved":"pending"; renderAcct(); route(); }
       else { state="error"; route(); }
+    });
     });
   });
 }
@@ -670,18 +681,19 @@ async function deleteMe(){
 const cleanName = n => String(n).trim().replace(/\s+/g," ");
 async function renameMe(newName){
   const old=myName(), name=cleanName(newName), oldKey=nameKey(old), key=nameKey(name);
-  if(key===oldKey){ if(name!==old){ await db.collection("users").doc(me).update({name}); } return; }
-  if(key===ADMIN_KEY) throw {code:"gk/taken"};
+  if(key===oldKey){ if(name!==old){ await db.collection("users").doc(me).update({name}); if(isAdmin()){ await db.collection("meta").doc("admin").set({uid:me, name}); setAdminInfo({uid:me, name}); } } return; }
+  if(key===ADMIN_KEY && !isAdmin()) throw {code:"gk/taken"};
   const taken = await db.collection("names").doc(key).get();
-  if(taken.exists) throw {code:"gk/taken"};
+  if(taken.exists && taken.data().uid!==me) throw {code:"gk/taken"};
   const mine = await db.collection("names").doc(oldKey).get();
   const email = (mine.exists && mine.data().email) || auth.currentUser.email;
-  try{ await db.collection("names").doc(key).set({uid:me, email}); } catch(e){ throw {code:"gk/taken"}; }
+  if(!taken.exists){ try{ await db.collection("names").doc(key).set({uid:me, email}); } catch(e){ throw {code:"gk/taken"}; } }
+  if(isAdmin()){ await db.collection("meta").doc("admin").set({uid:me, name}); setAdminInfo({uid:me, name}); }
   const was=[...new Set([...(profile.was||[]), old])].slice(-20);
   try{ await db.collection("users").doc(me).update({name, was}); }
   catch(e){ await db.collection("names").doc(key).delete().catch(()=>{}); throw e; }
-  await db.collection("names").doc(oldKey).delete().catch(()=>{});
-  notifyAdmin(`${old} is now ${name}`, `${old} changed their name to ${name}. They sign in with the new name.`, "#admin", "pencil2");
+  if(oldKey!==ADMIN_KEY) await db.collection("names").doc(oldKey).delete().catch(()=>{});
+  if(!isAdmin()) notifyAdmin(`${old} is now ${name}`, `${old} changed their name to ${name}. They sign in with the new name.`, "#admin", "pencil2");
 }
 function errText(e){
   const c=(e&&e.code)||"";
@@ -953,7 +965,7 @@ const fmtDate = t => t ? new Date(t).toLocaleDateString(undefined,{month:"short"
 function adminPage(){
   const pend=members.filter(m=>m.status==="pending"), appr=members.filter(m=>m.status==="approved"), den=members.filter(m=>m.status==="denied");
   const row = (m,acts) => `<li class="mrow"><span class="avatar">${esc(initial(m.name))}</span>
-      <div class="mwho"><b>${esc(m.name)}${nameKey(m.name)===ADMIN_KEY?' <span class="tag">Admin</span>':""}</b><span>${m.status==="pending"?"Asked to join":"Joined"} ${fmtDate(m.created)}</span></div>
+      <div class="mwho"><b>${esc(m.name)}${isAdminMember(m)?' <span class="tag">Admin</span>':""}</b><span>${m.status==="pending"?"Asked to join":"Joined"} ${fmtDate(m.created)}</span></div>
       <div class="macts">${acts}</div></li>`;
   const btn = (act,m,label,cls) => `<button type="button" class="btn ${cls||""}" data-act="${act}" data-uid="${esc(m.uid)}">${label}</button>`;
   const list = (arr,f,empty) => arr.length ? `<ul class="mlist">${arr.map(f).join("")}</ul>` : `<p class="hint mempty">${empty}</p>`;
@@ -962,7 +974,7 @@ function adminPage(){
     <div class="panel-a"><h3>Waiting for approval ${pend.length?`<span class="count">${pend.length}</span>`:""}</h3>
       ${list(pend, m=>row(m, btn("approve",m,"Approve","solid")+btn("deny",m,"Deny")), "No one is waiting. New requests appear here right away.")}</div>
     <div class="panel-a"><h3>Members</h3>
-      ${list(appr, m=>row(m, nameKey(m.name)===ADMIN_KEY ? "" : btn("ask-remove",m,"Remove")), "No members yet.")}</div>
+      ${list(appr, m=>row(m, isAdminMember(m) ? "" : btn("ask-remove",m,"Remove")), "No members yet.")}</div>
     ${den.length?`<div class="panel-a"><h3>Not approved</h3>${list(den, m=>row(m, btn("approve",m,"Approve","solid")+btn("ask-remove",m,"Remove")), "")}</div>`:""}
   </section>`;
   app.querySelectorAll("[data-act]").forEach(b=>b.onclick=async()=>{
@@ -2027,8 +2039,7 @@ async function profilePage(){
       ${stat(isAdmin()?newFeedback():feedback.length, isAdmin()?"new messages":"messages sent", isAdmin()?"#inbox":"#feedback")}
     </div>
     <div class="panel-a" id="prof-list" hidden></div>
-    ${offline?"":isAdmin()?`<div class="panel-a"><h3>Your name</h3><p class="hint">Your name, ${esc(name)}, is what makes you the admin, so it can't be changed here.</p></div>`
-      :`<div class="panel-a"><h3>Change name</h3>
+    ${offline?"":`<div class="panel-a"><h3>Change name</h3>
       <form id="nameform" class="pw-form" novalidate>
         <div class="field"><label for="nm-new">Name</label><input id="nm-new" type="text" maxlength="40" autocomplete="name" value="${esc(name)}"></div>
         <p class="hint">You'll sign in with the new name from now on. Your password stays the same.</p>

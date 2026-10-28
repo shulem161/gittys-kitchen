@@ -143,8 +143,18 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('old name no longer signs in', /no member/i.test(await R.locator('.err').innerText()));
     await R.fill('#nm', 'test member two'); await R.fill('#pw', 'member2'); await R.click('.primary'); await R.waitForTimeout(500);
     ok('new name signs in', (await R.locator('.eyebrow').innerText().catch(() => '')).includes('TEST MEMBER TWO'));
+    // Admin renames themselves and stays admin
     await A.goto(F + '#profile'); await A.waitForTimeout(500);
-    ok("admin's name is locked", await A.locator('#nameform').count() === 0);
+    await A.fill('#nm-new', 'Shulem'); await A.click('#nameform .primary'); await A.waitForTimeout(800);
+    ok('admin can change name', (await A.locator('.prof-head h2').innerText()) === 'Shulem');
+    ok('admin stays admin after rename', await A.evaluate(() => isAdmin()) && /Admin/.test(await A.locator('.prof-head .hint').innerText()));
+    await R.goto(F + '#feedback'); await R.waitForTimeout(500);
+    ok('members see the new admin name', /^Shulem reads/.test(await R.locator('.section-head p').first().innerText()));
+    await R.goto(F + '#profile'); await R.waitForTimeout(400); await R.fill('#nm-new', 'Shulem'); await R.click('#nameform .primary'); await R.waitForTimeout(500);
+    ok("member can't take the admin's new name", /already taken/.test(await R.locator('#nm-err').innerText()));
+    const Q = await page(); await Q.evaluate(() => localStorage.removeItem('gk-admin')); await Q.reload(); await Q.waitForTimeout(400);
+    await Q.fill('#nm', 'shulem'); await Q.fill('#pw', 'admin123'); await Q.click('.primary'); await Q.waitForTimeout(800);
+    ok('admin signs in with the new name on a new device and is still admin', await Q.evaluate(() => isAdmin()));
 
     // Search
     await B.goto(F); await B.waitForTimeout(300); await B.fill('#q', 'challah'); await B.waitForTimeout(300);
