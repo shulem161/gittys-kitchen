@@ -28,11 +28,31 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'public');
     }
     function isAdmin() { return isOwner() || (approvedMember() && myRole() == 'admin'); }
-    // Public members may do only what the owner/admins allow in meta/public (on unless switched off).
+    // Everyday permissions: employees have their own (users/{uid}.perms, on unless switched off);
+    // public members share meta/public (on unless switched off). Admins can always.
     function can(k) {
       let p = /databases/$(database)/documents/meta/public;
-      return approvedMember()
-        && (myRole() != 'public' || !exists(p) || get(p).data.get('allow', {}).get(k, true) == true);
+      let me = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return isAdmin()
+        || (approvedMember()
+            && ((me.get('role', 'public') == 'employee' && me.get('perms', {}).get(k, true) == true)
+                || (me.get('role', 'public') == 'public' && (!exists(p) || get(p).data.get('allow', {}).get(k, true) == true))));
+    }
+    // Extra permissions an admin grants one employee at a time (off unless granted).
+    function extra(k) {
+      let me = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return isAdmin()
+        || (approvedMember() && me.get('role', 'public') == 'employee' && me.get('perms', {}).get(k, false) == true);
+    }
+    // Who may write recipes: admins, and employees allowed to edit or to approve.
+    // Those employees can't change whether the public sees a recipe; new recipes follow their category.
+    function publishOk() {
+      let p = /databases/$(database)/documents/meta/public;
+      return isAdmin()
+        || ((extra('edit') || extra('review'))
+            && (resource == null
+                ? request.resource.data.get('pub', true) == (!exists(p) || get(p).data.get('cats', {}).get(request.resource.data.c, true) != false)
+                : request.resource.data.get('pub', null) == resource.data.get('pub', null)));
     }
     // Admins may manage employees and public members, but never the owner or another admin.
     function canManage(uid) {
@@ -57,7 +77,7 @@ service cloud.firestore {
     }
     match /meta/codes {
       allow get: if signedIn();
-      allow write: if isAdmin();
+      allow write: if isAdmin() || extra('edit') || extra('review');
     }
 
     // Who the owner is and the name shown for them. Only the owner can change it, and only to themselves.
@@ -116,7 +136,7 @@ service cloud.firestore {
     match /recipes/{id} {
       allow read: if isAdmin()
         || (approvedMember() && (myRole() != 'public' || resource.data.get('pub', false) == true));
-      allow write: if isAdmin();
+      allow write: if publishOk();
     }
 
     // Recipes sent in by members. Only the admin sees all of them and decides.
@@ -124,9 +144,9 @@ service cloud.firestore {
       allow create: if can('suggest')
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.status == 'pending';
-      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
-      allow update: if isAdmin();
-      allow delete: if isAdmin()
+      allow read: if extra('review') || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update: if extra('review');
+      allow delete: if extra('review')
         || (signedIn() && resource.data.uid == request.auth.uid && resource.data.status == 'pending');
     }
 
@@ -135,14 +155,14 @@ service cloud.firestore {
       allow create: if can('photos')
         && request.resource.data.uid == request.auth.uid
         && (request.resource.data.status == 'pending'
-            || (request.resource.data.status == 'approved' && isAdmin()))
+            || (request.resource.data.status == 'approved' && extra('review')))
         && request.resource.data.img is string && request.resource.data.img.size() < 900000
         && request.resource.data.thumb is string && request.resource.data.thumb.size() < 80000;
-      allow read: if isAdmin()
+      allow read: if extra('review')
         || (signedIn() && resource.data.uid == request.auth.uid)
         || (resource.data.status == 'approved' && approvedMember());
-      allow update: if isAdmin();
-      allow delete: if isAdmin()
+      allow update: if extra('review');
+      allow delete: if extra('review')
         || (signedIn() && resource.data.uid == request.auth.uid && resource.data.status == 'pending');
     }
 
@@ -153,9 +173,9 @@ service cloud.firestore {
         && request.resource.data.status == 'new'
         && request.resource.data.reply == ''
         && request.resource.data.text is string && request.resource.data.text.size() <= 1500;
-      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
-      allow update: if isAdmin();
-      allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow read: if extra('inbox') || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update: if extra('inbox');
+      allow delete: if extra('inbox') || (signedIn() && resource.data.uid == request.auth.uid);
     }
 
     // Recipe requests from members ("I need a recipe for…", optional small photo). Only the admin sees them all.
@@ -167,9 +187,9 @@ service cloud.firestore {
         && request.resource.data.items is list && request.resource.data.items.size() <= 12
         && request.resource.data.text is string && request.resource.data.text.size() <= 800
         && request.resource.data.photo is string && request.resource.data.photo.size() < 120000;
-      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
-      allow update: if isAdmin();
-      allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow read: if extra('answer') || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update: if extra('answer');
+      allow delete: if extra('answer') || (signedIn() && resource.data.uid == request.auth.uid);
     }
 
     // Member profiles. New members always start as "pending";

@@ -398,9 +398,20 @@ body.out .bar, body.out footer{display:none}
 .pub-row{display:flex;gap:12px;align-items:center;padding:10px 2px;cursor:pointer;font-size:15.5px}
 .pub-row input{width:22px;height:22px;flex:none;accent-color:var(--accent)}
 .pub-cats{list-style:none;margin:8px 0 0;padding:0}
-.pub-cats li{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line)}
+.pub-cats li{padding:10px 0;border-top:1px solid var(--line)}
 .pub-cats li:first-child{border-top:0}
-.pub-cats li>div:first-child{display:grid}
+.pub-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.pub-top>div:first-child{display:grid}
+.pub-pick summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:14px;padding:8px 0 2px;min-height:36px;display:flex;align-items:center;gap:6px}
+.pub-list{display:grid;padding:4px 0 6px 4px}
+.pub-sec{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--wheat);margin:12px 0 2px}
+.pub-rec{display:flex;gap:12px;align-items:center;padding:8px 2px;border-bottom:1px solid var(--line);cursor:pointer;font-size:15px}
+.pub-rec input{width:22px;height:22px;flex:none;accent-color:var(--accent)}
+.pub-rec small{color:var(--muted);font-size:12px;margin-left:4px}
+.pub-hits{display:grid;margin-bottom:6px}
+.permbox{flex-basis:100%;margin:4px 0 4px 52px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.perm-h{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--wheat);margin:10px 0 0}
+@media (max-width:640px){.permbox{margin-left:0}}
 .pub-btns{display:flex;gap:6px}
 .pub-btns .btn.on{background:var(--accent);border-color:var(--accent);color:var(--paper)}
 .mempty{margin:6px 0 2px}
@@ -576,6 +587,9 @@ a.btn.solid{color:var(--paper)}
 
 /* ---------- Everyday app layout: bottom tab bar, list rows, recipe tabs, timers ---------- */
 body{background-image:none;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+/* iPhone/iPad: no rubber-band bounce, which dragged the bottom bars along with the page */
+html,body{overscroll-behavior-y:none}
+.tabbar,.ractions,.tpill{transform:translateZ(0);-webkit-backface-visibility:hidden;backface-visibility:hidden}
 body.out{padding-bottom:0}
 .tilestripe{display:none}
 footer{padding-bottom:24px}
@@ -799,7 +813,7 @@ function nextCode(c, s){
   while(n<999 && usedCodes.has(pre+fmt(n))) n++;
   const code = pre + fmt(n);
   usedCodes.add(code);
-  if(JSON.stringify(CODEMAP)!==before && db && isAdmin()){ store("gk-codemap", CODEMAP); db.collection("meta").doc("codes").set(CODEMAP).catch(()=>{}); }
+  if(JSON.stringify(CODEMAP)!==before && db && mayPublish()){ store("gk-codemap", CODEMAP); db.collection("meta").doc("codes").set(CODEMAP).catch(()=>{}); }
   return code;
 }
 const preOf = r => ((r&&r.pre)||[]).map(id=>RECIPES.find(x=>x.id===id)).filter(Boolean);
@@ -853,19 +867,28 @@ const ROLE_LABEL = {owner:"Owner", admin:"Admin", employee:"Employee", public:"P
 // What public members may do; the owner and admins change this in Public portal settings (meta/public)
 const PUB_ALLOW = [["suggest","Suggest changes and send new recipes"],["photos","Send photos of dishes"],["requests","Request recipes"],["ai","AI tools: menu ideas and scanning recipes"],["feedback","Send suggestions and comments"]];
 let PUB = {allow:{}, cats:{}};
-const can = k => !isPublic() || PUB.allow[k]!==false;
+// Employees: each person has their own permissions (users/{uid}.perms). The everyday ones are on unless switched off;
+// the extras are off unless granted. Public members all share the Public portal settings. Admins can do everything.
+const EXTRA_PERMS = [["edit","Add and edit recipes directly, without approval"],["review","Approve suggested recipes and photos"],["answer","Answer recipe requests"],["inbox","Read and answer suggestions & comments"]];
+const isExtra = k => EXTRA_PERMS.some(x=>x[0]===k);
+const permOf = (m,k) => { const p=(m&&m.perms)||{}; return isExtra(k) ? p[k]===true : p[k]!==false; };
+const may = k => { if(isAdmin()) return true; if(!profile) return false;
+  if(isPublic()) return !isExtra(k) && PUB.allow[k]!==false;
+  return permOf(profile, k); };
+const can = may;
+const mayPublish = () => may("edit") || may("review");
 const pubDefault = c => PUB.cats[c]!==false;
 const pubVisible = r => r.pub===undefined ? pubDefault(r.c) : !!r.pub;
 const myName = () => profile ? profile.name : "";
 const uk = k => "gk-u-"+me+"-"+k;
 const favs = () => (profile && profile.favs) || [];
 const initial = n => (String(n).trim()[0]||"?").toUpperCase();
-const pendingCount = () => members.filter(m=>m.status==="pending").length + (isAdmin()?subs.filter(s=>s.status==="pending").length+pendingPhotos.length+newFeedback()+openRequests():0);
+const pendingCount = () => members.filter(m=>m.status==="pending").length + (may("review")?subs.filter(s=>s.status==="pending").length+pendingPhotos.length:0)+newFeedback()+openRequests();
 function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catch(e){for(let i=0;i<12;i++)a[i]=Math.random()*256|0} return [...a].map(b=>b.toString(16).padStart(2,"0")).join(""); }
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.51";
+const WEB_VERSION = "3.52";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -953,9 +976,9 @@ function boot(){
     adminReady.then(()=>{ if(me!==myUid || unsubMe) return;
     unsubMe = db.collection("users").doc(u.uid).onSnapshot(s=>{
       if(!s.exists){ if(pendingCreate) return; profile=null; store("gk-cache",null); state="removed"; renderAcct(); return route(); }
-      const was=state, wasRole = profile && profile.status==="approved" ? myRole() : null;
+      const was=state, wasRole = profile && profile.status==="approved" ? myRole() : null, wasPerms = JSON.stringify((profile&&profile.perms)||{});
       profile=s.data(); offline=false;
-      if(wasRole && profile.status==="approved" && wasRole!==myRole()){ store("gk-recipes", null); store("gk-recipes-pub", null); return location.reload(); }
+      if(wasRole && profile.status==="approved" && (wasRole!==myRole() || wasPerms!==JSON.stringify(profile.perms||{}))){ store("gk-recipes", null); store("gk-recipes-pub", null); return location.reload(); }
       if(profile.status==="approved" && isPublic() && !recipesOnline) setRecipes(store("gk-recipes-pub")||[]);
       state = profile.status==="approved" ? "approved" : profile.status==="denied" ? "denied" : "pending";
       cacheProfile(); renderAcct();
@@ -1214,15 +1237,15 @@ function home(){
       <a class="cat" href="#grocery"><div class="ic">${TOOL_IC.cart}</div><div class="tool-txt"><h3>Grocery list</h3><span>${gStore().items.length?`${gStore().items.length} ${gStore().items.length===1?"recipe":"recipes"} on it`:"Pick recipes, get one list"}</span></div></a>
       <a class="cat" href="#convert"><div class="ic">${TOOL_IC.calc}</div><div class="tool-txt"><h3>Calculator</h3><span>Double, halve, convert</span></div></a>
       ${offline||!can("ai")?"":`<a class="cat" href="#menu"><div class="ic">${TOOL_IC.menu}</div><div class="tool-txt"><h3>Menu ideas</h3><span>A full menu from the cookbook</span></div></a>`}
-      ${offline||(isAdmin()&&!recipesOnline)||!can("ai")||!can("suggest")?"":`<a class="cat" href="#scan"><div class="ic">${TOOL_IC.scan}</div><div class="tool-txt"><h3>Scan a recipe</h3><span>Photo, PDF or Word</span></div></a>`}
-      ${offline||!can("requests")?"":`<a class="cat" href="#requests"><div class="ic">${TOOL_IC.ask}</div><div class="tool-txt"><h3>${isAdmin()?"Recipe requests":"Request a recipe"}</h3><span>${isAdmin()?(openRequests()?`${openRequests()} waiting`:"What the family asks for"):"Ask for any recipe"}</span></div></a>`}
+      ${offline||(may("edit")&&!recipesOnline)||!can("ai")||!can("suggest")?"":`<a class="cat" href="#scan"><div class="ic">${TOOL_IC.scan}</div><div class="tool-txt"><h3>Scan a recipe</h3><span>Photo, PDF or Word</span></div></a>`}
+      ${offline||!can("requests")?"":`<a class="cat" href="#requests"><div class="ic">${TOOL_IC.ask}</div><div class="tool-txt"><h3>${may("answer")?"Recipe requests":"Request a recipe"}</h3><span>${may("answer")?(openRequests()?`${openRequests()} waiting`:"What the family asks for"):"Ask for any recipe"}</span></div></a>`}
     </div>
   </section>
   ${offline||!can("feedback")?"":`<section class="wrap"><div class="panel-a fb-card" style="margin-top:14px">
     <div class="ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/><path d="M8.5 11h7M8.5 14h4"/></svg></div>
-    <div class="fb-card-txt"><h3>${isAdmin()?"Suggestions &amp; comments":"Have a suggestion or a comment?"}</h3>
-      <p>${isAdmin()?(newFeedback()?`${newFeedback()} new ${newFeedback()===1?"message":"messages"} from members.`:"Messages from members appear here."):"Tell us what you'd like added or changed, or comment on a recipe. "+esc(ADMIN_NAME)+" reads every message."}</p></div>
-    <a class="btn solid" href="${isAdmin()?"#inbox":"#feedback"}">${isAdmin()?"Open inbox":"Send a message"}</a>
+    <div class="fb-card-txt"><h3>${may("inbox")?"Suggestions &amp; comments":"Have a suggestion or a comment?"}</h3>
+      <p>${may("inbox")?(newFeedback()?`${newFeedback()} new ${newFeedback()===1?"message":"messages"} from members.`:"Messages from members appear here."):"Tell us what you'd like added or changed, or comment on a recipe. "+esc(ADMIN_NAME)+" reads every message."}</p></div>
+    <a class="btn solid" href="${may("inbox")?"#inbox":"#feedback"}">${may("inbox")?"Open inbox":"Send a message"}</a>
   </div></section>`}
   <section class="wrap"><div class="home-foot"><button class="btn" id="dl-book" type="button">${DL_IC}Download the whole cookbook</button></div></section>`;
   const ib=document.getElementById("importbtn"); if(ib) ib.onclick=()=>importBundled(ib);
@@ -1293,7 +1316,7 @@ function category(c){
   const list = RECIPES.filter(r=>r.c===c);
   const secs = list.some(r=>r.sec) ? sectionsOf(list) : null, so = sortChoice("cat", SO_CAT, "code");
   app.innerHTML = `<section class="wrap">${tabs(c)}
-    <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}${!offline&&(!isAdmin()||recipesOnline)&&can("suggest")?` · <a class="link" href="#new-${slug(c).slice(2)}">+ Add a recipe</a>${can("ai")?` · <a class="link" href="#scan-${slug(c).slice(2)}">Add from photo or file</a>`:""}`:""}</p></div>
+    <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}${!offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit"))?` · <a class="link" href="#new-${slug(c).slice(2)}">+ Add a recipe</a>${can("ai")?` · <a class="link" href="#scan-${slug(c).slice(2)}">Add from photo or file</a>`:""}`:""}</p></div>
     ${list.length?`<div class="cat-tools"><button class="btn" id="dl-cat" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download ${esc(c)}</button></div>`:""}
     ${secs?`<div class="cats">${secs.map(s=>{ const n=list.filter(r=>secOf(r)===s).length;
       const L=CODEMAP.cats[c], sl=CODEMAP.secs[c]&&CODEMAP.secs[c][s];
@@ -1379,7 +1402,7 @@ function recipe(r){
       <div class="scale" role="group" aria-label="How much to make"><span>Make</span>${(SCALES.includes(sx)?SCALES:[...SCALES,sx].sort((a,b)=>a-b)).map(x=>`<button type="button" class="btn sm${x===sx?" on":""}" data-sx="${x}" aria-pressed="${x===sx}">${x===1?"1×":fmtNum(x)+"×"}</button>`).join("")}<a class="link" href="#convert-${r.id}">Calculator</a></div>
       ${sx!==1?`<p class="hint scale-note">Amounts are for ${fmtNum(sx)}× the recipe. Pan size and baking time may need adjusting.</p>`:""}
       <div class="tools">
-        ${recipesOnline&&!offline&&can("suggest")?`<a class="btn solid" href="#edit-${r.id}">${isAdmin()?"Edit recipe":"Suggest changes"}</a>`:""}
+        ${recipesOnline&&!offline&&(can("suggest")||may("edit"))?`<a class="btn solid" href="#edit-${r.id}">${may("edit")?"Edit recipe":"Suggest changes"}</a>`:""}
         ${isAdmin()&&recipesOnline&&!offline?`<button class="btn" id="pubtog" type="button" aria-pressed="${pubVisible(r)}">${pubVisible(r)?"Public can see it ✓":"Hidden from public"}</button>`:""}
         <button class="btn" id="td-rec" type="button" aria-pressed="${inToday(r.id)}">${inToday(r.id)?"On today's list ✓":"Add to today"}</button>
         <a class="btn" href="#timers-${r.id}">${TIMER_IC.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Set a timer</a>
@@ -1572,6 +1595,7 @@ function authScreen(msg){
 /* ---------- admin: approve members ---------- */
 const fmtDate = t => t ? new Date(t).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}) : "";
 const shownCodes={};
+const openPerms = new Set();   // employees whose permissions are showing on the Members page
 function adminPage(){
   const pend=members.filter(m=>m.status==="pending"), appr=members.filter(m=>m.status==="approved"), den=members.filter(m=>m.status==="denied");
   const row = (m,acts) => `<li class="mrow"><span class="avatar">${esc(initial(m.name))}</span>
@@ -1583,15 +1607,23 @@ function adminPage(){
   const manage = m => m.uid!==me && !isAdminMember(m) && (isOwner() || roleOf(m)!=="admin");
   const roleSel = m => `<label class="rolesel"><span class="sr">Role for ${esc(m.name)}</span><select data-role="${esc(m.uid)}">${(isOwner()?["public","employee","admin"]:["public","employee"]).map(r=>`<option value="${r}" ${roleOf(m)===r?"selected":""}>${ROLE_LABEL[r]}</option>`).join("")}</select></label>`;
   const order = {owner:0, admin:1, employee:2, public:3};
+  const permsBox = m => `<div class="permbox" data-pbox="${esc(m.uid)}"><p class="hint">What ${esc(m.name)} may do. Only this person changes.</p>
+    <div class="perm-h">Everyday (on unless you switch them off)</div>${PUB_ALLOW.map(([k,l])=>`<label class="pub-row"><input type="checkbox" data-pk="${k}" data-pu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span>${esc(l)}</span></label>`).join("")}
+    <div class="perm-h">Extra (off unless you allow them)</div>${EXTRA_PERMS.map(([k,l])=>`<label class="pub-row"><input type="checkbox" data-pk="${k}" data-pu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span>${esc(l)}</span></label>`).join("")}</div>`;
   app.innerHTML = `<section class="wrap admin">
     <div class="section-head" style="margin-top:28px"><h2>Approve members</h2><p>${members.length} ${members.length===1?"profile":"profiles"}</p></div>
     <div class="panel-a"><h3>Waiting for approval ${pend.length?`<span class="count">${pend.length}</span>`:""}</h3>
       ${list(pend, m=>row(m, btn("approve",m,"Approve as employee","solid")+btn("approve-public",m,"Approve as public")+btn("deny",m,"Deny")), "No one is waiting. New requests appear here right away.")}</div>
     <div class="panel-a"><h3>Members</h3>
       <p class="hint" style="margin-bottom:6px"><b>Employee</b>: everything members could always do. <b>Public</b>: only what you allow in <a class="link" href="#public">Public portal settings</a>. <b>Admin</b>: everything you can do, except changing you or other admins${isOwner()?" (only you make admins)":""}.</p>
-      ${list(appr.slice().sort((a,b)=>order[roleOf(a)]-order[roleOf(b)]), m=>row(m, manage(m) ? roleSel(m)+btn("reset",m,"Reset password")+btn("ask-remove",m,"Remove") : ""), "No members yet.")}</div>
+      ${list(appr.slice().sort((a,b)=>order[roleOf(a)]-order[roleOf(b)]), m=>row(m, manage(m) ? roleSel(m)+(roleOf(m)==="employee"?btn("perms",m,"Permissions"+(Object.keys(m.perms||{}).length?" ✓":"")):"")+btn("reset",m,"Reset password")+btn("ask-remove",m,"Remove") : "")+(openPerms.has(m.uid)&&roleOf(m)==="employee"&&manage(m)?permsBox(m):""), "No members yet.")}</div>
     ${den.length?`<div class="panel-a"><h3>Not approved</h3>${list(den, m=>row(m, btn("approve",m,"Approve as employee","solid")+btn("approve-public",m,"Approve as public")+btn("ask-remove",m,"Remove")), "")}</div>`:""}
   </section>`;
+  app.querySelectorAll("[data-pk]").forEach(c=>c.onchange=async()=>{ const m=members.find(x=>x.uid===c.dataset.pu); if(!m) return;
+    const k=c.dataset.pk, perms=Object.assign({}, m.perms||{});
+    if(c.checked === (isExtra(k) ? false : true)) delete perms[k]; else perms[k]=c.checked;   // store only what differs from normal
+    try{ await db.collection("users").doc(m.uid).update({perms}); m.perms=perms; toast(`${m.name}: ${c.checked?"allowed":"not allowed"}`); }
+    catch(e){ c.checked=!c.checked; toast("Couldn't save. Check your connection."); } });
   app.querySelectorAll("[data-role]").forEach(s=>s.onchange=async()=>{ const m=members.find(x=>x.uid===s.dataset.role); if(!m) return;
     s.disabled=true;
     try{ await db.collection("users").doc(m.uid).update({role:s.value}); toast(`${m.name} is now ${ROLE_LABEL[s.value].toLowerCase()==="admin"?"an admin":ROLE_LABEL[s.value].toLowerCase()}`); }
@@ -1600,6 +1632,7 @@ function adminPage(){
   app.querySelectorAll("[data-act]").forEach(b=>b.onclick=async()=>{
     const m=members.find(x=>x.uid===b.dataset.uid); if(!m) return;
     const act=b.dataset.act;
+    if(act==="perms"){ openPerms.has(m.uid) ? openPerms.delete(m.uid) : openPerms.add(m.uid); adminPage(); return; }
     if(act==="reset"){
       b.disabled=true;
       try{ shownCodes[m.uid]=await issueReset(m); adminPage(); }
@@ -1618,9 +1651,14 @@ function adminPage(){
     catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); }
   });
 }
+const pubOpen = new Set();   // categories left open in Public portal settings
 function publicPage(){
-  const cats = CATS.map(c=>{ const L=RECIPES.filter(r=>r.c===c), on=L.filter(r=>pubVisible(r)).length; return {c, n:L.length, on}; });
   const nPub = members.filter(m=>m.status==="approved" && roleOf(m)==="public").length;
+  const sum = c => { const L=RECIPES.filter(r=>r.c===c), on=L.filter(pubVisible).length;
+    return {n:L.length, on, txt: !L.length ? "No recipes yet" : on===L.length ? `All ${L.length} visible` : on ? `${on} of ${L.length} visible` : "All hidden"}; };
+  const recBox = r => `<label class="pub-rec"><input type="checkbox" data-pr="${esc(r.id)}" ${pubVisible(r)?"checked":""}><span>${noChip(r)} ${esc(r.t.replace(/^Untitled:\s*/,""))}</span></label>`;
+  const recList = c => { const L=RECIPES.filter(r=>r.c===c), secs=L.some(r=>r.sec) ? sectionsOf(L) : [null];
+    return secs.map(s=>{ const S=s===null?L:L.filter(r=>secOf(r)===s); return `${s!==null?`<div class="pub-sec">${esc(s)}</div>`:""}${S.map(recBox).join("")}`; }).join(""); };
   app.innerHTML = `<section class="wrap admin tools-page">
     <div class="section-head" style="margin-top:28px"><h2>Public portal</h2><p>${nPub} public ${nPub===1?"member":"members"} · <a class="link" href="#admin">Members</a></p></div>
     <div class="panel-a"><h3>What public members may do</h3>
@@ -1628,19 +1666,40 @@ function publicPage(){
       <div class="pub-allow">${PUB_ALLOW.map(([k,l])=>`<label class="pub-row"><input type="checkbox" data-pa="${k}" ${PUB.allow[k]!==false?"checked":""}><span>${esc(l)}</span></label>`).join("")}</div>
     </div>
     <div class="panel-a"><h3>Which recipes they see</h3>
-      <p class="hint">Choose by category here. To show or hide one recipe, open it and use the “Public can see it” button, or the box in Edit recipe. New recipes follow their category's setting.</p>
-      <ul class="pub-cats">${cats.map(x=>`<li><div><b>${esc(x.c)}</b><span class="hint">${x.on===x.n?(x.n?"All "+x.n+" visible":"No recipes yet"):x.on?`${x.on} of ${x.n} visible`:"Hidden"}</span></div>
-        <div class="pub-btns"><button type="button" class="btn sm${x.on===x.n&&x.n?" on":""}" data-pc="${esc(x.c)}" data-pv="1">Show all</button><button type="button" class="btn sm${!x.on&&x.n?" on":""}" data-pc="${esc(x.c)}" data-pv="0">Hide all</button></div></li>`).join("")}</ul>
+      <p class="hint">Tick the recipes public members may see. Open a category to choose recipe by recipe, or use Show all / Hide all for the whole category. A category is open to them as long as at least one of its recipes is ticked. New recipes follow their category's last Show all / Hide all.</p>
+      <div class="field" style="margin:12px 0 4px"><label for="pub-q">Find a recipe</label><input id="pub-q" type="search" autocomplete="off" placeholder="Type a name or code, e.g. kugel or LA012"></div>
+      <div class="pub-hits" id="pub-hits"></div>
+      <ul class="pub-cats">${CATS.map(c=>{ const x=sum(c);
+        return `<li data-pcat="${esc(c)}"><div class="pub-top"><div><b>${esc(c)}</b><span class="hint" data-psum>${x.txt}</span></div>
+          <div class="pub-btns"><button type="button" class="btn sm${x.on===x.n&&x.n?" on":""}" data-pc="${esc(c)}" data-pv="1">Show all</button><button type="button" class="btn sm${!x.on&&x.n?" on":""}" data-pc="${esc(c)}" data-pv="0">Hide all</button></div></div>
+          ${x.n?`<details class="pub-pick" data-pd="${esc(c)}" ${pubOpen.has(c)?"open":""}><summary>Choose recipes</summary><div class="pub-list">${pubOpen.has(c)?recList(c):""}</div></details>`:""}</li>`; }).join("")}</ul>
     </div>
   </section>`;
   const savePub = async patch => { const d={allow:Object.assign({},PUB.allow,patch.allow||{}), cats:Object.assign({},PUB.cats,patch.cats||{})};
     await db.collection("meta").doc("public").set(d); PUB=d; };
+  const refresh = c => { const li=[...app.querySelectorAll("[data-pcat]")].find(x=>x.dataset.pcat===c); if(!li) return; const x=sum(c);
+    li.querySelector("[data-psum]").textContent=x.txt;
+    const [sb,hb]=li.querySelectorAll("[data-pc]"); sb.classList.toggle("on", x.on===x.n&&x.n>0); hb.classList.toggle("on", !x.on&&x.n>0); };
+  const wireBoxes = root => root.querySelectorAll("[data-pr]").forEach(cb=>cb.onchange=async()=>{
+    const r=RECIPES.find(y=>y.id===cb.dataset.pr); if(!r) return; const v=cb.checked;
+    app.querySelectorAll(`[data-pr="${CSS.escape(r.id)}"]`).forEach(o=>o.checked=v);
+    try{ await db.collection("recipes").doc(r.id).update({pub:v}); r.pub=v; refresh(r.c); }
+    catch(e){ app.querySelectorAll(`[data-pr="${CSS.escape(r.id)}"]`).forEach(o=>o.checked=!v); toast("Couldn't save. Check your connection."); } });
+  app.querySelectorAll("[data-pd]").forEach(d=>d.addEventListener("toggle",()=>{ const c=d.dataset.pd;
+    if(d.open){ pubOpen.add(c); const box=d.querySelector(".pub-list"); if(!box.children.length){ box.innerHTML=recList(c); wireBoxes(box); } } else pubOpen.delete(c); }));
+  wireBoxes(app);
+  const pq=document.getElementById("pub-q"), hits=document.getElementById("pub-hits");
+  pq.oninput=()=>{ const s=pq.value.trim().toLowerCase(); if(!s){ hits.innerHTML=""; return; }
+    const L=RECIPES.filter(r=>r.t.toLowerCase().includes(s) || (codeOf(r)||"").toLowerCase()===s || (codeOf(r)||"").toLowerCase().startsWith(s) && s.length>=2).slice(0,30);
+    hits.innerHTML = L.length ? L.map(r=>recBox(r).replace("</span></label>",` <small>${esc(r.c)}</small></span></label>`)).join("") : `<p class="hint">No recipe matches.</p>`;
+    wireBoxes(hits); };
   app.querySelectorAll("[data-pa]").forEach(c=>c.onchange=async()=>{ try{ await savePub({allow:{[c.dataset.pa]:c.checked}}); toast(c.checked?"Public members can do this now":"Public members can't do this now"); }catch(e){ c.checked=!c.checked; toast("Couldn't save. Check your connection."); } });
   app.querySelectorAll("[data-pc]").forEach(b=>b.onclick=async()=>{ const c=b.dataset.pc, v=b.dataset.pv==="1";
     const ids=RECIPES.filter(r=>r.c===c).map(r=>r.id); b.disabled=true; b.textContent="Saving…";
     try{ await savePub({cats:{[c]:v}});
       for(let i=0;i<ids.length;i+=400){ const bt=db.batch(); ids.slice(i,i+400).forEach(id=>bt.update(db.collection("recipes").doc(id),{pub:v})); await bt.commit(); }
-      RECIPES.filter(r=>r.c===c).forEach(r=>r.pub=v); toast(`${c}: ${v?"public members can see these":"hidden from public members"}`); publicPage(); }
+      RECIPES.filter(r=>r.c===c).forEach(r=>r.pub=v); toast(`${c}: ${v?"public members can see all of these":"hidden from public members"}`);
+      const y=window.scrollY; publicPage(); window.scrollTo(0,y); }
     catch(e){ toast("Couldn't save. Check your connection."); publicPage(); } });
 }
 function copyText(s){
@@ -1662,7 +1721,7 @@ function renderAcct(){
   const ob=document.getElementById("offbar"); if(ob) ob.hidden = !(offline && state==="approved");
   if(state!=="approved"){ acct.innerHTML=""; return; }
   const open=!!acct.querySelector(".menu");
-  const pc = isAdmin() ? pendingCount() : 0;
+  const pc = (isAdmin()||may("review")||may("answer")||may("inbox")) ? pendingCount() : 0;
   acct.innerHTML = `<button class="avatar" id="avbtn" aria-label="Account menu for ${esc(myName())}${pc?`, ${pc} waiting for approval`:""}" aria-haspopup="true">${esc(initial(myName()))}${pc?`<span class="dot">${pc}</span>`:""}</button>`;
   document.getElementById("avbtn").onclick = e=>{ e.stopPropagation(); acct.querySelector(".menu") ? closeMenu() : openMenu(); };
   if(open) openMenu();
@@ -1674,12 +1733,12 @@ function openMenu(confirming){
   m.innerHTML = `<a class="who" href="#profile" role="menuitem"><b>${esc(myName())}</b><span>${ROLE_LABEL[myRole()]}${offline?" · offline":""} · My profile</span></a>
     ${isAdmin()?(()=>{const mp=members.filter(m=>m.status==="pending").length;return `<a href="#admin" role="menuitem">Approve members <span class="n${mp?" hot":""}">${mp?mp+" waiting":""}</span></a>`})():""}
     ${isAdmin()?`<a href="#public" role="menuitem">Public portal settings <span class="n"></span></a>`:""}
-    ${isAdmin()?`<a href="#review" role="menuitem">Approve recipes &amp; photos <span class="n${pendingSubs().length+pendingPhotos.length?" hot":""}">${pendingSubs().length+pendingPhotos.length?(pendingSubs().length+pendingPhotos.length)+" waiting":""}</span></a>`:""}
-    ${!offline&&(!isAdmin()||recipesOnline)&&can("suggest")?`<a href="#new" role="menuitem">Add a recipe <span class="n"></span></a>${can("ai")?`<a href="#scan" role="menuitem">Add from photo or file <span class="n"></span></a>`:""}`:""}
-    ${isAdmin()||(!can("suggest")&&!subs.length)?"":`<a href="#mine" role="menuitem">My recipes <span class="n">${subs.length||""}</span></a>`}
-    ${isAdmin()?`<a href="#inbox" role="menuitem">Suggestions &amp; comments <span class="n${newFeedback()?" hot":""}">${newFeedback()?newFeedback()+" new":""}</span></a>`:can("feedback")?`<a href="#feedback" role="menuitem">Suggestions &amp; comments <span class="n"></span></a>`:""}
+    ${may("review")?`<a href="#review" role="menuitem">Approve recipes &amp; photos <span class="n${pendingSubs().length+pendingPhotos.length?" hot":""}">${pendingSubs().length+pendingPhotos.length?(pendingSubs().length+pendingPhotos.length)+" waiting":""}</span></a>`:""}
+    ${!offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit"))?`<a href="#new" role="menuitem">Add a recipe <span class="n"></span></a>${can("ai")?`<a href="#scan" role="menuitem">Add from photo or file <span class="n"></span></a>`:""}`:""}
+    ${may("edit")||(!can("suggest")&&!subs.length)?"":`<a href="#mine" role="menuitem">My recipes <span class="n">${subs.length||""}</span></a>`}
+    ${may("inbox")?`<a href="#inbox" role="menuitem">Suggestions &amp; comments <span class="n${newFeedback()?" hot":""}">${newFeedback()?newFeedback()+" new":""}</span></a>`:can("feedback")?`<a href="#feedback" role="menuitem">Suggestions &amp; comments <span class="n"></span></a>`:""}
     <a href="#favorites" role="menuitem">My favorites <span class="n">${favs().length}</span></a>
-    ${offline||!can("requests")?"":isAdmin()?`<a href="#requests" role="menuitem">Recipe requests <span class="n${openRequests()?" hot":""}">${openRequests()?openRequests()+" waiting":""}</span></a>`:`<a href="#requests" role="menuitem">Request a recipe <span class="n"></span></a>`}
+    ${offline||!(can("requests")||may("answer"))?"":may("answer")?`<a href="#requests" role="menuitem">Recipe requests <span class="n${openRequests()?" hot":""}">${openRequests()?openRequests()+" waiting":""}</span></a>`:`<a href="#requests" role="menuitem">Request a recipe <span class="n"></span></a>`}
     <a href="#recent" role="menuitem">New recipes <span class="n">${recentList(7*864e5).length||""}</span></a>
     <a href="#grocery" role="menuitem">Grocery list <span class="n">${gStore().items.length||""}</span></a>
     ${offline||!can("ai")?"":`<a href="#menu" role="menuitem">Menu ideas <span class="n"></span></a>`}
@@ -1777,7 +1836,7 @@ function adminBanner(){
 /* ---------- recipe editor (admin) ---------- */
 function editor(r, cat, sub, draft){
   const isNew = !r;
-  const suggest = !isAdmin();
+  const suggest = !(sub ? may("review") : may("edit"));
   const editOf = r ? r.id : (sub && sub.editOf ? sub.editOf : "");
   const target = editOf ? RECIPES.find(x=>x.id===editOf) : null;
   const src = r || (sub ? fromDoc(sub.id, sub) : null) || draft || null;
@@ -1788,7 +1847,7 @@ function editor(r, cat, sub, draft){
   const catList = CATS.includes(catNow) || !catNow ? CATS : [...CATS, catNow];
   const pre = ((src && src.pre!==undefined ? src.pre : target && target.pre)||[]).filter(id=>RECIPES.some(x=>x.id===id));
   const selfId = r ? r.id : target ? target.id : "";
-  const rqDraft = (!r && !sub && isAdmin()) ? store("gk-rq-draft") : null;
+  const rqDraft = (!r && !sub && may("answer") && may("edit")) ? store("gk-rq-draft") : null;
   if(rqDraft) store("gk-rq-draft", null);
   const draw = () => {
     app.innerHTML = `<section class="wrap editor">
@@ -1919,7 +1978,7 @@ let unsubSubs = null;
 const pendingSubs = () => subs.filter(s=>s.status==="pending");
 function watchSubs(){
   if(unsubSubs || !db || !me) return;
-  const q = isAdmin() ? db.collection("submissions") : db.collection("submissions").where("uid","==",me);
+  const q = may("review") ? db.collection("submissions") : db.collection("submissions").where("uid","==",me);
   unsubSubs = q.onSnapshot(s=>{
     subs = s.docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(b.created||0)-(a.created||0));
     renderAcct();
@@ -1996,7 +2055,7 @@ let unsubPendingPhotos = null;
 let unsubRecipePhotos = [];      // listeners for the recipe page that's open
 const PHOTO_MAX = 1200, THUMB_MAX = 360;
 function watchPendingPhotos(){
-  if(unsubPendingPhotos || !db || !isAdmin()) return;
+  if(unsubPendingPhotos || !db || !may("review")) return;
   unsubPendingPhotos = db.collection("photos").where("status","==","pending").onSnapshot(s=>{
     pendingPhotos = s.docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(a.created||0)-(b.created||0));
     renderAcct();
@@ -2044,7 +2103,7 @@ function loadPhotos(r){
     if(!approved.length && !waiting.length){ g.innerHTML = `<p class="hint">No photos yet. Made this recipe? Add a photo of how it came out.</p>`; return; }
     g.innerHTML = approved.map(p=>`<figure class="ph"><button type="button" class="ph-open" data-id="${esc(p.id)}" aria-label="View photo by ${esc(p.byName||"a member")}"><img src="${p.thumb}" alt="${esc(r.t)} by ${esc(p.byName||"a member")}" loading="lazy"></button>
         <figcaption>${esc(p.byName||"")}${p.caption?` · ${esc(p.caption)}`:""}</figcaption>
-        ${isAdmin()?`<div class="ph-admin"><button type="button" class="btn sm" data-cover="${esc(p.id)}">${r.coverPhoto===p.id?"Card photo ✓":"Use on card"}</button><button type="button" class="btn sm" data-del="${esc(p.id)}">Remove</button></div>`:""}</figure>`).join("")
+        ${may("review")?`<div class="ph-admin"><button type="button" class="btn sm" data-cover="${esc(p.id)}">${r.coverPhoto===p.id?"Card photo ✓":"Use on card"}</button><button type="button" class="btn sm" data-del="${esc(p.id)}">Remove</button></div>`:""}</figure>`).join("")
       + waiting.map(p=>`<figure class="ph wait"><img src="${p.thumb}" alt="Your photo, waiting for approval"><figcaption><span class="pill wait">Waiting for approval</span></figcaption></figure>`).join("");
     g.querySelectorAll(".ph-open").forEach(b=>b.onclick=()=>{ const p=approved.find(x=>x.id===b.dataset.id); if(p) lightbox(p, r); });
     g.querySelectorAll("[data-cover]").forEach(b=>b.onclick=async()=>{ const p=approved.find(x=>x.id===b.dataset.cover);
@@ -2062,7 +2121,7 @@ function loadPhotos(r){
   const col = db.collection("photos");
   unsubRecipePhotos.push(col.where("recipeId","==",r.id).where("status","==","approved").onSnapshot(s=>{
     approved = s.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>(a.created||0)-(b.created||0)); draw(); }, ()=>{ approved=[]; draw(); }));
-  if(!isAdmin()) unsubRecipePhotos.push(col.where("recipeId","==",r.id).where("uid","==",me).onSnapshot(s=>{
+  if(!may("review")) unsubRecipePhotos.push(col.where("recipeId","==",r.id).where("uid","==",me).onSnapshot(s=>{
     mine = s.docs.map(d=>Object.assign({id:d.id},d.data())); draw(); }, ()=>{}));
   // Photos waiting to be sent (several can be taken or chosen before sending).
   let shots=[];
@@ -2074,25 +2133,25 @@ function loadPhotos(r){
       <div class="ph-new-thumbs">${shots.map((s,i)=>`<div class="ph-thumb"><img src="${s.thumb}" alt="New photo ${i+1}"><button type="button" class="ph-x" data-rm="${i}" aria-label="Remove photo ${i+1}">✕</button></div>`).join("")}
         <label class="ph-more" for="ph-cam" aria-label="Take another photo">+</label></div>
       <div class="ph-new-form"><div class="field"><label for="ph-cap">Caption (optional)</label><input id="ph-cap" type="text" maxlength="80" placeholder="e.g. Made it for Shabbos" value="${esc(pick.dataset.cap||"")}"></div>
-      <p class="hint">${shots.length} ${shots.length===1?"photo":"photos"}. ${isAdmin()?"They will appear on the recipe right away.":`${esc(ADMIN_NAME)} will approve them before everyone can see them.`}</p>
-      <div class="row"><button type="button" class="btn solid" id="ph-send">${isAdmin()?(shots.length>1?`Add ${shots.length} photos`:"Add photo"):"Send for approval"}</button><button type="button" class="btn" id="ph-cancel">Cancel</button></div></div></div>`;
+      <p class="hint">${shots.length} ${shots.length===1?"photo":"photos"}. ${may("review")?"They will appear on the recipe right away.":`${esc(ADMIN_NAME)} will approve them before everyone can see them.`}</p>
+      <div class="row"><button type="button" class="btn solid" id="ph-send">${may("review")?(shots.length>1?`Add ${shots.length} photos`:"Add photo"):"Send for approval"}</button><button type="button" class="btn" id="ph-cancel">Cancel</button></div></div></div>`;
     const cap=document.getElementById("ph-cap"); cap.oninput=()=>pick.dataset.cap=cap.value;
     pick.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ shots.splice(+b.dataset.rm,1); drawPick(); });
     document.getElementById("ph-cancel").onclick=()=>{ shots=[]; pick.dataset.cap=""; drawPick(); };
     document.getElementById("ph-send").onclick=async e=>{
       const btn=e.currentTarget; btn.disabled=true;
-      const caption=document.getElementById("ph-cap").value.trim(), status=isAdmin()?"approved":"pending";
+      const caption=document.getElementById("ph-cap").value.trim(), status=may("review")?"approved":"pending";
       let sent=0;
       try{
         for(const shot of shots.slice()){
           btn.textContent=`Uploading ${sent+1} of ${shots.length}…`;
           const id="p-"+newId();
           await db.collection("photos").doc(id).set({recipeId:r.id, recipeTitle:r.t, uid:me, byName:myName(), caption, img:shot.img, thumb:shot.thumb, status, created:Date.now()+sent});
-          if(isAdmin() && !r.cover){ await db.collection("recipes").doc(r.id).update({cover:shot.thumb, coverPhoto:id}).catch(()=>{}); r.cover=shot.thumb; r.coverPhoto=id; }
+          if(may("review") && !r.cover){ await db.collection("recipes").doc(r.id).update({cover:shot.thumb, coverPhoto:id}).catch(()=>{}); r.cover=shot.thumb; r.coverPhoto=id; }
           sent++;
         }
-        if(!isAdmin()) notifyAdmin(`${sent>1?sent+" new photos":"New photo"} from ${myName()}`, `${sent>1?"Photos":"A photo"} of “${r.t}” ${sent>1?"are":"is"} waiting for your approval.`, "#review", "camera");
-        toast(isAdmin()?(sent>1?`${sent} photos added`:"Photo added"):`${sent>1?sent+" photos":"Photo"} sent to ${ADMIN_NAME} for approval`);
+        if(!may("review")) notifyAdmin(`${sent>1?sent+" new photos":"New photo"} from ${myName()}`, `${sent>1?"Photos":"A photo"} of “${r.t}” ${sent>1?"are":"is"} waiting for your approval.`, "#review", "camera");
+        toast(may("review")?(sent>1?`${sent} photos added`:"Photo added"):`${sent>1?sent+" photos":"Photo"} sent to ${ADMIN_NAME} for approval`);
         shots=[]; pick.dataset.cap=""; drawPick();
       }catch(err){ shots=shots.slice(sent); drawPick(); toast(sent?`${sent} sent. The rest couldn't upload; check your connection and try again.`:"Couldn't upload. Check your internet connection and try again."); }
     };
@@ -2538,7 +2597,7 @@ function scanPage(cat){
     <a class="back" href="${cat?"#"+slug(cat):"#"}">← Cancel</a>
     <div class="panel-a scan">
       <h2>Add from a photo or file</h2>
-      <p class="sub">Take a picture of a recipe, or choose a PDF, a Word document or a text file. The recipes are read and set out neatly so you can check them before ${isAdmin()?"adding them":"sending them to "+esc(ADMIN_NAME)+" for approval"}.</p>
+      <p class="sub">Take a picture of a recipe, or choose a PDF, a Word document or a text file. The recipes are read and set out neatly so you can check them before ${may("edit")?"adding them":"sending them to "+esc(ADMIN_NAME)+" for approval"}.</p>
       <div class="scan-btns">
         <label class="primary scan-btn" for="scan-cam"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take a photo</label>
         <label class="btn scan-btn2" for="scan-file"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg>Choose photos</label>
@@ -2586,7 +2645,7 @@ function scanPage(cat){
       return localParse(src.text, fc).map(r=>({id:"", c:r.c||fc, t:r.t, by:r.by, n:undefined, s:r.s})); };
     const showDrafts = (drafts, how) => {
       if(how) toast(how);
-      if(drafts.length===1){ toast("Recipe read. Check it, then "+(isAdmin()?"add it.":"send it for approval.")); editor(null, cat, null, drafts[0]); }
+      if(drafts.length===1){ toast("Recipe read. Check it, then "+(may("edit")?"add it.":"send it for approval.")); editor(null, cat, null, drafts[0]); }
       else importList(drafts, cat);
     };
     if(src.text){ const ld=localDrafts(); if(ld.length>=2 && localParse(src.text,"").usedToc){ showDrafts(ld); return; } }
@@ -2622,7 +2681,7 @@ function importList(drafts, cat){
     <button type="button" class="back linkbtn" id="imp-back">← Start over</button>
     <div class="panel-a scan">
       <h2>${drafts.length} recipes found</h2>
-      <p class="sub">Untick any you don't want and check the categories. ${isAdmin()?"They'll be added to the cookbook.":"Each one goes to "+esc(ADMIN_NAME)+" for approval, who can also fix anything."}</p>
+      <p class="sub">Untick any you don't want and check the categories. ${may("edit")?"They'll be added to the cookbook.":"Each one goes to "+esc(ADMIN_NAME)+" for approval, who can also fix anything."}</p>
       <ul class="imp-list">${drafts.map((d,i)=>`<li class="imp" data-i="${i}">
         <label class="imp-pick"><input type="checkbox" ${have.has(norm(d.t))?"":"checked"} aria-label="Keep ${esc(d.t)}"></label>
         <div class="imp-body"><b>${esc(d.t)}</b>${have.has(norm(d.t))?`<span class="pill wait dup">Already in the cookbook</span>`:""}<span class="hint">${d.by?"From "+esc(d.by)+" · ":""}${nIng(d)} ingredients · ${nSteps(d)} steps</span>
@@ -2630,29 +2689,29 @@ function importList(drafts, cat){
         <select class="imp-cat" aria-label="Category for ${esc(d.t)}">${catOpts(d.c)}</select>
       </li>`).join("")}</ul>
       <p class="err" id="imp-err" role="alert" hidden></p>
-      <div><button class="primary" id="imp-go" type="button">${isAdmin()?"Add these recipes":"Send these for approval"}</button></div>
+      <div><button class="primary" id="imp-go" type="button">${may("edit")?"Add these recipes":"Send these for approval"}</button></div>
     </div></section>`;
   document.getElementById("imp-back").onclick=()=>{ scanPage(cat); window.scrollTo(0,0); };
   document.getElementById("imp-go").onclick=async e=>{
     const btn=e.currentTarget, rows=[...app.querySelectorAll(".imp")].filter(li=>li.querySelector("input").checked);
     const err=document.getElementById("imp-err");
     if(!rows.length){ err.textContent="Tick at least one recipe."; err.hidden=false; return; }
-    if(isAdmin() && !recipesOnline){ err.textContent="Put the recipes online first, from the home page."; err.hidden=false; return; }
+    if(may("edit") && !recipesOnline){ err.textContent="Put the recipes online first, from the home page."; err.hidden=false; return; }
     btn.disabled=true; let done=0;
     try{
       for(const li of rows){
         const d=Object.assign({}, drafts[+li.dataset.i], {c: li.querySelector(".imp-cat").value});
-        btn.textContent=`${isAdmin()?"Adding":"Sending"}… ${done+1} of ${rows.length}`;
-        if(isAdmin()){ const rec=Object.assign({}, d, {id:newRecipeId(d.t), ord:Date.now(), code:nextCode(d.c, "")}); withHistory(rec, null, "added", myName());
+        btn.textContent=`${may("edit")?"Adding":"Sending"}… ${done+1} of ${rows.length}`;
+        if(may("edit")){ const rec=Object.assign({}, d, {id:newRecipeId(d.t), ord:Date.now(), code:nextCode(d.c, "")}); withHistory(rec, null, "added", myName());
           await db.collection("recipes").doc(rec.id).set(toDoc(rec), {merge:true}); onlineIds.add(rec.id); }
         else { const doc=toDoc(Object.assign({}, d, {ord:0}));
           await db.collection("submissions").doc("s-"+newId()).set({c:doc.c,t:doc.t,by:doc.by,n:doc.n,s:doc.s, uid:me, byName:myName(), status:"pending", created:Date.now(), editOf:""}); }
         done++;
       }
-      if(!isAdmin()) notifyAdmin(`${done} new ${done===1?"recipe":"recipes"} from ${myName()}`, `Waiting for your approval.`, "#review", "cookie");
-      toast(isAdmin()?`${done} recipes added`:`${done} recipes sent to ${ADMIN_NAME} for approval`);
-      location.hash = isAdmin() ? "" : "mine";
-    }catch(x){ btn.disabled=false; btn.textContent=isAdmin()?"Add these recipes":"Send these for approval"; err.textContent=`Stopped after ${done} of ${rows.length}. Check your internet connection and try again.`; err.hidden=false; }
+      if(!may("edit")) notifyAdmin(`${done} new ${done===1?"recipe":"recipes"} from ${myName()}`, `Waiting for your approval.`, "#review", "cookie");
+      toast(may("edit")?`${done} recipes added`:`${done} recipes sent to ${ADMIN_NAME} for approval`);
+      location.hash = may("edit") ? "" : "mine";
+    }catch(x){ btn.disabled=false; btn.textContent=may("edit")?"Add these recipes":"Send these for approval"; err.textContent=`Stopped after ${done} of ${rows.length}. Check your internet connection and try again.`; err.hidden=false; }
   };
 }
 
@@ -2661,15 +2720,15 @@ let feedback = [];            // admin: everyone's messages; member: their own
 let unsubFeedback = null;
 const FB_KINDS = {suggestion:"Suggestion", comment:"Comment", problem:"Problem"};
 const FB_STATUS = {new:"New", planned:"Planned", done:"Done", closed:"Closed"};
-const newFeedback = () => isAdmin() ? feedback.filter(f=>f.status==="new").length : 0;
+const newFeedback = () => may("inbox") ? feedback.filter(f=>f.status==="new").length : 0;
 function watchFeedback(){
   if(unsubFeedback || !db || !me) return;
-  const q = isAdmin() ? db.collection("feedback") : db.collection("feedback").where("uid","==",me);
+  const q = may("inbox") ? db.collection("feedback") : db.collection("feedback").where("uid","==",me);
   unsubFeedback = q.onSnapshot(s=>{
     feedback = s.docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(b.created||0)-(a.created||0));
     renderAcct();
     if(/^#(feedback|inbox)/.test(location.hash) && !document.activeElement?.matches?.("textarea,input")) route();
-    else if((location.hash===""||location.hash==="#") && !document.getElementById("q").value.trim() && isAdmin()) route();
+    else if((location.hash===""||location.hash==="#") && !document.getElementById("q").value.trim() && may("inbox")) route();
   }, ()=>{});
 }
 const fbPill = s => `<span class="pill ${s==="done"?"ok":s==="closed"?"no":s==="planned"?"plan":"wait"}">${FB_STATUS[s]||"New"}</span>`;
@@ -3179,15 +3238,15 @@ function showMenu(menu, opts, via){
    The cookbook is searched first (and the AI looks at the photo); anything not found goes to the admin. */
 let requests = [];            // admin: everyone's; member: their own
 let unsubRequests = null;
-const openRequests = () => isAdmin() ? requests.filter(r=>r.status==="open").length : 0;
+const openRequests = () => may("answer") ? requests.filter(r=>r.status==="open").length : 0;
 function watchRequests(){
   if(unsubRequests || !db || !me) return;
-  const q = isAdmin() ? db.collection("requests") : db.collection("requests").where("uid","==",me);
+  const q = may("answer") ? db.collection("requests") : db.collection("requests").where("uid","==",me);
   unsubRequests = q.onSnapshot(s=>{
     requests = s.docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(b.created||0)-(a.created||0));
     renderAcct();
     if(!/^#requests/.test(location.hash)) return;
-    if(isAdmin()){ if(!document.activeElement?.matches?.("textarea,input,select")) route(); }
+    if(may("answer")){ if(!document.activeElement?.matches?.("textarea,input,select")) route(); }
     else { const box=document.getElementById("rq-mine"); if(box) box.innerHTML=mineHTML(); }
   }, ()=>{});
 }
@@ -3204,7 +3263,7 @@ function findInBook(ask){
   }).filter(x=>x.all || x.score>=3*Math.max(1,want.length-1)).sort((a,b)=>b.score-a.score).slice(0,4).map(x=>x.r);
 }
 function requestsPage(){
-  if(isAdmin()) return requestsAdminPage();
+  if(may("answer")) return requestsAdminPage();
   const mine = requests;
   app.innerHTML = `<section class="wrap admin">
     <div class="section-head" style="margin-top:28px"><h2>Request a recipe</h2><p>We'll look in the cookbook first</p></div>
@@ -3290,15 +3349,15 @@ function reqItem(q){
   return `<li class="rq-item">
     ${q.photo?`<img class="rq-img" src="${q.photo}" alt="">`:""}
     <div><div class="rq-what">${(q.items||[]).map(i=>esc(i.ask)).join(" · ")}</div>
-      <div class="hint">${isAdmin()?`From ${esc(q.byName||"a member")} · `:""}${fmtDate(q.created)} · <span class="pill ${q.status==="open"?"wait":"ok"}">${RQ_STATUS[q.status]||"Waiting"}</span></div>
+      <div class="hint">${may("answer")?`From ${esc(q.byName||"a member")} · `:""}${fmtDate(q.created)} · <span class="pill ${q.status==="open"?"wait":"ok"}">${RQ_STATUS[q.status]||"Waiting"}</span></div>
       ${rec?`<a class="link" href="#${rec.id}">${esc(rec.t)}</a>`:""}
       ${q.reply?`<div class="fb-reply"><b>${esc(ADMIN_NAME)}:</b> ${esc(q.reply)}</div>`:""}
-      ${isAdmin()&&q.status==="open"?`<div class="rq-acts">
+      ${may("answer")&&q.status==="open"?`<div class="rq-acts">
         <a class="btn sm solid" href="#new" data-rqnew="${esc(q.id)}">Add the recipe</a>
         <input class="rq-reply" data-rqid="${esc(q.id)}" type="text" maxlength="300" placeholder="Reply (optional)">
         <select class="rq-link" data-rqid="${esc(q.id)}"><option value="">Link a recipe (optional)</option>${RECIPES.slice().sort((a,b)=>byName(a.t,b.t)).map(r=>`<option value="${r.id}">${esc(r.t)}</option>`).join("")}</select>
         <button type="button" class="btn sm" data-rqdone="${esc(q.id)}">Mark answered</button></div>`:""}
-      ${isAdmin()?`<button type="button" class="link rq-del" data-rqdel="${esc(q.id)}">Delete</button>`:""}
+      ${may("answer")?`<button type="button" class="link rq-del" data-rqdel="${esc(q.id)}">Delete</button>`:""}
     </div></li>`;
 }
 function requestsAdminPage(){
@@ -3391,7 +3450,7 @@ async function profilePage(){
       ${stat(added.length, added.length===1?"recipe added":"recipes added", "#prof-added")}
       ${stat(changed.length, changed.length===1?"recipe changed":"recipes changed", "#prof-changed")}
       ${stat('<span id="prof-phn">…</span>', '<span id="prof-phl">photos shared</span>', "#prof-photos")}
-      ${stat(isAdmin()?newFeedback():feedback.length, isAdmin()?"new messages":"messages sent", isAdmin()?"#inbox":"#feedback")}
+      ${stat(may("inbox")?newFeedback():feedback.length, may("inbox")?"new messages":"messages sent", may("inbox")?"#inbox":"#feedback")}
     </div>
     <div class="panel-a" id="prof-list" hidden></div>
     ${offline?"":`<div class="panel-a"><h3>Change name</h3>
@@ -3710,11 +3769,11 @@ function routePage(){
     q.value=""; toast("That isn't available in your portal."); history.replaceState(null,"",location.pathname+location.search); home(); return; }
   if(!offline && h.startsWith("edit-")){ const er=RECIPES.find(x=>x.id===h.slice(5)); if(er){ q.value=""; editor(er); window.scrollTo(0,0); return; } }
   if(h==="profile"){ q.value=""; profilePage(); window.scrollTo(0,0); return; }
-  if(h==="inbox" && isAdmin()){ q.value=""; inboxPage(); window.scrollTo(0,0); return; }
+  if(h==="inbox" && may("inbox")){ q.value=""; inboxPage(); window.scrollTo(0,0); return; }
   if(h==="feedback" || h.startsWith("feedback-")){ q.value=""; feedbackPage(h.startsWith("feedback-")?h.slice(9):""); window.scrollTo(0,0); return; }
-  if(h==="review" && isAdmin()){ q.value=""; reviewPage(); window.scrollTo(0,0); return; }
-  if(h.startsWith("review-") && isAdmin()){ const sb=subs.find(x=>x.id===h.slice(7)&&x.status==="pending"); if(sb){ q.value=""; editor(null,null,sb); window.scrollTo(0,0); return; } }
-  if(h==="mine" && !isAdmin()){ q.value=""; minePage(); window.scrollTo(0,0); return; }
+  if(h==="review" && may("review")){ q.value=""; reviewPage(); window.scrollTo(0,0); return; }
+  if(h.startsWith("review-") && may("review")){ const sb=subs.find(x=>x.id===h.slice(7)&&x.status==="pending"); if(sb){ q.value=""; editor(null,null,sb); window.scrollTo(0,0); return; } }
+  if(h==="mine" && !may("edit")){ q.value=""; minePage(); window.scrollTo(0,0); return; }
   if(!offline && (h==="scan" || h.startsWith("scan-"))){ q.value=""; scanPage(CATS.find(x=>slug(x)==="c-"+h.slice(5))); window.scrollTo(0,0); return; }
   if(!offline && (h==="new" || h.startsWith("new-"))){ q.value=""; editor(null, CATS.find(x=>slug(x)==="c-"+h.slice(4))); window.scrollTo(0,0); return; }
   if(h==="favorites"){ q.value=""; favorites(); window.scrollTo(0,0); return; }

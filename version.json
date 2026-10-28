@@ -1,6 +1,6 @@
 {
-  "web": "3.51",
+  "web": "3.52",
   "apk": 9,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New: owner, admin, employee and public portals. Public portal settings choose what public members can see and do."
+  "notes": "New: choose recipe by recipe what the public sees, and give each employee their own permissions. The bottom bar no longer moves when you pull the page."
 }

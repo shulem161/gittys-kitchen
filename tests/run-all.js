@@ -354,6 +354,15 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok("public member can't open it by address", (await PP.locator('#rqform').count()) === 0);
     await A.goto(F + '#r-challah'); await A.waitForTimeout(300); await A.click('#pubtog'); await A.waitForTimeout(500);
     ok('admin can hide one recipe', await PP.evaluate(() => !RECIPES.some(r => r.id === 'r-challah')) && await V.evaluate(() => RECIPES.some(r => r.id === 'r-challah')));
+    await A.goto(F + '#public'); await A.waitForTimeout(400);
+    await A.locator('[data-pd="Bread"] summary').click(); await A.waitForTimeout(200);
+    const br = await A.locator('[data-pd="Bread"] [data-pr]').count();
+    await A.locator('[data-pd="Bread"] [data-pr="r-croissants"]').uncheck(); await A.waitForTimeout(500);
+    ok('recipe-by-recipe: untick hides just that one', br >= 5 && await PP.evaluate(() => !RECIPES.some(r => r.id === 'r-croissants') && RECIPES.some(r => r.c === 'Bread')), br);
+    ok('category shows how many are visible', /of \d+ visible/.test(await A.locator('[data-pcat="Bread"] [data-psum]').innerText()));
+    await A.fill('#pub-q', 'croissant'); await A.waitForTimeout(200);
+    await A.locator('#pub-hits [data-pr="r-croissants"]').check(); await A.waitForTimeout(500);
+    ok('search box finds and shows a recipe again', await PP.evaluate(() => RECIPES.some(r => r.id === 'r-croissants')) && await A.locator('[data-pd="Bread"] [data-pr="r-croissants"]').isChecked());
     await V.goto(F + '#public'); await V.waitForTimeout(300);
     ok("employees don't get admin pages", (await V.locator('.pub-cats').count()) === 0);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(300);
@@ -366,6 +375,20 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await PP.goto(F + '#admin'); await PP.waitForTimeout(500);
     ok("an admin can't change the owner", (await PP.locator('.mrow', {hasText: 'Shulem'}).locator('[data-role]').count()) === 0 && (await PP.locator('.mrow', {hasText: 'Test Member'}).first().locator('[data-role]').count()) === 1);
     await A.goto(F + '#public'); await A.waitForTimeout(300); await A.locator('[data-pc="Cakes"][data-pv="1"]').click(); await A.waitForTimeout(500); await A.check('[data-pa=requests]'); await A.waitForTimeout(300);
+
+    // Per-person employee permissions
+    const vn = await V.evaluate(() => myName());
+    await A.goto(F + '#admin'); await A.waitForTimeout(400);
+    await A.locator('.mrow', {hasText: vn}).locator('[data-act=perms]').click(); await A.waitForTimeout(200);
+    await A.locator('[data-pk=edit]').check(); await A.waitForTimeout(1500);
+    await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
+    ok('one employee can be allowed to edit recipes', /Edit recipe/.test(await V.locator('.rhead').innerText()) && await V.evaluate(() => may('edit') && !may('review')));
+    await A.locator('[data-pk=photos]').uncheck(); await A.waitForTimeout(1500);
+    await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
+    ok('an everyday permission can be switched off for one employee', (await V.locator('.ph-add').count()) === 0);
+    await A.locator('[data-pk=photos]').check(); await A.waitForTimeout(400); await A.locator('[data-pk=edit]').uncheck(); await A.waitForTimeout(1500);
+    await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
+    ok('taking a permission away works', /Suggest changes/.test(await V.locator('.rhead').innerText()) && (await V.locator('.ph-add').count()) > 0);
 
     // Search
     await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);
