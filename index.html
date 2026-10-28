@@ -18,7 +18,6 @@
 :root{
   --bg:#EEF2F7; --tile:#DCE4EF; --paper:#FFFFFF; --ink:#1B2638; --muted:#5B6678; --line:#D5DCE7;
   --accent:#2C5A9A; --accent-2:#2E8C93; --accent-soft:#E2EAF6; --wheat:#B7862F; --wheat-soft:#F6EBD5; --done:#9AA4B3;
-  --meat-bg:#FBE4E1; --meat-line:#E9B3AC; --meat-ink:#A33A2E; --dairy-bg:#E0EAF8; --dairy-line:#AFC5E6; --dairy-ink:#2C5A9A; --other-bg:#ECEEF1; --other-line:#D2D6DD; --other-ink:#5B6678;
   --shadow:0 1px 2px rgba(27,38,56,.06),0 8px 24px rgba(27,38,56,.07);
   --display:"Young Serif",Georgia,"Times New Roman",serif;
   --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -26,12 +25,10 @@
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#111824;--tile:#18212F;--paper:#18212F;--ink:#E6EBF2;--muted:#A0AABA;--line:#2A3547;
   --accent:#8EB1E6;--accent-2:#6CC3C9;--accent-soft:#1F2B40;--wheat:#DDB46A;--wheat-soft:#2B2618;--done:#5E6879;
-  --meat-bg:#3A2224;--meat-line:#5C3236;--meat-ink:#F0A39A;--dairy-bg:#1E2B40;--dairy-line:#30476A;--dairy-ink:#8EB1E6;--other-bg:#232A35;--other-line:#363F4D;--other-ink:#A0AABA;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#111824;--tile:#18212F;--paper:#18212F;--ink:#E6EBF2;--muted:#A0AABA;--line:#2A3547;
   --accent:#8EB1E6;--accent-2:#6CC3C9;--accent-soft:#1F2B40;--wheat:#DDB46A;--wheat-soft:#2B2618;--done:#5E6879;
-  --meat-bg:#3A2224;--meat-line:#5C3236;--meat-ink:#F0A39A;--dairy-bg:#1E2B40;--dairy-line:#30476A;--dairy-ink:#8EB1E6;--other-bg:#232A35;--other-line:#363F4D;--other-ink:#A0AABA;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);color-scheme:dark}
 
 *{box-sizing:border-box}
@@ -82,10 +79,6 @@ button{font:inherit;color:inherit}
 .cat{display:flex;flex-direction:column;gap:14px;background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:20px;text-decoration:none;color:var(--ink);transition:transform .15s ease,box-shadow .15s,border-color .15s}
 .cat:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:var(--accent)}
 .cat .ic{width:48px;height:48px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
-/* main menu: every category tile the same gray */
-.cat{background:var(--other-bg);border-color:var(--other-line)}
-.cat .ic{background:var(--paper);color:var(--other-ink)}
-.cat:hover{border-color:var(--other-ink)}
 .cat .ic svg{width:28px;height:28px}
 .cat h3{font-size:21px}
 .cat span{font-size:13px;color:var(--muted);margin-top:-10px}
@@ -102,18 +95,10 @@ button{font:inherit;color:inherit}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;padding-bottom:56px;align-items:start}
 .rc{display:flex;flex-direction:column;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px 20px;text-decoration:none;color:var(--ink);transition:transform .15s ease,box-shadow .15s,border-color .15s}
 .rc:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:var(--accent)}
-/* recipe colors: meat red, dairy blue, everything else gray */
-.rc.k-meat,.rhead.k-meat{background:var(--meat-bg);border-color:var(--meat-line)}
-.rc.k-dairy,.rhead.k-dairy{background:var(--dairy-bg);border-color:var(--dairy-line)}
-.rc.k-other,.rhead.k-other{background:var(--other-bg);border-color:var(--other-line)}
-.rc.k-meat:hover{border-color:var(--meat-ink)}.rc.k-dairy:hover{border-color:var(--dairy-ink)}.rc.k-other:hover{border-color:var(--other-ink)}
-.rc .meta{border-top-color:rgba(127,127,127,.25)}
-.kchip{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:4px 9px;border-radius:999px;background:var(--paper);white-space:nowrap}
-.kchip.meat{color:var(--meat-ink)}.kchip.dairy{color:var(--dairy-ink)}
-.klegend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--muted);margin:-6px 0 14px}
-.klegend span{display:inline-flex;align-items:center;gap:6px}
-.klegend i{width:14px;height:14px;border-radius:4px;border:1px solid}
-.klegend .meat i{background:var(--meat-bg);border-color:var(--meat-line)}.klegend .dairy i{background:var(--dairy-bg);border-color:var(--dairy-line)}.klegend .other i{background:var(--other-bg);border-color:var(--other-line)}
+/* Meat / Dairy label, in the cookbook's blue */
+.kchip{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:4px 9px;border-radius:999px;background:var(--accent);color:var(--paper);white-space:nowrap}
+.rhead .kchip{margin-left:6px}
+.rc .chips{display:flex;gap:6px;flex-wrap:wrap;margin-right:auto}
 .rc .top{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:22px}
 .chip{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);padding:4px 9px;border-radius:999px;white-space:nowrap}
 .oven{font-size:13px;font-weight:600;color:var(--wheat);font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -531,7 +516,6 @@ function autoKind(r){
 const kindOf = r => (r && (r.kind==="meat"||r.kind==="dairy"||r.kind==="other")) ? r.kind : autoKind(r||{});
 const KIND_LABEL = {meat:"Meat", dairy:"Dairy", other:""};
 const kindChip = r => { const k=kindOf(r); return KIND_LABEL[k]?`<span class="kchip ${k}">${KIND_LABEL[k]}</span>`:""; };
-const LEGEND = `<div class="klegend" aria-label="Color key"><span class="meat"><i></i>Meat</span><span class="dairy"><i></i>Dairy</span><span class="other"><i></i>Everything else</span></div>`;
 const preOf = r => ((r&&r.pre)||[]).map(id=>RECIPES.find(x=>x.id===id)).filter(Boolean);
 const usedIn = r => RECIPES.filter(x=>(x.pre||[]).includes(r.id));
 const unbracket = s => String(s).replace(/\[\[([^\]]+)\]\]/g,"$1");
@@ -582,7 +566,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.32";
+const WEB_VERSION = "3.33";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -831,9 +815,9 @@ const HEART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 
 function card(r){
   const t = temps(r);
-  return `<a class="rc k-${kindOf(r)}${r.cover?" has-img":""}" href="#${r.id}">
+  return `<a class="rc${r.cover?" has-img":""}" href="#${r.id}">
     ${r.cover?`<div class="rc-img" style="background-image:url('${r.cover}')" role="img" aria-label="Photo of ${esc(r.t)}"></div>`:""}
-    <div class="top"><span class="chip">${esc(r.c)}</span>${kindChip(r)}${t.length?`<span class="oven">${t.slice(0,2).join(" → ")}</span>`:""}${me&&favs().includes(r.id)?HEART.replace("<svg",'<svg class="heart"'):""}</div>
+    <div class="top"><span class="chips"><span class="chip">${esc(r.c)}</span>${kindChip(r)}</span>${t.length?`<span class="oven">${t.slice(0,2).join(" → ")}</span>`:""}${me&&favs().includes(r.id)?HEART.replace("<svg",'<svg class="heart"'):""}</div>
     <h3>${titleHTML(r)}</h3>
     ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}
     <div class="meta"><span><b>${nIng(r)}</b> ingredients</span><span><b>${nSteps(r)}</b> steps</span></div>
@@ -889,7 +873,6 @@ function category(c){
   app.innerHTML = `<section class="wrap">${tabs(c)}
     <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}${!offline&&(!isAdmin()||recipesOnline)?` · <a class="link" href="#new-${slug(c).slice(2)}">+ Add a recipe</a> · <a class="link" href="#scan-${slug(c).slice(2)}">Add from photo or file</a>`:""}</p></div>
     ${list.length?`<div class="cat-tools"><button class="btn" id="dl-cat" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download ${esc(c)}</button></div>`:""}
-    ${list.length?LEGEND:""}
     <div class="grid">${list.length ? list.map(card).join("") : `<div class="empty">No ${esc(c)} recipes yet.${offline?"":` <a class="link" href="#new-${slug(c).slice(2)}">Add the first one</a>`}</div>`}</div></section>`;
   const dc=document.getElementById("dl-cat"); if(dc) dc.onclick=()=>downloadBook([c], dc);
   const a=app.querySelector('.tab[aria-current="page"]'); if(a) a.parentElement.scrollLeft = a.offsetLeft - 16;
@@ -899,7 +882,6 @@ function favorites(){
   const f = favs().map(id=>RECIPES.find(r=>r.id===id)).filter(Boolean);
   app.innerHTML = `<section class="wrap">${tabs(null)}
     <div class="section-head"><h2>Your favorites</h2><p>${f.length} ${f.length===1?"recipe":"recipes"}</p></div>
-    ${f.length?LEGEND:""}
     <div class="grid">${f.length? f.map(card).join("") : `<div class="empty">No favorites yet. Open any recipe and tap “Save to favorites”.</div>`}</div></section>`;
 }
 
@@ -910,7 +892,6 @@ function results(term){
   const rest = list.filter(r=>!r.t.toLowerCase().includes(t));
   app.innerHTML = `<section class="wrap">${tabs(null)}
     <div class="section-head"><h2>Results for “${esc(term)}”</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}</p></div>
-    ${list.length?LEGEND:""}
     <div class="grid">${list.length? [...titleHits,...rest].map(card).join("") : `<div class="empty">No recipes match that search. Try a dish like “challah” or an ingredient like “farmer's cheese”.</div>`}</div></section>`;
 }
 
@@ -947,8 +928,8 @@ function recipe(r){
   app.innerHTML = `
   <div class="wrap">
     <a class="back" href="#${slug(r.c)}">← ${esc(r.c)}</a>
-    <section class="rhead k-${kindOf(r)}"><div class="tilestripe"></div>
-      <span class="chip">${esc(r.c)}</span>
+    <section class="rhead"><div class="tilestripe"></div>
+      <span class="chip">${esc(r.c)}</span>${kindChip(r)}
       <h1>${titleHTML(r)}</h1>
       ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}
       <div class="facts">
@@ -1286,7 +1267,7 @@ function editor(r, cat, sub, draft){
           <div class="field"><label for="ed-by">From (optional)</label><input id="ed-by" type="text" maxlength="40" value="${esc(src?src.by:(suggest?myName():""))}" placeholder="e.g. Bobby"></div>
         </div>
         <div class="field"><label for="ed-k">Meat or dairy</label>
-          <select id="ed-k">${[["","Automatic"],["meat","Meat (red)"],["dairy","Dairy (blue)"],["other","Neither (gray)"]].map(([v,l])=>`<option value="${v}" ${(src&&src.kind||"")===v?"selected":""}>${v?l:`${l}: ${({meat:"meat",dairy:"dairy",other:"neither"})[autoKind(src||{c:catNow,s:[]})]}`}</option>`).join("")}</select>
+          <select id="ed-k">${[["","Automatic"],["meat","Meat"],["dairy","Dairy"],["other","Neither"]].map(([v,l])=>`<option value="${v}" ${(src&&src.kind||"")===v?"selected":""}>${v?l:`${l}: ${({meat:"meat",dairy:"dairy",other:"neither"})[autoKind(src||{c:catNow,s:[]})]}`}</option>`).join("")}</select>
           <p class="hint">Automatic goes by the category and ingredients. Choose one if it's wrong.</p></div>
         <div class="field"><label for="ed-n">Note (optional)</label><textarea id="ed-n" rows="2">${esc(src&&src.n?src.n:"")}</textarea></div>
         <div class="field"><label for="ed-pre-q">Make first (optional)</label>
@@ -1688,7 +1669,7 @@ async function drawRecipe(doc, r, opts){
   const C=PDF_COLORS, M=doc.M, CW=doc.CW, footer=opts.footer;
   doc.text("GITTY'S KITCHEN  ·  "+r.c.toUpperCase(), M, doc.y, 9, "F2", C.wheat); doc.y+=26;
   for(const l of wrap(r.t.replace(/^Untitled: /,""), 26, CW, true, true)){ doc.text(l, M, doc.y, 26, "F3", C.ink); doc.y+=30; }
-  const meta=[r.by?creditText(r.by):"", temps(r).length?"Oven "+temps(r).join(" -> "):"", `${nIng(r)} ingredients`, `${nSteps(r)} steps`].filter(Boolean).join("   ·   ");
+  const meta=[KIND_LABEL[kindOf(r)]||"", r.by?creditText(r.by):"", temps(r).length?"Oven "+temps(r).join(" -> "):"", `${nIng(r)} ingredients`, `${nSteps(r)} steps`].filter(Boolean).join("   ·   ");
   doc.text(meta, M, doc.y, 10, "F1", C.muted); doc.y+=16;
   const ph = opts.bigPhoto ? await photoForPdf(r) : (r.cover||"");
   if(ph && ph.startsWith("data:image/jpeg")){
