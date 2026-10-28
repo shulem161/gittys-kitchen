@@ -15,6 +15,11 @@ service cloud.firestore {
     }
 
     // Recipe code letters per category, and number blocks per section. Members read, only the admin writes.
+    // The design everyone gets (chosen by the admin).
+    match /meta/look {
+      allow get: if signedIn();
+      allow write: if isAdmin();
+    }
     match /meta/codes {
       allow get: if signedIn();
       allow write: if isAdmin();
