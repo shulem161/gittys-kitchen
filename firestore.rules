@@ -28,21 +28,26 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'public');
     }
     function isAdmin() { return isOwner() || (approvedMember() && myRole() == 'admin'); }
-    // Everyday permissions: employees have their own (users/{uid}.perms, on unless switched off);
+    // Employee settings (meta/employees) for all employees; a person's own perms override them.
+    function empAllow(k, d) {
+      let e = /databases/$(database)/documents/meta/employees;
+      return exists(e) ? get(e).data.get('allow', {}).get(k, d) : d;
+    }
+    // Everyday permissions: employees per Employee settings / their own perms (on unless switched off);
     // public members share meta/public (on unless switched off). Admins can always.
     function can(k) {
       let p = /databases/$(database)/documents/meta/public;
       let me = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
       return isAdmin()
         || (approvedMember()
-            && ((me.get('role', 'public') == 'employee' && me.get('perms', {}).get(k, true) == true)
+            && ((me.get('role', 'public') == 'employee' && me.get('perms', {}).get(k, empAllow(k, true)) == true)
                 || (me.get('role', 'public') == 'public' && (!exists(p) || get(p).data.get('allow', {}).get(k, true) == true))));
     }
     // Extra permissions an admin grants one employee at a time (off unless granted).
     function extra(k) {
       let me = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
       return isAdmin()
-        || (approvedMember() && me.get('role', 'public') == 'employee' && me.get('perms', {}).get(k, false) == true);
+        || (approvedMember() && me.get('role', 'public') == 'employee' && me.get('perms', {}).get(k, empAllow(k, false)) == true);
     }
     // Who may write recipes: admins, and employees allowed to edit or to approve.
     // Those employees can't change whether the public sees a recipe; new recipes follow their category.
@@ -66,6 +71,14 @@ service cloud.firestore {
     match /meta/look {
       allow get: if signedIn();
       allow write: if isAdmin();
+    }
+
+    // What every employee may do (Employee settings).
+    match /meta/employees {
+      allow get: if signedIn();
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['allow'])
+        && request.resource.data.allow is map;
     }
 
     // What public members may do, and each category's setting for new recipes.
