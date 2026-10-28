@@ -367,6 +367,7 @@ body.out .ptr{top:calc(env(safe-area-inset-top,0px) + 16px)}
 .scan-pages .row{display:flex;gap:8px;flex-wrap:wrap}
 .err-detail{font-size:13px;color:var(--muted)}
 .err-detail code{display:block;white-space:pre-wrap;word-break:break-word;margin-top:6px;padding:8px;background:var(--bg);border-radius:8px}
+.rlink{color:var(--accent);font-weight:600;text-decoration:underline;text-underline-offset:2px}
 /* recipe editor */
 .note.setup{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:28px}
 .note.setup p{margin:4px 0 0;color:var(--muted)}
@@ -460,6 +461,12 @@ function creditText(by){
   if(by.toLowerCase()==="got") return "Source: got";
   return "From "+by.replace(/(^|[\s-])([a-z])/g,(m,a,b)=>a+b.toUpperCase());
 }
+// [[Recipe name]] in recipe text becomes a link to that recipe (or plain text if there's no such recipe).
+const linkify = html => html.replace(/\[\[([^\]]+)\]\]/g, (m, name) => {
+  const key = name.replace(/&amp;/g,"&").replace(/&#39;|&apos;/g,"'").trim().toLowerCase();
+  const r = RECIPES.find(x => x.t.replace(/^Untitled: /,"").toLowerCase() === key);
+  return r ? `<a class="rlink" href="#${r.id}">${name}</a>` : name;
+});
 const hiTemps = s => esc(s).replace(/(\d{3}°F)/g,'<span class="temp">$1</span>');
 function splitQty(t){
   const m = t.match(/^((?:\d+[½¼¾⅓⅔⅛]?|[½¼¾⅓⅔⅛])(?:\s?[–-]\s?\d+[½¼¾⅓⅔⅛]?)?(?:\s?(?:lb|oz|cups?|tbsp|tsp|sticks?|cans?|packs?|pk\.|lg\.|glass|squares?|bunch|cloves?|heads?|quart)\b\.?)?)\s+(.*)$/i);
@@ -497,7 +504,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.25";
+const WEB_VERSION = "3.26";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -758,11 +765,11 @@ function recipe(r){
     const ing = p.ing.length ? `<div class="col ing"><h2>Ingredients</h2>${p.ing.map(g=>`
       ${g.title?`<div class="group">${esc(g.title)}</div>`:""}
       <ul>${g.items.map(t=>{const k=ik++;const [qty,name]=splitQty(t);
-        return `<li><label><input type="checkbox" id="i-${r.id}-${k}" data-k="${k}" ${saved.i.includes(k)?"checked":""}><span>${qty?`<span class="qty">${esc(qty)}</span> `:""}${esc(name)}</span></label></li>`}).join("")}</ul>`).join("")}</div>` : "";
+        return `<li><label><input type="checkbox" id="i-${r.id}-${k}" data-k="${k}" ${saved.i.includes(k)?"checked":""}><span>${qty?`<span class="qty">${esc(qty)}</span> `:""}${linkify(esc(name))}</span></label></li>`}).join("")}</ul>`).join("")}</div>` : "";
     const steps = p.steps.length ? `<div class="col"><h2>Method</h2>${p.steps.map(g=>`
       ${g.title?`<div class="group">${esc(g.title)}</div>`:""}
       <ol class="steps">${g.items.map(t=>{const k=sk++;const d=saved.s.includes(k);
-        return `<li class="step${d?" done":""}" data-k="${k}" tabindex="0" role="button" aria-pressed="${d}"><span class="num">${k+1}</span><p>${hiTemps(t)}</p></li>`}).join("")}</ol>`).join("")}</div>` : "";
+        return `<li class="step${d?" done":""}" data-k="${k}" tabindex="0" role="button" aria-pressed="${d}"><span class="num">${k+1}</span><p>${linkify(hiTemps(t))}</p></li>`}).join("")}</ol>`).join("")}</div>` : "";
     const cls = !p.ing.length?" only-steps":(!p.steps.length?" only-ing":"");
     return `<section class="part${cls}">${multi?`<div class="part-label">Part ${pi+1} of ${parts.length}</div>`:""}${ing}${steps}</section>`;
   }).join("");
@@ -791,7 +798,7 @@ function recipe(r){
     </section>
     ${photosSection(r)}
     <div class="parts">
-      ${r.n?`<div class="note"><b>Note:</b> ${esc(r.n)}</div>`:""}
+      ${r.n?`<div class="note"><b>Note:</b> ${linkify(esc(r.n))}</div>`:""}
       ${partHTML}
       ${offline?"":`<p class="fb-link"><a class="link" href="#feedback-${r.id}">Comment on this recipe</a></p>`}
       ${historyLines(r).length?`<div class="byline">${historyLines(r).map(l=>`<span>${esc(l)}</span>`).join("")}</div>`:""}
@@ -802,6 +809,7 @@ function recipe(r){
     </div>
   </div>`;
   loadPhotos(r);
+  app.querySelectorAll("a.rlink").forEach(a=>a.addEventListener("click", e=>e.stopPropagation()));
   document.getElementById("dl").onclick=e=>downloadRecipe(r, e.currentTarget);
   document.getElementById("fav").onclick=e=>{
     const b=e.currentTarget, f=favs(), on=!f.includes(r.id);
@@ -1068,7 +1076,7 @@ function editor(r, cat, sub, draft){
         </div>
         <div class="field"><label for="ed-n">Note (optional)</label><textarea id="ed-n" rows="2">${esc(src&&src.n?src.n:"")}</textarea></div>
         <h3>Ingredients and steps</h3>
-        <p class="hint">Write one ingredient or one step per line. Add more parts for things like a dough, a filling or a topping.</p>
+        <p class="hint">Write one ingredient or one step per line. Add more parts for things like a dough, a filling or a topping. To link to another recipe, put its name in double brackets, like [[Basic Sourdough Starter]].</p>
         <div id="ed-secs">${secs.map((s,i)=>`
           <div class="sec" data-i="${i}">
             <div class="sec-top">
@@ -1378,6 +1386,7 @@ function bindPhotoReview(){
 /* ---------- download a recipe as a PDF (built on the device, no outside service) ---------- */
 const WINANSI = {"€":128,"‚":130,"„":132,"…":133,"•":149,"‘":145,"’":146,"“":147,"”":148,"–":150,"—":151,"™":153};
 function pdfText(s){
+  s = String(s).replace(/\[\[([^\]]+)\]\]/g,"$1");
   s = String(s).replace(/⅓/g," 1/3").replace(/⅔/g," 2/3").replace(/⅛/g," 1/8").replace(/⅜/g," 3/8").replace(/→/g,"->").replace(/×/g,"x").replace(/^ /,"");
   let out=""; for(const ch of s){ const c=ch.codePointAt(0); out += WINANSI[ch]!==undefined ? String.fromCharCode(WINANSI[ch]) : c<256 ? ch : "?"; }
   return out;
