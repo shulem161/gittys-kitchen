@@ -238,6 +238,19 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('menu ideas gives a full menu', mn === 6, mn);
     ok('menu never mixes meat and dairy', !/mixes meat and dairy/.test(await A.locator('.mn-result').innerText()));
 
+    // Fish label, recipe numbers, sections
+    await A.goto(F + '#c-fish'); await A.waitForTimeout(400);
+    ok('fish recipes say Fish', await A.$$eval('.rc', els => els.length > 0 && els.every(e => /\bFish\b/i.test(e.querySelector('.kchip')?.textContent || ''))));
+    await A.goto(F + '#new-pesach'); await A.waitForTimeout(400);
+    await A.fill('#ed-t', 'Test Pesach Kugel'); await A.fill('#ed-sec', 'Kugel'); await A.locator('.sec-items').nth(0).fill('5 potatoes'); await A.click('#edform .primary'); await A.waitForTimeout(1500);
+    ok('new recipe gets a number', /^#\d+$/.test(await A.locator('.rhead .nochip').innerText().catch(() => '')));
+    const newNo = (await A.locator('.rhead .nochip').innerText().catch(() => '')).slice(1);
+    await A.goto(F + '#c-pesach'); await A.waitForTimeout(500);
+    ok('Pesach shows sections', (await A.locator('.sec-pill').allInnerTexts()).some(x => /Kugel/.test(x)) && (await A.locator('.sec-title').count()) >= 2);
+    await A.goto(F); await A.waitForTimeout(300); await A.fill('#q', '#' + newNo); await A.waitForTimeout(300);
+    ok('search by recipe number', (await A.locator('.rc h3').allInnerTexts()).join() === 'Test Pesach Kugel');
+    await A.fill('#q', ''); await A.waitForTimeout(200);
+
     // Search
     await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);
     ok('search finds recipes', await V.locator('.rc').count() >= 3);
