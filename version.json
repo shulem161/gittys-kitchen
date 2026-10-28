@@ -1,6 +1,6 @@
 {
   "web": "3.57",
-  "apk": 10,
+  "apk": 11,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Stopping a timer on the phone also clears it in the app (app update). Categories as compact rows, Stop cooking button, and Clear list fixed."
+  "notes": "App update: the phone vibrates while a timer rings and stops vibrating together with the alarm."
 }
