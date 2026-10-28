@@ -4,12 +4,23 @@ service cloud.firestore {
 
     function signedIn() { return request.auth != null; }
 
-    // The admin is whoever owns the name "Shulem Schlesinger".
+    // The admin is the account saved in meta/admin. Until that exists,
+    // it is whoever owns the name "Shulem Schlesinger".
     function isAdmin() {
-      let k = 'shulem schlesinger';
+      let m = /databases/$(database)/documents/meta/admin;
+      let k = /databases/$(database)/documents/names/$('shulem schlesinger');
       return signedIn()
-        && exists(/databases/$(database)/documents/names/$(k))
-        && get(/databases/$(database)/documents/names/$(k)).data.uid == request.auth.uid;
+        && ((exists(m) && get(m).data.uid == request.auth.uid)
+            || (!exists(m) && exists(k) && get(k).data.uid == request.auth.uid));
+    }
+
+    // Who the admin is and the name shown for them. Only the admin can change it, and only to themselves.
+    match /meta/admin {
+      allow get: if true;
+      allow write: if isAdmin()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'name'])
+        && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 40;
     }
 
     // One entry per member name, so every name is unique.

@@ -44,6 +44,21 @@ await check("can't rename someone else", assertFails(updateDoc(doc(G, 'users', '
 await check('admin keeps admin rights', assertSucceeds(updateDoc(doc(A, 'users', 'malky'), { status: 'approved' })));
 await check('admin still recognised by name', assertSucceeds(getDoc(doc(A, 'users', 'gitty'))));
 
+// Admin by account (meta/admin), after the admin's rename to "Shulem"
+const M = env.authenticatedContext('malky').firestore();
+await check("members can't make themselves admin", assertFails(setDoc(doc(M, 'meta', 'admin'), { uid: 'malky', name: 'Malky' })));
+await check('admin can save who the admin is', assertSucceeds(setDoc(doc(A, 'meta', 'admin'), { uid: 'admin', name: 'Shulem' })));
+await check('anyone can see the admin name', assertSucceeds(getDoc(doc(env.unauthenticatedContext().firestore(), 'meta', 'admin'))));
+await check("admin can't hand admin to someone else by mistake", assertFails(setDoc(doc(A, 'meta', 'admin'), { uid: 'malky', name: 'Malky' })));
+await check('admin can claim the short name', assertSucceeds(setDoc(doc(A, 'names', 'shulem'), { uid: 'admin', email: 'a@x' })));
+await check('admin can rename self', assertSucceeds(updateDoc(doc(A, 'users', 'admin'), { name: 'Shulem', was: ['Shulem Schlesinger'] })));
+await check('admin keeps rights after rename', assertSucceeds(updateDoc(doc(A, 'users', 'malky'), { status: 'approved' })));
+await check('admin still sees all members', assertSucceeds(getDoc(doc(A, 'users', 'malky'))));
+await check('admin can still edit recipes', assertSucceeds(setDoc(doc(A, 'recipes', 'r-test'), { t: 'Test', c: 'Cakes' })));
+await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'names', 'shulem schlesinger'), { uid: 'malky', email: 'm@x' }); });
+await check('owning the old admin name no longer makes you admin', assertFails(setDoc(doc(M, 'recipes', 'r-test2'), { t: 'X', c: 'Cakes' })));
+await check("members still can't edit recipes", assertFails(setDoc(doc(G, 'recipes', 'r-test3'), { t: 'X', c: 'Cakes' })));
+
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(`::notice::Rule checks: ${pass} passed, ${fail} failed`);
