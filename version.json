@@ -1,6 +1,6 @@
 {
-  "web": "3.62",
+  "web": "3.63",
   "apk": 11,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Admins: duplicate recipe finder and an Activity page. Who added or changed a recipe is now shown only to admins."
+  "notes": "Duplicate recipes moved to the Recipes part of the menu."
 }

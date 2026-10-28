@@ -980,7 +980,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.62";
+const WEB_VERSION = "3.63";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -2001,7 +2001,6 @@ function openMenu(confirming){
     !offline&&may("answer") ? item("#requests","Recipe requests", openRequests()?openRequests()+" waiting":"", openRequests()) : "",
     may("inbox") ? item("#inbox","Suggestions &amp; comments", newFeedback()?newFeedback()+" new":"", newFeedback()) : "",
     isAdmin()&&recipesOnline ? item("#activity","Activity") : "",
-    isAdmin()&&recipesOnline ? item("#dupes","Duplicate recipes", findDupes(0.9).length?findDupes(0.9).length+" pairs":"", findDupes(0.9).length) : "",
     isAdmin() ? item("#employees","Employee settings") : "",
     isAdmin() ? item("#public","Public portal settings") : "",
   ].filter(Boolean);
@@ -2010,6 +2009,7 @@ function openMenu(confirming){
     !offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit")) ? item("#new","Add a recipe")+(can("ai")?item("#scan","Add from photo or file"):"") : "",
     may("edit")||(!can("suggest")&&!subs.length) ? "" : item("#mine","My recipes", subs.length||""),
     item("#favorites","My favorites", favs().length||""),
+    isAdmin()&&recipesOnline ? item("#dupes","Duplicate recipes", findDupes(0.9).length?findDupes(0.9).length+" pairs":"", findDupes(0.9).length) : "",
     !offline&&can("requests")&&!may("answer") ? item("#requests","Request a recipe") : "",
     !may("inbox")&&can("feedback") ? item("#feedback","Suggestions &amp; comments") : "",
   ].filter(Boolean);

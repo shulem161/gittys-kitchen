@@ -449,6 +449,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('"Not duplicates" hides the pair', (await A.locator('.dup').count()) === nd - 1);
     await A.click('#dup-unhide'); await A.waitForTimeout(500);
     ok('hidden pairs can be shown again', (await A.locator('.dup').count()) === nd);
+    ok('Duplicate recipes is under Recipes in the menu', await A.evaluate(() => { openMenu(); const ok = !!document.querySelector('.mgroup[data-mg=recipes] a[href="#dupes"]') && !document.querySelector('.mgroup[data-mg=manage] a[href="#dupes"]'); closeMenu(); return ok; }));
 
     ok('sources show without page numbers', await A.evaluate(() => creditText('The Haimishe Kitchen – Pesach Cookbook, page 22') === 'From The Haimishe Kitchen – Pesach Cookbook' && creditText('Bobby') === 'From Bobby'));
 
