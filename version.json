@@ -1,6 +1,6 @@
 {
-  "web": "3.50",
+  "web": "3.51",
   "apk": 9,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New: say how much you already have on the grocery list, a to-do list for today, and timers that ring on the phone's alarm volume (app update)."
+  "notes": "New: owner, admin, employee and public portals. Public portal settings choose what public members can see and do."
 }

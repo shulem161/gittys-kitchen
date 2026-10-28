@@ -4,26 +4,66 @@ service cloud.firestore {
 
     function signedIn() { return request.auth != null; }
 
-    // The admin is the account saved in meta/admin. Until that exists,
+    // The owner is the account saved in meta/admin. Until that exists,
     // it is whoever owns the name "Shulem Schlesinger".
-    function isAdmin() {
+    function isOwner() {
       let m = /databases/$(database)/documents/meta/admin;
       let k = /databases/$(database)/documents/names/$('shulem schlesinger');
       return signedIn()
         && ((exists(m) && get(m).data.uid == request.auth.uid)
             || (!exists(m) && exists(k) && get(k).data.uid == request.auth.uid));
     }
+    function ownerUid() {
+      let m = /databases/$(database)/documents/meta/admin;
+      return exists(m) ? get(m).data.uid : '';
+    }
+
+    // Roles: "admin" (chosen by the owner), "employee" (what members could always do), "public" (limited).
+    // A profile without a role counts as public.
+    function approvedMember() {
+      return signedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved';
+    }
+    function myRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'public');
+    }
+    function isAdmin() { return isOwner() || (approvedMember() && myRole() == 'admin'); }
+    // Public members may do only what the owner/admins allow in meta/public (on unless switched off).
+    function can(k) {
+      let p = /databases/$(database)/documents/meta/public;
+      return approvedMember()
+        && (myRole() != 'public' || !exists(p) || get(p).data.get('allow', {}).get(k, true) == true);
+    }
+    // Admins may manage employees and public members, but never the owner or another admin.
+    function canManage(uid) {
+      return isOwner()
+        || (isAdmin() && uid != ownerUid() && uid != request.auth.uid
+            && get(/databases/$(database)/documents/users/$(uid)).data.get('role', 'public') != 'admin');
+    }
 
     // Recipe code letters per category, and number blocks per section. Members read, only the admin writes.
+    // The design everyone gets (chosen by an admin).
+    match /meta/look {
+      allow get: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // What public members may do, and each category's setting for new recipes.
+    match /meta/public {
+      allow get: if signedIn();
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['allow', 'cats'])
+        && request.resource.data.allow is map && request.resource.data.cats is map;
+    }
     match /meta/codes {
       allow get: if signedIn();
       allow write: if isAdmin();
     }
 
-    // Who the admin is and the name shown for them. Only the admin can change it, and only to themselves.
+    // Who the owner is and the name shown for them. Only the owner can change it, and only to themselves.
     match /meta/admin {
       allow get: if true;
-      allow write: if (isAdmin()
+      allow write: if (isOwner()
             || (signedIn() && exists(/databases/$(database)/documents/meta/admin)
                 && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.from == get(/databases/$(database)/documents/meta/admin).data.uid))
         && request.resource.data.uid == request.auth.uid
@@ -38,7 +78,7 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.keys().hasOnly(['uid', 'email']);
-      allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow delete: if (isAdmin() && canManage(resource.data.uid)) || (signedIn() && resource.data.uid == request.auth.uid);
       // Forgot password: a valid reset or recovery code moves the name to a new sign-in.
       allow update: if signedIn()
         && request.resource.data.uid == request.auth.uid
@@ -60,7 +100,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['key', 'uid', 'by', 'created', 'expires'])
         && exists(/databases/$(database)/documents/names/$(request.resource.data.key))
         && get(/databases/$(database)/documents/names/$(request.resource.data.key)).data.uid == request.resource.data.uid
-        && ((isAdmin() && request.resource.data.by == 'admin'
+        && ((isAdmin() && canManage(request.resource.data.uid) && request.resource.data.by == 'admin'
               && request.resource.data.expires is int
               && request.resource.data.expires <= request.time.toMillis() + 3 * 86400000)
             || (signedIn() && request.resource.data.by == 'self' && code.size() >= 12
@@ -71,32 +111,28 @@ service cloud.firestore {
             || get(/databases/$(database)/documents/names/$(resource.data.key)).data.uid == request.auth.uid));
     }
 
-    // Recipes: approved members can read, only the admin can add, edit or delete.
+    // Recipes: employees and admins read all; public members only recipes marked pub == true.
+    // Only admins add, edit or delete.
     match /recipes/{id} {
       allow read: if isAdmin()
-        || (signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved');
+        || (approvedMember() && (myRole() != 'public' || resource.data.get('pub', false) == true));
       allow write: if isAdmin();
     }
 
     // Recipes sent in by members. Only the admin sees all of them and decides.
     match /submissions/{id} {
-      allow create: if signedIn()
+      allow create: if can('suggest')
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.status == 'pending'
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved';
+        && request.resource.data.status == 'pending';
       allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
       allow update: if isAdmin();
       allow delete: if isAdmin()
         || (signedIn() && resource.data.uid == request.auth.uid && resource.data.status == 'pending');
     }
 
-    // Photos of finished dishes. Members' photos wait for the admin's approval.
-    function approvedMember() {
-      return signedIn()
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved';
-    }
+    // Photos of finished dishes. Members' photos wait for an admin's approval.
     match /photos/{id} {
-      allow create: if approvedMember()
+      allow create: if can('photos')
         && request.resource.data.uid == request.auth.uid
         && (request.resource.data.status == 'pending'
             || (request.resource.data.status == 'approved' && isAdmin()))
@@ -112,7 +148,7 @@ service cloud.firestore {
 
     // Suggestions and comments from members. Only the admin sees them all and can reply.
     match /feedback/{id} {
-      allow create: if approvedMember()
+      allow create: if can('feedback')
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.status == 'new'
         && request.resource.data.reply == ''
@@ -124,7 +160,7 @@ service cloud.firestore {
 
     // Recipe requests from members ("I need a recipe for…", optional small photo). Only the admin sees them all.
     match /requests/{id} {
-      allow create: if approvedMember()
+      allow create: if can('requests')
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.status == 'open'
         && request.resource.data.reply == '' && request.resource.data.recipeId == ''
@@ -147,13 +183,18 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/names/$(request.resource.data.name.lower())).data.uid == request.auth.uid
         && ((request.resource.data.keys().hasOnly(['name', 'status', 'created', 'favs'])
              && (request.resource.data.status == 'pending'
-                 || (request.resource.data.status == 'approved' && isAdmin())))
+                 || (request.resource.data.status == 'approved' && isOwner())))
           // after a reset: copy of the old profile, same name and same approval
-          || (request.resource.data.keys().hasOnly(['name', 'status', 'created', 'favs', 'was', 'from'])
+          || (request.resource.data.keys().hasOnly(['name', 'status', 'created', 'favs', 'was', 'from', 'role'])
              && request.resource.data.from is string
+             && request.resource.data.get('role', 'public') == get(/databases/$(database)/documents/users/$(request.resource.data.from)).data.get('role', 'public')
              && get(/databases/$(database)/documents/users/$(request.resource.data.from)).data.name == request.resource.data.name
              && get(/databases/$(database)/documents/users/$(request.resource.data.from)).data.status == request.resource.data.status));
-      allow update: if isAdmin()
+      // The owner can change anyone. Admins can change employees and public members, but can't make admins.
+      allow update: if isOwner()
+        || (isAdmin() && canManage(uid) && request.resource.data.get('role', 'public') in ['public', 'employee'])
+        // admins tidy up after a member's password reset (moved), on any profile but the owner's
+        || (isAdmin() && uid != ownerUid() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['moved']))
         || (signedIn() && request.auth.uid == uid
             && resource.data.status == 'approved'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favs', 'rc', 'rcAt']))
@@ -167,7 +208,7 @@ service cloud.firestore {
             && resource.data.name.lower() != 'shulem schlesinger'
             && (!('was' in request.resource.data) || (request.resource.data.was is list && request.resource.data.was.size() <= 20))
             && get(/databases/$(database)/documents/names/$(request.resource.data.name.lower())).data.uid == request.auth.uid);
-      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid)
+      allow delete: if (isAdmin() && canManage(uid)) || (signedIn() && request.auth.uid == uid)
         || (signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.from == uid);
     }
   }

@@ -148,7 +148,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#profile'); await A.waitForTimeout(500);
     await A.fill('#nm-new', 'Shulem'); await A.click('#nameform .primary'); await A.waitForTimeout(800);
     ok('admin can change name', (await A.locator('.prof-head h2').innerText()) === 'Shulem');
-    ok('admin stays admin after rename', await A.evaluate(() => isAdmin()) && /Admin/.test(await A.locator('.prof-head .hint').innerText()));
+    ok('admin stays admin after rename', await A.evaluate(() => isAdmin()) && /Owner/.test(await A.locator('.prof-head .hint').innerText()));
     await R.goto(F + '#feedback'); await R.waitForTimeout(500);
     ok('members see the new admin name', /^Shulem reads/.test(await R.locator('.section-head p').first().innerText()));
     await R.goto(F + '#profile'); await R.waitForTimeout(400); await R.fill('#nm-new', 'Shulem'); await R.click('#nameform .primary'); await R.waitForTimeout(500);
@@ -335,6 +335,37 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('request not in the cookbook goes to the admin', /Sent to/.test(rqt) && notes.some(n => /asking for a recipe/.test(n)), [rqt, notes.slice(-3)]);
     await A.goto(F + '#requests'); await A.waitForTimeout(600);
     ok('admin sees the request', /Quince tagine/.test(await A.locator('.rq-list').first().innerText().catch(() => '')));
+
+    // Portals: owner/admin, employee, public
+    const PP = await page(); await join(PP, 'Public Pat', 'pub123');
+    await A.goto(F + '#admin'); await A.waitForTimeout(400);
+    await A.locator('.mrow', {hasText: 'Public Pat'}).locator('[data-act=approve-public]').click(); await A.waitForTimeout(800);
+    ok('approved as public', /PUBLIC PAT/.test(await PP.locator('.eyebrow').innerText().catch(() => '')) && await PP.evaluate(() => myRole()) === 'public');
+    ok('public member sees recipes', await PP.evaluate(() => RECIPES.length) > 50);
+    await A.goto(F + '#public'); await A.waitForTimeout(400);
+    await A.locator('[data-pc="Cakes"][data-pv="0"]').click(); await A.waitForTimeout(800);
+    await A.uncheck('[data-pa=requests]'); await A.waitForTimeout(400);
+    await PP.goto(F); await PP.waitForTimeout(600);
+    ok('hidden category is gone for public members', await PP.evaluate(() => !RECIPES.some(r => r.c === 'Cakes')));
+    ok('employees still see it', await V.evaluate(() => RECIPES.some(r => r.c === 'Cakes')));
+    await V.goto(F); await V.waitForTimeout(400);
+    ok('switched-off tool is gone for public members', (await PP.locator('.cats.tools a[href="#requests"]').count()) === 0 && (await V.locator('.cats.tools a[href="#requests"]').count()) === 1);
+    await PP.goto(F + '#requests'); await PP.waitForTimeout(400);
+    ok("public member can't open it by address", (await PP.locator('#rqform').count()) === 0);
+    await A.goto(F + '#r-challah'); await A.waitForTimeout(300); await A.click('#pubtog'); await A.waitForTimeout(500);
+    ok('admin can hide one recipe', await PP.evaluate(() => !RECIPES.some(r => r.id === 'r-challah')) && await V.evaluate(() => RECIPES.some(r => r.id === 'r-challah')));
+    await V.goto(F + '#public'); await V.waitForTimeout(300);
+    ok("employees don't get admin pages", (await V.locator('.pub-cats').count()) === 0);
+    await V.goto(F + '#r-challah'); await V.waitForTimeout(300);
+    ok('employees suggest changes, not edit', /Suggest changes/.test(await V.locator('.rhead').innerText()) && (await V.locator('#pubtog').count()) === 0);
+    await A.goto(F + '#admin'); await A.waitForTimeout(400);
+    await A.locator('.mrow', {hasText: 'Public Pat'}).locator('[data-role]').selectOption('employee'); await A.waitForTimeout(1500);
+    ok('making them an employee opens everything', await PP.evaluate(() => myRole()) === 'employee' && await PP.evaluate(() => RECIPES.some(r => r.c === 'Cakes')));
+    await A.locator('.mrow', {hasText: 'Public Pat'}).locator('[data-role]').selectOption('admin'); await A.waitForTimeout(1500);
+    ok('owner can make an admin', await PP.evaluate(() => isAdmin()) && (await A.locator('.mrow', {hasText: 'Public Pat'}).locator('.tag').innerText()) === 'ADMIN');
+    await PP.goto(F + '#admin'); await PP.waitForTimeout(500);
+    ok("an admin can't change the owner", (await PP.locator('.mrow', {hasText: 'Shulem'}).locator('[data-role]').count()) === 0 && (await PP.locator('.mrow', {hasText: 'Test Member'}).first().locator('[data-role]').count()) === 1);
+    await A.goto(F + '#public'); await A.waitForTimeout(300); await A.locator('[data-pc="Cakes"][data-pv="1"]').click(); await A.waitForTimeout(500); await A.check('[data-pa=requests]'); await A.waitForTimeout(300);
 
     // Search
     await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);
