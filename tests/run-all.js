@@ -103,6 +103,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       if (fs.readFileSync(p2).slice(0, 5).toString() === '%PDF-') styled++;
     }
     ok('every design makes a PDF, and the choice is remembered', styled === 5 && await B.evaluate(() => pdfStyleKey()) === 'large');
+    ok('Recipe card is the default and listed first', await B.evaluate(() => { const k = store('gk-pdfstyle'); store('gk-pdfstyle', null); const d = pdfStyleKey(); store('gk-pdfstyle', k); return d === 'card' && Object.keys(PDF_STYLES)[0] === 'card'; }));
 
     // Scan a recipe from a photo (AI stand-in)
     await B.goto(F + '#scan'); await B.waitForTimeout(300); await B.setInputFiles('#scan-file', IMG); await B.waitForTimeout(1200); await B.click('#scan-read'); await B.waitForTimeout(2000);

@@ -1,6 +1,6 @@
 {
-  "web": "3.53",
+  "web": "3.54",
   "apk": 9,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New: five designs for downloaded recipes and cookbooks: Classic, Recipe card, Elegant, Ink saver and Large print."
+  "notes": "Downloads now use the Recipe card design unless you pick another."
 }

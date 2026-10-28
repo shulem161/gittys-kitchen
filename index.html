@@ -900,7 +900,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.53";
+const WEB_VERSION = "3.54";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -2283,13 +2283,15 @@ const pdfRGB = h => [1,3,5].map(i=>(parseInt(h.slice(i,i+2),16)/255).toFixed(3))
 const pdfPal = o => Object.fromEntries(Object.entries(o).map(([k,v])=>[k, v.startsWith("#")?pdfRGB(v):v]));
 // Designs for downloaded recipes and cookbooks
 const PDF_STYLES = {
+  card:    null,
   classic: {name:"Classic", desc:"Blue stripe, serif titles, the cookbook's own look", C:PDF_COLORS, head:"strip", twoCol:false, photo:true, body:11, lead:15, title:26, cover:["#2C5A9A","#2E8C93"]},
-  card:    {name:"Recipe card", desc:"Title band; ingredients in a shaded column beside the method", C:pdfPal({ink:"#1B2638", muted:"#5B6678", accent:"#2C5A9A", wheat:"#B7862F", line:"#D5DCE7", white:"#FFFFFF", soft:"#E9EFF8"}), head:"band", twoCol:true, photo:true, body:10.5, lead:14, title:24, cover:["#2C5A9A","#1D3E6E"]},
+  card2:   {name:"Recipe card", desc:"Title band; ingredients in a shaded column beside the method", C:pdfPal({ink:"#1B2638", muted:"#5B6678", accent:"#2C5A9A", wheat:"#B7862F", line:"#D5DCE7", white:"#FFFFFF", soft:"#E9EFF8"}), head:"band", twoCol:true, photo:true, body:10.5, lead:14, title:24, cover:["#2C5A9A","#1D3E6E"]},
   elegant: {name:"Elegant", desc:"Navy and gold, centered titles, fine double rules", C:pdfPal({ink:"#1A2340", muted:"#5E6378", accent:"#A8822F", wheat:"#A8822F", line:"#D9CDAE", white:"#FFFFFF", soft:"#F5F0E4"}), head:"center", twoCol:false, photo:true, body:11, lead:15.5, title:28, cover:["#1A2340","#2D3866"]},
   print:   {name:"Ink saver", desc:"Black and white, no photos, no colored pages: best for printing", C:pdfPal({ink:"#000000", muted:"#444444", accent:"#000000", wheat:"#333333", line:"#999999", white:"#FFFFFF", soft:"#EEEEEE"}), head:"none", twoCol:true, photo:false, body:10.5, lead:14, title:22, cover:null},
   large:   {name:"Large print", desc:"Bigger letters, easy to read in the kitchen", C:PDF_COLORS, head:"strip", twoCol:false, photo:true, body:14, lead:19.5, title:32, cover:["#2C5A9A","#2E8C93"]},
 };
-const pdfStyleKey = () => { const k=store("gk-pdfstyle"); return PDF_STYLES[k] ? k : "classic"; };
+PDF_STYLES.card = PDF_STYLES.card2; delete PDF_STYLES.card2;
+const pdfStyleKey = () => { const k=store("gk-pdfstyle"); return PDF_STYLES[k] ? k : "card"; };   // Recipe card is the default (owner's choice)
 
 // Top of a recipe page in each design
 function pdfHead(doc, r){
