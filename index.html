@@ -409,6 +409,18 @@ body.out .bar, body.out footer{display:none}
 .pub-rec input{width:22px;height:22px;flex:none;accent-color:var(--accent)}
 .pub-rec small{color:var(--muted);font-size:12px;margin-left:4px}
 .pub-hits{display:grid;margin-bottom:6px}
+.dlpick{flex-basis:100%;margin:12px 0;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--paper);box-shadow:var(--shadow)}
+.dlpick fieldset{border:0;margin:0;padding:0;display:grid;gap:6px}
+.dlpick legend{font-weight:700;margin-bottom:6px;padding:0}
+.dl-opt{display:flex;gap:12px;align-items:center;padding:8px;border:2px solid var(--line);border-radius:12px;cursor:pointer}
+.dl-opt:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.dl-opt input{width:20px;height:20px;flex:none;accent-color:var(--accent)}
+.dl-opt small{display:block;color:var(--muted);font-size:13px;line-height:1.35}
+.dl-sw{position:relative;flex:none;width:40px;height:52px;border-radius:4px;background:var(--b);border:1px solid rgba(0,0,0,.15);overflow:hidden}
+.dl-sw i{position:absolute;inset:0 0 auto;height:12px;background:var(--a)}
+.dl-sw b{position:absolute;left:6px;right:6px;height:3px;background:var(--c);top:20px;border-radius:2px}
+.dl-sw b+b{top:28px;right:14px;opacity:.6}
+.dlpick .row{display:flex;gap:8px;margin-top:10px}
 .permbox{flex-basis:100%;margin:4px 0 4px 52px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
 .perm-h{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--wheat);margin:10px 0 0}
 @media (max-width:640px){.permbox{margin-left:0}}
@@ -888,7 +900,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.52";
+const WEB_VERSION = "3.53";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -2228,18 +2240,19 @@ function imgSize(src){ return new Promise(res=>{ const i=new Image(); i.onload=(
 
 // A tiny PDF writer: pages of text, lines, boxes and JPEG pictures.
 class PdfDoc {
-  constructor(){ this.W=612; this.H=792; this.M=54; this.pages=[]; this.images=[]; this.footers=[]; }
+  constructor(style){ this.S=style||PDF_STYLES.classic; this.C=this.S.C; this.W=612; this.H=792; this.M=54; this.pages=[]; this.images=[]; this.footers=[]; }
   get CW(){ return this.W-2*this.M; }
   page(footer){ this.ops=[]; this.pages.push(this.ops); this.footers.push(footer||null); this.y=this.M; return this.pages.length; }
   need(h, footer){ if(this.H-this.y-h < this.M+24) { this.page(footer||this.footers[this.footers.length-1]); this.y=this.M+10; } }
   text(s,x,y,size,font,color){ this.ops.push(`BT /${font} ${size} Tf ${color} rg ${x.toFixed(1)} ${(this.H-y).toFixed(1)} Td (${pdfEsc(s)}) Tj ET`); }
+  textCenter(s,xc,y,size,font,color){ this.text(s, xc-textWidth(pdfText(s),size,font!=="F1",font==="F3")/2, y, size, font, color); }
   textRight(s,xr,y,size,font,color){ this.text(s, xr-textWidth(pdfText(s),size,font!=="F1",font==="F3"), y, size, font, color); }
   rule(y,color,w,x1,x2){ this.ops.push(`${color} RG ${w||0.8} w ${(x1??this.M)} ${(this.H-y).toFixed(1)} m ${(x2??this.W-this.M)} ${(this.H-y).toFixed(1)} l S`); }
   rect(x,y,w,h,color){ this.ops.push(`${color} rg ${x.toFixed(1)} ${(this.H-y-h).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)} re f`); }
   addImage(dataUrl,w,h){ this.images.push({data:atob(dataUrl.split(",")[1]), w, h}); return "Im"+this.images.length; }
   image(name,x,y,w,h){ this.ops.push(`q ${w.toFixed(1)} 0 0 ${h.toFixed(1)} ${x.toFixed(1)} ${(this.H-y-h).toFixed(1)} cm /${name} Do Q`); }
   bytes(title){
-    const C=PDF_COLORS;
+    const C=this.C;
     this.pages.forEach((p,i)=>{ const f=this.footers[i]; if(!f) return;
       p.push(`${C.line} RG 0.6 w ${this.M} 40 m ${this.W-this.M} 40 l S`);
       p.push(`BT /F1 8 Tf ${C.muted} rg ${this.M} 28 Td (${pdfEsc(f)}) Tj ET`);
@@ -2266,42 +2279,92 @@ class PdfDoc {
   }
 }
 const PDF_COLORS = {ink:"0.106 0.149 0.220", muted:"0.357 0.400 0.471", accent:"0.173 0.353 0.604", wheat:"0.718 0.525 0.184", line:"0.835 0.863 0.906", white:"1 1 1", soft:"0.886 0.918 0.965"};
+const pdfRGB = h => [1,3,5].map(i=>(parseInt(h.slice(i,i+2),16)/255).toFixed(3)).join(" ");
+const pdfPal = o => Object.fromEntries(Object.entries(o).map(([k,v])=>[k, v.startsWith("#")?pdfRGB(v):v]));
+// Designs for downloaded recipes and cookbooks
+const PDF_STYLES = {
+  classic: {name:"Classic", desc:"Blue stripe, serif titles, the cookbook's own look", C:PDF_COLORS, head:"strip", twoCol:false, photo:true, body:11, lead:15, title:26, cover:["#2C5A9A","#2E8C93"]},
+  card:    {name:"Recipe card", desc:"Title band; ingredients in a shaded column beside the method", C:pdfPal({ink:"#1B2638", muted:"#5B6678", accent:"#2C5A9A", wheat:"#B7862F", line:"#D5DCE7", white:"#FFFFFF", soft:"#E9EFF8"}), head:"band", twoCol:true, photo:true, body:10.5, lead:14, title:24, cover:["#2C5A9A","#1D3E6E"]},
+  elegant: {name:"Elegant", desc:"Navy and gold, centered titles, fine double rules", C:pdfPal({ink:"#1A2340", muted:"#5E6378", accent:"#A8822F", wheat:"#A8822F", line:"#D9CDAE", white:"#FFFFFF", soft:"#F5F0E4"}), head:"center", twoCol:false, photo:true, body:11, lead:15.5, title:28, cover:["#1A2340","#2D3866"]},
+  print:   {name:"Ink saver", desc:"Black and white, no photos, no colored pages: best for printing", C:pdfPal({ink:"#000000", muted:"#444444", accent:"#000000", wheat:"#333333", line:"#999999", white:"#FFFFFF", soft:"#EEEEEE"}), head:"none", twoCol:true, photo:false, body:10.5, lead:14, title:22, cover:null},
+  large:   {name:"Large print", desc:"Bigger letters, easy to read in the kitchen", C:PDF_COLORS, head:"strip", twoCol:false, photo:true, body:14, lead:19.5, title:32, cover:["#2C5A9A","#2E8C93"]},
+};
+const pdfStyleKey = () => { const k=store("gk-pdfstyle"); return PDF_STYLES[k] ? k : "classic"; };
 
+// Top of a recipe page in each design
+function pdfHead(doc, r){
+  const S=doc.S, C=doc.C, M=doc.M, CW=doc.CW, W=doc.W, title=r.t.replace(/^Untitled: /,"");
+  const kicker = "GITTY'S KITCHEN  ·  "+r.c.toUpperCase()+(r.sec&&r.sec!==r.c?"  ·  "+r.sec.toUpperCase():"")+(codeOf(r)?"  ·  "+codeOf(r):"");
+  if(S.head==="band"){
+    const lines=wrap(title, S.title, CW, true, true), h=46+lines.length*(S.title+6);
+    doc.rect(0, 0, W, h+8, C.accent);
+    doc.text(kicker, M, 34, 9, "F2", C.white); let y=34+S.title+10;
+    lines.forEach(l=>{ doc.text(l, M, y, S.title, "F3", C.white); y+=S.title+6; });
+    doc.y=h+30; return;
+  }
+  if(S.head==="center"){
+    doc.rule(doc.y-14, C.accent, 0.6); doc.rule(doc.y-11, C.accent, 0.6);
+    doc.textCenter(kicker, W/2, doc.y+10, 8.5, "F2", C.accent); doc.y+=40;
+    for(const l of wrap(title, S.title, CW-40, true, true)){ doc.textCenter(l, W/2, doc.y, S.title, "F3", C.ink); doc.y+=S.title+6; }
+    return;
+  }
+  doc.text(kicker, M, doc.y, 9, "F2", C.wheat); doc.y+=26;
+  for(const l of wrap(title, S.title, CW, true, true)){ doc.text(l, M, doc.y, S.title, "F3", C.ink); doc.y+=S.title+4; }
+}
 // Lay out one recipe starting on the current page.
 async function drawRecipe(doc, r, opts){
-  const C=PDF_COLORS, M=doc.M, CW=doc.CW, footer=opts.footer;
-  doc.text("GITTY'S KITCHEN  ·  "+r.c.toUpperCase(), M, doc.y, 9, "F2", C.wheat); doc.y+=26;
-  for(const l of wrap(r.t.replace(/^Untitled: /,""), 26, CW, true, true)){ doc.text(l, M, doc.y, 26, "F3", C.ink); doc.y+=30; }
-  const meta=[[KIND_LABEL[kindOf(r)], /^pesach$/i.test(r.c)?"Pesach":""].filter(Boolean).join(", "), r.by?creditText(r.by):"", temps(r).length?"Oven "+temps(r).join(" -> "):"", `${nIng(r)} ingredients`, `${nSteps(r)} steps`].filter(Boolean).join("   ·   ");
-  doc.text(meta, M, doc.y, 10, "F1", C.muted); doc.y+=16;
-  const ph = opts.bigPhoto ? await photoForPdf(r) : (r.cover||"");
+  const S=doc.S, C=doc.C, M=doc.M, CW=doc.CW, footer=opts.footer, B=S.body, LH=S.lead, center=S.head==="center";
+  pdfHead(doc, r);
+  const meta=[[KIND_LABEL[kindOf(r)], /^pesach$/i.test(r.c)?"Pesach":""].filter(Boolean).join(", "), r.by?creditText(r.by):"", temps(r).length?"Oven "+temps(r).join(" -> "):"", `${nIng(r)} ingredients`, `${nSteps(r)} steps`, timeText(r)].filter(Boolean).join("   ·   ");
+  for(const l of wrap(meta, 10, CW)){ center ? doc.textCenter(l, doc.W/2, doc.y, 10, "F1", C.muted) : doc.text(l, M, doc.y, 10, "F1", C.muted); doc.y+=14; }
+  doc.y+=2;
+  const ph = !S.photo ? "" : opts.bigPhoto ? await photoForPdf(r) : (r.cover||"");
   if(ph && ph.startsWith("data:image/jpeg")){
     const sz = await imgSize(ph);
     if(sz){ const maxH=opts.bigPhoto?250:170, k=Math.min(CW/sz[0], maxH/sz[1]); const iw=sz[0]*k, ih=sz[1]*k;
-      doc.y+=6; doc.image(doc.addImage(ph,sz[0],sz[1]), M, doc.y, iw, ih); doc.y+=ih+8; }
+      doc.y+=6; doc.image(doc.addImage(ph,sz[0],sz[1]), center?(doc.W-iw)/2:M, doc.y, iw, ih); doc.y+=ih+8; }
   }
-  doc.y+=6; doc.rule(doc.y, C.line); doc.y+=22;
+  doc.y+=6; if(center){ doc.rule(doc.y, C.accent, 0.6, M+120, doc.W-M-120); } else doc.rule(doc.y, C.line); doc.y+=22;
   for(const [lab,list] of [["Make first: ",preOf(r)],["Use it in: ",usedIn(r)]]) if(list.length){
-    for(const l of wrap(lab+list.map(x=>x.t).join(", "), 11, CW)){ doc.need(16,footer); doc.text(l, M, doc.y, 11, "F2", C.accent); doc.y+=15; } doc.y+=6; }
-  if(r.n){ for(const l of wrap("Note: "+unbracket(r.n), 11, CW)){ doc.need(16,footer); doc.text(l, M, doc.y, 11, "F1", C.wheat); doc.y+=15; } doc.y+=8; }
+    for(const l of wrap(lab+list.map(x=>x.t).join(", "), B, CW)){ doc.need(LH+1,footer); doc.text(l, M, doc.y, B, "F2", C.accent); doc.y+=LH; } doc.y+=6; }
+  if(r.n){ for(const l of wrap("Note: "+unbracket(r.n), B, CW)){ doc.need(LH+1,footer); doc.text(l, M, doc.y, B, "F1", C.wheat); doc.y+=LH; } doc.y+=8; }
   const parts=buildParts(r); let stepNo=0;
+  const head = (s,x) => { doc.text(s, x, doc.y, B+3, "F3", C.ink); };
   parts.forEach((p,pi)=>{
     if(parts.length>1){ doc.need(40,footer); doc.text(`PART ${pi+1} OF ${parts.length}`, M, doc.y, 9, "F2", C.muted); doc.y+=18; }
+    // Side by side: ingredients in a shaded column, method beside it (when the part fits on a page)
+    if(S.twoCol && p.ing.length && p.steps.length){
+      const iw=176, gap=22, sx=M+iw+gap, sw=CW-iw-gap;
+      const ingRows=[], stepRows=[]; let n0=stepNo;
+      p.ing.forEach(g=>{ if(g.title) ingRows.push(["g",g.title.toUpperCase()]); g.items.forEach(it=>{ wrap(unbracket(it), B, iw-30).forEach((l,i)=>ingRows.push(["i",l,i===0])); ingRows.push(["s"]); }); });
+      p.steps.forEach(g=>{ if(g.title) stepRows.push(["g",g.title.toUpperCase()]); g.items.forEach(it=>{ n0++; wrap(unbracket(it), B, sw-24).forEach((l,i)=>stepRows.push(["i",l,i===0?n0:0])); stepRows.push(["s"]); }); });
+      const hOf = rows => rows.reduce((h,x)=>h+(x[0]==="g"?LH:x[0]==="s"?3:LH),0)+B+14;
+      const need=Math.max(hOf(ingRows),hOf(stepRows))+16, room=doc.H-doc.M-24;
+      if(need < room-doc.M){
+        doc.need(need, footer);
+        const top=doc.y; doc.rect(M-10, top-B-12, iw+18, hOf(ingRows)+16, C.soft);
+        let y=top; doc.text("Ingredients", M, y, B+3, "F3", C.ink); y+=LH+6;
+        ingRows.forEach(x=>{ if(x[0]==="g"){ doc.text(x[1], M, y, 8.5, "F2", C.wheat); y+=LH; } else if(x[0]==="s") y+=3; else { if(x[2]) doc.text("•", M+1, y, B, "F1", C.accent); doc.text(x[1], M+12, y, B, "F1", C.ink); y+=LH; } });
+        let y2=top; doc.text("Method", sx, y2, B+3, "F3", C.ink); y2+=LH+6;
+        stepRows.forEach(x=>{ if(x[0]==="g"){ doc.text(x[1], sx, y2, 8.5, "F2", C.wheat); y2+=LH; } else if(x[0]==="s") y2+=3; else { if(x[2]) doc.text(x[2]+".", sx, y2, B, "F2", C.accent); doc.text(x[1], sx+22, y2, B, "F1", C.ink); y2+=LH; } });
+        stepNo=n0; doc.y=Math.max(y,y2)+14; return;
+      }
+    }
     if(p.ing.length){
-      doc.need(40,footer); doc.text("Ingredients", M, doc.y, 14, "F3", C.ink); doc.y+=20;
+      doc.need(40,footer); head("Ingredients", M); doc.y+=LH+5;
       p.ing.forEach(g=>{
-        if(g.title){ doc.need(30,footer); doc.text(g.title.toUpperCase(), M, doc.y, 9, "F2", C.wheat); doc.y+=15; }
-        g.items.forEach(it=>{ const ls=wrap(unbracket(it), 11, CW-16); doc.need(ls.length*15+2,footer);
-          doc.text("•", M+2, doc.y, 11, "F1", C.accent); ls.forEach(l=>{ doc.text(l, M+16, doc.y, 11, "F1", C.ink); doc.y+=15; }); doc.y+=2; });
+        if(g.title){ doc.need(30,footer); doc.text(g.title.toUpperCase(), M, doc.y, 9, "F2", C.wheat); doc.y+=LH; }
+        g.items.forEach(it=>{ const ls=wrap(unbracket(it), B, CW-16); doc.need(ls.length*LH+2,footer);
+          doc.text("•", M+2, doc.y, B, "F1", C.accent); ls.forEach(l=>{ doc.text(l, M+16, doc.y, B, "F1", C.ink); doc.y+=LH; }); doc.y+=2; });
       });
       doc.y+=10;
     }
     if(p.steps.length){
-      doc.need(40,footer); doc.text("Method", M, doc.y, 14, "F3", C.ink); doc.y+=20;
+      doc.need(40,footer); head("Method", M); doc.y+=LH+5;
       p.steps.forEach(g=>{
-        if(g.title){ doc.need(30,footer); doc.text(g.title.toUpperCase(), M, doc.y, 9, "F2", C.wheat); doc.y+=15; }
-        g.items.forEach(it=>{ stepNo++; const ls=wrap(unbracket(it), 11, CW-26); doc.need(ls.length*15+6,footer);
-          doc.text(stepNo+".", M, doc.y, 11, "F2", C.accent); ls.forEach(l=>{ doc.text(l, M+26, doc.y, 11, "F1", C.ink); doc.y+=15; }); doc.y+=6; });
+        if(g.title){ doc.need(30,footer); doc.text(g.title.toUpperCase(), M, doc.y, 9, "F2", C.wheat); doc.y+=LH; }
+        g.items.forEach(it=>{ stepNo++; const ls=wrap(unbracket(it), B, CW-28); doc.need(ls.length*LH+6,footer);
+          doc.text(stepNo+".", M, doc.y, B, "F2", C.accent); ls.forEach(l=>{ doc.text(l, M+28, doc.y, B, "F1", C.ink); doc.y+=LH; }); doc.y+=6; });
       });
       doc.y+=10;
     }
@@ -2309,18 +2372,21 @@ async function drawRecipe(doc, r, opts){
   const hl = historyLines(r);
   if(hl.length){ doc.need(hl.length*14+16,footer); doc.rule(doc.y, C.line, 0.5); doc.y+=16; hl.forEach(l=>{ doc.text(l, M, doc.y, 9, "F1", C.muted); doc.y+=13; }); }
 }
+// The thin colored stripe at the top of each page, for designs that have one
+const pdfStripe = doc => { if(doc.S.head==="strip") doc.rect(0,0,doc.W,8,doc.C.accent); else if(doc.S.head==="center") doc.rect(0,0,doc.W,4,doc.C.ink); };
 
-async function makeRecipePdf(r){
-  const doc=new PdfDoc(), footer="Gitty's Kitchen  ·  "+r.t.replace(/^Untitled: /,"");
-  doc.page(footer); doc.rect(0,0,doc.W,8,PDF_COLORS.accent);
+async function makeRecipePdf(r, styleKey){
+  const doc=new PdfDoc(PDF_STYLES[styleKey||pdfStyleKey()]), footer="Gitty's Kitchen  ·  "+r.t.replace(/^Untitled: /,"");
+  doc.page(footer); pdfStripe(doc); if(doc.S.head==="center") doc.y=doc.M+20;
   await drawRecipe(doc, r, {footer, bigPhoto:true});
   return doc.bytes(r.t);
 }
 
 // Cover art (tile pattern + icon) drawn on a canvas and placed in the PDF as a picture.
-async function coverArt(w, h, iconSvg){
+async function coverArt(w, h, iconSvg, colors){
+  colors = colors || ["#2C5A9A","#2E8C93"];
   const c=document.createElement("canvas"); c.width=w; c.height=h; const g=c.getContext("2d");
-  const grad=g.createLinearGradient(0,0,w,h); grad.addColorStop(0,"#2C5A9A"); grad.addColorStop(1,"#2E8C93");
+  const grad=g.createLinearGradient(0,0,w,h); grad.addColorStop(0,colors[0]); grad.addColorStop(1,colors[1]);
   g.fillStyle=grad; g.fillRect(0,0,w,h);
   g.strokeStyle="rgba(255,255,255,.10)"; g.lineWidth=3;
   for(let y=-60;y<h+120;y+=120) for(let x=-60;x<w+120;x+=120){ g.beginPath(); g.arc(x,y,44,0,Math.PI*2); g.stroke(); }
@@ -2333,19 +2399,19 @@ async function coverArt(w, h, iconSvg){
 const CHEF_PATH='<path d="M9 14a5 5 0 1 1 3.5-8.6A5 5 0 0 1 22 7a4.5 4.5 0 1 1 1 8.9V25H9z"/><path d="M9 21h14"/>';
 
 // The whole cookbook (or one category) as one PDF book.
-async function makeBookPdf(cats, onProgress){
-  const C=PDF_COLORS, doc=new PdfDoc(), M=doc.M, W=doc.W, H=doc.H;
+async function makeBookPdf(cats, onProgress, styleKey){
+  const doc=new PdfDoc(PDF_STYLES[styleKey||pdfStyleKey()]), C=doc.C, S=doc.S, M=doc.M, W=doc.W, H=doc.H, onArt = S.cover ? C.white : C.ink;
   const list = c => RECIPES.filter(r=>r.c===c);
   const whole = cats.length>1;
   const count = cats.reduce((n,c)=>n+list(c).length,0);
   // front cover
   doc.page(null);
-  const art=await coverArt(1224, 1584, CHEF_PATH);
-  if(art) doc.image(doc.addImage(art,1224,1584), 0, 0, W, H); else doc.rect(0,0,W,H,C.accent);
-  doc.text("FAMILY RECIPES  ·  JANUARY 2009", M, 150, 11, "F2", C.white);
-  doc.text("Gitty's Kitchen", M, 220, 54, "F3", C.white);
-  if(!whole) doc.text(cats[0], M, 262, 15, "F1", C.white);
-  doc.text("Downloaded "+new Date().toLocaleDateString(undefined,{month:"long",day:"numeric",year:"numeric"}), M, H-60, 10, "F1", C.white);
+  const art = S.cover ? await coverArt(1224, 1584, CHEF_PATH, S.cover) : "";
+  if(art) doc.image(doc.addImage(art,1224,1584), 0, 0, W, H); else if(S.cover) doc.rect(0,0,W,H,C.accent); else { doc.rule(120, C.ink, 2); doc.rule(H-90, C.ink, 2); }
+  doc.text("FAMILY RECIPES  ·  JANUARY 2009", M, 150, 11, "F2", onArt);
+  doc.text("Gitty's Kitchen", M, 220, 54, "F3", onArt);
+  if(!whole) doc.text(cats[0], M, 262, 15, "F1", onArt);
+  doc.text("Downloaded "+new Date().toLocaleDateString(undefined,{month:"long",day:"numeric",year:"numeric"}), M, H-60, 10, "F1", onArt);
   // contents page (filled in at the end, once page numbers are known)
   let tocPage=null; if(whole){ doc.page("Gitty's Kitchen  ·  Contents"); tocPage=doc.ops; }
   const starts={};
@@ -2353,19 +2419,19 @@ async function makeBookPdf(cats, onProgress){
     const recs=list(c); if(!recs.length) continue;
     // category cover: the art now, the recipe list after the recipes are placed
     const coverNo=doc.page(null); starts[c]=coverNo; const coverOps=doc.ops;
-    const art2=await coverArt(1224, 900, ICONS[c]||ICONS.Miscellaneous);
-    if(art2) doc.image(doc.addImage(art2,1224,900), 0, 0, W, 450); else doc.rect(0,0,W,450,C.accent);
+    const art2 = S.cover ? await coverArt(1224, 900, ICONS[c]||ICONS.Miscellaneous, S.cover) : "";
+    if(art2) doc.image(doc.addImage(art2,1224,900), 0, 0, W, 450); else if(S.cover) doc.rect(0,0,W,450,C.accent); else doc.rule(450, C.ink, 1.5);
     const recPages=[];
     for(const r of recs){
       const footer=`Gitty's Kitchen  ·  ${c}`;
-      recPages.push(doc.page(footer)); doc.rect(0,0,W,8,C.accent); doc.y=M;
+      recPages.push(doc.page(footer)); pdfStripe(doc); doc.y = S.head==="center" ? M+20 : M;
       await drawRecipe(doc, r, {footer, bigPhoto:false});
       if(onProgress) onProgress(Object.keys(starts).length, cats.length);
     }
     const keep=doc.ops; doc.ops=coverOps;
-    doc.text(`SECTION ${ci+1}`, M, 110, 11, "F2", C.white);
-    doc.text(c, M, 170, 46, "F3", C.white);
-    doc.text(`${recs.length} ${recs.length===1?"recipe":"recipes"}`, M, 205, 14, "F1", C.white);
+    doc.text(`SECTION ${ci+1}`, M, 110, 11, "F2", onArt);
+    doc.text(c, M, 170, 46, "F3", onArt);
+    doc.text(`${recs.length} ${recs.length===1?"recipe":"recipes"}`, M, 205, 14, "F1", onArt);
     let y=490; const colW=(doc.CW-24)/2, rows=Math.ceil(recs.length/2), lh=Math.min(16,(H-60-y)/rows), size=Math.min(10.5, lh-4);
     recs.forEach((r,i)=>{ const col=i<rows?0:1, row=col?i-rows:i, x=M+col*(colW+24), yy=y+row*lh;
       if(yy>H-50) return;
@@ -2376,7 +2442,7 @@ async function makeBookPdf(cats, onProgress){
   }
   if(tocPage){
     const keep=doc.ops; doc.ops=tocPage; let y=M+10;
-    doc.rect(0,0,W,8,C.accent);
+    pdfStripe(doc);
     doc.text("Contents", M, y+20, 30, "F3", C.ink); y+=64;
     cats.forEach(c=>{ if(!starts[c]) return; doc.text(c, M, y, 14, "F1", C.ink);
       doc.text(`${list(c).length} recipes`, M+220, y, 10, "F1", C.muted);
@@ -2400,16 +2466,30 @@ async function saveBytes(bytes, name){
   return "Downloaded";
 }
 const fileName = s => s.replace(/[\\/:*?"<>|]+/g,"").slice(0,90)+".pdf";
-async function downloadRecipe(r, btn){
+// Before a download: choose one of the designs (remembered for next time)
+function pickPdfStyle(btn, go){
+  const old=document.getElementById("dlpick"); if(old){ old.remove(); if(old._for===btn) return; }
+  const cur=pdfStyleKey(), box=document.createElement("div"); box.id="dlpick"; box.className="dlpick"; box._for=btn;
+  box.innerHTML=`<fieldset><legend>Choose a design</legend>${Object.entries(PDF_STYLES).map(([k,s])=>`<label class="dl-opt"><input type="radio" name="dlst" value="${k}" ${k===cur?"checked":""}><span class="dl-sw" style="${pdfSwatch(k)}" aria-hidden="true"><i></i><b></b><b></b></span><span><b>${esc(s.name)}</b><small>${esc(s.desc)}</small></span></label>`).join("")}</fieldset>
+    <div class="row"><button type="button" class="btn solid" id="dl-go">Download</button><button type="button" class="btn" id="dl-cancel">Cancel</button></div>`;
+  (btn.closest(".tools, .home-foot, .cat-tools") || btn.parentElement).after(box);
+  box.querySelector("#dl-cancel").onclick=()=>box.remove();
+  box.querySelector("#dl-go").onclick=()=>{ const k=box.querySelector("input:checked").value; store("gk-pdfstyle", k); box.remove(); go(k); };
+  box.scrollIntoView({block:"nearest"});
+}
+const pdfSwatch = k => ({classic:"--a:#2C5A9A;--b:#FFFFFF;--c:#B7862F", card:"--a:#2C5A9A;--b:#E9EFF8;--c:#2C5A9A", elegant:"--a:#1A2340;--b:#FFFFFF;--c:#A8822F", print:"--a:#000000;--b:#FFFFFF;--c:#777777", large:"--a:#2C5A9A;--b:#FFFFFF;--c:#1B2638"})[k];
+async function downloadRecipe(r, btn, styleKey){
+  if(!styleKey) return pickPdfStyle(btn, k=>downloadRecipe(r, btn, k));
   const label=btn.innerHTML; btn.disabled=true; btn.textContent="Preparing…";
-  try{ toast(await saveBytes(await makeRecipePdf(r), fileName("Gittys Kitchen - "+r.t.replace(/^Untitled: /,"")))); }
+  try{ toast(await saveBytes(await makeRecipePdf(r, styleKey), fileName("Gittys Kitchen - "+r.t.replace(/^Untitled: /,"")))); }
   catch(e){ toast("Couldn't make the download. Try again."); }
   btn.disabled=false; btn.innerHTML=label;
 }
-async function downloadBook(cats, btn){
+async function downloadBook(cats, btn, styleKey){
+  if(!styleKey) return pickPdfStyle(btn, k=>downloadBook(cats, btn, k));
   const label=btn.innerHTML; btn.disabled=true; btn.textContent="Making your cookbook…";
   try{
-    const bytes=await makeBookPdf(cats, (d,n)=>{ btn.textContent=`Making your cookbook… ${Math.round(d/n*100)}%`; });
+    const bytes=await makeBookPdf(cats, (d,n)=>{ btn.textContent=`Making your cookbook… ${Math.round(d/n*100)}%`; }, styleKey);
     toast(await saveBytes(bytes, fileName(cats.length>1 ? "Gittys Kitchen - Cookbook" : "Gittys Kitchen - "+cats[0])));
   }catch(e){ toast("Couldn't make the cookbook. Try again."); }
   btn.disabled=false; btn.innerHTML=label;

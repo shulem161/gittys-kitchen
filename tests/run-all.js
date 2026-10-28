@@ -90,9 +90,19 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
 
     // Download a recipe as PDF
     await B.goto(F + '#r-boston-cream-pie'); await B.waitForTimeout(400);
-    const [dl] = await Promise.all([B.waitForEvent('download'), B.click('#dl')]);
+    await B.click('#dl'); await B.waitForTimeout(200);
+    ok('download offers five designs', (await B.locator('#dlpick input[name=dlst]').count()) === 5);
+    const [dl] = await Promise.all([B.waitForEvent('download'), B.click('#dl-go')]);
     const pdfPath = path.join(os.tmpdir(), 'gk-test.pdf'); await dl.saveAs(pdfPath);
     ok('recipe downloads as a PDF', fs.readFileSync(pdfPath).slice(0, 5).toString() === '%PDF-' && /\.pdf$/.test(dl.suggestedFilename()), dl.suggestedFilename());
+    let styled = 0;
+    for (const k of ['classic', 'card', 'elegant', 'print', 'large']) {
+      await B.goto(F + '#r-challah'); await B.waitForTimeout(300); await B.click('#dl'); await B.check(`#dlpick input[value=${k}]`);
+      const [d2] = await Promise.all([B.waitForEvent('download'), B.click('#dl-go')]);
+      const p2 = path.join(os.tmpdir(), `gk-style-${k}.pdf`); await d2.saveAs(p2);
+      if (fs.readFileSync(p2).slice(0, 5).toString() === '%PDF-') styled++;
+    }
+    ok('every design makes a PDF, and the choice is remembered', styled === 5 && await B.evaluate(() => pdfStyleKey()) === 'large');
 
     // Scan a recipe from a photo (AI stand-in)
     await B.goto(F + '#scan'); await B.waitForTimeout(300); await B.setInputFiles('#scan-file', IMG); await B.waitForTimeout(1200); await B.click('#scan-read'); await B.waitForTimeout(2000);
@@ -103,7 +113,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
 
     // Whole cookbook download
     await B.goto(F); await B.waitForTimeout(400);
-    const [bk] = await Promise.all([B.waitForEvent('download', {timeout: 120000}), B.click('#dl-book')]);
+    await B.click('#dl-book'); await B.waitForTimeout(200); await B.check('#dlpick input[value=classic]');
+    const [bk] = await Promise.all([B.waitForEvent('download', {timeout: 120000}), B.click('#dl-go')]);
     const bookPath = path.join(os.tmpdir(), 'gk-book.pdf'); await bk.saveAs(bookPath);
     const bookBytes = fs.readFileSync(bookPath);
     ok('whole cookbook downloads as one PDF', bookBytes.slice(0, 5).toString() === '%PDF-' && (bookBytes.toString('latin1').match(/\/Type \/Page\b/g) || []).length > 100);
