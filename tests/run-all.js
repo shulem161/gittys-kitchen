@@ -223,6 +223,26 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('grocery list adds up the half challah', /^3 lb/.test((await A.locator('.glist li', {hasText: 'flour'}).first().innerText()).trim()), await A.locator('.glist li', {hasText: 'flour'}).first().innerText());
     await A.locator('.glist input').first().check(); await A.waitForTimeout(200);
     ok('grocery items can be ticked off', (await A.locator('.glist li.have').count()) === 1);
+    const fl = A.locator('.glist li', {hasText: 'flour'}).first();
+    await fl.locator('.g-hv').click(); await A.waitForTimeout(150);
+    await A.fill('#ghv-n', '1'); await A.selectOption('#ghv-u', 'lb'); await A.click('.g-hvbox .solid'); await A.waitForTimeout(300);
+    const fl2 = (await A.locator('.glist li', {hasText: 'flour'}).first().innerText()).replace(/\s+/g, ' ').trim();
+    ok('"I have some" leaves only what to buy', /^2 lb/.test(fl2) && /have 1 lb/.test(fl2), fl2);
+    await A.locator('.glist li', {hasText: 'flour'}).first().locator('.g-hv').click(); await A.waitForTimeout(150);
+    await A.fill('#ghv-n', '5'); await A.click('.g-hvbox .solid'); await A.waitForTimeout(300);
+    ok('having enough counts as ticked', (await A.locator('.glist li.have', {hasText: 'flour'}).count()) === 1);
+    // Today's to-do list
+    await A.goto(F); await A.waitForTimeout(300);
+    await A.fill('#td-new', 'Take out the chicken'); await A.click('#td-form .solid'); await A.waitForTimeout(200);
+    await A.goto(F + '#r-challah'); await A.waitForTimeout(300); await A.click('#td-rec'); await A.waitForTimeout(200);
+    await A.goto(F); await A.waitForTimeout(300);
+    const td = await A.locator('#today').innerText();
+    ok('today list has a task and a recipe', /Take out the chicken/.test(td) && /Make Challah/.test(td), td);
+    await A.locator('#today [data-td]').first().check(); await A.waitForTimeout(200);
+    ok('today tasks can be ticked off', (await A.locator('#today li.done').count()) === 1);
+    await A.evaluate(() => { const v = store(uk('today')); v.day = '2000-01-01'; store(uk('today'), v); }); await A.goto(F + '#categories'); await A.goto(F); await A.waitForTimeout(300);
+    const td2 = await A.locator('#today').innerText();
+    ok('next day: finished tasks go, unfinished stay', !/Take out the chicken/.test(td2) && /Make Challah/.test(td2) && /from before/.test(td2), td2);
     await A.goto(F + '#convert'); await A.waitForTimeout(400);
     ok('calculator converts a cup', /16\s*tbsp/.test(await A.locator('#cv-out').innerText()) && /237\s*ml/.test(await A.locator('#cv-out').innerText()));
     await A.fill('#cv-n', '350'); await A.selectOption('#cv-u', '°F'); await A.waitForTimeout(100);
@@ -287,6 +307,13 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.click('#talarm-stop'); await A.waitForTimeout(300);
     ok('Stop silences the alarm', !(await A.locator('#talarm').isVisible()));
     await A.evaluate(() => { TIMERS = []; saveTimers(); afterTimerChange(); });
+    // In the Android app the phone schedules the alarm itself
+    await A.evaluate(() => { window.__al = []; window.GKApp = {setAlarm: (id, at, l) => { __al.push('set ' + l); return true; }, cancelAlarm: id => { __al.push('cancel'); return true; }, stopRinging: () => __al.push('stop')}; });
+    await A.goto(F + '#timers'); await A.waitForTimeout(200); await A.fill('#tm-name', 'Phone kugel'); await A.click('[data-tq="300"]'); await A.waitForTimeout(200);
+    await A.locator('.tm [data-ta=pause]').click(); await A.waitForTimeout(200);
+    const al = await A.evaluate(() => __al);
+    ok('app timers go to the phone alarm, and pausing cancels it', al.includes('set Phone kugel') && al.includes('cancel'), al);
+    await A.evaluate(() => { delete window.GKApp; TIMERS = []; store('gk-native-alarms', []); saveTimers(); afterTimerChange(); });
     await A.goto(F); await A.waitForTimeout(300);
     await A.goto(F + '#c-cakes'); await A.waitForTimeout(300); await A.selectOption('[data-sortpage]', 'za'); await A.waitForTimeout(300);
     const za = await A.locator('.rc h3').allInnerTexts();

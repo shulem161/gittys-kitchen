@@ -1,6 +1,6 @@
 {
-  "web": "3.49",
-  "apk": 8,
+  "web": "3.50",
+  "apk": 9,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New look: a menu bar at the bottom, recipes as a list, Ingredients / Steps / Notes tabs, and kitchen timers."
+  "notes": "New: say how much you already have on the grocery list, a to-do list for today, and timers that ring on the phone's alarm volume (app update)."
 }
