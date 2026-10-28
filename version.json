@@ -1,6 +1,6 @@
 {
-  "web": "3.35",
+  "web": "3.36",
   "apk": 8,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New: Scan a recipe from the home page."
+  "notes": "New: double or halve a whole recipe in the Kitchen calculator."
 }

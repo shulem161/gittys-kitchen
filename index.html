@@ -116,6 +116,10 @@ button{font:inherit;color:inherit}
 .cv-chips span.x{border-color:var(--accent)}
 .cv-chips b,.cv-big b{font-variant-numeric:tabular-nums;color:var(--accent)}
 .cv-big{font-size:20px;margin:6px 0}
+.wr-own{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--muted);margin-left:4px}
+.wr-own input{width:70px;padding:6px 8px}
+.wr-title{margin:14px 0 6px;font-size:16px}.wr-title a{color:var(--accent)}
+.wr-list{margin:4px 0 8px;padding-left:20px}.wr-list li{margin:3px 0}.wr-list b{color:var(--accent);font-variant-numeric:tabular-nums}
 .cv-guide{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px 18px;padding-left:18px;margin:0}
 .g-recs{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .g-rec{display:flex;align-items:center;gap:8px}.g-rec a{flex:1;color:var(--ink);font-weight:600;text-decoration:none}
@@ -610,7 +614,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.35";
+const WEB_VERSION = "3.36";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -999,7 +1003,7 @@ function recipe(r){
         <div class="fact"><b>${nSteps(r)}</b> steps</div>
         <div class="fact" title="${r.time?"Time to make":"Estimated from the recipe"}">${TOOL_IC.clock}<b>${esc(timeText(r))}</b></div>
       </div>
-      <div class="scale" role="group" aria-label="How much to make"><span>Make</span>${SCALES.map(x=>`<button type="button" class="btn sm${x===sx?" on":""}" data-sx="${x}" aria-pressed="${x===sx}">${x===1?"1×":fmtNum(x)+"×"}</button>`).join("")}<a class="link" href="#convert">Calculator</a></div>
+      <div class="scale" role="group" aria-label="How much to make"><span>Make</span>${(SCALES.includes(sx)?SCALES:[...SCALES,sx].sort((a,b)=>a-b)).map(x=>`<button type="button" class="btn sm${x===sx?" on":""}" data-sx="${x}" aria-pressed="${x===sx}">${x===1?"1×":fmtNum(x)+"×"}</button>`).join("")}<a class="link" href="#convert-${r.id}">Calculator</a></div>
       ${sx!==1?`<p class="hint scale-note">Amounts are for ${fmtNum(sx)}× the recipe. Pan size and baking time may need adjusting.</p>`:""}
       <div class="tools">
         ${recipesOnline&&!offline?`<a class="btn solid" href="#edit-${r.id}">${isAdmin()?"Edit recipe":"Suggest changes"}</a>`:""}
@@ -2313,13 +2317,16 @@ function fmtNum(x){
   if(!whole && !fr) return x<0.1 ? "a pinch of" : "⅛";
   return (whole?String(whole):"")+fr;
 }
-// Neat unit after scaling: 6 tsp → 2 tbsp, 8 tbsp → ½ cup
+// Neat unit after scaling: 6 tsp → 2 tbsp, 8 tbsp → ½ cup, ⅜ cup → 6 tbsp, 1⅛ cup → 1 cup + 2 tbsp
+const CLEAN=[0,1/4,1/3,1/2,2/3,3/4,1];
+const isClean = v => CLEAN.some(c=>Math.abs(c-(v-Math.floor(v)))<0.02);
 function tidyUnit(n,unit){
-  const nice = v => Math.abs(v*8-Math.round(v*8))<0.04;
-  if(unit==="tsp" && n>=3 && nice(n/3)) return [n/3,"tbsp"];
-  if(unit==="tbsp" && n>=4 && nice(n/16)) return [n/16,"cup"];
+  if(unit==="tsp" && n>=3 && Math.abs(n/3*2-Math.round(n/3*2))<0.04) return [n/3,"tbsp"];
+  if(unit==="tbsp" && n>=4 && Math.abs(n/16*4-Math.round(n/16*4))<0.02) return [n/16,"cup"];
+  if(unit==="cup" && !isClean(n)){ const tb=(n-Math.floor(n))*16; if(Math.abs(tb*2-Math.round(tb*2))<0.05) return n<1 ? [tb,"tbsp"] : [n,"cup+tbsp"]; }
   return [n,unit];
 }
+const qtyText = (n,unit) => unit==="cup+tbsp" ? `${Math.floor(n)} ${unitLabel("cup",Math.floor(n))} + ${fmtNum((n-Math.floor(n))*16)} tbsp` : fmtNum(n)+(unit?" "+unitLabel(unit,n):"");
 // Returns [amount, rest] for showing an ingredient at x times the recipe
 function scaledQty(t,x){
   if(x===1) return splitQty(t);
@@ -2331,7 +2338,8 @@ function scaledQty(t,x){
   const inner = s => s.replace(new RegExp("("+NUM_RE+")(\\s*)(?=(?:"+UW+")\\b)","gi"), (m0,a,sp)=>fmtNum(numVal(a)*x)+sp);
   let name=inner(p.name);
   if(!unit && n2===null && n<=1) name=name.replace(/^(egg|yolk|white|potato|onion|carrot|apple|lemon|banana|tomato|zucchini|pepper)(e?s)\b/i,"$1");
-  return [fmtNum(n)+(n2!==null?"–"+fmtNum(n2):"")+(unit?" "+unitLabel(unit,n2||n):""), (p.paren?inner(p.paren)+" ":"")+name];
+  if(!unit && (n>1 || n2!==null)) name=name.replace(/^(egg|yolk|white|onion|carrot|apple|lemon|banana|pepper)\b(?!s)/i,"$1s").replace(/^(potato|tomato)\b(?!e?s)/i,"$1es");
+  return [n2!==null ? fmtNum(n)+"–"+fmtNum(n2)+(unit?" "+unitLabel(unit,n2):"") : qtyText(n,unit), (p.paren?inner(p.paren)+" ":"")+name];
 }
 const SCALES=[0.5,1,1.5,2,3];
 const scaleNow = {};   // recipe id → size picked on this visit
@@ -2362,10 +2370,16 @@ const timeShort = r => r.time ? r.time : (()=>{ const e=estMinutes(r); return "~
 
 /* ---------- kitchen calculator ---------- */
 const CUP_GRAMS = [["flour",125],["sugar",200],["brown sugar",220],["confectioners' sugar",120],["margarine or butter",227],["oil",218],["honey",340],["cocoa",85],["rice (uncooked)",185],["oats",90],["water or milk",240],["chopped nuts",120],["chocolate chips",170]];
-function calcPage(){
+let calcRec={id:"",x:2};
+function calcPage(preId){
+  if(preId && RECIPES.some(r=>r.id===preId)) calcRec={id:preId, x:scaleNow[preId]&&scaleNow[preId]!==1?scaleNow[preId]:2};
   const vol=UNITS.filter(u=>u[2]==="vol").map(u=>u[0]), wt=UNITS.filter(u=>u[2]==="wt").map(u=>u[0]);
   app.innerHTML = `<section class="wrap admin tools-page">
-    <div class="section-head" style="margin-top:28px"><h2>Kitchen calculator</h2><p>Convert amounts and temperatures</p></div>
+    <div class="section-head" style="margin-top:28px"><h2>Kitchen calculator</h2><p>Change recipes, convert amounts</p></div>
+    <div class="panel-a" id="wr"><h3>Double or halve a whole recipe</h3>
+      <div class="field"><label for="wr-q">Recipe</label><input id="wr-q" type="text" autocomplete="off" placeholder="Type a recipe name…"><div class="pre-sugg" id="wr-sugg"></div></div>
+      <div id="wr-body"></div>
+    </div>
     <div class="panel-a"><h3>Convert</h3>
       <div class="calc-row">
         <div class="field"><label for="cv-n">Amount</label><input id="cv-n" type="text" inputmode="decimal" value="1" autocomplete="off"></div>
@@ -2383,7 +2397,7 @@ function calcPage(){
         <div class="field"><label for="mx-x">Times</label><select id="mx-x">${[["0.5","½ (half)"],["0.333333","⅓"],["0.75","¾"],["1.5","1½"],["2","2 (double)"],["3","3 (triple)"],["4","4"]].map(([v,l])=>`<option value="${v}" ${v==="2"?"selected":""}>${l}</option>`).join("")}</select></div>
       </div>
       <p class="cv-big" id="mx-out" aria-live="polite"></p>
-      <p class="hint">To change a whole recipe, open it and tap ½×, 2× or 3× at the top.</p>
+      
     </div>
     <div class="panel-a"><h3>Quick guide</h3>
       <ul class="cv-guide">
@@ -2413,6 +2427,34 @@ function calcPage(){
   ["cv-n","cv-u","cv-i"].forEach(id=>$(id).addEventListener("input",conv)); $("cv-u").onchange=conv; $("cv-i").onchange=conv;
   $("mx-a").addEventListener("input",mult); $("mx-x").onchange=mult;
   conv(); mult();
+  // whole recipe
+  const wq=$("wr-q"), ws=$("wr-sugg");
+  const drawWhole=()=>{
+    const r=RECIPES.find(x=>x.id===calcRec.id), body=$("wr-body"); if(!body) return;
+    if(!r){ body.innerHTML=`<p class="hint">Choose a recipe, then pick how much to make. Every ingredient is worked out for you.</p>`; return; }
+    wq.value=r.t.replace(/^Untitled:\s*/,"");
+    const x=calcRec.x, inList=gStore().items.some(i=>i.id===r.id);
+    const groups=buildParts(r).flatMap(p=>p.ing);
+    body.innerHTML=`<div class="scale" role="group" aria-label="How much to make"><span>Make</span>${[0.5,1.5,2,3,4].map(v=>`<button type="button" class="btn sm${v===x?" on":""}" data-wx="${v}" aria-pressed="${v===x}">${v===0.5?"½× (half)":v===2?"2× (double)":fmtNum(v)+"×"}</button>`).join("")}
+        <label class="wr-own">or <input id="wr-own" type="text" inputmode="decimal" value="${SCALES.concat([4]).includes(x)?"":fmtNum(x)}" placeholder="e.g. 1¼" aria-label="Other amount"> ×</label></div>
+      <h4 class="wr-title"><a href="#${r.id}">${esc(r.t)}</a> · ${fmtNum(x)}× the recipe</h4>
+      ${groups.length?groups.map(g=>`${g.title?`<div class="group">${esc(g.title)}</div>`:""}<ul class="wr-list">${g.items.map(it=>{ const [q,n]=scaledQty(it,x); return `<li>${q?`<b>${esc(q)}</b> `:""}${esc(unbracket(n))}</li>`; }).join("")}</ul>`).join(""):`<p class="hint">This recipe has no ingredient list.</p>`}
+      <p class="hint">Pan size and baking time may need adjusting.</p>
+      <div class="row mn-actions"><a class="btn solid" id="wr-open" href="#${r.id}">Open recipe at this size</a><button type="button" class="btn" id="wr-copy">Copy</button><button type="button" class="btn" id="wr-groc">${inList?"Update grocery list":"Add to grocery list"}</button></div>`;
+    body.querySelectorAll("[data-wx]").forEach(b=>b.onclick=()=>{ calcRec.x=+b.dataset.wx; drawWhole(); });
+    const own=$("wr-own"); own.onchange=()=>{ const v=numVal(own.value.replace(",",".")); if(v>0 && v<=50){ calcRec.x=v; drawWhole(); } };
+    own.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); own.onchange(); } };
+    $("wr-open").onclick=()=>{ scaleNow[r.id]=x; };
+    $("wr-copy").onclick=()=>copyText(`${r.t} – ${fmtNum(x)}× the recipe\n`+groups.flatMap(g=>(g.title?["",g.title]:[]).concat(g.items.map(it=>{ const [q,n]=scaledQty(it,x); return "• "+(q?q+" ":"")+unbracket(n); }))).join("\n"));
+    $("wr-groc").onclick=()=>{ const g=gStore(), it=g.items.find(i=>i.id===r.id); if(it) it.x=x; else g.items.push({id:r.id,x}); gSave(g); renderAcct(); toast(it?"Grocery list updated":"Added to the grocery list"); drawWhole(); };
+  };
+  wq.oninput=()=>{ const q=wq.value.trim().toLowerCase(); if(!q){ ws.innerHTML=""; return; }
+    const hits=RECIPES.filter(x=>x.t.toLowerCase().includes(q)).slice(0,6);
+    ws.innerHTML = hits.length ? hits.map(x=>`<button type="button" class="pre-opt" data-wr="${esc(x.id)}">${esc(x.t)} <span>${esc(x.c)}</span></button>`).join("") : `<p class="hint">No recipe with that name.</p>`;
+    ws.querySelectorAll("[data-wr]").forEach(b=>b.onclick=()=>{ calcRec.id=b.dataset.wr; ws.innerHTML=""; drawWhole(); }); };
+  wq.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=ws.querySelector("[data-wr]"); if(b) b.click(); } };
+  wq.onfocus=()=>{ if(calcRec.id) wq.select(); };
+  drawWhole();
 }
 
 /* ---------- grocery list ---------- */
@@ -2758,7 +2800,7 @@ function route(){
   if(!offline && (h==="scan" || h.startsWith("scan-"))){ q.value=""; scanPage(CATS.find(x=>slug(x)==="c-"+h.slice(5))); window.scrollTo(0,0); return; }
   if(!offline && (h==="new" || h.startsWith("new-"))){ q.value=""; editor(null, CATS.find(x=>slug(x)==="c-"+h.slice(4))); window.scrollTo(0,0); return; }
   if(h==="favorites"){ q.value=""; favorites(); window.scrollTo(0,0); return; }
-  if(h==="convert"){ q.value=""; calcPage(); window.scrollTo(0,0); return; }
+  if(h==="convert" || h.startsWith("convert-")){ q.value=""; calcPage(h.slice(8)); window.scrollTo(0,0); return; }
   if(h==="grocery"){ q.value=""; groceryPage(); window.scrollTo(0,0); return; }
   if(h==="menu"){ q.value=""; menuPage(); window.scrollTo(0,0); return; }
   const r = RECIPES.find(x=>x.id===h);

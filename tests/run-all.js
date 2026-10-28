@@ -225,6 +225,13 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#convert'); await A.waitForTimeout(400);
     ok('calculator converts a cup', /16\s*tbsp/.test(await A.locator('#cv-out').innerText()) && /237\s*ml/.test(await A.locator('#cv-out').innerText()));
     await A.fill('#cv-n', '350'); await A.selectOption('#cv-u', '°F'); await A.waitForTimeout(100);
+    await A.fill('#wr-q', 'apple kugel'); await A.waitForTimeout(200); await A.locator('[data-wr]').first().click(); await A.waitForTimeout(300);
+    ok('calculator doubles a whole recipe', /^6 cups flour/.test(await A.locator('.wr-list li').first().innerText()), await A.locator('.wr-list li').first().innerText());
+    await A.click('[data-wx="0.5"]'); await A.waitForTimeout(200);
+    ok('calculator halves a whole recipe', /^1½ cups flour/.test(await A.locator('.wr-list li').first().innerText()) && /6 tbsp sugar/.test(await A.locator('.wr-list').first().innerText()));
+    await A.click('#wr-open'); await A.waitForTimeout(400);
+    ok('open recipe at the chosen size', /^1½ cups flour/.test(await A.locator('.col.ing li').first().innerText()));
+    await A.goto(F + '#convert'); await A.waitForTimeout(300); await A.fill('#cv-n', '350'); await A.selectOption('#cv-u', '°F'); await A.waitForTimeout(100);
     ok('calculator converts oven temperature', /177\s*°C/.test(await A.locator('#cv-out').innerText()));
     await A.goto(F + '#menu'); await A.waitForTimeout(400); await A.click('[data-mq="Beef"]'); await A.click('#mnform .primary'); await A.waitForTimeout(2500);
     const mn = await A.locator('.mn-list li').count();
