@@ -676,7 +676,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.44";
+const WEB_VERSION = "3.45";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -998,7 +998,8 @@ function home(){
 }
 
 function tabs(active){
-  return `<nav class="tabs" aria-label="Categories">${CATS.map(c=>{const n=RECIPES.filter(r=>r.c===c).length;
+  const nw = recentList(7*864e5).length;
+  return `<nav class="tabs" aria-label="Categories"><a class="tab tab-new" href="#recent" ${active==="__new"?'aria-current="page"':""}>New recipes <span class="n">${nw}</span></a>${CATS.map(c=>{const n=RECIPES.filter(r=>r.c===c).length;
     return `<a class="tab" href="#${slug(c)}" ${c===active?'aria-current="page"':""}>${esc(c)} <span class="n">${n}</span></a>`}).join("")}</nav>`;
 }
 
@@ -2941,7 +2942,7 @@ function recentPage(which){
   const pick = RECENT.find(x=>x[0]===which) || RECENT[1];
   store("gk-recent", pick[0]);
   const list = recentList(pick[2]);
-  app.innerHTML = `<section class="wrap">${tabs(null)}
+  app.innerHTML = `<section class="wrap">${tabs("__new")}
     <div class="section-head"><h2>New recipes</h2><p>${list.length} ${list.length===1?"recipe":"recipes"} added</p></div>
     <nav class="sec-nav" aria-label="How far back">${RECENT.map(([k,l,ms])=>`<a class="sec-pill${k===pick[0]?" on":""}" href="#recent-${k}"${k===pick[0]?' aria-current="page"':""}>${l} <span>${recentList(ms).length}</span></a>`).join("")}</nav>
     ${list.length ? (()=>{ let last=""; return list.map(r=>{ const d=new Date(addedAt(r)).toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});

@@ -260,6 +260,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#c-bread'); await A.waitForTimeout(400);
     const bc = await A.locator('.rc .nochip').allInnerTexts();
     ok('category lists recipes by code', bc.length >= 2 && bc.every((c, i) => !i || bc[i - 1].localeCompare(c, undefined, {numeric: true}) < 0) && (await A.locator('.rc').first().locator('.nochip').count()) === 1, bc);
+    ok('New recipes is first in the category bar', /^New recipes/.test(await A.locator('.tabs .tab').first().innerText()));
     // New recipes
     await A.goto(F + '#recent-day'); await A.waitForTimeout(400);
     ok('new recipes page lists recipes added today', (await A.locator('.rc h3').allInnerTexts()).includes('Test Pesach Kugel'));

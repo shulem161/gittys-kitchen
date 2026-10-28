@@ -1,6 +1,6 @@
 {
-  "web": "3.44",
+  "web": "3.45",
   "apk": 8,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Recipes are listed in order of their codes (A001, A002\u2026)."
+  "notes": "New recipes button first in the category bar."
 }
