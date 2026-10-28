@@ -1,0 +1,21 @@
+# Check that "Menu ideas" gets good answers from the AI (Firebase AI Logic).
+name: Check menu ideas
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, menu-check]
+    paths:
+      - tools/check-menu.mjs
+      - .github/workflows/check-menu.yml
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-save --no-audit --no-fund firebase@12.5.0
+      - run: node tools/check-menu.mjs
