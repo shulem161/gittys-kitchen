@@ -113,6 +113,7 @@ button{font:inherit;color:inherit}
 .rq-what{font-weight:700}
 .rq-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.rq-acts input,.rq-acts select{flex:1 1 180px;min-width:0}
 .rq-del{font-size:13px;margin-top:6px}
+.newchip{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:999px;background:var(--wheat-soft);color:var(--wheat);white-space:nowrap}
 .nochip{font-size:11px;font-weight:700;letter-spacing:.04em;padding:4px 8px;border-radius:999px;border:1px solid var(--accent);color:var(--accent);font-variant-numeric:tabular-nums;white-space:nowrap}
 .rhead .nochip{margin-right:6px}.rhead .chip+.chip{margin-left:6px}
 .sec-nav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px}
@@ -643,7 +644,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.38";
+const WEB_VERSION = "3.39";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -895,7 +896,7 @@ function card(r){
   const t = temps(r);
   return `<a class="rc${r.cover?" has-img":""}" href="#${r.id}">
     ${r.cover?`<div class="rc-img" style="background-image:url('${r.cover}')" role="img" aria-label="Photo of ${esc(r.t)}"></div>`:""}
-    <div class="top"><span class="chips">${noChip(r)}<span class="chip">${esc(r.sec||r.c)}</span>${kindChip(r)}</span>${t.length?`<span class="oven">${t.slice(0,2).join(" → ")}</span>`:""}${me&&favs().includes(r.id)?HEART.replace("<svg",'<svg class="heart"'):""}</div>
+    <div class="top"><span class="chips">${noChip(r)}<span class="chip">${esc(r.sec||r.c)}</span>${kindChip(r)}${addedAt(r)>Date.now()-7*864e5?'<span class="newchip">New</span>':""}</span>${t.length?`<span class="oven">${t.slice(0,2).join(" → ")}</span>`:""}${me&&favs().includes(r.id)?HEART.replace("<svg",'<svg class="heart"'):""}</div>
     <h3>${titleHTML(r)}</h3>
     ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}
     <div class="meta"><span><b>${nIng(r)}</b> ingredients</span><span><b>${nSteps(r)}</b> steps</span><span>${TOOL_IC.clock}<b>${esc(timeShort(r))}</b></span></div>
@@ -909,6 +910,7 @@ const TOOL_IC = {
   scan:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M8 9h8M8 12h8M8 15h5"/></svg>',
   ask:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M9.6 9.5a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5M12 16h.01"/></svg>',
   cam:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  spark:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>',
   clock:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
 };
 function home(){
@@ -943,6 +945,7 @@ function home(){
   <section class="wrap">
     <div class="section-head"><h2>Kitchen tools</h2><p>Plan, shop and measure</p></div>
     <div class="cats tools">
+      <a class="cat" href="#recent"><div class="ic">${TOOL_IC.spark}</div><div class="tool-txt"><h3>New recipes</h3><span>${(()=>{ const d=recentList(864e5).length, w=recentList(7*864e5).length; return d?`${d} added today`:w?`${w} added this week`:"See what's been added lately"; })()}</span></div></a>
       ${offline||(isAdmin()&&!recipesOnline)?"":`<a class="cat" href="#scan"><div class="ic">${TOOL_IC.scan}</div><div class="tool-txt"><h3>Scan a recipe</h3><span>Photo of a paper, PDF or Word</span></div></a>`}
       ${offline?"":`<a class="cat" href="#requests"><div class="ic">${TOOL_IC.ask}</div><div class="tool-txt"><h3>${isAdmin()?"Recipe requests":"Request a recipe"}</h3><span>${isAdmin()?(openRequests()?`${openRequests()} waiting`:"What the family is asking for"):"Ask for any recipe, or send a photo"}</span></div></a>`}
       ${offline?"":`<a class="cat" href="#menu"><div class="ic">${TOOL_IC.menu}</div><div class="tool-txt"><h3>Menu ideas</h3><span>A full menu from the cookbook</span></div></a>`}
@@ -1296,6 +1299,7 @@ function openMenu(confirming){
     ${isAdmin()?`<a href="#inbox" role="menuitem">Suggestions &amp; comments <span class="n${newFeedback()?" hot":""}">${newFeedback()?newFeedback()+" new":""}</span></a>`:`<a href="#feedback" role="menuitem">Suggestions &amp; comments <span class="n"></span></a>`}
     <a href="#favorites" role="menuitem">My favorites <span class="n">${favs().length}</span></a>
     ${offline?"":isAdmin()?`<a href="#requests" role="menuitem">Recipe requests <span class="n${openRequests()?" hot":""}">${openRequests()?openRequests()+" waiting":""}</span></a>`:`<a href="#requests" role="menuitem">Request a recipe <span class="n"></span></a>`}
+    <a href="#recent" role="menuitem">New recipes <span class="n">${recentList(7*864e5).length||""}</span></a>
     <a href="#grocery" role="menuitem">Grocery list <span class="n">${gStore().items.length||""}</span></a>
     ${offline?"":`<a href="#menu" role="menuitem">Menu ideas <span class="n"></span></a>`}
     <a href="#convert" role="menuitem">Kitchen calculator <span class="n"></span></a>
@@ -2875,8 +2879,31 @@ function requestsAdminPage(){
     catch(e){ toast("Couldn't save. Check your connection."); }
   };
   app.querySelectorAll("[data-rqdone]").forEach(b=>b.onclick=()=>{ const id=b.dataset.rqdone, link=(app.querySelector(`.rq-link[data-rqid="${id}"]`)||{}).value||""; done(id, link?"done":"closed", link); });
-  app.querySelectorAll("[data-rqnew]").forEach(a=>a.onclick=()=>{ const q=requests.find(x=>x.id===a.dataset.rqnew); store("gk-rq-draft", q?{id:q.id, t:(q.items&&q.items[0]&&q.items[0].ask)||""}:null); });
+  app.querySelectorAll("[data-rqnew]").forEach(a=>a.onclick=()=>{ const q=requests.find(x=>x.id===a.dataset.rqnew); store("gk-rq-draft", q?{id:q.id, t:((q.items||[]).map(i=>i.ask).find(a=>!/^the dish in the photo$/i.test(a)))||""}:null); });
   app.querySelectorAll("[data-rqdel]").forEach(b=>b.onclick=async()=>{ try{ await db.collection("requests").doc(b.dataset.rqdel).delete(); }catch(e){ toast("Couldn't delete."); } });
+}
+
+/* ---------- new recipes ---------- */
+const addedAt = r => { const h=(r.history||[]).find(x=>x.a==="added"); return h ? +h.at||0 : 0; };
+const RECENT = [["day","Last 24 hours",864e5],["week","Last 7 days",7*864e5],["month","Last 30 days",30*864e5]];
+const recentList = ms => RECIPES.filter(r=>addedAt(r) > Date.now()-ms).sort((a,b)=>addedAt(b)-addedAt(a) || byName(a.t,b.t));
+function whenText(t){
+  const m=Math.round((Date.now()-t)/60000);
+  if(m<60) return m<=1?"just now":`${m} minutes ago`;
+  const h=Math.round(m/60); if(h<24) return h===1?"1 hour ago":`${h} hours ago`;
+  const d=Math.round(h/24); return d===1?"yesterday":`${d} days ago`;
+}
+function recentPage(which){
+  const pick = RECENT.find(x=>x[0]===which) || RECENT[1];
+  store("gk-recent", pick[0]);
+  const list = recentList(pick[2]);
+  app.innerHTML = `<section class="wrap">${tabs(null)}
+    <div class="section-head"><h2>New recipes</h2><p>${list.length} ${list.length===1?"recipe":"recipes"} added</p></div>
+    <nav class="sec-nav" aria-label="How far back">${RECENT.map(([k,l,ms])=>`<a class="sec-pill${k===pick[0]?" on":""}" href="#recent-${k}"${k===pick[0]?' aria-current="page"':""}>${l} <span>${recentList(ms).length}</span></a>`).join("")}</nav>
+    ${list.length ? (()=>{ let last=""; return list.map(r=>{ const d=new Date(addedAt(r)).toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
+        const head = d!==last ? `${last?"</div>":""}<h3 class="sec-title">${esc(d)}</h3><div class="grid">` : ""; last=d; return head+card(r); }).join("")+"</div>"; })()
+      : `<div class="empty">No recipes were added in the ${pick[1].toLowerCase()}.${pick[0]!=="month"?` <a class="link" href="#recent-${pick[0]==="day"?"week":"month"}">See a longer time</a>`:""}</div>`}
+  </section>`;
 }
 
 /* ---------- my profile ---------- */
@@ -3010,6 +3037,7 @@ function route(){
   if(!offline && (h==="new" || h.startsWith("new-"))){ q.value=""; editor(null, CATS.find(x=>slug(x)==="c-"+h.slice(4))); window.scrollTo(0,0); return; }
   if(h==="favorites"){ q.value=""; favorites(); window.scrollTo(0,0); return; }
   if(h==="requests" && !offline){ q.value=""; requestsPage(); window.scrollTo(0,0); return; }
+  if(h==="recent" || h.startsWith("recent-")){ q.value=""; recentPage(h.slice(7) || store("gk-recent")); window.scrollTo(0,0); return; }
   if(h==="convert" || h.startsWith("convert-")){ q.value=""; calcPage(h.slice(8)); window.scrollTo(0,0); return; }
   if(h==="grocery"){ q.value=""; groceryPage(); window.scrollTo(0,0); return; }
   if(h==="menu"){ q.value=""; menuPage(); window.scrollTo(0,0); return; }

@@ -253,6 +253,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('search by recipe number', (await A.locator('.rc h3').allInnerTexts()).join() === 'Test Pesach Kugel');
     await A.fill('#q', ''); await A.waitForTimeout(200);
 
+    // New recipes
+    await A.goto(F + '#recent-day'); await A.waitForTimeout(400);
+    ok('new recipes page lists recipes added today', (await A.locator('.rc h3').allInnerTexts()).includes('Test Pesach Kugel'));
+    ok('new recipes has 24h / 7 days / 30 days', (await A.locator('.sec-pill').count()) === 3);
+
     // Recipe requests
     await V.goto(F + '#requests'); await V.waitForTimeout(400);
     await V.fill('#rq-text', 'Potato kugel\nQuince tagine with saffron'); await V.click('#rqform .primary'); await V.waitForTimeout(1500);
