@@ -169,6 +169,22 @@ await check('…and then that employee can read comments', assertSucceeds(getDoc
 // Duplicate recipes: only admins
 await check('admin can mark recipes as not duplicates', assertSucceeds(setDoc(doc(ADM, 'meta', 'dupes'), { ignore: ['r-a|r-b'] })));
 await check("employees can't see or change the duplicates list", assertFails(getDoc(doc(EMP, 'meta', 'dupes'))));
+// Calendars and menus: each person's own; menus can be shared
+await check('a member can save their own calendar', assertSucceeds(setDoc(doc(EMP, 'plans', 'emp'), { days: { '2026-10-30': [{ k: 'a', meal: 'Supper', rid: 'r-pub', x: 1, done: false }] } })));
+await check("nobody else can read someone's calendar", assertFails(getDoc(doc(PUB, 'plans', 'emp'))));
+await check("…not even an admin", assertFails(getDoc(doc(ADM, 'plans', 'emp'))));
+const mn = (uid, shared) => ({ uid, ownerName: 'X', name: 'Friday night', items: [{ rid: 'r-pub', x: 1, course: 'Fish' }], shared, sharedNames: [] });
+await check('a member can make a menu', assertSucceeds(setDoc(doc(EMP, 'menus', 'm1'), mn('emp', ['pub']))));
+await check("can't make a menu in someone else's name", assertFails(setDoc(doc(EMP, 'menus', 'm2'), mn('pub', []))));
+await check('the person it is shared with can read it', assertSucceeds(getDoc(doc(PUB, 'menus', 'm1'))));
+await check('…and find it in a list of menus shared with them', assertSucceeds(fs.getDocs(fs.query(fs.collection(PUB, 'menus'), fs.where('shared', 'array-contains', 'pub')))));
+await check("…but can't change it", assertFails(updateDoc(doc(PUB, 'menus', 'm1'), { name: 'Mine now' })));
+await check("…or delete it", assertFails(deleteDoc(doc(PUB, 'menus', 'm1'))));
+await check("someone it isn't shared with can't read it", assertFails(getDoc(doc(as('rev'), 'menus', 'm1'))));
+await check("…or list all menus", assertFails(fs.getDocs(fs.collection(as('rev'), 'menus'))));
+await check('the owner can change it', assertSucceeds(updateDoc(doc(EMP, 'menus', 'm1'), { name: 'Shabbos night' })));
+await check("the owner can't hand it to someone else", assertFails(updateDoc(doc(EMP, 'menus', 'm1'), { uid: 'pub' })));
+await check('the owner can delete it', assertSucceeds(deleteDoc(doc(EMP, 'menus', 'm1'))));
 // Employee settings for all employees
 await check("employees can't change Employee settings", assertFails(setDoc(doc(EMP, 'meta', 'employees'), { allow: { edit: true } })));
 await check('admin can change Employee settings', assertSucceeds(setDoc(doc(ADM, 'meta', 'employees'), { allow: { answer: true, photos: false } })));

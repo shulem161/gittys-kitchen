@@ -1,6 +1,6 @@
 {
-  "web": "3.64",
+  "web": "3.65",
   "apk": 11,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Fix: recipes marked Not duplicates stay hidden after refreshing."
+  "notes": "New: a Calendar tab with Hebrew dates and Jewish holidays, your own menus on any day and meal, progress for each day and week, and menus you can share."
 }

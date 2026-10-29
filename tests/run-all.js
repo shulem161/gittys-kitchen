@@ -457,6 +457,39 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
 
     ok('sources show without page numbers', await A.evaluate(() => creditText('The Haimishe Kitchen – Pesach Cookbook, page 22') === 'From The Haimishe Kitchen – Pesach Cookbook' && creditText('Bobby') === 'From Bobby'));
 
+    // Calendar (Hebrew dates, holidays) and menus
+    await A.goto(F + '#plan-2026-12-05'); await A.waitForTimeout(500);
+    const dh = await A.locator('.pl-dhead').innerText();
+    ok('calendar shows the Hebrew date and the holiday', /25 Kislev 5787/.test(dh) && /Chanukah/.test(dh) && /Shabbos/.test(dh), dh);
+    ok('Calendar is the last button in the bottom bar, where Me was', (await A.locator('#tabbar [data-nav=plan][aria-current=page]').count()) === 1 && await A.evaluate(() => [...document.querySelectorAll('#tabbar [data-nav]')].map(a => a.dataset.nav).join()) === 'home,cats,grocery,timers,plan');
+    await A.goto(F + '#menus'); await A.waitForTimeout(300); await A.fill('#mn-name', 'Test Friday night'); await A.click('#mn-new .solid'); await A.waitForTimeout(600);
+    for (const q of ['chicken soup', 'challah']) { await A.fill('#mi-q', q); await A.waitForTimeout(150); await A.locator('[data-miadd]').first().click(); await A.waitForTimeout(300); }
+    ok('a menu holds recipes', (await A.locator('.mi-row').count()) === 2);
+    await A.fill('#mi-date', '2026-12-04'); await A.selectOption('#mi-meal', 'Friday night'); await A.click('#mi-cal'); await A.waitForTimeout(700);
+    ok('a menu goes on a chosen day and meal', /Friday night/.test(await A.locator('.pl-meal').innerText().catch(() => '')) && /Test Friday night/.test(await A.locator('.pl-entry').innerText().catch(() => '')) && await A.evaluate(() => planSel) === '2026-12-04');
+    await A.locator('[data-pdone]').first().check(); await A.waitForTimeout(400);
+    ok('ticking a recipe off counts what is done and what is left', /1 of 2 made/.test(await A.locator('.pl-prog').innerText()) && /left/.test(await A.locator('.pl-prog').innerText()));
+    await A.evaluate(() => { const g = gStore(); g.items = []; gSave(g); }); await A.click('#pl-groc'); await A.waitForTimeout(200);
+    ok('a day goes to the grocery list in one tap', await A.evaluate(() => gStore().items.length) === 2);
+    // edit the menu: the linked day shows the change
+    const mid = await A.evaluate(() => Object.values(MENUS).find(m => m.name === 'Test Friday night').id);
+    await A.goto(F + '#menu-' + mid); await A.waitForTimeout(300); await A.fill('#mi-q', 'kugel'); await A.waitForTimeout(150); await A.locator('[data-miadd]').first().click(); await A.waitForTimeout(300);
+    await A.goto(F + '#plan-2026-12-04'); await A.waitForTimeout(400);
+    ok('the day is linked to the menu: changes show up', /1 of 3 made/.test(await A.locator('.pl-prog').innerText()));
+    // share it
+    const vn2 = await V.evaluate(() => myName());
+    await A.goto(F + '#menu-' + mid); await A.waitForTimeout(300); await A.fill('#mi-share', vn2); await A.click('#mi-sharego'); await A.waitForTimeout(800);
+    await V.goto(F + '#menus'); await V.waitForTimeout(800);
+    ok('a shared menu shows up for the other member', /Shared with me/.test(await V.locator('main').innerText()) && /Test Friday night/.test(await V.locator('main').innerText()));
+    await V.goto(F + '#menu-' + mid); await V.waitForTimeout(400);
+    ok("…they can use it but not change it", (await V.locator('#mi-q').count()) === 0 && (await V.locator('#mi-cal').count()) === 1 && (await V.locator('#mi-copy').count()) === 1);
+    await V.goto(F + '#plan-2026-12-04'); await V.waitForTimeout(400);
+    ok("everyone's calendar is their own", !/Test Friday night/.test(await V.locator('#pl-day').innerText()));
+    // from a recipe page
+    await A.goto(F + '#r-croissants'); await A.waitForTimeout(300); await A.click('#toplan-btn'); await A.fill('#tp-date', '2026-12-06'); await A.click('#tp-cal'); await A.waitForTimeout(400);
+    await A.goto(F + '#plan-2026-12-06'); await A.waitForTimeout(400);
+    ok('a recipe page can put a recipe on the calendar', /Croissants/.test(await A.locator('#pl-day').innerText()));
+
     // Search
     await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);
     ok('search finds recipes', await V.locator('.rc').count() >= 3);
