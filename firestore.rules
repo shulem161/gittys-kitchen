@@ -257,7 +257,8 @@ service cloud.firestore {
         || (isAdmin() && uid != ownerUid() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['moved']))
         || (signedIn() && request.auth.uid == uid
             && resource.data.status == 'approved'
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favs', 'rc', 'rcAt']))
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favs', 'rc', 'rcAt', 'prefs'])
+            && (!('prefs' in request.resource.data) || request.resource.data.prefs is map))
         // a member changing their own name: the new name must already point to them
         || (signedIn() && request.auth.uid == uid
             && resource.data.status == 'approved'
