@@ -524,6 +524,7 @@ body.out .bar, body.out footer{display:none}
 .tp-cook{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
 .tp-cook summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px;min-height:36px}
 .tp-menu{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.pub-state{cursor:default;color:var(--muted);border-style:dashed}
 .gl-list{list-style:none;margin:6px 0 0;padding:0}.gl-list li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
 .gl-list li>div:first-child{display:grid}
 .mv-sec{display:flex;gap:6px;align-items:center;font-size:14px;font-weight:600;color:var(--muted)}.mv-sec[hidden]{display:none}
@@ -1060,7 +1061,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.68";
+const WEB_VERSION = "3.69";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1608,7 +1609,7 @@ function recipe(r){
       <div class="tools">
         ${recipesOnline&&!offline&&(can("suggest")||may("edit"))?`<a class="btn solid" href="#edit-${r.id}">${may("edit")?"Edit recipe":"Suggest changes"}</a>`:""}
         ${may("move")&&recipesOnline&&!offline?`<button class="btn" id="mv-btn" type="button">Move to another category</button>`:""}
-        ${myRole()==="employee"&&recipesOnline&&!offline&&!pubVisible(r)?(myGolive(r.id)?`<span class="btn" aria-disabled="true">Asked to go live ✓</span>`:`<button class="btn" id="gl-btn" type="button">Request to go live</button>`):""}
+        ${myRole()==="employee"&&recipesOnline&&!offline?(pubVisible(r)?`<span class="btn pub-state" aria-disabled="true">Public can see it ✓</span>`:myGolive(r.id)?`<span class="btn pub-state" aria-disabled="true">Asked to go live ✓</span>`:`<button class="btn solid" id="gl-btn" type="button">Request to go live</button>`):""}
         ${isAdmin()&&recipesOnline&&!offline?`<button class="btn" id="pubtog" type="button" aria-pressed="${pubVisible(r)}">${pubVisible(r)?"Public can see it ✓":"Hidden from public"}</button>`:""}
         <button class="btn" id="toplan-btn" type="button">${TOOL_IC.cal}Add to calendar</button>
         <button class="btn" id="td-rec" type="button" aria-pressed="${inToday(r.id)}">${inToday(r.id)?"On today's list ✓":"Add to today"}</button>
@@ -1695,7 +1696,7 @@ function recipe(r){
   };
   const mvb=document.getElementById("mv-btn"); if(mvb) mvb.onclick=e=>moveBox(r, e.currentTarget);
   const glb=document.getElementById("gl-btn"); if(glb) glb.onclick=async()=>{ glb.disabled=true;
-    try{ await requestGolive(r); glb.outerHTML='<span class="btn" aria-disabled="true">Asked to go live ✓</span>'; toast("Sent to the admins"); }catch(e){ glb.disabled=false; toast("Couldn't send. Check your connection."); } };
+    try{ await requestGolive(r); glb.outerHTML='<span class="btn pub-state" aria-disabled="true">Asked to go live ✓</span>'; toast("Sent to the admins"); }catch(e){ glb.disabled=false; toast("Couldn't send. Check your connection."); } };
   const pt=document.getElementById("pubtog");
   if(pt) pt.onclick=async()=>{ const v=!pubVisible(r); pt.disabled=true;
     try{ await db.collection("recipes").doc(r.id).update({pub:v}); r.pub=v; pt.setAttribute("aria-pressed",v); pt.textContent=v?"Public can see it ✓":"Hidden from public"; toast(v?"Public members can see this recipe":"Hidden from public members"); }

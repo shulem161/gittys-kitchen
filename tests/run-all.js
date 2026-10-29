@@ -394,6 +394,9 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // Employees ask for a hidden recipe to go live
     await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
     ok('employees see "Request to go live" on a hidden recipe', (await V.locator('#gl-btn').count()) === 1);
+    await V.goto(F + '#r-croissants'); await V.waitForTimeout(300);
+    ok('…and "Public can see it" on a visible one', /Public can see it/.test(await V.locator('.rhead').innerText()) && (await V.locator('#gl-btn').count()) === 0);
+    await V.goto(F + '#r-challah'); await V.waitForTimeout(400);
     await V.click('#gl-btn'); await V.waitForTimeout(600);
     ok('…and it shows as asked', /Asked to go live/.test(await V.locator('.rhead').innerText()) && notes.some(n => /show a recipe to the public/.test(n)));
     await A.goto(F + '#public'); await A.waitForTimeout(600);

@@ -1,6 +1,6 @@
 {
-  "web": "3.68",
+  "web": "3.69",
   "apk": 11,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Every recipe shows how many it serves. Move recipes to another category. Employees can ask for a recipe to go live for the public."
+  "notes": "Employees see on every recipe whether the public can see it, with a Request to go live button on hidden ones."
 }
