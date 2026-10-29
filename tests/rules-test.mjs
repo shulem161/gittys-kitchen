@@ -29,6 +29,8 @@ await check('member can change own name once the new name points to them', asser
 await check('member can let go of the old name', assertSucceeds(deleteDoc(doc(G, 'names', 'gitty'))));
 await check('member can change capital letters only', assertSucceeds(updateDoc(doc(G, 'users', 'gitty'), { name: 'gitty schlesinger' })));
 await check('favorites still save', assertSucceeds(updateDoc(doc(G, 'users', 'gitty'), { favs: ['r-x'] })));
+await check('a member can save their own settings', assertSucceeds(updateDoc(doc(G, 'users', 'gitty'), { prefs: { todoDays: 7 } })));
+await check("…but can't sneak a role in with them", assertFails(updateDoc(doc(G, 'users', 'gitty'), { prefs: { todoDays: 3 }, role: 'admin' })));
 
 // Things that must be refused
 await check("can't take another member's name", assertFails(setDoc(doc(G, 'names', 'malky klein'), { uid: 'gitty', email: 'g@x' })));

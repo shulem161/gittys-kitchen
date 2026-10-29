@@ -247,7 +247,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Clear list empties the grocery list', (await A.locator('.glist li').count()) === 0 && await A.evaluate(() => gStore().items.length) === 0);
     await A.setViewportSize({width: 1100, height: 900});
     await A.goto(F + '#r-croissants'); await A.waitForTimeout(300); await A.click('#groc'); await A.waitForTimeout(300);
-    // Today's to-do list
+    // Today's to-do list: on the home page only when there's something to do soon (each person's choice)
+    await A.goto(F); await A.waitForTimeout(300);
+    ok('no to-do box on the home page when nothing is coming up', (await A.locator('#today').count()) === 0);
+    await A.goto(F + '#profile'); await A.waitForTimeout(300); await A.selectOption('#pref-todo', '-1'); await A.waitForTimeout(300);
+    ok('the choice is saved to the profile', await A.evaluate(() => profile.prefs && profile.prefs.todoDays === -1));
     await A.goto(F); await A.waitForTimeout(300);
     await A.fill('#td-new', 'Take out the chicken'); await A.click('#td-form .solid'); await A.waitForTimeout(200);
     await A.goto(F + '#r-challah'); await A.waitForTimeout(300); await A.click('#td-rec'); await A.waitForTimeout(200);
@@ -259,6 +263,13 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.evaluate(() => { const v = store(uk('today')); v.day = '2000-01-01'; store(uk('today'), v); }); await A.goto(F + '#categories'); await A.goto(F); await A.waitForTimeout(300);
     const td2 = await A.locator('#today').innerText();
     ok('next day: finished tasks go, unfinished stay', !/Take out the chicken/.test(td2) && /Make Challah/.test(td2) && /from before/.test(td2), td2);
+    await A.goto(F + '#profile'); await A.waitForTimeout(300); await A.selectOption('#pref-todo', '3'); await A.waitForTimeout(300);
+    await A.goto(F); await A.waitForTimeout(300);
+    ok('with "next 3 days" it shows while there is a to-do today', (await A.locator('#today').count()) === 1);
+    await A.evaluate(() => { const v = tdStore(); v.items = []; tdSave(v); }); await A.goto(F + '#categories'); await A.goto(F); await A.waitForTimeout(300);
+    ok('…and goes away when there is nothing to do', (await A.locator('#today').count()) === 0);
+    await A.goto(F + '#plan'); await A.waitForTimeout(400);
+    ok("today's to-do list is always on the Calendar", (await A.locator('#pl-day ~ #today, .pl-todo').count()) === 1);
     await A.goto(F + '#convert'); await A.waitForTimeout(400);
     ok('calculator converts a cup', /16\s*tbsp/.test(await A.locator('#cv-out').innerText()) && /237\s*ml/.test(await A.locator('#cv-out').innerText()));
     await A.fill('#cv-n', '350'); await A.selectOption('#cv-u', '°F'); await A.waitForTimeout(100);
@@ -504,9 +515,16 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await V.goto(F + '#plan-2026-12-04'); await V.waitForTimeout(400);
     ok("everyone's calendar is their own", !/Test Friday night/.test(await V.locator('#pl-day').innerText()));
     // from a recipe page
-    await A.goto(F + '#r-croissants'); await A.waitForTimeout(300); await A.click('#toplan-btn'); await A.fill('#tp-date', '2026-12-06'); await A.click('#tp-cal'); await A.waitForTimeout(400);
+    await A.goto(F + '#r-croissants'); await A.waitForTimeout(300); await A.click('#toplan-btn');
+    await A.fill('#tp-date', '2026-12-06'); await A.locator('#tp-date').dispatchEvent('change'); await A.selectOption('#tp-meal', 'Kiddush'); await A.selectOption('#tp-x', '2');
+    ok('the recipe page shows the Hebrew date of the chosen day', /ו׳ כסלו|כסלו/.test(await A.locator('#tp-heb').innerText()));
+    await A.click('#tp-cookbox summary'); await A.fill('#tp-cdate', '2026-12-04'); await A.fill('#tp-ctime', '10:30'); await A.click('#tp-cal'); await A.waitForTimeout(400);
     await A.goto(F + '#plan-2026-12-06'); await A.waitForTimeout(400);
-    ok('a recipe page can put a recipe on the calendar', /Croissants/.test(await A.locator('#pl-day').innerText()));
+    const pd6 = await A.locator('#pl-day').innerText();
+    ok('a recipe page puts a recipe on a day, a meal and an amount', /Croissants/.test(pd6) && /Kiddush/i.test(pd6) && /2×/.test(pd6), pd6.slice(0, 300));
+    ok('…with when to cook it', /Cook Fri, Dec 4 at 10:30/.test(pd6), pd6.slice(0, 400));
+    await A.goto(F + '#plan-2026-12-04'); await A.waitForTimeout(400);
+    ok('…and that cooking day lists it', /Croissants/.test(await A.locator('.pl-cooking').innerText().catch(() => '')));
 
     // Search
     await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);

@@ -515,6 +515,14 @@ body.out .bar, body.out footer{display:none}
 .pl-ctime{min-width:68px;font-weight:700;color:var(--wheat);font-variant-numeric:tabular-nums}
 .cal-marks{margin-top:auto;display:flex;align-items:center;gap:3px}.cal-marks .cal-n{margin-top:0}
 .cal-cook{display:inline-flex;color:var(--wheat)}.cal-d.sel .cal-cook{color:var(--paper)}
+.toplan b{font-size:16px}
+.tp-grid{display:flex;flex-wrap:wrap;gap:8px 12px;margin-top:10px}
+.tp-grid label{display:flex;gap:6px;align-items:center;font-size:14px;font-weight:600;color:var(--muted)}
+.tp-grid input,.tp-grid select{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);font:inherit;font-size:15px}
+.tp-heb{margin:6px 0 0;color:var(--wheat);font-weight:600}
+.tp-cook{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.tp-cook summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px;min-height:36px}
+.tp-menu{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
 .td-menu{display:flex;gap:8px;align-items:baseline;padding:6px 0 4px;text-decoration:none;color:var(--ink);font-size:14px;border-bottom:1px solid var(--line)}
 .td-menu span:first-child{color:var(--muted)}.td-menu .link{margin-left:auto;font-size:13px}
 .act-filters{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
@@ -1047,7 +1055,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.66";
+const WEB_VERSION = "3.67";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1195,6 +1203,14 @@ async function signOut(){
   closeMenu(); store("gk-cache",null); location.hash="";
   if(auth){ try{ await auth.signOut(); }catch(e){} }
   else { me=null; profile=null; state="offline-first"; route(); }
+}
+// Each person's own settings (profile.prefs). todoDays: how far ahead the home page looks before showing the to-do box (0 = never, -1 = always)
+const myPrefs = () => (profile && profile.prefs) || store(uk("prefs")) || {};
+const TODO_CHOICES = [[1,"Today only"],[2,"Today and tomorrow"],[3,"The next 3 days"],[7,"The next week"],[30,"The next month"],[-1,"Always"],[0,"Never"]];
+const todoDays = () => { const v=myPrefs().todoDays; return TODO_CHOICES.some(c=>c[0]===v) ? v : 3; };
+function setPref(k, v){
+  const p=Object.assign({}, myPrefs(), {[k]:v}); if(profile) profile.prefs=p; store(uk("prefs"), p); cacheProfile();
+  if(db && !offline) db.collection("users").doc(me).update({prefs:p}).catch(()=>{});
 }
 function setFavs(list){
   profile.favs=list; cacheProfile();
@@ -1344,11 +1360,27 @@ function todayAdd(text, rid){
   if(rid && v.items.some(x=>x.rid===rid && !x.done)) return false;
   v.items.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5), t:text, rid:rid||"", done:false}); tdSave(v); return true;
 }
+// Is there anything to do in the next `days` days (to-dos, planned recipes not made yet, cooking)?
+function upcomingWork(days){
+  const out=[], k0=dayKey(), v=tdStore();
+  for(let i=0;i<days;i++){ const k=addDays(k0,i), left=dayItems(k).filter(x=>x.r && !x.done), cooks=cookList(k).filter(c=>!c.done && c.day!==k);
+    const tasks = i===0 ? v.items.filter(x=>!x.done).length : 0;
+    if(left.length || cooks.length || tasks) out.push({k, i, left, cooks, tasks}); }
+  return out;
+}
+function homeTodoBox(){
+  const n=todoDays(); if(n===0) return "";
+  if(n>0 && !upcomingWork(n).length) return "";
+  return todayHTML();
+}
 function todayHTML(){
   const v=tdStore(), left=v.items.filter(x=>!x.done).length;
+  const ahead = upcomingWork(Math.max(1, todoDays())).filter(u=>u.i>0);
   return `<div class="panel-a today" id="today">
     <div class="g-head"><h3>Today</h3><span class="td-head-r"><span>${new Date().toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})}${v.items.length?` · ${left} left`:""}</span>${v.items.some(x=>x.done)?`<button type="button" class="link td-clear" id="td-clear">Clear finished</button>`:""}</span></div>
     ${!offline?todayMenuLine():""}
+    ${ahead.map(u=>{ const d=keyToDate(u.k), meals=[...new Set(u.left.map(x=>x.e.meal))];
+      return `<a class="td-menu" href="#plan-${u.k}"><span>${u.i===1?"Tomorrow":d.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})}</span><b>${[u.left.length?`${u.left.length} to make${meals.length?" · "+esc(meals.join(", ")):""}`:"", u.cooks.length?`cook ${esc(u.cooks.map(c=>c.name+(c.time?" "+fmtClock(c.time):"")).join(", "))}`:""].filter(Boolean).join(" · ")}</b><span class="link">Open</span></a>`; }).slice(0,4).join("")}
     ${v.items.length?`<ul class="td-list">${v.items.map(x=>{ const r=x.rid&&RECIPES.find(y=>y.id===x.rid);
       return `<li class="${x.done?"done":""}"><label><input type="checkbox" data-td="${x.id}" ${x.done?"checked":""}><span>${esc(x.t)}${x.carried&&!x.done?' <small>from before</small>':""}</span></label>${r?`<a class="link" href="#${r.id}">Open</a>`:""}<button type="button" class="td-x" data-tdx="${x.id}" aria-label="Remove ${esc(x.t)}">✕</button></li>`; }).join("")}</ul>`
       :`<p class="hint" style="margin:4px 0 10px">Nothing planned yet. Add a task, or tap “Add to today” on a recipe.</p>`}
@@ -1387,7 +1419,7 @@ function home(){
   <section class="wrap home">
     <div class="hello"><div><div class="eyebrow">${hi}, ${esc(myName())}</div><h1>Gitty's Kitchen</h1></div></div>
     ${tabs("")}
-    ${todayHTML()}
+    ${homeTodoBox()}
   </section>
   ${adminBanner()}
   ${dupBanner()}
@@ -1567,7 +1599,7 @@ function recipe(r){
       <div class="tools">
         ${recipesOnline&&!offline&&(can("suggest")||may("edit"))?`<a class="btn solid" href="#edit-${r.id}">${may("edit")?"Edit recipe":"Suggest changes"}</a>`:""}
         ${isAdmin()&&recipesOnline&&!offline?`<button class="btn" id="pubtog" type="button" aria-pressed="${pubVisible(r)}">${pubVisible(r)?"Public can see it ✓":"Hidden from public"}</button>`:""}
-        <button class="btn" id="toplan-btn" type="button">${TOOL_IC.cal}Add to menu</button>
+        <button class="btn" id="toplan-btn" type="button">${TOOL_IC.cal}Add to calendar</button>
         <button class="btn" id="td-rec" type="button" aria-pressed="${inToday(r.id)}">${inToday(r.id)?"On today's list ✓":"Add to today"}</button>
         <a class="btn" href="#timers-${r.id}">${TIMER_IC.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Set a timer</a>
         <button class="btn fav" id="fav" aria-pressed="${isFav}">${HEART}${isFav?"Saved to favorites":"Save to favorites"}</button>
@@ -2281,6 +2313,7 @@ function planPage(sel){
       </form>
       ${sum.n?`<div class="row mn-actions"><button type="button" class="btn" id="pl-groc">Add this day to grocery list</button><button type="button" class="btn" id="pl-copy">Copy this day…</button><button type="button" class="btn danger-btn" id="pl-clear">Clear day</button></div><div id="pl-confirm"></div>`:""}
     </div>
+    ${k===today?todayHTML().replace('class="panel-a today" id="today"','class="panel-a today pl-todo" id="today"'):""}
     <div class="panel-a pl-week"><h3>This week</h3><p class="hint">${new Date(keyToDate(wkStart)).toLocaleDateString(undefined,{month:"short",day:"numeric"})} – ${keyToDate(addDays(wkStart,6)).toLocaleDateString(undefined,{month:"short",day:"numeric"})}: ${esc(wsum.txt)}</p>
       ${wsum.n?`<div class="row mn-actions"><button type="button" class="btn" id="pl-wgroc">Add the week to grocery list</button></div>`:""}</div>
     <div class="panel-a"><h3>Coming up</h3><ul class="pl-up">${up.map(u=>`<li><button type="button" class="link" lang="he" data-day="${dayKey(u.date)}">${esc(u.name)}</button><span class="hint">${u.date.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})} · ${u.days===0?"today":u.days===1?"tomorrow":"in "+u.days+" days"}</span></li>`).join("")}</ul></div>
@@ -2292,6 +2325,7 @@ function planPage(sel){
   document.getElementById("cal-prev").onclick=()=>{ planMonth=new Date(planMonth.getFullYear(), planMonth.getMonth()-1, 1); planPage(); };
   document.getElementById("cal-next").onclick=()=>{ planMonth=new Date(planMonth.getFullYear(), planMonth.getMonth()+1, 1); planPage(); };
   const tb=document.getElementById("cal-today"); if(tb) tb.onclick=()=>go(today);
+  if(k===today) wireToday();
   app.querySelectorAll("[data-pdone]").forEach(c=>c.onchange=()=>{ const e=(PLAN.days[k]||[]).find(x=>x.k===c.dataset.pdone); if(!e) return;
     if(e.menuId){ e.done=Object.assign({}, e.done||{}); if(c.checked) e.done[c.dataset.prid]=true; else delete e.done[c.dataset.prid]; } else e.done=c.checked;
     savePlan(); const y=window.scrollY; planPage(); window.scrollTo(0,y); });
@@ -2431,17 +2465,39 @@ function menuEditPage(id){
 // On a recipe page: put it on a day and meal, or into one of my menus
 function addToPlanBox(r, btn){
   const old=document.getElementById("toplan"); if(old){ old.remove(); return; }
-  const mine=Object.values(MENUS).filter(m=>m.uid===me), box=document.createElement("div"); box.id="toplan"; box.className="dlpick";
-  const k=dayKey();
-  box.innerHTML=`<b>Add “${esc(r.t.replace(/^Untitled: /,""))}” to…</b>
-    <div class="pl-add-row" style="margin-top:8px"><input type="date" id="tp-date" value="${k}" aria-label="Day"><label>Meal ${mealSelect("tp-meal", k)}</label><button type="button" class="btn solid" id="tp-cal">Add to calendar</button></div>
-    ${mine.length?`<div class="pl-add-row" style="margin-top:8px"><select id="tp-menu" aria-label="Menu">${mine.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join("")}</select><button type="button" class="btn" id="tp-menugo">Add to this menu</button></div>`:`<p class="hint" style="margin-top:8px">Or <a class="link" href="#menus">make a menu</a> to keep recipes together.</p>`}`;
+  const mine=Object.values(MENUS).filter(m=>m.uid===me), box=document.createElement("div"); box.id="toplan"; box.className="dlpick toplan";
+  const k=planSel && planSel>=dayKey() ? planSel : dayKey(), sx=scaleNow[r.id]||1;
+  box.innerHTML=`<b>Make “${esc(r.t.replace(/^Untitled: /,""))}”</b>
+    <div class="tp-grid">
+      <label>For <input type="date" id="tp-date" value="${k}"></label>
+      <label>Meal ${mealSelect("tp-meal", k)}</label>
+      <label>Amount <select id="tp-x">${[...new Set([...SCALES,sx])].sort((a,b)=>a-b).map(x=>`<option value="${x}" ${x===sx?"selected":""}>${x===1?"1×":fmtNum(x)+"×"}</option>`).join("")}</select></label>
+    </div>
+    <p class="tp-heb hint" id="tp-heb"></p>
+    <details class="tp-cook" id="tp-cookbox"><summary>${TIMER_IC.replace("<svg",'<svg width="15" height="15"')} When to cook it (optional)</summary>
+      <div class="tp-grid"><label>Cook on <input type="date" id="tp-cdate" value="${k}"></label><label>at <input type="time" id="tp-ctime"></label></div>
+      <p class="hint">Leave it if you'll cook it the same day. The calendar shows it under “To cook” on that day, with the time.</p></details>
+    <div class="row" style="margin-top:10px"><button type="button" class="btn solid" id="tp-cal">Add to calendar</button><button type="button" class="btn" id="tp-cancel">Cancel</button></div>
+    ${mine.length?`<div class="pl-add-row tp-menu"><span class="hint">Or keep it in a menu:</span><select id="tp-menu" aria-label="Menu">${mine.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join("")}</select><button type="button" class="btn sm" id="tp-menugo">Add to this menu</button></div>`:""}`;
   btn.closest(".tools").after(box);
-  document.getElementById("tp-cal").onclick=()=>{ const dk=document.getElementById("tp-date").value; if(!dk) return;
-    (PLAN.days[dk]=PLAN.days[dk]||[]).push({k:newKey(), meal:document.getElementById("tp-meal").value, rid:r.id, x:scaleNow[r.id]||1, done:false}); savePlan(); box.remove();
-    toast(`Added to ${keyToDate(dk).toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"})}`); };
-  const mg=document.getElementById("tp-menugo"); if(mg) mg.onclick=()=>{ const m=MENUS[document.getElementById("tp-menu").value]; if(!m) return;
-    if(!(m.items||[]).some(i=>i.rid===r.id)){ m.items=[...(m.items||[]), {rid:r.id, x:scaleNow[r.id]||1, course:""}]; saveMenu(m); }
+  const $=x=>document.getElementById(x), cdate=$("tp-cdate");
+  const showHeb=()=>{ const v=$("tp-date").value; if(!v) return; const d=keyToDate(v), h=hebDate(d), j=jewishDays(d).filter(x=>x.kind!=="erev"||x.name!=="ערב שבת");
+    $("tp-heb").innerHTML=`<span lang="he" dir="rtl">${hebTextHe(h)}${j.length?" · "+j.map(x=>esc(x.name)).join(" · "):""}</span>`; };
+  $("tp-date").onchange=()=>{ const v=$("tp-date").value; if(!v) return; showHeb(); if(cdate.dataset.touched!=="1") cdate.value=v;
+    const ms=$("tp-meal"); if(ms.dataset.touched!=="1") ms.value=defaultMeal(v); };
+  $("tp-meal").onchange=()=>{ $("tp-meal").dataset.touched="1"; };
+  cdate.onchange=()=>{ cdate.dataset.touched="1"; };
+  showHeb(); box.scrollIntoView({block:"nearest", behavior:"smooth"});
+  $("tp-cancel").onclick=()=>box.remove();
+  $("tp-cal").onclick=()=>{ const dk=$("tp-date").value; if(!dk){ $("tp-date").focus(); return; }
+    const open=$("tp-cookbox").open, cd=open?cdate.value:"", ct=open?$("tp-ctime").value:"";
+    const e={k:newKey(), meal:$("tp-meal").value, rid:r.id, x:+$("tp-x").value, done:false};
+    if(cd && cd!==dk) e.cookDate=cd; if(ct) e.cookTime=ct;
+    (PLAN.days[dk]=PLAN.days[dk]||[]).push(e); savePlan(); box.remove(); planSel=dk;
+    const when=keyToDate(dk).toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
+    toast(`On the calendar for ${e.meal}, ${when}${cookText(e,dk)?" · "+cookText(e,dk).toLowerCase():""}`); };
+  const mg=$("tp-menugo"); if(mg) mg.onclick=()=>{ const m=MENUS[$("tp-menu").value]; if(!m) return;
+    if(!(m.items||[]).some(i=>i.rid===r.id)){ m.items=[...(m.items||[]), {rid:r.id, x:+$("tp-x").value||1, course:""}]; saveMenu(m); }
     box.remove(); toast(`Added to “${m.name}”`); };
 }
 // Home page: today's menu in one line
@@ -4284,6 +4340,10 @@ async function profilePage(){
         <p class="err" id="nm-err" role="alert" hidden></p>
         <div><button class="primary" type="submit">Save name</button></div>
       </form></div>`}
+    <div class="panel-a"><h3>Home page</h3>
+      <div class="field"><label for="pref-todo">Show my to-do list on the home page when there's something to do in…</label>
+        <select id="pref-todo">${TODO_CHOICES.map(([v,l])=>`<option value="${v}" ${v===todoDays()?"selected":""}>${l}</option>`).join("")}</select></div>
+      <p class="hint">Otherwise it stays out of the way. Today's to-do list is always on the Calendar, on today's date.</p></div>
     ${lookPanel()}
     ${offline?"":`<div class="panel-a" id="rcpanel"><h3>Recovery code</h3>
       <div id="rcbody">${profile.rc?`<p class="hint">You made a recovery code on ${fmtDate(profile.rcAt)}. If you've lost it, make a new one. The old one stops working.</p><button type="button" class="btn" id="rc-make">Make a new code</button>`
@@ -4319,6 +4379,7 @@ async function profilePage(){
     list.innerHTML=`<h3>Photos you shared</h3>${myPhotos.length?`<div class="ph-grid" style="margin-top:10px">${myPhotos.map(p=>`<figure class="ph${p.status==="pending"?" wait":""}"><a href="#${esc(p.recipeId)}"><img src="${p.thumb}" alt="${esc(p.recipeTitle||"")}"></a><figcaption>${esc(p.recipeTitle||"")}${p.status==="pending"?" · waiting for approval":""}</figcaption></figure>`).join("")}</div>`:`<p class="hint mempty">No photos yet. Open a recipe you've made and tap Take a photo.</p>`}`;
     list.scrollIntoView({behavior:"smooth",block:"start"}); };
   wireLooks();
+  const pt=document.getElementById("pref-todo"); if(pt) pt.onchange=()=>{ setPref("todoDays", +pt.value); toast("Saved"); };
   // recovery code
   const rcb=document.getElementById("rc-make");
   if(rcb) rcb.onclick=async()=>{
