@@ -211,6 +211,27 @@ service cloud.firestore {
       allow delete: if extra('answer') || (signedIn() && resource.data.uid == request.auth.uid);
     }
 
+    // Each person's own calendar: only they can see or change it.
+    match /plans/{uid} {
+      allow read, write: if approvedMember() && request.auth.uid == uid;
+    }
+
+    // Menus: the person who made one changes it; people it's shared with can read it.
+    match /menus/{id} {
+      allow read: if approvedMember()
+        && (resource.data.uid == request.auth.uid || request.auth.uid in resource.data.get('shared', []));
+      allow create: if approvedMember() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.name is string && request.resource.data.name.size() <= 60
+        && request.resource.data.items is list && request.resource.data.items.size() <= 60
+        && request.resource.data.shared is list && request.resource.data.shared.size() <= 50;
+      allow update: if approvedMember() && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.name is string && request.resource.data.name.size() <= 60
+        && request.resource.data.items is list && request.resource.data.items.size() <= 60
+        && request.resource.data.shared is list && request.resource.data.shared.size() <= 50;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
     // Member profiles. New members always start as "pending";
     // only the admin can approve, deny or remove them.
     match /users/{uid} {
