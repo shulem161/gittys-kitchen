@@ -171,6 +171,17 @@ await check('…and then that employee can read comments', assertSucceeds(getDoc
 // Duplicate recipes: only admins
 await check('admin can mark recipes as not duplicates', assertSucceeds(setDoc(doc(ADM, 'meta', 'dupes'), { ignore: ['r-a|r-b'] })));
 await check("employees can't see or change the duplicates list", assertFails(getDoc(doc(EMP, 'meta', 'dupes'))));
+// Moving recipes between categories, and requests to go live
+await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'users', 'ed'), { perms: { edit: false, move: true } }, { merge: true }); });
+await check('an employee allowed to move recipes can change the category and code', assertSucceeds(updateDoc(doc(ED, 'recipes', 'r-pub'), { c: 'Bread', sec: '', code: 'A099', history: [], updated: 1 })));
+await check("…but can't change anything else that way", assertFails(updateDoc(doc(ED, 'recipes', 'r-pub'), { c: 'Cakes', t: 'Renamed' })));
+await check("an employee without that permission can't move recipes", assertFails(updateDoc(doc(EMP, 'recipes', 'r-pub'), { c: 'Cakes', code: 'B099' })));
+const gl = uid => ({ uid, byName: 'X', rid: 'r-hid', title: 'Hidden', status: 'open', created: 1 });
+await check('an employee can ask for a recipe to go live', assertSucceeds(setDoc(doc(EMP, 'golive', 'g1'), gl('emp'))));
+await check("…not in someone else's name", assertFails(setDoc(doc(EMP, 'golive', 'g2'), gl('ed'))));
+await check("public members can't ask", assertFails(setDoc(doc(PUB, 'golive', 'g3'), gl('pub'))));
+await check("the employee can't approve it", assertFails(updateDoc(doc(EMP, 'golive', 'g1'), { status: 'approved' })));
+await check('an admin can approve it', assertSucceeds(updateDoc(doc(ADM, 'golive', 'g1'), { status: 'approved' })));
 // Calendars and menus: each person's own; menus can be shared
 await check('a member can save their own calendar', assertSucceeds(setDoc(doc(EMP, 'plans', 'emp'), { days: { '2026-10-30': [{ k: 'a', meal: 'Supper', rid: 'r-pub', x: 1, done: false }] } })));
 await check("nobody else can read someone's calendar", assertFails(getDoc(doc(PUB, 'plans', 'emp'))));

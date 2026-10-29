@@ -1,6 +1,6 @@
 {
-  "web": "3.67",
+  "web": "3.68",
   "apk": 11,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Add to calendar from any recipe (day, meal, amount, when to cook). The home to-do box shows only when something is coming up; choose how far ahead in My profile."
+  "notes": "Every recipe shows how many it serves. Move recipes to another category. Employees can ask for a recipe to go live for the public."
 }

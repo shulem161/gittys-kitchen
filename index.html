@@ -267,6 +267,7 @@ button{font:inherit;color:inherit}
 .facts{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
 .fact{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:7px 13px;font-size:14px;color:var(--muted)}
 .fact b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.fact.serves{background:var(--accent-soft);border-color:transparent}.fact.serves b{color:var(--accent)}.fact.serves small{color:var(--muted)}
 .fact.hot{background:var(--wheat-soft);border-color:transparent}
 .fact.hot b{color:var(--wheat)}
 .tools{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
@@ -523,6 +524,10 @@ body.out .bar, body.out footer{display:none}
 .tp-cook{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
 .tp-cook summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px;min-height:36px}
 .tp-menu{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.gl-list{list-style:none;margin:6px 0 0;padding:0}.gl-list li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.gl-list li>div:first-child{display:grid}
+.mv-sec{display:flex;gap:6px;align-items:center;font-size:14px;font-weight:600;color:var(--muted)}.mv-sec[hidden]{display:none}
+.mv-list{display:grid;margin-top:4px}
 .td-menu{display:flex;gap:8px;align-items:baseline;padding:6px 0 4px;text-decoration:none;color:var(--ink);font-size:14px;border-bottom:1px solid var(--line)}
 .td-menu span:first-child{color:var(--muted)}.td-menu .link{margin-left:auto;font-size:13px}
 .act-filters{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
@@ -1033,7 +1038,7 @@ const PUB_ALLOW = [["suggest","Suggest changes and send new recipes"],["photos",
 let PUB = {allow:{}, cats:{}};
 // Employees: each person has their own permissions (users/{uid}.perms). The everyday ones are on unless switched off;
 // the extras are off unless granted. Public members all share the Public portal settings. Admins can do everything.
-const EXTRA_PERMS = [["edit","Add and edit recipes directly, without approval"],["review","Approve suggested recipes and photos"],["answer","Answer recipe requests"],["inbox","Read and answer suggestions & comments"]];
+const EXTRA_PERMS = [["edit","Add and edit recipes directly, without approval"],["move","Move recipes to a different category"],["review","Approve suggested recipes and photos"],["answer","Answer recipe requests"],["inbox","Read and answer suggestions & comments"]];
 const isExtra = k => EXTRA_PERMS.some(x=>x[0]===k);
 // Employee settings (meta/employees) apply to every employee; a person's own Permissions override them.
 let EMP = {allow:{}};
@@ -1043,19 +1048,19 @@ const may = k => { if(isAdmin()) return true; if(!profile) return false;
   if(isPublic()) return !isExtra(k) && PUB.allow[k]!==false;
   return permOf(profile, k); };
 const can = may;
-const mayPublish = () => may("edit") || may("review");
+const mayPublish = () => may("edit") || may("review") || may("move");
 const pubDefault = c => PUB.cats[c]!==false;
 const pubVisible = r => r.pub===undefined ? pubDefault(r.c) : !!r.pub;
 const myName = () => profile ? profile.name : "";
 const uk = k => "gk-u-"+me+"-"+k;
 const favs = () => (profile && profile.favs) || [];
 const initial = n => (String(n).trim()[0]||"?").toUpperCase();
-const pendingCount = () => members.filter(m=>m.status==="pending").length + (may("review")?subs.filter(s=>s.status==="pending").length+pendingPhotos.length:0)+newFeedback()+openRequests();
+const pendingCount = () => members.filter(m=>m.status==="pending").length + (may("review")?subs.filter(s=>s.status==="pending").length+pendingPhotos.length:0)+newFeedback()+openRequests()+openGolive();
 function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catch(e){for(let i=0;i<12;i++)a[i]=Math.random()*256|0} return [...a].map(b=>b.toString(16).padStart(2,"0")).join(""); }
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.67";
+const WEB_VERSION = "3.68";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1134,6 +1139,7 @@ function boot(){
     if(unsubPub){unsubPub();unsubPub=null}
     if(unsubEmp){unsubEmp();unsubEmp=null}
     stopPlans();
+    if(unsubGolive){unsubGolive();unsubGolive=null;GOLIVE=[]}
     if(unsubDupes){unsubDupes();unsubDupes=null;DUP_IGNORE=new Set()}
     if(unsubSubs){unsubSubs();unsubSubs=null;subs=[]}
     if(unsubPendingPhotos){unsubPendingPhotos();unsubPendingPhotos=null;pendingPhotos=[]}
@@ -1154,6 +1160,7 @@ function boot(){
       cacheProfile(); renderAcct();
       if(isAdmin() && !unsubAll) watchMembers();
       if(isAdmin()) watchDupes();
+      if(profile.status==="approved") watchGolive();
       if(state==="approved"){ watchPlans(); watchRecipes(); watchSubs(); watchPendingPhotos(); watchFeedback(); watchRequests(); if(!update){ lastUpdCheck=Date.now(); checkUpdates(false); } else renderUpdateBar(); }
       if(was!==state || state!=="approved") route();
     }, ()=>{
@@ -1328,7 +1335,7 @@ function card(r){
     ${r.cover?`<div class="rc-th" style="background-image:url('${r.cover}')" role="img" aria-label="Photo of ${esc(r.t)}"></div>`:`<div class="rc-th">${icon(r.c==="Pesach"&&r.sec?(SEC_ICON[r.sec]||r.sec):r.c)}</div>`}
     <div class="rc-body">
       <h3>${titleHTML(r)}</h3>
-      <div class="rc-meta">${noChip(r)}${(r.sec||!/^pesach$/i.test(r.c)) && (r.sec||r.c).toLowerCase()!==(KIND_LABEL[kindOf(r)]||"").toLowerCase()?`<span class="chip">${esc(r.sec||r.c)}</span>`:""}${kindChip(r)}${addedAt(r)>Date.now()-7*864e5?'<span class="newchip">New</span>':""}<span class="rc-time">${TOOL_IC.clock}${esc(timeShort(r))}</span>${t.length?`<span class="oven">${t[0]}</span>`:""}</div>
+      <div class="rc-meta">${noChip(r)}${(r.sec||!/^pesach$/i.test(r.c)) && (r.sec||r.c).toLowerCase()!==(KIND_LABEL[kindOf(r)]||"").toLowerCase()?`<span class="chip">${esc(r.sec||r.c)}</span>`:""}${kindChip(r)}${addedAt(r)>Date.now()-7*864e5?'<span class="newchip">New</span>':""}<span class="rc-time">${TOOL_IC.clock}${esc(timeShort(r))}</span>${r.serves?`<span class="rc-time">${TOOL_IC.people}${esc(servesText(r).replace(/^Serves /,""))}</span>`:""}${t.length?`<span class="oven">${t[0]}</span>`:""}</div>
       ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}
     </div>
     ${me&&favs().includes(r.id)?HEART.replace("<svg",'<svg class="heart"'):""}
@@ -1344,6 +1351,7 @@ const TOOL_IC = {
   cam:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
   spark:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>',
   cal:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  people:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-right:5px"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.4c2 .8 3.5 2.8 3.5 5.6"/></svg>',
   clock:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
 };
 /* ---------- today's to-do list (private: kept on this device under your account) ---------- */
@@ -1512,7 +1520,7 @@ function category(c){
   const secs = list.some(r=>r.sec) ? sectionsOf(list) : null, so = sortChoice("cat", SO_CAT, "code");
   app.innerHTML = `<section class="wrap">${tabs(c)}
     <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}${!offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit"))?` · <a class="link" href="#new-${slug(c).slice(2)}">+ Add a recipe</a>${can("ai")?` · <a class="link" href="#scan-${slug(c).slice(2)}">Add from photo or file</a>`:""}`:""}</p></div>
-    ${list.length?`<div class="cat-tools"><button class="btn" id="dl-cat" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download ${esc(c)}</button></div>`:""}
+    ${list.length?`<div class="cat-tools">${may("move")&&recipesOnline&&!offline?`<a class="btn" href="#move-${slug(c).slice(2)}">Move recipes…</a>`:""}<button class="btn" id="dl-cat" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download ${esc(c)}</button></div>`:""}
     ${secs?`<div class="cats rows">${secs.map(s=>{ const n=list.filter(r=>secOf(r)===s).length;
       const L=CODEMAP.cats[c], sl=CODEMAP.secs[c]&&CODEMAP.secs[c][s];
       return `<a class="cat" href="#${slug(c)}--${secSlug(s)}">${L&&sl?`<span class="catcode" title="Recipe codes start with ${L}${sl}">${L}${sl}</span>`:""}<div class="ic">${icon(SEC_ICON[s]||s)}</div><h3>${esc(s)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`; }).join("")}</div>` : ""}
@@ -1590,6 +1598,7 @@ function recipe(r){
       ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}
       <div class="facts">
         ${t.length?`<div class="fact hot">Oven <b>${t.join(" → ")}</b></div>`:""}
+        ${servesText(r,sx)?`<div class="fact serves">${TOOL_IC.people}<b>${esc(servesText(r,sx))}</b>${sx!==1?` <small>at ${fmtNum(sx)}×</small>`:""}</div>`:""}
         <div class="fact"><b>${nIng(r)}</b> ingredients</div>
         <div class="fact"><b>${nSteps(r)}</b> steps</div>
         <div class="fact" title="${r.time?"Time to make":"Estimated from the recipe"}">${TOOL_IC.clock}<b>${esc(timeText(r))}</b></div>
@@ -1598,6 +1607,8 @@ function recipe(r){
       ${sx!==1?`<p class="hint scale-note">Amounts are for ${fmtNum(sx)}× the recipe. Pan size and baking time may need adjusting.</p>`:""}
       <div class="tools">
         ${recipesOnline&&!offline&&(can("suggest")||may("edit"))?`<a class="btn solid" href="#edit-${r.id}">${may("edit")?"Edit recipe":"Suggest changes"}</a>`:""}
+        ${may("move")&&recipesOnline&&!offline?`<button class="btn" id="mv-btn" type="button">Move to another category</button>`:""}
+        ${myRole()==="employee"&&recipesOnline&&!offline&&!pubVisible(r)?(myGolive(r.id)?`<span class="btn" aria-disabled="true">Asked to go live ✓</span>`:`<button class="btn" id="gl-btn" type="button">Request to go live</button>`):""}
         ${isAdmin()&&recipesOnline&&!offline?`<button class="btn" id="pubtog" type="button" aria-pressed="${pubVisible(r)}">${pubVisible(r)?"Public can see it ✓":"Hidden from public"}</button>`:""}
         <button class="btn" id="toplan-btn" type="button">${TOOL_IC.cal}Add to calendar</button>
         <button class="btn" id="td-rec" type="button" aria-pressed="${inToday(r.id)}">${inToday(r.id)?"On today's list ✓":"Add to today"}</button>
@@ -1682,6 +1693,9 @@ function recipe(r){
     if(tb && getComputedStyle(tb).display!=="none") window.scrollTo(0, tb.offsetTop-70); else if(first) first.scrollIntoView({block:"center"});
     toast(on ? "Screen stays on while you cook. Tap a step when it's done." : "Tap a step when it's done.");
   };
+  const mvb=document.getElementById("mv-btn"); if(mvb) mvb.onclick=e=>moveBox(r, e.currentTarget);
+  const glb=document.getElementById("gl-btn"); if(glb) glb.onclick=async()=>{ glb.disabled=true;
+    try{ await requestGolive(r); glb.outerHTML='<span class="btn" aria-disabled="true">Asked to go live ✓</span>'; toast("Sent to the admins"); }catch(e){ glb.disabled=false; toast("Couldn't send. Check your connection."); } };
   const pt=document.getElementById("pubtog");
   if(pt) pt.onclick=async()=>{ const v=!pubVisible(r); pt.disabled=true;
     try{ await db.collection("recipes").doc(r.id).update({pub:v}); r.pub=v; pt.setAttribute("aria-pressed",v); pt.textContent=v?"Public can see it ✓":"Hidden from public"; toast(v?"Public members can see this recipe":"Hidden from public members"); }
@@ -1888,6 +1902,7 @@ function publicPage(){
     return secs.map(s=>{ const S=s===null?L:L.filter(r=>secOf(r)===s); return `${s!==null?`<div class="pub-sec">${esc(s)}</div>`:""}${S.map(recBox).join("")}`; }).join(""); };
   app.innerHTML = `<section class="wrap admin tools-page">
     <div class="section-head" style="margin-top:28px"><h2>Public portal</h2><p>${nPub} public ${nPub===1?"member":"members"} · <a class="link" href="#admin">Members</a></p></div>
+    ${goliveHTML()}
     <div class="panel-a"><h3>What public members may do</h3>
       <p class="hint">Public members can always read the recipes you let them see, and use favorites, the grocery list, timers, the calculator and their Today list.</p>
       <div class="pub-allow">${PUB_ALLOW.map(([k,l])=>`<label class="pub-row"><input type="checkbox" data-pa="${k}" ${PUB.allow[k]!==false?"checked":""}><span>${esc(l)}</span></label>`).join("")}</div>
@@ -1904,6 +1919,7 @@ function publicPage(){
   </section>`;
   const savePub = async patch => { const d={allow:Object.assign({},PUB.allow,patch.allow||{}), cats:Object.assign({},PUB.cats,patch.cats||{})};
     await db.collection("meta").doc("public").set(d); PUB=d; };
+  wireGolive();
   const refresh = c => { const li=[...app.querySelectorAll("[data-pcat]")].find(x=>x.dataset.pcat===c); if(!li) return; const x=sum(c);
     li.querySelector("[data-psum]").textContent=x.txt;
     const [sb,hb]=li.querySelectorAll("[data-pc]"); sb.classList.toggle("on", x.on===x.n&&x.n>0); hb.classList.toggle("on", !x.on&&x.n>0); };
@@ -2508,6 +2524,92 @@ function todayMenuLine(){
     + (cooks.length?`<a class="td-menu" href="#plan"><span>To cook today</span><b>${cooks.map(c=>esc(c.name)+(c.time?" · "+fmtClock(c.time):"")).slice(0,2).join(", ")}${cooks.length>2?` +${cooks.length-2}`:""}</b><span class="link">Open</span></a>`:"");
 }
 
+/* ---------- moving recipes to another category (admins; employees only if allowed) ---------- */
+async function moveRecipes(ids, cat, sec){
+  sec = cat==="Pesach" ? (sec||"").trim() : "";
+  let n=0;
+  for(const id of ids){ const r=RECIPES.find(x=>x.id===id); if(!r || (r.c===cat && (r.sec||"")===sec)) continue;
+    const code=nextCode(cat, sec), history=[...(r.history||[]), {a:"moved", by:myName(), at:Date.now(), from:r.c+(r.sec?" · "+r.sec:"")}].slice(-12);
+    await db.collection("recipes").doc(id).update({c:cat, sec, code, history, updated:Date.now()});
+    Object.assign(r, {c:cat, sec, code, history}); n++; }
+  return n;
+}
+function moveCatOptions(cur){ return [...new Set([...CATS, ...ORDER])].sort(byName).map(c=>`<option ${c===cur?"selected":""}>${esc(c)}</option>`).join(""); }
+function moveSecField(id, cat){ const secs=sectionsOf(RECIPES.filter(r=>r.c==="Pesach"));
+  return `<label class="mv-sec" ${cat==="Pesach"?"":"hidden"}>Section <input id="${id}" list="${id}-l" type="text" maxlength="40" placeholder="e.g. Kugel"><datalist id="${id}-l">${secs.map(s=>`<option value="${esc(s)}">`).join("")}</datalist></label>`; }
+// Move several at once: #move-<category slug>
+function movePage(c){
+  const list=sortList(RECIPES.filter(r=>r.c===c), "code");
+  app.innerHTML = `<section class="wrap tools-page">
+    <a class="back" href="#${slug(c)}">← ${esc(c)}</a>
+    <div class="section-head"><h2>Move recipes</h2><p>From ${esc(c)} · ${list.length} ${list.length===1?"recipe":"recipes"}</p></div>
+    <div class="panel-a mv-bar"><div class="pl-add-row"><label>Move to <select id="mv-cat">${moveCatOptions(c)}</select></label>${moveSecField("mv-sec", c)}
+      <button type="button" class="btn solid" id="mv-go" disabled>Move</button></div>
+      <p class="hint" id="mv-n">Tick the recipes to move. They get a new code in their new category.</p></div>
+    <div class="panel-a"><label class="pub-row"><input type="checkbox" id="mv-all"><span><b>All in ${esc(c)}</b></span></label>
+      <div class="mv-list">${list.map(r=>`<label class="pub-rec"><input type="checkbox" data-mv="${esc(r.id)}"><span>${noChip(r)} ${esc(r.t.replace(/^Untitled:\s*/,""))}${r.sec?` <small>${esc(r.sec)}</small>`:""}</span></label>`).join("")}</div></div>
+  </section>`;
+  const sel=()=>[...app.querySelectorAll("[data-mv]:checked")].map(x=>x.dataset.mv), go=document.getElementById("mv-go"), cs=document.getElementById("mv-cat");
+  const upd=()=>{ const n=sel().length; go.disabled=!n; go.textContent=n?`Move ${n}`:"Move"; document.getElementById("mv-n").textContent = n ? `${n} ${n===1?"recipe":"recipes"} will move to ${cs.value}.` : "Tick the recipes to move. They get a new code in their new category."; };
+  app.querySelectorAll("[data-mv]").forEach(x=>x.onchange=upd);
+  document.getElementById("mv-all").onchange=e=>{ app.querySelectorAll("[data-mv]").forEach(x=>x.checked=e.target.checked); upd(); };
+  cs.onchange=()=>{ app.querySelector(".mv-sec").hidden = cs.value!=="Pesach"; upd(); };
+  go.onclick=async()=>{ const ids=sel(); if(!ids.length) return; go.disabled=true; go.textContent="Moving…";
+    try{ const n=await moveRecipes(ids, cs.value, (document.getElementById("mv-sec")||{}).value); toast(`${n} ${n===1?"recipe":"recipes"} moved to ${cs.value}`); location.hash=slug(cs.value); }
+    catch(e){ toast("Couldn't move. Check your connection."); go.disabled=false; upd(); } };
+}
+// Move one: on the recipe page
+function moveBox(r, btn){
+  const old=document.getElementById("mvbox"); if(old){ old.remove(); return; }
+  const box=document.createElement("div"); box.id="mvbox"; box.className="dlpick";
+  box.innerHTML=`<b>Move “${esc(r.t.replace(/^Untitled: /,""))}” to another category</b>
+    <div class="pl-add-row" style="margin-top:8px"><label>Category <select id="mv1-cat">${moveCatOptions(r.c)}</select></label>${moveSecField("mv1-sec", r.c)}
+    <button type="button" class="btn solid" id="mv1-go">Move</button><button type="button" class="btn" id="mv1-no">Cancel</button></div>
+    <p class="hint">It gets a new code in its new category (now ${esc(codeOf(r)||"none")}).</p>`;
+  btn.closest(".tools").after(box);
+  const cs=document.getElementById("mv1-cat"); if(r.sec) document.getElementById("mv1-sec").value=r.sec;
+  cs.onchange=()=>{ box.querySelector(".mv-sec").hidden = cs.value!=="Pesach"; };
+  document.getElementById("mv1-no").onclick=()=>box.remove();
+  document.getElementById("mv1-go").onclick=async e=>{ e.target.disabled=true;
+    try{ const n=await moveRecipes([r.id], cs.value, (document.getElementById("mv1-sec")||{}).value);
+      toast(n?`Moved to ${cs.value}${r.sec?" · "+r.sec:""} as ${codeOf(r)}`:"It's already there"); box.remove(); recipe(r); }
+    catch(err){ e.target.disabled=false; toast("Couldn't move. Check your connection."); } };
+}
+
+/* ---------- requests from employees to show a recipe to the public ---------- */
+let GOLIVE = [], unsubGolive = null;
+function watchGolive(){
+  if(unsubGolive || !db || offline || !(isAdmin() || myRole()==="employee")) return;
+  const q = isAdmin() ? db.collection("golive") : db.collection("golive").where("uid","==",me);
+  unsubGolive = q.onSnapshot(s=>{ const before=GOLIVE.filter(g=>g.status==="open").map(g=>g.id).join();
+    GOLIVE = s.docs.map(d=>Object.assign({id:d.id}, d.data())); renderAcct();
+    const changed = before !== GOLIVE.filter(g=>g.status==="open").map(g=>g.id).join();
+    if(changed && location.hash==="#public" && !document.querySelector("#pub-q:focus, .pub-list input:focus")){ const y=window.scrollY; publicPage(); window.scrollTo(0,y); } }, ()=>{});
+}
+const openGolive = () => isAdmin() ? GOLIVE.filter(g=>g.status==="open").length : 0;
+const myGolive = rid => GOLIVE.find(g=>g.rid===rid && g.uid===me && g.status==="open");
+async function requestGolive(r){
+  const ref=db.collection("golive").doc();
+  await ref.set({uid:me, byName:myName(), rid:r.id, title:r.t, status:"open", created:Date.now()});
+  GOLIVE.push({id:ref.id, uid:me, rid:r.id, status:"open"});
+  notifyAdmin(`${myName()} asks to show a recipe to the public`, `“${r.t}” is waiting in Public portal settings.`, "#public", "eyes");
+}
+function goliveHTML(){
+  const open=GOLIVE.filter(g=>g.status==="open").sort((a,b)=>(a.created||0)-(b.created||0)); if(!open.length) return "";
+  return `<div class="panel-a"><h3>Requests to go live <span class="count">${open.length}</span></h3>
+    <p class="hint">Employees asked for these recipes to be shown to public members.</p>
+    <ul class="gl-list">${open.map(g=>{ const r=RECIPES.find(x=>x.id===g.rid);
+      return `<li><div><a class="link" href="#${esc(g.rid)}">${esc(r?r.t:g.title||"A recipe")}</a><span class="hint">${esc(g.byName||"An employee")} · ${fmtDate(g.created)}${r&&pubVisible(r)?" · already showing":""}</span></div>
+        <div class="dup-acts"><button type="button" class="btn sm solid" data-gl="${esc(g.id)}" data-glok="1">Show to public</button><button type="button" class="btn sm" data-gl="${esc(g.id)}" data-glok="0">Decline</button></div></li>`; }).join("")}</ul></div>`;
+}
+function wireGolive(){
+  app.querySelectorAll("[data-gl]").forEach(b=>b.onclick=async()=>{ const g=GOLIVE.find(x=>x.id===b.dataset.gl); if(!g) return; const ok=b.dataset.glok==="1"; b.disabled=true;
+    try{ if(ok){ await db.collection("recipes").doc(g.rid).update({pub:true}); const r=RECIPES.find(x=>x.id===g.rid); if(r) r.pub=true; }
+      await db.collection("golive").doc(g.id).update({status:ok?"approved":"declined", decided:Date.now(), decidedBy:myName()}); g.status=ok?"approved":"declined";
+      toast(ok?"Public members can see it now":"Declined"); const y=window.scrollY; publicPage(); window.scrollTo(0,y); }
+    catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); } });
+}
+
 const menuOpen = new Set(["manage"]);   // which menu groups are open
 function openMenu(confirming){
   if(confirming) menuOpen.add("app");
@@ -2524,9 +2626,9 @@ function openMenu(confirming){
     may("inbox") ? item("#inbox","Suggestions &amp; comments", newFeedback()?newFeedback()+" new":"", newFeedback()) : "",
     isAdmin()&&recipesOnline ? item("#activity","Activity") : "",
     isAdmin() ? item("#employees","Employee settings") : "",
-    isAdmin() ? item("#public","Public portal settings") : "",
+    isAdmin() ? item("#public","Public portal settings", openGolive()?openGolive()+" waiting":"", openGolive()) : "",
   ].filter(Boolean);
-  const manageN = (isAdmin()?mp:0)+(may("review")?waitSubs:0)+(may("answer")?openRequests():0)+(may("inbox")?newFeedback():0);
+  const manageN = (isAdmin()?mp+openGolive():0)+(may("review")?waitSubs:0)+(may("answer")?openRequests():0)+(may("inbox")?newFeedback():0);
   const recipes = [
     !offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit")) ? item("#new","Add a recipe")+(can("ai")?item("#scan","Add from photo or file"):"") : "",
     may("edit")||(!can("suggest")&&!subs.length) ? "" : item("#mine","My recipes", subs.length||""),
@@ -2567,10 +2669,10 @@ let maxNo = 0;                // highest recipe number used so far
 let onlineIds = new Set();    // every recipe id stored online (including deleted ones)
 let unsubRecipes = null;
 const withHistory = (rec, base, action, by) => { rec.history = [...((base&&base.history)||[]), {a:action, by:by||"a member", at:Date.now()}].slice(-12); return rec; };
-const historyLines = r => (r.history||[]).slice(-6).map(h=>`${h.a==="added"?"Added":"Changed"} by ${h.by} on ${fmtDate(h.at)}`);
-const toDoc = r => ({pub: r.pub===undefined ? pubDefault(r.c) : !!r.pub, c:r.c, t:r.t, by:r.by||"", n:r.n||"", pre:r.pre||[], kind:r.kind||"", time:r.time||"", sec:r.sec||"", ...(r.no?{no:r.no}:{}), ...(r.code?{code:r.code}:{}), ord:r.ord||0, deleted:false, updated:Date.now(), ...(r.history?{history:r.history}:{}),
+const historyLines = r => (r.history||[]).slice(-6).map(h=>h.a==="moved" ? `Moved here${h.from?" from "+h.from:""} by ${h.by} on ${fmtDate(h.at)}` : `${h.a==="added"?"Added":"Changed"} by ${h.by} on ${fmtDate(h.at)}`);
+const toDoc = r => ({pub: r.pub===undefined ? pubDefault(r.c) : !!r.pub, c:r.c, t:r.t, by:r.by||"", n:r.n||"", pre:r.pre||[], kind:r.kind||"", time:r.time||"", serves:r.serves||"", sec:r.sec||"", ...(r.no?{no:r.no}:{}), ...(r.code?{code:r.code}:{}), ord:r.ord||0, deleted:false, updated:Date.now(), ...(r.history?{history:r.history}:{}),
   s:r.s.map(([ing,h,items])=>({k:ing?"ing":"step", h:h||"", items:items}))});
-const fromDoc = (id,d) => ({id, pub: d.pub===undefined ? undefined : !!d.pub, c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, pre:d.pre, kind:d.kind||"", time:d.time||"", sec:d.sec||"", no:d.no||0, code:d.code||"", ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[],
+const fromDoc = (id,d) => ({id, pub: d.pub===undefined ? undefined : !!d.pub, c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, pre:d.pre, kind:d.kind||"", time:d.time||"", serves:d.serves||"", sec:d.sec||"", no:d.no||0, code:d.code||"", ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[],
   s:(d.s||[]).map(x=>[x.k==="ing"?1:0, x.h||"", x.items||[]])});
 // Recipes are listed A to Z by category, then by recipe code (A001, A002…); any without a code go after, A to Z by name.
 const sortName = r => r.t.replace(/^Untitled:\s*/,"").replace(/^[^A-Za-z0-9]+/,"");
@@ -2669,6 +2771,7 @@ function editor(r, cat, sub, draft){
           <select id="ed-k">${[["","Automatic"],["meat","Meat"],["dairy","Dairy"],["fish","Fish"],["other","None of these"]].map(([v,l])=>`<option value="${v}" ${(src&&src.kind||"")===v?"selected":""}>${v?l:`${l}: ${({fish:"fish",meat:"meat",dairy:"dairy",other:"neither"})[autoKind(src||{c:catNow,s:[]})]}`}</option>`).join("")}</select>
           <p class="hint">Automatic goes by the category and ingredients. Choose one if it's wrong.</p></div>
         <div class="field"><label for="ed-sec">Section (optional)</label><input id="ed-sec" type="text" maxlength="40" list="ed-sec-list" value="${esc(src&&src.sec||"")}" placeholder="e.g. Kugel, inside Pesach"><datalist id="ed-sec-list">${[...new Set(RECIPES.map(x=>x.sec).filter(Boolean))].map(s=>`<option value="${esc(s)}">`).join("")}</datalist></div>
+        <div class="field"><label for="ed-serves">Serves</label><input id="ed-serves" type="text" maxlength="40" value="${esc(src&&src.serves||"")}" placeholder="A number like 8 or 6–8, or e.g. Makes 3 dozen"><p class="hint">How many people it serves, or how much it makes.</p></div>
         <div class="field"><label for="ed-time">Time to make (optional)</label><input id="ed-time" type="text" maxlength="40" value="${esc(src&&src.time||"")}" placeholder="Leave empty for an estimate (${src?esc(timeText(Object.assign({},src,{time:""}))):"worked out from the steps"})"></div>
         <div class="field"><label for="ed-n">Note (optional)</label><textarea id="ed-n" rows="2">${esc(src&&src.n?src.n:"")}</textarea></div>
         ${suggest?"":`<label class="pub-row"><input type="checkbox" id="ed-pub" ${(r ? pubVisible(r) : target ? pubVisible(target) : pubDefault(catNow))?"checked":""}><span>Public members can see this recipe</span></label>`}
@@ -2704,7 +2807,7 @@ function editor(r, cat, sub, draft){
     const sel=F.querySelector("#ed-c"), cn=F.querySelector("#ed-cn");
     sel.onchange=()=>{ cn.hidden = sel.value!=="__new"; if(!cn.hidden) cn.focus(); };
     const sync=()=>{ F.querySelectorAll(".sec").forEach((el,i)=>{ secs[i].ing = el.querySelector(".sec-k").value==="ing"; secs[i].h=el.querySelector(".sec-h").value; secs[i].items=el.querySelector(".sec-items").value; }); };
-    const keep=()=>({t:F.querySelector("#ed-t").value, c:sel.value, cn:cn.value, by:F.querySelector("#ed-by").value, n:F.querySelector("#ed-n").value, k:F.querySelector("#ed-k").value, tm:F.querySelector("#ed-time").value, sc:F.querySelector("#ed-sec").value, pb:F.querySelector("#ed-pub")?F.querySelector("#ed-pub").checked:null});
+    const keep=()=>({t:F.querySelector("#ed-t").value, c:sel.value, cn:cn.value, by:F.querySelector("#ed-by").value, n:F.querySelector("#ed-n").value, k:F.querySelector("#ed-k").value, sv:F.querySelector("#ed-serves").value, tm:F.querySelector("#ed-time").value, sc:F.querySelector("#ed-sec").value, pb:F.querySelector("#ed-pub")?F.querySelector("#ed-pub").checked:null});
     // linked recipes picker
     const pq=F.querySelector("#ed-pre-q"), ps=F.querySelector("#ed-pre-sugg");
     const showSugg=()=>{
@@ -2718,7 +2821,7 @@ function editor(r, cat, sub, draft){
     pq.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=ps.querySelector("[data-pre]"); if(b) b.click(); } };
     F.querySelectorAll("[data-unpre]").forEach(b=>b.onclick=()=>{ pre.splice(pre.indexOf(b.dataset.unpre),1); redraw(); });
     const redraw=()=>{ const k=keep(); sync(); draw(); const G=document.getElementById("edform");
-      G.querySelector("#ed-t").value=k.t; G.querySelector("#ed-by").value=k.by; G.querySelector("#ed-n").value=k.n; G.querySelector("#ed-k").value=k.k; G.querySelector("#ed-time").value=k.tm; G.querySelector("#ed-sec").value=k.sc; if(k.pb!==null && G.querySelector("#ed-pub")) G.querySelector("#ed-pub").checked=k.pb;
+      G.querySelector("#ed-t").value=k.t; G.querySelector("#ed-by").value=k.by; G.querySelector("#ed-n").value=k.n; G.querySelector("#ed-k").value=k.k; G.querySelector("#ed-time").value=k.tm; G.querySelector("#ed-serves").value=k.sv; G.querySelector("#ed-sec").value=k.sc; if(k.pb!==null && G.querySelector("#ed-pub")) G.querySelector("#ed-pub").checked=k.pb;
       const s2=G.querySelector("#ed-c"); s2.value=k.c; if(k.c==="__new"){ const c2=G.querySelector("#ed-cn"); c2.hidden=false; c2.value=k.cn; } };
     F.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>{ sync(); const i=+b.closest(".sec").dataset.i, j=i+(+b.dataset.mv); [secs[i],secs[j]]=[secs[j],secs[i]]; secs.__skip=1; redraw(); });
     F.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ sync(); secs.splice(+b.closest(".sec").dataset.i,1); redraw(); });
@@ -2745,7 +2848,7 @@ function editor(r, cat, sub, draft){
       const btn0=F.querySelector(".primary");
       if(suggest){
         btn0.disabled=true; btn0.textContent="Sending…";
-        const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s, ord:0});
+        const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s, ord:0});
         try{
           await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,sec:d.sec,s:d.s, uid:me, byName:myName(), status:"pending", created:Date.now(), editOf});
           if(editOf) notifyAdmin(`${myName()} suggested changes`, `Changes to “${r?r.t:t}” are waiting for your approval.`, "#review", "pencil2");
@@ -2758,7 +2861,7 @@ function editor(r, cat, sub, draft){
       let id = r ? r.id : target ? target.id : "r-"+t.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
       if(!r && !target){ if(id==="r-") id="r-recipe"; let k=2, base=id; while(onlineIds.has(id)) id=base+"-"+(k++); }
       const pubBox=F.querySelector("#ed-pub");
-      const rec={id, pub: pubBox ? pubBox.checked : undefined, c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:pre.filter(x=>x!==id), kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), code:(r&&r.code&&r.c===c&&(r.sec||"")===(F.querySelector("#ed-sec").value.trim()))?r.code:(target&&target.code&&target.c===c)?target.code:nextCode(c, F.querySelector("#ed-sec").value.trim()), s, ord: r ? (r.ord||0) : target ? (target.ord||0) : Date.now()};
+      const rec={id, pub: pubBox ? pubBox.checked : undefined, c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:pre.filter(x=>x!==id), kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), code:(r&&r.code&&r.c===c&&(r.sec||"")===(F.querySelector("#ed-sec").value.trim()))?r.code:(target&&target.code&&target.c===c)?target.code:nextCode(c, F.querySelector("#ed-sec").value.trim()), s, ord: r ? (r.ord||0) : target ? (target.ord||0) : Date.now()};
       { const base = r || target;
         withHistory(rec, base, sub ? (sub.editOf&&base?"changed":"added") : (base?"changed":"added"), sub ? sub.byName : myName()); }
       const btn=F.querySelector(".primary"); btn.disabled=true; btn.textContent="Saving…";
@@ -3108,7 +3211,7 @@ function pdfHead(doc, r){
 async function drawRecipe(doc, r, opts){
   const S=doc.S, C=doc.C, M=doc.M, CW=doc.CW, footer=opts.footer, B=S.body, LH=S.lead, center=S.head==="center";
   pdfHead(doc, r);
-  const meta=[[KIND_LABEL[kindOf(r)], /^pesach$/i.test(r.c)?"Pesach":""].filter(Boolean).join(", "), r.by?creditText(r.by):"", temps(r).length?"Oven "+temps(r).join(" -> "):"", `${nIng(r)} ingredients`, `${nSteps(r)} steps`, timeText(r)].filter(Boolean).join("   ·   ");
+  const meta=[[KIND_LABEL[kindOf(r)], /^pesach$/i.test(r.c)?"Pesach":""].filter(Boolean).join(", "), r.by?creditText(r.by):"", temps(r).length?"Oven "+temps(r).join(" -> "):"", servesText(r), `${nIng(r)} ingredients`, `${nSteps(r)} steps`, timeText(r)].filter(Boolean).join("   ·   ");
   for(const l of wrap(meta, 10, CW)){ center ? doc.textCenter(l, doc.W/2, doc.y, 10, "F1", C.muted) : doc.text(l, M, doc.y, 10, "F1", C.muted); doc.y+=14; }
   doc.y+=2;
   const ph = !S.photo ? "" : opts.bigPhoto ? await photoForPdf(r) : (r.cover||"");
@@ -3748,6 +3851,20 @@ const SCALES=[0.5,1,1.5,2,3];
 const scaleNow = {};   // recipe id → size picked on this visit
 
 /* ---------- how long a recipe takes ---------- */
+// How many it serves (or makes). A plain number or range means "Serves …"; anything else is shown as written.
+// Recipes without one get a rough guess by category, marked "about".
+const SERVES_GUESS = {Bread:"Makes 2 loaves", Cakes:"12–16", Cookies:"Makes about 4 dozen", Kugel:"8–10", Soups:"8", Meat:"6", Fish:"6", "Side Dish":"6", Dairy:"6", Desserts:"8", Dips:"Makes about 2 cups", Miscellaneous:"", Pesach:"6–8"};
+function scaleWords(s, x){
+  if(x===1) return s;
+  return s.replace(/(\d+(?:\s?[½¼¾⅓⅔])?|[½¼¾⅓⅔])(?![\d/x½¼¾⅓⅔])/g, m=>{ const v=numVal(m.replace(/\s/g,"")); return isNaN(v) ? m : fmtNum(Math.round(v*x*4)/4); });
+}
+function servesText(r, x){
+  x = x||1; let s=(r.serves||"").trim(), guess=false;
+  if(!s){ s=SERVES_GUESS[r.sec&&r.c==="Pesach"?"Pesach":r.c]||""; guess=!!s; }
+  if(!s || /^(as much|1 egg per)/i.test(s)) return s;
+  if(/^\d[\d\s½¼¾⅓⅔–-]*$/.test(s)) return `Serves ${guess?"about ":""}${scaleWords(s, x)}`;
+  return guess && !/about/i.test(s) ? scaleWords(s.replace(/^Makes /,"Makes about "), x) : scaleWords(s, x);
+}
 function estMinutes(r){
   const steps=(r.s||[]).filter(x=>!x[0]).flatMap(x=>x[2]).join(" \n ");
   let wait=0;
@@ -4677,6 +4794,7 @@ function routePage(){
   if(h==="convert" || h.startsWith("convert-")){ q.value=""; calcPage(h.slice(8)); window.scrollTo(0,0); return; }
   if(h==="grocery"){ q.value=""; groceryPage(); window.scrollTo(0,0); return; }
   if(h==="categories"){ q.value=""; categoriesPage(); window.scrollTo(0,0); return; }
+  if(h.startsWith("move-") && may("move")){ const mc=CATS.find(x=>slug(x)==="c-"+h.slice(5)); if(mc){ q.value=""; movePage(mc); window.scrollTo(0,0); return; } }
   if(h==="plan" || h.startsWith("plan-")){ q.value=""; planPage(h.slice(5)||null); window.scrollTo(0,0); return; }
   if(!h.startsWith("menu-")) menuBack=null;
   if(h==="menus"){ q.value=""; menusPage(); window.scrollTo(0,0); return; }

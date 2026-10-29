@@ -391,6 +391,16 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok("public member can't open it by address", (await PP.locator('#rqform').count()) === 0);
     await A.goto(F + '#r-challah'); await A.waitForTimeout(300); await A.click('#pubtog'); await A.waitForTimeout(500);
     ok('admin can hide one recipe', await PP.evaluate(() => !RECIPES.some(r => r.id === 'r-challah')) && await V.evaluate(() => RECIPES.some(r => r.id === 'r-challah')));
+    // Employees ask for a hidden recipe to go live
+    await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
+    ok('employees see "Request to go live" on a hidden recipe', (await V.locator('#gl-btn').count()) === 1);
+    await V.click('#gl-btn'); await V.waitForTimeout(600);
+    ok('…and it shows as asked', /Asked to go live/.test(await V.locator('.rhead').innerText()) && notes.some(n => /show a recipe to the public/.test(n)));
+    await A.goto(F + '#public'); await A.waitForTimeout(600);
+    ok('the request waits in Public portal settings', /Requests to go live/.test(await A.locator('main').innerText()));
+    await A.locator('[data-gl][data-glok="1"]').first().click(); await A.waitForTimeout(800);
+    ok('approving it shows the recipe to the public', await PP.evaluate(() => RECIPES.some(r => r.id === 'r-challah')));
+    await A.goto(F + '#r-challah'); await A.waitForTimeout(300); await A.click('#pubtog'); await A.waitForTimeout(400);
     await A.goto(F + '#public'); await A.waitForTimeout(400);
     await A.locator('[data-pd="Bread"] summary').click(); await A.waitForTimeout(200);
     const br = await A.locator('[data-pd="Bread"] [data-pr]').count();
@@ -525,6 +535,31 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('…with when to cook it', /Cook Fri, Dec 4 at 10:30/.test(pd6), pd6.slice(0, 400));
     await A.goto(F + '#plan-2026-12-04'); await A.waitForTimeout(400);
     ok('…and that cooking day lists it', /Croissants/.test(await A.locator('.pl-cooking').innerText().catch(() => '')));
+
+    // Servings
+    await A.goto(F + '#edit-r-croissants'); await A.waitForTimeout(300); await A.fill('#ed-serves', '6–8'); await A.click('#edform .primary'); await A.waitForTimeout(800);
+    await A.goto(F + '#r-croissants'); await A.waitForTimeout(400);
+    ok('a recipe shows how many it serves', /Serves 6–8/.test(await A.locator('.fact.serves').innerText().catch(() => '')));
+    await A.click('[data-sx="2"]'); await A.waitForTimeout(300);
+    ok('…and it doubles with the recipe', /Serves 12–16/.test(await A.locator('.fact.serves').innerText().catch(() => '')));
+    await A.click('[data-sx="1"]'); await A.waitForTimeout(200);
+    await A.goto(F + '#r-boston-cream-pie'); await A.waitForTimeout(300);
+    ok('recipes without one show a guess', /about/.test(await A.locator('.fact.serves').innerText().catch(() => '')));
+    // Moving recipes to another category
+    await A.goto(F + '#r-croissants'); await A.waitForTimeout(300); await A.click('#mv-btn'); await A.selectOption('#mv1-cat', 'Cakes'); await A.click('#mv1-go'); await A.waitForTimeout(800);
+    const mvd = await A.evaluate(() => { const r = RECIPES.find(x => x.id === 'r-croissants'); return [r.c, r.code, CODEMAP.cats.Cakes]; });
+    ok('admins can move a recipe to another category, with a new code', mvd[0] === 'Cakes' && mvd[1].startsWith(mvd[2]), mvd);
+    await A.goto(F + '#move-cakes'); await A.waitForTimeout(400);
+    await A.locator('[data-mv="r-croissants"]').check(); await A.selectOption('#mv-cat', 'Bread'); await A.click('#mv-go'); await A.waitForTimeout(1000);
+    ok('…or several at once', await A.evaluate(() => RECIPES.find(x => x.id === 'r-croissants').c) === 'Bread');
+    await V.goto(F + '#r-croissants'); await V.waitForTimeout(400);
+    ok("employees can't move recipes unless allowed", (await V.locator('#mv-btn').count()) === 0);
+    const vn3 = await V.evaluate(() => myName());
+    await A.goto(F + '#admin'); await A.waitForTimeout(400); await A.locator('.mrow', {hasText: vn3}).locator('[data-act=perms]').click(); await A.waitForTimeout(200);
+    await A.locator('[data-pk=move]').check(); await A.waitForTimeout(1500);
+    await V.goto(F + '#r-croissants'); await V.waitForTimeout(500);
+    ok('…and can once you allow it', (await V.locator('#mv-btn').count()) === 1);
+    await A.locator('[data-pk=move]').uncheck(); await A.waitForTimeout(800);
 
     // Search
     await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);
