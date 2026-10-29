@@ -254,7 +254,9 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('the choice is saved to the profile', await A.evaluate(() => profile.prefs && profile.prefs.todoDays === -1));
     await A.goto(F); await A.waitForTimeout(300);
     await A.fill('#td-new', 'Take out the chicken'); await A.click('#td-form .solid'); await A.waitForTimeout(200);
-    await A.goto(F + '#r-challah'); await A.waitForTimeout(300); await A.click('#td-rec'); await A.waitForTimeout(200);
+    await A.goto(F + '#r-challah'); await A.waitForTimeout(300);
+    ok('the recipe page has no "Add to today" button (Add to calendar does it)', (await A.locator('#td-rec').count()) === 0 && (await A.locator('#toplan-btn').count()) === 1);
+    await A.evaluate(() => todayAdd('Make Challah', 'r-challah'));
     await A.goto(F); await A.waitForTimeout(300);
     const td = await A.locator('#today').innerText();
     ok('today list has a task and a recipe', /Take out the chicken/.test(td) && /Make Challah/.test(td), td);

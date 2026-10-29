@@ -1,6 +1,6 @@
 {
-  "web": "3.72",
+  "web": "3.73",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Owner and admins: Log in as an admin, an employee or a customer to see exactly what they see."
+  "notes": "The recipe page's Add to today button is gone; use Add to calendar."
 }

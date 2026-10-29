@@ -1087,7 +1087,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.72";
+const WEB_VERSION = "3.73";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1418,7 +1418,7 @@ function todayHTML(){
       return `<a class="td-menu" href="#plan-${u.k}"><span>${u.i===1?"Tomorrow":d.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})}</span><b>${[u.left.length?`${u.left.length} to make${meals.length?" · "+esc(meals.join(", ")):""}`:"", u.cooks.length?`cook ${esc(u.cooks.map(c=>c.name+(c.time?" "+fmtClock(c.time):"")).join(", "))}`:""].filter(Boolean).join(" · ")}</b><span class="link">Open</span></a>`; }).slice(0,4).join("")}
     ${v.items.length?`<ul class="td-list">${v.items.map(x=>{ const r=x.rid&&RECIPES.find(y=>y.id===x.rid);
       return `<li class="${x.done?"done":""}"><label><input type="checkbox" data-td="${x.id}" ${x.done?"checked":""}><span>${esc(x.t)}${x.carried&&!x.done?' <small>from before</small>':""}</span></label>${r?`<a class="link" href="#${r.id}">Open</a>`:""}<button type="button" class="td-x" data-tdx="${x.id}" aria-label="Remove ${esc(x.t)}">✕</button></li>`; }).join("")}</ul>`
-      :`<p class="hint" style="margin:4px 0 10px">Nothing planned yet. Add a task, or tap “Add to today” on a recipe.</p>`}
+      :`<p class="hint" style="margin:4px 0 10px">Nothing planned yet. Add a task, or put a recipe on the calendar.</p>`}
     <form class="td-add" id="td-form"><label class="sr" for="td-new">New task</label><input id="td-new" type="text" maxlength="120" autocomplete="off" placeholder="Add a task…"><button class="btn solid" type="submit">Add</button></form>
   </div>`;
 }
@@ -1638,7 +1638,6 @@ function recipe(r){
         ${myRole()==="employee"&&recipesOnline&&!offline?(pubVisible(r)?`<span class="btn pub-state live" aria-disabled="true">Live ✓</span>`:myGolive(r.id)?`<span class="btn pub-state" aria-disabled="true">Asked to go live ✓</span>`:`<button class="btn solid" id="gl-btn" type="button">Request to go live</button>`):""}
         ${isAdmin()&&recipesOnline&&!offline?`<button class="btn${pubVisible(r)?" live":" solid"}" id="pubtog" type="button" aria-pressed="${pubVisible(r)}" title="${pubVisible(r)?"Public members can see it. Tap to take it off.":"Public members can't see it. Tap to make it live."}">${pubVisible(r)?"Live ✓":"Go live"}</button>`:""}
         <button class="btn" id="toplan-btn" type="button">${TOOL_IC.cal}Add to calendar</button>
-        <button class="btn" id="td-rec" type="button" aria-pressed="${inToday(r.id)}">${inToday(r.id)?"On today's list ✓":"Add to today"}</button>
         <a class="btn" href="#timers-${r.id}">${TIMER_IC.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Set a timer</a>
         <button class="btn fav" id="fav" aria-pressed="${isFav}">${HEART}${isFav?"Saved to favorites":"Save to favorites"}</button>
         <button class="btn" id="wake" aria-pressed="${!!wakeLock}">${wakeLock?"Screen stays on":"Keep screen on"}</button>
@@ -1728,7 +1727,7 @@ function recipe(r){
     try{ await db.collection("recipes").doc(r.id).update({pub:v}); r.pub=v; pt.setAttribute("aria-pressed",v); pt.textContent=v?"Live ✓":"Go live"; pt.classList.toggle("live",v); pt.classList.toggle("solid",!v); toast(v?"Live: public members can see it":"Not live: public members can't see it"); }
     catch(e){ toast("Couldn't save. Check your connection."); } pt.disabled=false; };
   document.getElementById("toplan-btn").onclick=e=>addToPlanBox(r, e.currentTarget);
-  document.getElementById("td-rec").onclick=e=>{ const b=e.currentTarget, nm=r.t.replace("Untitled: ","");
+  const tdr=document.getElementById("td-rec"); if(tdr) tdr.onclick=e=>{ const b=e.currentTarget, nm=r.t.replace("Untitled: ","");
     if(inToday(r.id)){ const v=tdStore(); v.items=v.items.filter(x=>!(x.rid===r.id&&!x.done)); tdSave(v); b.setAttribute("aria-pressed","false"); b.textContent="Add to today"; toast("Taken off today's list"); }
     else { todayAdd("Make "+nm, r.id); b.setAttribute("aria-pressed","true"); b.textContent="On today's list ✓"; toast("Added to today's list"); } };
   app.querySelectorAll(".tbtn").forEach(b=>b.addEventListener("click", e=>{ e.stopPropagation();
