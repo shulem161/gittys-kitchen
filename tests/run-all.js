@@ -583,6 +583,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.click('[data-va=public]'); await A.waitForTimeout(1500);
     ok('seeing it as public: a bar says so', /Logged in as a customer/.test(await A.locator('#viewas-bar').innerText().catch(() => '')));
     ok('…hidden recipes are gone and the watermark shows', await A.evaluate(() => !RECIPES.some(r => r.id === 'r-challah') && !!document.getElementById('wmark') && myRole() === 'public' && !isAdmin()));
+    await A.evaluate(() => { window.__sec2 = []; window.GKApp = Object.assign(window.GKApp || {}, {setSecure: v => __sec2.push(v)}); capWas = null; renderAcct(); });
+    ok('…and screenshots are blocked in the app, like a real customer', await A.evaluate(() => __sec2[__sec2.length - 1] === true));
     await A.click('#avbtn'); await A.waitForTimeout(200);
     ok('…the menu has no admin pages', !/Members|Employee settings/.test(await A.locator('.menu').innerText()));
     await A.click('#avbtn');

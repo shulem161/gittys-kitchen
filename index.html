@@ -1087,7 +1087,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.73";
+const WEB_VERSION = "3.74";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1994,7 +1994,7 @@ let capWas = null;
 function applyNoCapture(){
   const on = state==="approved" && !!profile && isPublic();
   document.body.classList.toggle("no-capture", on);
-  try{ if(window.GKApp && typeof GKApp.setSecure==="function" && capWas!==on) GKApp.setSecure(on && !viewingAs()); }catch(e){}
+  try{ if(window.GKApp && typeof GKApp.setSecure==="function" && capWas!==on) GKApp.setSecure(on); }catch(e){}   // the customer preview behaves exactly like a real customer
   capWas = on;
   let wm=document.getElementById("wmark");
   if(on){

@@ -1,6 +1,6 @@
 {
-  "web": "3.73",
+  "web": "3.74",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "The recipe page's Add to today button is gone; use Add to calendar."
+  "notes": "The customer preview now blocks screenshots in the app, like a real customer."
 }
