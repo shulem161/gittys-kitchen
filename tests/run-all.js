@@ -590,7 +590,18 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.click('#avbtn');
     await A.goto(F + '#viewas'); await A.waitForTimeout(300); await A.click('[data-va=employee]'); await A.waitForTimeout(1500);
     ok('seeing it as an employee', /an employee/.test(await A.locator('#viewas-bar').innerText().catch(() => '')) && await A.evaluate(() => RECIPES.some(r => r.id === 'r-challah') && !isAdmin() && myRole() === 'employee'));
+    await A.goto(F + '#profile'); await A.waitForTimeout(300);
+    ok("previews never offer to delete your own profile", (await A.locator('#prof-del').count()) === 0);
+    // one particular employee, with their own permissions
+    const vn4 = await V.evaluate(() => myName());
     await A.click('#va-back'); await A.waitForTimeout(1500);
+    await A.goto(F + '#admin'); await A.waitForTimeout(400); await A.locator('.mrow', {hasText: vn4}).locator('[data-act=perms]').click(); await A.waitForTimeout(200);
+    await A.locator('[data-pk=edit]').check(); await A.waitForTimeout(800);
+    await A.goto(F + '#viewas'); await A.waitForTimeout(400); await A.selectOption('#va-emp', {label: vn4 + ' · own permissions'}); await A.click('#va-empgo'); await A.waitForTimeout(1500);
+    ok('the owner can log in as one particular employee, with their own permissions', new RegExp(vn4).test(await A.locator('#viewas-bar').innerText().catch(() => '')) && await A.evaluate(() => may('edit') && myRole() === 'employee'));
+    await A.click('#va-back'); await A.waitForTimeout(1500);
+    await A.goto(F + '#admin'); await A.waitForTimeout(400); await A.locator('.mrow', {hasText: vn4}).locator('[data-act=perms]').click(); await A.waitForTimeout(200);
+    await A.locator('[data-pk=edit]').uncheck(); await A.waitForTimeout(800);
     ok('Back to my view brings everything back', (await A.locator('#viewas-bar').count()) === 0 && await A.evaluate(() => isOwner() && isAdmin()));
 
     // Search

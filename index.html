@@ -1050,8 +1050,9 @@ const realAdmin = () => realOwner() || (!!profile && profile.status==="approved"
 // "See it as…": the owner (or an admin) can look at the app as an admin, an employee or a public member would.
 // Kept for this visit only (closing the app goes back to your own view).
 let VIEW_AS = (()=>{ try{ return sessionStorage.getItem("gk-viewas")||""; }catch(e){ return ""; } })();
+let VIEW_WHO = (()=>{ try{ return JSON.parse(sessionStorage.getItem("gk-viewas-who")||"null"); }catch(e){ return null; } })();   // {name, perms} when looking as one particular employee
 const viewingAs = () => VIEW_AS && realAdmin() && (VIEW_AS!=="admin" || realOwner()) ? VIEW_AS : "";
-function setViewAs(v){ try{ v ? sessionStorage.setItem("gk-viewas", v) : sessionStorage.removeItem("gk-viewas"); }catch(e){} VIEW_AS=v||"";
+function setViewAs(v, who){ try{ v ? sessionStorage.setItem("gk-viewas", v) : sessionStorage.removeItem("gk-viewas"); who ? sessionStorage.setItem("gk-viewas-who", JSON.stringify(who)) : sessionStorage.removeItem("gk-viewas-who"); }catch(e){} VIEW_AS=v||"";
   location.hash = v ? "" : "viewas"; location.reload(); }
 const isOwner = () => realOwner() && !viewingAs();
 const ROLES = ["public","employee","admin"];
@@ -1073,7 +1074,7 @@ const empDefault = k => EMP.allow[k]!==undefined ? EMP.allow[k]===true : !isExtr
 const permOf = (m,k) => { const p=(m&&m.perms)||{}; return p[k]!==undefined ? p[k]===true : empDefault(k); };
 const may = k => { if(isAdmin()) return true; if(!profile) return false;
   if(isPublic()) return !isExtra(k) && PUB.allow[k]!==false;
-  return viewingAs()==="employee" ? empDefault(k) : permOf(profile, k); };
+  return viewingAs()==="employee" ? (VIEW_WHO ? permOf({perms:VIEW_WHO.perms||{}}, k) : empDefault(k)) : permOf(profile, k); };
 const can = may;
 const mayPublish = () => may("edit") || may("review") || may("move");
 const pubDefault = c => PUB.cats[c]!==false;
@@ -1087,7 +1088,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.74";
+const WEB_VERSION = "3.75";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -2015,18 +2016,22 @@ function viewAsBar(){
   if(!v){ if(b) b.remove(); document.body.classList.remove("viewing-as"); return; }
   if(!b){ b=document.createElement("div"); b.id="viewas-bar"; b.setAttribute("role","status"); document.body.prepend(b); }
   b.className="viewas-bar va-"+v;
-  b.innerHTML=`<span>Logged in as ${v==="admin"?"an admin":v==="employee"?"an employee":"a customer"}</span><button type="button" class="btn sm" id="va-back">Back to my view</button>`;
+  b.innerHTML=`<span>Logged in as ${v==="admin"?"an admin":v==="employee"?(VIEW_WHO?esc(VIEW_WHO.name)+" (employee)":"an employee"):"a customer"}</span><button type="button" class="btn sm" id="va-back">Back to my view</button>`;
   b.querySelector("#va-back").onclick=()=>setViewAs("");
   document.body.classList.add("viewing-as");
 }
 function viewAsPage(){
   const opts=[realOwner()?["admin","Log in as an admin","Everything except changing you or other admins."]:null, ["employee","Log in as an employee","What every employee gets from Employee settings. People's own permissions aren't included."], ["public","Log in as a customer (public)","Only live recipes and what Public portal settings allow, with the watermark."]].filter(Boolean);
+  const emps = members.filter(m=>m.status==="approved" && roleOf(m)==="employee").sort((a,b)=>byName(a.name,b.name));
   app.innerHTML = `<section class="wrap tools-page">
     <div class="section-head" style="margin-top:28px"><h2>Log in as…</h2><p>See the cookbook exactly the way others see it</p></div>
     <div class="panel-a"><div class="va-opts">${opts.map(([k,l,d])=>`<button type="button" class="va-opt${viewingAs()===k?" on":""}" data-va="${k}"><b>${l}</b><span>${d}</span></button>`).join("")}</div>
+      ${emps.length?`<div class="field" style="margin-top:12px"><label for="va-emp">Or log in as one particular employee (with their own permissions)</label>
+        <div class="td-add"><select id="va-emp">${emps.map(m=>`<option value="${esc(m.uid)}">${esc(m.name)}${Object.keys(m.perms||{}).length?" · own permissions":""}</option>`).join("")}</select><button type="button" class="btn solid" id="va-empgo">Log in</button></div></div>`:""}
       <p class="hint" style="margin-top:12px">You stay signed in as yourself; this only shows you their view. A bar at the top says which one you're in, with “Back to my view”. Closing the app also brings you back.</p></div>
   </section>`;
   app.querySelectorAll("[data-va]").forEach(b=>b.onclick=()=>setViewAs(b.dataset.va));
+  const eg=document.getElementById("va-empgo"); if(eg) eg.onclick=()=>{ const m=members.find(x=>x.uid===document.getElementById("va-emp").value); if(m) setViewAs("employee", {name:m.name, perms:m.perms||{}}); };
 }
 function renderAcct(){
   viewAsBar();
@@ -2659,6 +2664,7 @@ function watchGolive(){
 const openGolive = () => isAdmin() ? GOLIVE.filter(g=>g.status==="open").length : 0;
 const myGolive = rid => GOLIVE.find(g=>g.rid===rid && g.uid===me && g.status==="open");
 async function requestGolive(r){
+  if(viewingAs()){ toast("Preview: a real employee's request would go to the admins now"); return; }
   const ref=db.collection("golive").doc();
   await ref.set({uid:me, byName:myName(), rid:r.id, title:r.t, status:"open", created:Date.now()});
   GOLIVE.push({id:ref.id, uid:me, rid:r.id, status:"open"});
@@ -2716,7 +2722,7 @@ function openMenu(confirming){
     ${group("app","App", [
       isAdmin()?`<button type="button" role="menuitem" id="m-ntfy">Send test notification <span class="n"></span></button>`:"",
       `<button type="button" role="menuitem" id="m-upd">Check for updates <span class="n">v${WEB_VERSION}</span></button>`,
-      isAdmin()||offline ? "" : confirming?`<div class="confirm">Delete your profile and favorites? You'd need to ask to join again.
+      isAdmin()||offline||viewingAs() ? "" : confirming?`<div class="confirm">Delete your profile and favorites? You'd need to ask to join again.
         <div class="row"><button type="button" class="btn warn" id="m-yes">Delete</button><button type="button" class="btn" id="m-no">Cancel</button></div></div>`
         :`<button type="button" role="menuitem" class="danger" id="m-del">Delete my profile</button>`].filter(Boolean), 0)}
     <button type="button" role="menuitem" id="m-out" class="m-out">Sign out</button>`;
@@ -4546,7 +4552,7 @@ async function profilePage(){
       </form></div>`}
     <div class="panel-a prof-actions">
       <button type="button" class="btn" id="prof-out">Sign out</button>
-      ${isAdmin()||offline?"":`<button type="button" class="btn danger-btn" id="prof-del">Delete my profile</button>`}
+      ${isAdmin()||offline||viewingAs()?"":`<button type="button" class="btn danger-btn" id="prof-del">Delete my profile</button>`}
       <div id="prof-confirm"></div>
     </div>
   </section>`;

@@ -1,6 +1,6 @@
 {
-  "web": "3.74",
+  "web": "3.75",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "The customer preview now blocks screenshots in the app, like a real customer."
+  "notes": "Log in as… now also lets you look as one particular employee, with their own permissions."
 }
