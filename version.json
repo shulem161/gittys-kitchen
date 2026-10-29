@@ -1,6 +1,6 @@
 {
-  "web": "3.71",
+  "web": "3.72",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Go live and Live buttons for admins. App update: public members can't take screenshots."
+  "notes": "Owner and admins: Log in as an admin, an employee or a customer to see exactly what they see."
 }

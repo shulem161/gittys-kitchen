@@ -574,6 +574,21 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('…and can once you allow it', (await V.locator('#mv-btn').count()) === 1);
     await A.locator('[data-pk=move]').uncheck(); await A.waitForTimeout(800);
 
+    // See it as… (owner)
+    await A.goto(F + '#r-challah'); await A.waitForTimeout(300); if ((await A.locator('#pubtog').innerText()).includes('Live')) { await A.click('#pubtog'); await A.waitForTimeout(400); }
+    await A.goto(F + '#viewas'); await A.waitForTimeout(300);
+    ok('the owner can log in as admin, employee or customer', (await A.locator('[data-va]').count()) === 3);
+    await A.click('[data-va=public]'); await A.waitForTimeout(1500);
+    ok('seeing it as public: a bar says so', /Logged in as a customer/.test(await A.locator('#viewas-bar').innerText().catch(() => '')));
+    ok('…hidden recipes are gone and the watermark shows', await A.evaluate(() => !RECIPES.some(r => r.id === 'r-challah') && !!document.getElementById('wmark') && myRole() === 'public' && !isAdmin()));
+    await A.click('#avbtn'); await A.waitForTimeout(200);
+    ok('…the menu has no admin pages', !/Members|Employee settings/.test(await A.locator('.menu').innerText()));
+    await A.click('#avbtn');
+    await A.goto(F + '#viewas'); await A.waitForTimeout(300); await A.click('[data-va=employee]'); await A.waitForTimeout(1500);
+    ok('seeing it as an employee', /an employee/.test(await A.locator('#viewas-bar').innerText().catch(() => '')) && await A.evaluate(() => RECIPES.some(r => r.id === 'r-challah') && !isAdmin() && myRole() === 'employee'));
+    await A.click('#va-back'); await A.waitForTimeout(1500);
+    ok('Back to my view brings everything back', (await A.locator('#viewas-bar').count()) === 0 && await A.evaluate(() => isOwner() && isAdmin()));
+
     // Search
     await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);
     ok('search finds recipes', await V.locator('.rc').count() >= 3);

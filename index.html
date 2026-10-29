@@ -531,6 +531,17 @@ body.no-capture img{-webkit-user-drag:none;pointer-events:none}
 #wmark{position:fixed;inset:0;z-index:15;pointer-events:none;background-repeat:repeat}
 body.no-capture.veil main,body.no-capture.veil .bar{filter:blur(14px)}
 @media print{body.no-capture *{display:none!important}body.no-capture::before{content:"Printing isn't available for this cookbook.";display:block;padding:40px;font:18px sans-serif}}
+.viewas-bar{position:sticky;top:0;z-index:30;display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:nowrap;white-space:nowrap;padding:5px 12px;font-size:13.5px!important;padding-top:calc(6px + env(safe-area-inset-top,0px));font-size:14px;font-weight:700;color:#fff;background:#C2581A}
+body.viewing-as .bar{top:calc(env(safe-area-inset-top,0px) + 42px)}
+.viewas-bar{min-height:42px;box-sizing:border-box}
+.viewas-bar.va-employee{background:#2E7D5B}.viewas-bar.va-admin{background:#5B3E96}
+.viewas-bar span{overflow:hidden;text-overflow:ellipsis}
+.viewas-bar .btn{padding:4px 12px;font-size:13px;background:#fff;color:#1B2638;border-color:#fff;font-weight:700}
+.menu a.m-viewas{font-weight:600;color:var(--accent)}
+.va-opts{display:grid;gap:8px}
+.va-opt{display:grid;gap:2px;text-align:left;padding:14px 16px;border:2px solid var(--line);border-radius:14px;background:var(--paper);color:var(--ink);cursor:pointer;font:inherit}
+.va-opt b{font-size:17px}.va-opt span{font-size:13.5px;color:var(--muted)}
+.va-opt.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .btn.live{background:#E3F2E8;border-color:#7DBB92;color:#25704A}
 .gl-list{list-style:none;margin:6px 0 0;padding:0}.gl-list li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
 .gl-list li>div:first-child{display:grid}
@@ -1034,11 +1045,19 @@ let state="loading";    // loading | setup | offline-first | signedout | pending
 let offline=false, pendingCreate=false;
 let unsubMe=null, unsubAll=null, members=[], adminReady=Promise.resolve();
 // Roles: the owner (meta/admin), admins the owner chooses, employees (what members could always do) and public members.
-const isOwner = () => !!profile && (adminUid ? me===adminUid : nameKey(profile.name)===ADMIN_KEY);
+const realOwner = () => !!profile && (adminUid ? me===adminUid : nameKey(profile.name)===ADMIN_KEY);
+const realAdmin = () => realOwner() || (!!profile && profile.status==="approved" && profile.role==="admin");
+// "See it as…": the owner (or an admin) can look at the app as an admin, an employee or a public member would.
+// Kept for this visit only (closing the app goes back to your own view).
+let VIEW_AS = (()=>{ try{ return sessionStorage.getItem("gk-viewas")||""; }catch(e){ return ""; } })();
+const viewingAs = () => VIEW_AS && realAdmin() && (VIEW_AS!=="admin" || realOwner()) ? VIEW_AS : "";
+function setViewAs(v){ try{ v ? sessionStorage.setItem("gk-viewas", v) : sessionStorage.removeItem("gk-viewas"); }catch(e){} VIEW_AS=v||"";
+  location.hash = v ? "" : "viewas"; location.reload(); }
+const isOwner = () => realOwner() && !viewingAs();
 const ROLES = ["public","employee","admin"];
 const roleOf = m => isAdminMember(m) ? "owner" : (ROLES.includes(m.role) ? m.role : "public");
-const myRole = () => profile ? roleOf(Object.assign({}, profile, {uid:me})) : "public";
-const isAdmin = () => isOwner() || (!!profile && profile.status==="approved" && profile.role==="admin");
+const myRole = () => viewingAs() || (profile ? roleOf(Object.assign({}, profile, {uid:me})) : "public");
+const isAdmin = () => viewingAs() ? viewingAs()==="admin" : realAdmin();
 const isPublic = () => !!profile && myRole()==="public";
 const ROLE_LABEL = {owner:"Owner", admin:"Admin", employee:"Employee", public:"Public"};
 // What public members may do; the owner and admins change this in Public portal settings (meta/public)
@@ -1054,7 +1073,7 @@ const empDefault = k => EMP.allow[k]!==undefined ? EMP.allow[k]===true : !isExtr
 const permOf = (m,k) => { const p=(m&&m.perms)||{}; return p[k]!==undefined ? p[k]===true : empDefault(k); };
 const may = k => { if(isAdmin()) return true; if(!profile) return false;
   if(isPublic()) return !isExtra(k) && PUB.allow[k]!==false;
-  return permOf(profile, k); };
+  return viewingAs()==="employee" ? empDefault(k) : permOf(profile, k); };
 const can = may;
 const mayPublish = () => may("edit") || may("review") || may("move");
 const pubDefault = c => PUB.cats[c]!==false;
@@ -1068,7 +1087,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.71";
+const WEB_VERSION = "3.72";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1976,7 +1995,7 @@ let capWas = null;
 function applyNoCapture(){
   const on = state==="approved" && !!profile && isPublic();
   document.body.classList.toggle("no-capture", on);
-  try{ if(window.GKApp && typeof GKApp.setSecure==="function" && capWas!==on) GKApp.setSecure(on); }catch(e){}
+  try{ if(window.GKApp && typeof GKApp.setSecure==="function" && capWas!==on) GKApp.setSecure(on && !viewingAs()); }catch(e){}
   capWas = on;
   let wm=document.getElementById("wmark");
   if(on){
@@ -1992,7 +2011,26 @@ document.addEventListener("keydown", e=>{ if(capOn() && (e.ctrlKey||e.metaKey) &
 addEventListener("blur", ()=>{ if(capOn()) document.body.classList.add("veil"); });
 addEventListener("focus", ()=>document.body.classList.remove("veil"));
 document.addEventListener("visibilitychange", ()=>{ if(capOn() && document.visibilityState!=="visible") document.body.classList.add("veil"); });
+function viewAsBar(){
+  let b=document.getElementById("viewas-bar"); const v=state==="approved" ? viewingAs() : "";
+  if(!v){ if(b) b.remove(); document.body.classList.remove("viewing-as"); return; }
+  if(!b){ b=document.createElement("div"); b.id="viewas-bar"; b.setAttribute("role","status"); document.body.prepend(b); }
+  b.className="viewas-bar va-"+v;
+  b.innerHTML=`<span>Logged in as ${v==="admin"?"an admin":v==="employee"?"an employee":"a customer"}</span><button type="button" class="btn sm" id="va-back">Back to my view</button>`;
+  b.querySelector("#va-back").onclick=()=>setViewAs("");
+  document.body.classList.add("viewing-as");
+}
+function viewAsPage(){
+  const opts=[realOwner()?["admin","Log in as an admin","Everything except changing you or other admins."]:null, ["employee","Log in as an employee","What every employee gets from Employee settings. People's own permissions aren't included."], ["public","Log in as a customer (public)","Only live recipes and what Public portal settings allow, with the watermark."]].filter(Boolean);
+  app.innerHTML = `<section class="wrap tools-page">
+    <div class="section-head" style="margin-top:28px"><h2>Log in as…</h2><p>See the cookbook exactly the way others see it</p></div>
+    <div class="panel-a"><div class="va-opts">${opts.map(([k,l,d])=>`<button type="button" class="va-opt${viewingAs()===k?" on":""}" data-va="${k}"><b>${l}</b><span>${d}</span></button>`).join("")}</div>
+      <p class="hint" style="margin-top:12px">You stay signed in as yourself; this only shows you their view. A bar at the top says which one you're in, with “Back to my view”. Closing the app also brings you back.</p></div>
+  </section>`;
+  app.querySelectorAll("[data-va]").forEach(b=>b.onclick=()=>setViewAs(b.dataset.va));
+}
 function renderAcct(){
+  viewAsBar();
   applyNoCapture();
   const ob=document.getElementById("offbar"); if(ob) ob.hidden = !(offline && state==="approved");
   if(state!=="approved"){ acct.innerHTML=""; return; }
@@ -2673,6 +2711,7 @@ function openMenu(confirming){
   ].filter(Boolean);
   const group = (key,title,items,n) => items.length ? `<details class="mgroup" data-mg="${key}" ${menuOpen.has(key)?"open":""}><summary>${title}<span class="n${n?" hot":""}">${n?n+" waiting":""}</span></summary>${items.join("")}</details>` : "";
   m.innerHTML = `<a class="who" href="#profile" role="menuitem"><b>${esc(myName())}</b><span>${ROLE_LABEL[myRole()]}${offline?" · offline":""} · My profile</span></a>
+    ${realAdmin()?`<a href="#viewas" role="menuitem" class="m-viewas">Log in as… <span class="n">${viewingAs()?ROLE_LABEL[viewingAs()].replace("Public","Customer"):"admin · employee · customer"}</span></a>`:""}
     ${group("manage","Manage", manage, manageN)}
     ${group("recipes","Recipes", recipes, 0)}
     ${group("app","App", [
@@ -4809,6 +4848,7 @@ function routePage(){
   if(h==="public" && isAdmin()){ q.value=""; publicPage(); window.scrollTo(0,0); return; }
   if(h==="activity" && isAdmin()){ q.value=""; activityPage(); window.scrollTo(0,0); return; }
   if(h==="dupes" && isAdmin()){ q.value=""; dupesPage(); window.scrollTo(0,0); return; }
+  if(h==="viewas" && realAdmin()){ q.value=""; viewAsPage(); window.scrollTo(0,0); return; }
   if(h==="employees" && isAdmin()){ q.value=""; employeesPage(); window.scrollTo(0,0); return; }
   if(isPublic() && ((/^(new|edit-|review)/.test(h) && !can("suggest")) || (/^scan/.test(h) && !(can("ai")&&can("suggest"))) || (h==="menu" && !can("ai")) || (h==="requests" && !can("requests")) || (/^feedback/.test(h) && !can("feedback")))){
     q.value=""; toast("That isn't available in your portal."); history.replaceState(null,"",location.pathname+location.search); home(); return; }
