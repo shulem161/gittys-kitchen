@@ -379,6 +379,12 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.locator('.mrow', {hasText: 'Public Pat'}).locator('[data-act=approve]').click(); await A.waitForTimeout(800);
     ok('approved as public', /PUBLIC PAT/.test(await PP.locator('.eyebrow').innerText().catch(() => '')) && await PP.evaluate(() => myRole()) === 'public');
     ok('public member sees recipes', await PP.evaluate(() => RECIPES.length) > 50);
+    await PP.evaluate(() => { window.__sec = []; window.GKApp = Object.assign(window.GKApp || {}, {setSecure: v => __sec.push(v)}); capWas = null; renderAcct(); });
+    ok('public members: the app blocks screenshots', await PP.evaluate(() => __sec[__sec.length - 1] === true && document.body.classList.contains('no-capture')));
+    ok('…the website stops copying and shows their name faintly', await PP.evaluate(() => getComputedStyle(document.body).userSelect === 'none' && !!document.getElementById('wmark')));
+    await PP.goto(F + '#r-challah'); await PP.waitForTimeout(300);
+    ok('…and no downloads', !(await PP.locator('#dl').isVisible()));
+    ok('employees and admins are not limited', await V.evaluate(() => !document.body.classList.contains('no-capture') && !document.getElementById('wmark')) && await A.evaluate(() => !document.body.classList.contains('no-capture')));
     await A.goto(F + '#public'); await A.waitForTimeout(400);
     await A.locator('[data-pc="Cakes"][data-pv="0"]').click(); await A.waitForTimeout(800);
     await A.uncheck('[data-pa=requests]'); await A.waitForTimeout(400);
@@ -395,7 +401,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
     ok('employees see "Request to go live" on a hidden recipe', (await V.locator('#gl-btn').count()) === 1);
     await V.goto(F + '#r-croissants'); await V.waitForTimeout(300);
-    ok('…and "Public can see it" on a visible one', /Public can see it/.test(await V.locator('.rhead').innerText()) && (await V.locator('#gl-btn').count()) === 0);
+    ok('…and "Live ✓" on a visible one', /Live ✓/.test(await V.locator('.rhead').innerText()) && (await V.locator('#gl-btn').count()) === 0);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(400);
     await V.click('#gl-btn'); await V.waitForTimeout(600);
     ok('…and it shows as asked', /Asked to go live/.test(await V.locator('.rhead').innerText()) && notes.some(n => /show a recipe to the public/.test(n)));
@@ -403,7 +409,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('the request waits in Public portal settings', /Requests to go live/.test(await A.locator('main').innerText()));
     await A.locator('[data-gl][data-glok="1"]').first().click(); await A.waitForTimeout(800);
     ok('approving it shows the recipe to the public', await PP.evaluate(() => RECIPES.some(r => r.id === 'r-challah')));
-    await A.goto(F + '#r-challah'); await A.waitForTimeout(300); await A.click('#pubtog'); await A.waitForTimeout(400);
+    await A.goto(F + '#r-challah'); await A.waitForTimeout(300);
+    ok('admins see "Live ✓" on a live recipe', (await A.locator('#pubtog').innerText()).trim() === 'Live ✓');
+    await A.click('#pubtog'); await A.waitForTimeout(400);
+    ok('…and "Go live" once it is taken off', (await A.locator('#pubtog').innerText()).trim() === 'Go live');
     await A.goto(F + '#public'); await A.waitForTimeout(400);
     await A.locator('[data-pd="Bread"] summary').click(); await A.waitForTimeout(200);
     const br = await A.locator('[data-pd="Bread"] [data-pr]').count();
@@ -420,6 +429,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#admin'); await A.waitForTimeout(400);
     await A.locator('.mrow', {hasText: 'Public Pat'}).locator('[data-role]').selectOption('employee'); await A.waitForTimeout(1500);
     ok('making them an employee opens everything', await PP.evaluate(() => myRole()) === 'employee' && await PP.evaluate(() => RECIPES.some(r => r.c === 'Cakes')));
+    ok('…and lifts the screenshot block', await PP.evaluate(() => !document.body.classList.contains('no-capture')));
     await A.locator('.mrow', {hasText: 'Public Pat'}).locator('[data-role]').selectOption('admin'); await A.waitForTimeout(1500);
     ok('owner can make an admin', await PP.evaluate(() => isAdmin()) && (await A.locator('.mrow', {hasText: 'Public Pat'}).locator('.tag').innerText()) === 'ADMIN');
     await PP.goto(F + '#admin'); await PP.waitForTimeout(500);

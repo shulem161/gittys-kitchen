@@ -525,6 +525,13 @@ body.out .bar, body.out footer{display:none}
 .tp-cook summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px;min-height:36px}
 .tp-menu{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
 .pub-state{cursor:default;color:var(--muted);border-style:dashed}
+body.no-capture{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body.no-capture input,body.no-capture textarea{-webkit-user-select:text;user-select:text}
+body.no-capture img{-webkit-user-drag:none;pointer-events:none}
+#wmark{position:fixed;inset:0;z-index:15;pointer-events:none;background-repeat:repeat}
+body.no-capture.veil main,body.no-capture.veil .bar{filter:blur(14px)}
+@media print{body.no-capture *{display:none!important}body.no-capture::before{content:"Printing isn't available for this cookbook.";display:block;padding:40px;font:18px sans-serif}}
+.btn.live{background:#E3F2E8;border-color:#7DBB92;color:#25704A}
 .gl-list{list-style:none;margin:6px 0 0;padding:0}.gl-list li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
 .gl-list li>div:first-child{display:grid}
 .mv-sec{display:flex;gap:6px;align-items:center;font-size:14px;font-weight:600;color:var(--muted)}.mv-sec[hidden]{display:none}
@@ -1061,7 +1068,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.69";
+const WEB_VERSION = "3.71";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1415,7 +1422,7 @@ function categoriesPage(){
   app.innerHTML = `<section class="wrap">
     <div class="section-head" style="margin-top:26px"><h2>Categories</h2><p>${RECIPES.length} recipes in ${CATS.length} categories</p></div>
     <div class="cats rows" style="padding-bottom:18px">${catTiles()}</div>
-    <div class="home-foot" style="margin-bottom:32px"><button class="btn" id="dl-book" type="button">${DL_IC}Download the whole cookbook</button></div>
+    <div class="home-foot" style="margin-bottom:32px"><button class="btn" id="dl-book" type="button"${isPublic()?" hidden":""}>${DL_IC}Download the whole cookbook</button></div>
   </section>`;
   const db0=document.getElementById("dl-book"); if(db0) db0.onclick=()=>downloadBook(CATS.filter(c=>RECIPES.some(r=>r.c===c)), db0);
 }
@@ -1451,7 +1458,7 @@ function home(){
       <p>${may("inbox")?(newFeedback()?`${newFeedback()} new ${newFeedback()===1?"message":"messages"} from members.`:"Messages from members appear here."):"Tell us what you'd like added or changed, or comment on a recipe. "+esc(ADMIN_NAME)+" reads every message."}</p></div>
     <a class="btn solid" href="${may("inbox")?"#inbox":"#feedback"}">${may("inbox")?"Open inbox":"Send a message"}</a>
   </div></section>`}
-  <section class="wrap"><div class="home-foot"><button class="btn" id="dl-book" type="button">${DL_IC}Download the whole cookbook</button></div></section>`;
+  <section class="wrap"><div class="home-foot"><button class="btn" id="dl-book" type="button"${isPublic()?" hidden":""}>${DL_IC}Download the whole cookbook</button></div></section>`;
   const ib=document.getElementById("importbtn"); if(ib) ib.onclick=()=>importBundled(ib);
   const db0=document.getElementById("dl-book"); if(db0) db0.onclick=()=>downloadBook(CATS.filter(c=>RECIPES.some(r=>r.c===c)), db0);
   wireToday();
@@ -1521,7 +1528,7 @@ function category(c){
   const secs = list.some(r=>r.sec) ? sectionsOf(list) : null, so = sortChoice("cat", SO_CAT, "code");
   app.innerHTML = `<section class="wrap">${tabs(c)}
     <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}${!offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit"))?` · <a class="link" href="#new-${slug(c).slice(2)}">+ Add a recipe</a>${can("ai")?` · <a class="link" href="#scan-${slug(c).slice(2)}">Add from photo or file</a>`:""}`:""}</p></div>
-    ${list.length?`<div class="cat-tools">${may("move")&&recipesOnline&&!offline?`<a class="btn" href="#move-${slug(c).slice(2)}">Move recipes…</a>`:""}<button class="btn" id="dl-cat" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download ${esc(c)}</button></div>`:""}
+    ${list.length?`<div class="cat-tools">${may("move")&&recipesOnline&&!offline?`<a class="btn" href="#move-${slug(c).slice(2)}">Move recipes…</a>`:""}<button class="btn" id="dl-cat" type="button"${isPublic()?" hidden":""}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download ${esc(c)}</button></div>`:""}
     ${secs?`<div class="cats rows">${secs.map(s=>{ const n=list.filter(r=>secOf(r)===s).length;
       const L=CODEMAP.cats[c], sl=CODEMAP.secs[c]&&CODEMAP.secs[c][s];
       return `<a class="cat" href="#${slug(c)}--${secSlug(s)}">${L&&sl?`<span class="catcode" title="Recipe codes start with ${L}${sl}">${L}${sl}</span>`:""}<div class="ic">${icon(SEC_ICON[s]||s)}</div><h3>${esc(s)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`; }).join("")}</div>` : ""}
@@ -1609,14 +1616,14 @@ function recipe(r){
       <div class="tools">
         ${recipesOnline&&!offline&&(can("suggest")||may("edit"))?`<a class="btn solid" href="#edit-${r.id}">${may("edit")?"Edit recipe":"Suggest changes"}</a>`:""}
         ${may("move")&&recipesOnline&&!offline?`<button class="btn" id="mv-btn" type="button">Move to another category</button>`:""}
-        ${myRole()==="employee"&&recipesOnline&&!offline?(pubVisible(r)?`<span class="btn pub-state" aria-disabled="true">Public can see it ✓</span>`:myGolive(r.id)?`<span class="btn pub-state" aria-disabled="true">Asked to go live ✓</span>`:`<button class="btn solid" id="gl-btn" type="button">Request to go live</button>`):""}
-        ${isAdmin()&&recipesOnline&&!offline?`<button class="btn" id="pubtog" type="button" aria-pressed="${pubVisible(r)}">${pubVisible(r)?"Public can see it ✓":"Hidden from public"}</button>`:""}
+        ${myRole()==="employee"&&recipesOnline&&!offline?(pubVisible(r)?`<span class="btn pub-state live" aria-disabled="true">Live ✓</span>`:myGolive(r.id)?`<span class="btn pub-state" aria-disabled="true">Asked to go live ✓</span>`:`<button class="btn solid" id="gl-btn" type="button">Request to go live</button>`):""}
+        ${isAdmin()&&recipesOnline&&!offline?`<button class="btn${pubVisible(r)?" live":" solid"}" id="pubtog" type="button" aria-pressed="${pubVisible(r)}" title="${pubVisible(r)?"Public members can see it. Tap to take it off.":"Public members can't see it. Tap to make it live."}">${pubVisible(r)?"Live ✓":"Go live"}</button>`:""}
         <button class="btn" id="toplan-btn" type="button">${TOOL_IC.cal}Add to calendar</button>
         <button class="btn" id="td-rec" type="button" aria-pressed="${inToday(r.id)}">${inToday(r.id)?"On today's list ✓":"Add to today"}</button>
         <a class="btn" href="#timers-${r.id}">${TIMER_IC.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Set a timer</a>
         <button class="btn fav" id="fav" aria-pressed="${isFav}">${HEART}${isFav?"Saved to favorites":"Save to favorites"}</button>
         <button class="btn" id="wake" aria-pressed="${!!wakeLock}">${wakeLock?"Screen stays on":"Keep screen on"}</button>
-        <button class="btn" id="dl" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download</button>
+        <button class="btn" id="dl" type="button"${isPublic()?" hidden":""}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download</button>
         <button class="btn" id="reset">Clear checkmarks</button>
       </div>
     </section>
@@ -1699,7 +1706,7 @@ function recipe(r){
     try{ await requestGolive(r); glb.outerHTML='<span class="btn pub-state" aria-disabled="true">Asked to go live ✓</span>'; toast("Sent to the admins"); }catch(e){ glb.disabled=false; toast("Couldn't send. Check your connection."); } };
   const pt=document.getElementById("pubtog");
   if(pt) pt.onclick=async()=>{ const v=!pubVisible(r); pt.disabled=true;
-    try{ await db.collection("recipes").doc(r.id).update({pub:v}); r.pub=v; pt.setAttribute("aria-pressed",v); pt.textContent=v?"Public can see it ✓":"Hidden from public"; toast(v?"Public members can see this recipe":"Hidden from public members"); }
+    try{ await db.collection("recipes").doc(r.id).update({pub:v}); r.pub=v; pt.setAttribute("aria-pressed",v); pt.textContent=v?"Live ✓":"Go live"; pt.classList.toggle("live",v); pt.classList.toggle("solid",!v); toast(v?"Live: public members can see it":"Not live: public members can't see it"); }
     catch(e){ toast("Couldn't save. Check your connection."); } pt.disabled=false; };
   document.getElementById("toplan-btn").onclick=e=>addToPlanBox(r, e.currentTarget);
   document.getElementById("td-rec").onclick=e=>{ const b=e.currentTarget, nm=r.t.replace("Untitled: ","");
@@ -1961,7 +1968,32 @@ function toast(t){
 /* ---------- account menu ---------- */
 const acct = document.getElementById("acct");
 function closeMenu(){ const m=acct.querySelector(".menu"); if(m) m.remove(); }
+/* ---------- no screenshots for public members ----------
+   In the Android app the phone blocks screenshots and screen recording (FLAG_SECURE).
+   On the web nothing can truly block them, so: no copying, no printing, the page blurs when it loses focus
+   (as when a screenshot tool opens), and a faint watermark with the member's name. Employees and admins: no limits. */
+let capWas = null;
+function applyNoCapture(){
+  const on = state==="approved" && !!profile && isPublic();
+  document.body.classList.toggle("no-capture", on);
+  try{ if(window.GKApp && typeof GKApp.setSecure==="function" && capWas!==on) GKApp.setSecure(on); }catch(e){}
+  capWas = on;
+  let wm=document.getElementById("wmark");
+  if(on){
+    if(!wm){ wm=document.createElement("div"); wm.id="wmark"; wm.setAttribute("aria-hidden","true"); document.body.appendChild(wm); }
+    const txt=`Gitty's Kitchen · ${myName()}`, svg=`<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200"><text x="20" y="120" transform="rotate(-24 160 100)" font-family="sans-serif" font-size="16" fill="rgba(27,38,56,0.09)">${txt.replace(/[<>&"]/g,"")}</text></svg>`;
+    wm.style.backgroundImage=`url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+  } else if(wm) wm.remove();
+}
+const capOn = () => document.body.classList.contains("no-capture");
+["copy","cut","contextmenu","dragstart","selectstart"].forEach(ev=>document.addEventListener(ev, e=>{ if(capOn() && !(e.target.closest&&e.target.closest("input,textarea"))) e.preventDefault(); }, true));
+document.addEventListener("keyup", e=>{ if(capOn() && e.key==="PrintScreen"){ try{ navigator.clipboard.writeText(""); }catch(_){} toast("Screenshots aren't allowed"); } });
+document.addEventListener("keydown", e=>{ if(capOn() && (e.ctrlKey||e.metaKey) && /^[ps]$/i.test(e.key)){ e.preventDefault(); toast(e.key.toLowerCase()==="p" ? "Printing isn't available" : "Saving isn't available"); } });
+addEventListener("blur", ()=>{ if(capOn()) document.body.classList.add("veil"); });
+addEventListener("focus", ()=>document.body.classList.remove("veil"));
+document.addEventListener("visibilitychange", ()=>{ if(capOn() && document.visibilityState!=="visible") document.body.classList.add("veil"); });
 function renderAcct(){
+  applyNoCapture();
   const ob=document.getElementById("offbar"); if(ob) ob.hidden = !(offline && state==="approved");
   if(state!=="approved"){ acct.innerHTML=""; return; }
   const open=!!acct.querySelector(".menu");
@@ -2775,7 +2807,7 @@ function editor(r, cat, sub, draft){
         <div class="field"><label for="ed-serves">Serves</label><input id="ed-serves" type="text" maxlength="40" value="${esc(src&&src.serves||"")}" placeholder="A number like 8 or 6–8, or e.g. Makes 3 dozen"><p class="hint">How many people it serves, or how much it makes.</p></div>
         <div class="field"><label for="ed-time">Time to make (optional)</label><input id="ed-time" type="text" maxlength="40" value="${esc(src&&src.time||"")}" placeholder="Leave empty for an estimate (${src?esc(timeText(Object.assign({},src,{time:""}))):"worked out from the steps"})"></div>
         <div class="field"><label for="ed-n">Note (optional)</label><textarea id="ed-n" rows="2">${esc(src&&src.n?src.n:"")}</textarea></div>
-        ${suggest?"":`<label class="pub-row"><input type="checkbox" id="ed-pub" ${(r ? pubVisible(r) : target ? pubVisible(target) : pubDefault(catNow))?"checked":""}><span>Public members can see this recipe</span></label>`}
+        ${suggest?"":`<label class="pub-row"><input type="checkbox" id="ed-pub" ${(r ? pubVisible(r) : target ? pubVisible(target) : pubDefault(catNow))?"checked":""}><span>Live: public members can see this recipe</span></label>`}
         <div class="field"><label for="ed-pre-q">Make first (optional)</label>
           <div class="pre-chips" id="ed-pre">${pre.map(id=>{ const x=RECIPES.find(y=>y.id===id); return `<span class="chip pre-chip">${esc(x.t)}<button type="button" data-unpre="${esc(id)}" aria-label="Remove ${esc(x.t)}">✕</button></span>`; }).join("")}</div>
           <input id="ed-pre-q" type="text" autocomplete="off" placeholder="Type a recipe name to link it…">

@@ -1,6 +1,6 @@
 {
-  "web": "3.69",
-  "apk": 11,
+  "web": "3.71",
+  "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Employees see on every recipe whether the public can see it, with a Request to go live button on hidden ones."
+  "notes": "Go live and Live buttons for admins. App update: public members can't take screenshots."
 }
