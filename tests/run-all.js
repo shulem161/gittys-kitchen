@@ -460,7 +460,25 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // Calendar (Hebrew dates, holidays) and menus
     await A.goto(F + '#plan-2026-12-05'); await A.waitForTimeout(500);
     const dh = await A.locator('.pl-dhead').innerText();
-    ok('calendar shows the Hebrew date and the holiday', /25 Kislev 5787/.test(dh) && /Chanukah/.test(dh) && /Shabbos/.test(dh), dh);
+    ok('calendar writes the Hebrew date and the Yom Tovim in Hebrew', /כ״ה כסלו תשפ״ז/.test(dh) && !/Kislev|Chanukah|Shabbos/.test(dh) && /חנוכה · נר א׳/.test(dh) && /שבת קודש/.test(dh), dh);
+    await A.goto(F + '#plan-2026-09-26'); await A.waitForTimeout(400);
+    ok('Yom Tov names in Hebrew in the calendar boxes too', /שמ״ע|חוה״מ|סוכות/.test(await A.locator('.cal').innerText()) && /סוכות/.test(await A.locator('.pl-up').innerText().catch(() => '') + await A.locator('.cal').innerText()));
+    ok('Kiddush is one of the meals', (await A.locator('#pl-meal option', {hasText: 'Kiddush'}).count()) === 1);
+    // a new menu for one meal, made right on the day
+    await A.goto(F + '#plan-2026-12-05'); await A.waitForTimeout(400);
+    await A.selectOption('#pl-meal', 'Kiddush'); await A.selectOption('#pl-what', 'new'); await A.waitForTimeout(100);
+    await A.fill('#pl-newname', 'Test Kiddush'); await A.click('#pl-newgo'); await A.waitForTimeout(800);
+    ok('a new menu for a meal opens to add its recipes', (await A.locator('#mi-q').count()) === 1 && /Back to Saturday/.test(await A.locator('.back').innerText()));
+    await A.fill('#mi-q', 'cake'); await A.waitForTimeout(150); await A.locator('[data-miadd]').first().click(); await A.waitForTimeout(300);
+    await A.click('.back'); await A.waitForTimeout(500);
+    ok('…and sits on that day under that meal', /Kiddush/.test(await A.locator('.pl-meal').first().innerText()) && /Test Kiddush/.test(await A.locator('#pl-day').innerText()));
+    // when to cook: a different day and a time
+    await A.locator('[data-cook]').first().click(); await A.waitForTimeout(100);
+    await A.fill('.pc-date', '2026-12-03'); await A.fill('.pc-time', '20:00'); await A.click('.pc-save'); await A.waitForTimeout(400);
+    ok('a menu gets its own cooking day and time', /Cook Thu, Dec 3 at 8:00/.test(await A.locator('.pl-cook').first().innerText()), await A.locator('.pl-cook').first().innerText());
+    await A.goto(F + '#plan-2026-12-03'); await A.waitForTimeout(400);
+    ok('the cooking day shows what to cook and when', /To cook/i.test(await A.locator('.pl-cooking').innerText().catch(() => '')) && /8:00/.test(await A.locator('.pl-cooking').innerText().catch(() => '')) && /Test Kiddush/.test(await A.locator('.pl-cooking').innerText().catch(() => '')));
+    ok('the month heading is in Hebrew too', /כסלו – טבת תשפ״ז/.test(await A.locator('.cal-title').innerText()), await A.locator('.cal-title').innerText());
     ok('Calendar is the last button in the bottom bar, where Me was', (await A.locator('#tabbar [data-nav=plan][aria-current=page]').count()) === 1 && await A.evaluate(() => [...document.querySelectorAll('#tabbar [data-nav]')].map(a => a.dataset.nav).join()) === 'home,cats,grocery,timers,plan');
     await A.goto(F + '#menus'); await A.waitForTimeout(300); await A.fill('#mn-name', 'Test Friday night'); await A.click('#mn-new .solid'); await A.waitForTimeout(600);
     for (const q of ['chicken soup', 'challah']) { await A.fill('#mi-q', q); await A.waitForTimeout(150); await A.locator('[data-miadd]').first().click(); await A.waitForTimeout(300); }

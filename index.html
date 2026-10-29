@@ -466,14 +466,15 @@ body.out .bar, body.out footer{display:none}
 .cal-d.sel .cal-h,.cal-d.sel .cal-hol{color:var(--paper)}
 .cal-top{display:flex;justify-content:space-between;align-items:baseline;gap:2px}.cal-top b{font-size:14px}
 .cal-h{font-size:10.5px;color:var(--muted);direction:rtl}
-.cal-hol{font-size:9.5px;line-height:1.15;overflow-wrap:anywhere;letter-spacing:-.01em;font-weight:700;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;color:var(--accent)}
+.cal-hol{direction:rtl;text-align:right;font-size:10px;line-height:1.15;overflow-wrap:anywhere;letter-spacing:-.01em;font-weight:700;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;color:var(--accent)}
 .cal-d.k-yt .cal-hol{color:#C2581A}.cal-d.k-fast .cal-hol{color:var(--muted)}.cal-d.k-rc .cal-hol{color:var(--wheat)}
 .cal-n{margin-top:auto;align-self:flex-start;font-size:10px;font-weight:700;padding:1px 5px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
 .cal-n.all{background:#E3F2E8;color:#25704A}.cal-d.sel .cal-n{background:var(--paper)}
 .cal-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;font-size:13px}
 .pl-dhead h3{font-size:20px;margin:0}
+.pl-heb{margin:2px 0 0;font-size:17px;font-weight:600;color:var(--wheat);text-align:left}
 .pl-hols{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-.pl-hol{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.pl-hol{direction:rtl;font-size:13px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
 .pl-hol.k-yt{background:#FBE6D9;color:#9A4310}.pl-hol.k-fast{background:var(--bg);color:var(--muted)}.pl-hol.k-rc,.pl-hol.k-erev,.pl-hol.k-shabbos{background:var(--wheat-soft);color:var(--wheat)}
 .pl-prog{display:grid;gap:6px;margin:12px 0 4px;font-size:14px;font-weight:600}
 .pl-meal h4{margin:14px 0 4px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--wheat)}
@@ -500,6 +501,20 @@ body.out .bar, body.out footer{display:none}
 .mi-acts input,.mi-acts select{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);font:inherit;font-size:14px}
 .mi-course{width:110px}
 .mi-shared{list-style:none;margin:10px 0 0;padding:0}.mi-shared li{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)}
+.pl-mhead{display:flex;justify-content:space-between;align-items:baseline}
+.pl-mhead .link{font-size:13px}
+.pl-cook{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:2px 0 4px;font-size:13px;color:var(--wheat);font-weight:600}
+.pl-cook .link{font-size:13px;font-weight:600}
+.pl-cook.editing{color:var(--muted)}
+.pl-cook label{display:flex;gap:6px;align-items:center}
+.pl-cook input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);font:inherit;font-size:14px}
+.pl-cooking{margin:12px 0 4px;padding:10px 12px;border-radius:12px;background:var(--wheat-soft)}
+.pl-cooking h4{margin:0 0 4px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--wheat)}
+.pl-cooking ul{list-style:none;margin:0;padding:0}.pl-cooking li{display:flex;gap:10px;align-items:baseline;padding:5px 0;font-size:14.5px}
+.pl-cooking li.done b{text-decoration:line-through;color:var(--done)}.pl-cooking small{color:var(--muted)}.pl-cooking .link{margin-left:auto;font-size:13px}
+.pl-ctime{min-width:68px;font-weight:700;color:var(--wheat);font-variant-numeric:tabular-nums}
+.cal-marks{margin-top:auto;display:flex;align-items:center;gap:3px}.cal-marks .cal-n{margin-top:0}
+.cal-cook{display:inline-flex;color:var(--wheat)}.cal-d.sel .cal-cook{color:var(--paper)}
 .td-menu{display:flex;gap:8px;align-items:baseline;padding:6px 0 4px;text-decoration:none;color:var(--ink);font-size:14px;border-bottom:1px solid var(--line)}
 .td-menu span:first-child{color:var(--muted)}.td-menu .link{margin-left:auto;font-size:13px}
 .act-filters{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
@@ -1032,7 +1047,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.65";
+const WEB_VERSION = "3.66";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -2074,50 +2089,50 @@ function hebDate(date){
 const GEM = ["","א","ב","ג","ד","ה","ו","ז","ח","ט","י","יא","יב","יג","יד","טו","טז","יז","יח","יט","כ","כא","כב","כג","כד","כה","כו","כז","כח","כט","ל"];
 const hebDayLetters = n => { const s=GEM[n]||String(n); return s.length>1 ? s.slice(0,-1)+"״"+s.slice(-1) : s+"׳"; };
 // Holidays (as kept outside Israel). Returns [{name, kind}] — kind: yt (Yom Tov), chag, fast, minor, rc (Rosh Chodesh), erev
+const HEB_LIGHT = ["","א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ז׳","ח׳"];
 function jewishDays(date){
   const h=hebDate(date), out=[], dow=date.getDay(), M=h.m, d=h.d, add=(name,kind)=>out.push({name,kind});
-  const leap=hebLeap(h.y), adar = leap ? "Adar II" : "Adar";
-  const nextLen = (h.months[h.mi]||[])[1];
+  const leap=hebLeap(h.y), adar = leap ? "Adar II" : "Adar", MH = m => ({Tishrei:"תשרי",Cheshvan:"חשון",Kislev:"כסלו",Teves:"טבת",Shevat:"שבט","Adar I":"אדר א׳","Adar II":"אדר ב׳",Adar:"אדר",Nissan:"ניסן",Iyar:"אייר",Sivan:"סיון",Tammuz:"תמוז",Av:"אב",Elul:"אלול"})[m]||m;
   if(M==="Tishrei"){
-    if(d===1||d===2) add("Rosh Hashana","yt");
-    if(d===3 && dow!==6 || d===4 && dow===0) add("Tzom Gedaliah","fast");
-    if(d===9) add("Erev Yom Kippur","erev");
-    if(d===10) add("Yom Kippur","yt");
-    if(d===14) add("Erev Sukkos","erev");
-    if(d===15||d===16) add("Sukkos","yt");
-    if(d>=17&&d<=20) add("Chol Hamoed Sukkos","chag");
-    if(d===21) add("Hoshana Rabba","chag");
-    if(d===22) add("Shemini Atzeres","yt");
-    if(d===23) add("Simchas Torah","yt");
+    if(d===1||d===2) add("ראש השנה","yt");
+    if(d===3 && dow!==6 || d===4 && dow===0) add("צום גדליה","fast");
+    if(d===9) add("ערב יום כיפור","erev");
+    if(d===10) add("יום כיפור","yt");
+    if(d===14) add("ערב סוכות","erev");
+    if(d===15||d===16) add("סוכות","yt");
+    if(d>=17&&d<=20) add("חול המועד סוכות","chag");
+    if(d===21) add("הושענא רבה","chag");
+    if(d===22) add("שמיני עצרת","yt");
+    if(d===23) add("שמחת תורה","yt");
   }
-  if(M==="Elul" && d===29) add("Erev Rosh Hashana","erev");
+  if(M==="Elul" && d===29) add("ערב ראש השנה","erev");
   const kislevLen=h.months[2][1];
-  if(M==="Kislev" && d>=25) add(`Chanukah · ${d-24}${["st","nd","rd"][d-25]||"th"} light`,"chag");
-  if(M==="Teves" && d<=(kislevLen===30?2:3)){ const n=(kislevLen===30?6:5)+d; add(`Chanukah · ${n}${["st","nd","rd"][n-1]||"th"} light`,"chag"); }
-  if(M==="Teves" && d===10) add("Asara B'Teves","fast");
-  if(M==="Shevat" && d===15) add("Tu B'Shvat","minor");
-  if(leap && M==="Adar I" && d===14) add("Purim Katan","minor");
+  if(M==="Kislev" && d>=25) add(`חנוכה · נר ${HEB_LIGHT[d-24]}`,"chag");
+  if(M==="Teves" && d<=(kislevLen===30?2:3)){ const n=(kislevLen===30?6:5)+d; add(`חנוכה · נר ${HEB_LIGHT[n]}`,"chag"); }
+  if(M==="Teves" && d===10) add("עשרה בטבת","fast");
+  if(M==="Shevat" && d===15) add("ט״ו בשבט","minor");
+  if(leap && M==="Adar I" && d===14) add("פורים קטן","minor");
   if(M===adar){
-    if(d===13 && dow!==6 || d===11 && dow===4) add("Taanis Esther","fast");
-    if(d===14) add("Purim","chag");
-    if(d===15) add("Shushan Purim","minor");
+    if(d===13 && dow!==6 || d===11 && dow===4) add("תענית אסתר","fast");
+    if(d===14) add("פורים","chag");
+    if(d===15) add("שושן פורים","minor");
   }
   if(M==="Nissan"){
-    if(d===14) add("Erev Pesach","erev");
-    if(d===15||d===16) add("Pesach","yt");
-    if(d>=17&&d<=20) add("Chol Hamoed Pesach","chag");
-    if(d===21||d===22) add("Pesach","yt");
+    if(d===14) add("ערב פסח","erev");
+    if(d===15||d===16) add("פסח","yt");
+    if(d>=17&&d<=20) add("חול המועד פסח","chag");
+    if(d===21||d===22) add("פסח","yt");
   }
-  if(M==="Iyar" && d===18) add("Lag BaOmer","minor");
-  if(M==="Sivan"){ if(d===5) add("Erev Shavuos","erev"); if(d===6||d===7) add("Shavuos","yt"); }
-  if(M==="Tammuz" && (d===17 && dow!==6 || d===18 && dow===0)) add("Shiva Asar B'Tammuz","fast");
-  if(M==="Av" && (d===9 && dow!==6 || d===10 && dow===0)) add("Tisha B'Av","fast");
-  if(M==="Av" && d===15) add("Tu B'Av","minor");
+  if(M==="Iyar" && d===18) add("ל״ג בעומר","minor");
+  if(M==="Sivan"){ if(d===5) add("ערב שבועות","erev"); if(d===6||d===7) add("שבועות","yt"); }
+  if(M==="Tammuz" && (d===17 && dow!==6 || d===18 && dow===0)) add("שבעה עשר בתמוז","fast");
+  if(M==="Av" && (d===9 && dow!==6 || d===10 && dow===0)) add("תשעה באב","fast");
+  if(M==="Av" && d===15) add("ט״ו באב","minor");
   // Rosh Chodesh: the 30th of a month and the 1st of the next (not Tishrei: that's Rosh Hashana)
-  if(d===30) add(`Rosh Chodesh ${h.months[(h.mi+1)%h.months.length][0]}`,"rc");
-  if(d===1 && M!=="Tishrei") add(`Rosh Chodesh ${M}`,"rc");
-  if(dow===5 && !out.some(x=>x.kind==="yt")) add("Erev Shabbos","erev");
-  if(dow===6) add("Shabbos","shabbos");
+  if(d===30) add(`ראש חודש ${MH(h.months[(h.mi+1)%h.months.length][0])}`,"rc");
+  if(d===1 && M!=="Tishrei") add(`ראש חודש ${MH(M)}`,"rc");
+  if(dow===5 && !out.some(x=>x.kind==="yt")) add("ערב שבת","erev");
+  if(dow===6) add("שבת קודש","shabbos");
   return out;
 }
 
@@ -2125,7 +2140,7 @@ function jewishDays(date){
    plans/{uid}: {days: {"2026-10-29": [entry…]}} · entry: {k, meal, rid, x, done} for one recipe,
    or {k, meal, menuId, x, done:{rid:true}} for a menu linked to that day and meal (it always shows the menu as it is now).
    menus/{id}: {uid, ownerName, name, items:[{rid, x, course}], shared:[uid…], sharedNames:[name…]} */
-const MEALS = ["Breakfast","Lunch","Supper","Friday night","Shabbos lunch","Seudah shlishis","Melave malka","Yom Tov night","Yom Tov lunch","Other"];
+const MEALS = ["Breakfast","Kiddush","Lunch","Supper","Friday night","Shabbos lunch","Seudah shlishis","Melave malka","Yom Tov night","Yom Tov lunch","Other"];
 const HEB_MONTH_HE = {Tishrei:"תשרי",Cheshvan:"חשון",Kislev:"כסלו",Teves:"טבת",Shevat:"שבט","Adar I":"אדר א׳","Adar II":"אדר ב׳",Adar:"אדר",Nissan:"ניסן",Iyar:"אייר",Sivan:"סיון",Tammuz:"תמוז",Av:"אב",Elul:"אלול"};
 function gematria(n){ const L=[[400,"ת"],[300,"ש"],[200,"ר"],[100,"ק"],[90,"צ"],[80,"פ"],[70,"ע"],[60,"ס"],[50,"נ"],[40,"מ"],[30,"ל"],[20,"כ"],[10,"י"],[9,"ט"],[8,"ח"],[7,"ז"],[6,"ו"],[5,"ה"],[4,"ד"],[3,"ג"],[2,"ב"],[1,"א"]];
   let s=""; n%=1000; while(n>0){ if(n===15){s+="טו";break} if(n===16){s+="טז";break} for(const [v,c] of L) if(n>=v){ s+=c; n-=v; break; } }
@@ -2135,7 +2150,7 @@ const hebTextHe = h => `${hebDayLetters(h.d)} ${HEB_MONTH_HE[h.m]||h.m} ${gematr
 const keyToDate = k => { const [y,m,d]=k.split("-").map(Number); return new Date(y,m-1,d); };
 const addDays = (k,n) => { const d=keyToDate(k); d.setDate(d.getDate()+n); return dayKey(d); };
 
-let PLAN = {days:{}}, MENUS = {}, unsubPlan=null, unsubMenus=[];
+let PLAN = {days:{}}, MENUS = {}, unsubPlan=null, unsubMenus=[], menuBack=null;
 let planSel = null, planMonth = null;   // selected day key; first day of the month shown
 function watchPlans(){
   if(unsubPlan || !db || offline) return;
@@ -2171,6 +2186,22 @@ function dayItems(k){
   }
   return out;
 }
+// When to cook (optional, per menu or recipe on a day): its own date and time
+const fmtClock = hm => { if(!hm) return ""; const [H,M]=hm.split(":").map(Number); const d=new Date(); d.setHours(H,M,0,0); return d.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}); };
+const cookDay = (e,k) => e.cookDate || (e.cookTime ? k : "");
+function cookText(e,k){ const cd=cookDay(e,k); if(!cd) return "";
+  return `Cook ${cd===k?"this day":keyToDate(cd).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})}${e.cookTime?" at "+fmtClock(e.cookTime):""}`; }
+// Everything set to be cooked on day k (for any day it's served), soonest first
+function cookList(k){
+  const out=[];
+  for(const [day,list] of Object.entries(PLAN.days)) for(const e of list||[]) if(cookDay(e,day)===k){
+    const name = e.menuId ? (MENUS[e.menuId]||{}).name : (RECIPES.find(r=>r.id===e.rid)||{}).t;
+    if(!name) continue;
+    const items=dayItems(day).filter(i=>i.e===e && i.r), done=items.length && items.every(i=>i.done);
+    out.push({e, day, name:name.replace(/^Untitled: /,""), time:e.cookTime||"", n:items.length, done});
+  }
+  return out.sort((a,b)=>(a.time||"99").localeCompare(b.time||"99"));
+}
 const minsLeft = items => items.filter(i=>i.r && !i.done).reduce((n,i)=>n+estMinutes(i.r).total,0);
 function planSummary(items){
   const real=items.filter(i=>i.r), done=real.filter(i=>i.done).length, left=minsLeft(real);
@@ -2184,7 +2215,7 @@ function addPlanToGrocery(items){
 function upcomingHolidays(n){
   const out=[], seen=new Set(), d=new Date(); d.setHours(0,0,0,0);
   for(let i=0;i<400 && out.length<n;i++){ const x=new Date(d); x.setDate(d.getDate()+i);
-    for(const j of jewishDays(x)) if(["yt","chag","fast","minor"].includes(j.kind)){ const base=j.name.replace(/ ·.*$/,"").replace(/^Chol Hamoed /,""); if(seen.has(base)) continue; seen.add(base); out.push({name:base, date:x, kind:j.kind, days:i}); } }
+    for(const j of jewishDays(x)) if(["yt","chag","fast","minor"].includes(j.kind)){ const base=j.name.replace(/ ·.*$/,"").replace(/^חול המועד /,""); if(seen.has(base)) continue; seen.add(base); out.push({name:base, date:x, kind:j.kind, days:i}); } }
   return out;
 }
 function mealSelect(id, k, cur){ return `<select id="${id}" aria-label="Meal">${MEALS.map(m=>`<option ${m===(cur||defaultMeal(k))?"selected":""}>${m}</option>`).join("")}</select>`; }
@@ -2192,7 +2223,8 @@ function menuOptions(){ const L=Object.values(MENUS).sort((a,b)=>(a.uid!==me)-(b
   return L.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}${m.uid!==me?` (from ${esc(m.ownerName||"someone")})`:""}</option>`).join(""); }
 
 // Short holiday names for the small calendar boxes
-const calShort = n => n.replace(/ · .*$/,"").replace(/^Rosh Chodesh .*/,"R\"Ch").replace(/^Chol Hamoed .*/,"Ch\"M").replace(/^Rosh Hashana$/,"R\"H").replace(/^Shemini Atzeres$/,"Shmini Atz.").replace(/^Shiva Asar B'Tammuz$/,"17 Tammuz").replace(/^Asara B'Teves$/,"10 Teves").replace(/^Taanis Esther$/,"Taanis Est.").replace(/^Tzom Gedaliah$/,"Tz. Gedaliah").replace(/^Hoshana Rabba$/,"Hosh. Rabba").replace(/^Shushan Purim$/,"Shushan P.");
+const CAL_SHORT = {"ראש השנה":"ר״ה","יום כיפור":"יוה״כ","הושענא רבה":"הוש״ר","שמיני עצרת":"שמ״ע","שמחת תורה":"שמח״ת","שבעה עשר בתמוז":"י״ז תמוז","תשעה באב":"ת״ב","תענית אסתר":"תענית אסתר","שושן פורים":"שושן פורים"};
+const calShort = n => { n=n.replace(/ · .*$/,""); if(/^ראש חודש/.test(n)) return "ר״ח"; if(/^חול המועד/.test(n)) return "חוה״מ"; return CAL_SHORT[n]||n; };
 function planPage(sel){
   const today=dayKey(); planSel = sel || planSel || today;
   const selD=keyToDate(planSel);
@@ -2200,54 +2232,58 @@ function planPage(sel){
   const first=new Date(planMonth), start=new Date(first); start.setDate(1-first.getDay());
   const cells=[]; for(let i=0;i<42;i++){ const d=new Date(start); d.setDate(start.getDate()+i); cells.push(d); if(i>=34 && d.getMonth()!==first.getMonth() && d.getDay()===6) break; }
   const hFirst=hebDate(first), last=new Date(first.getFullYear(), first.getMonth()+1, 0), hLast=hebDate(last);
-  const hebRange = hFirst.m===hLast.m ? `${hFirst.m} ${hFirst.y}` : `${hFirst.m} – ${hLast.m} ${hLast.y}`;
+  const hm = h => HEB_MONTH_HE[h.m]||h.m;
+  const hebRange = hFirst.m===hLast.m ? `${hm(hFirst)} ${gematria(hFirst.y)}` : hFirst.y===hLast.y ? `${hm(hFirst)} – ${hm(hLast)} ${gematria(hLast.y)}` : `${hm(hFirst)} ${gematria(hFirst.y)} – ${hm(hLast)} ${gematria(hLast.y)}`;
   const cell = d => { const k=dayKey(d), h=hebDate(d), j=jewishDays(d), items=dayItems(k).filter(i=>i.r), done=items.filter(i=>i.done).length;
     const hol=j.find(x=>["yt","chag","fast","minor"].includes(x.kind)) || j.find(x=>x.kind==="rc");
     return `<button type="button" class="cal-d${d.getMonth()!==first.getMonth()?" other":""}${k===today?" today":""}${k===planSel?" sel":""}${d.getDay()===6?" shab":""}${hol?" k-"+hol.kind:""}" data-day="${k}" aria-label="${d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})}, ${hebText(h)}${hol?", "+hol.name:""}${items.length?`, ${items.length} recipes planned, ${done} made`:""}">
       <span class="cal-top"><b>${d.getDate()}</b><span class="cal-h" lang="he">${hebDayLetters(h.d)}</span></span>
       ${hol?`<span class="cal-hol">${esc(calShort(hol.name))}</span>`:""}
-      ${items.length?`<span class="cal-n${done===items.length?" all":""}">${done}/${items.length}</span>`:""}</button>`; };
+      <span class="cal-marks">${items.length?`<span class="cal-n${done===items.length?" all":""}">${done}/${items.length}</span>`:""}${cookList(k).some(c=>c.day!==k)?`<span class="cal-cook" title="Cooking for another day">${TIMER_IC.replace("<svg",'<svg width="11" height="11"')}</span>`:""}</span></button>`; };
   // the selected day
   const k=planSel, d=keyToDate(k), h=hebDate(d), jd=jewishDays(d);
   const items=dayItems(k), sum=planSummary(items);
   const wkStart=addDays(k, -d.getDay()), wk=[...Array(7)].flatMap((_,i)=>dayItems(addDays(wkStart,i))), wsum=planSummary(wk);
   const meals=[...new Set((PLAN.days[k]||[]).map(e=>e.meal))].sort((a,b)=>MEALS.indexOf(a)-MEALS.indexOf(b));
   const recRow = i => `<li class="pl-rec${i.done?" done":""}"><label><input type="checkbox" data-pdone="${esc(i.e.k)}" data-prid="${esc(i.r.id)}" ${i.done?"checked":""}><span><a href="#${i.r.id}">${esc(i.r.t.replace(/^Untitled: /,""))}</a> <small>${i.x!==1?fmtNum(i.x)+"× · ":""}${esc(timeShort(i.r))}${i.it&&i.it.course?" · "+esc(i.it.course):""}</small></span></label></li>`;
+  const cookLine = e => `<div class="pl-cook" data-cookbox="${esc(e.k)}">${TIMER_IC.replace("<svg",'<svg width="15" height="15"')}${cookText(e,k)?`<span>${esc(cookText(e,k))}</span><button type="button" class="link" data-cook="${esc(e.k)}">Change</button>`:`<button type="button" class="link" data-cook="${esc(e.k)}">When to cook?</button>`}</div>`;
+  const cooks=cookList(k);
   const entryHTML = e => {
     const its=items.filter(i=>i.e===e);
     if(e.menuId){ const m=MENUS[e.menuId];
       if(!m) return `<div class="pl-entry"><div class="pl-ehead"><span class="pl-tag">Menu</span><b>A menu that's no longer shared with you</b><button type="button" class="td-x" data-pdel="${esc(e.k)}" aria-label="Remove">✕</button></div></div>`;
       return `<div class="pl-entry"><div class="pl-ehead"><span class="pl-tag">Menu</span><a href="#menu-${esc(m.id)}"><b>${esc(m.name)}</b></a>${(e.x||1)!==1?` <small>${fmtNum(e.x)}×</small>`:""}<button type="button" class="td-x" data-pdel="${esc(e.k)}" aria-label="Remove ${esc(m.name)} from this day">✕</button></div>
-        <ul class="pl-list">${its.filter(i=>i.r).map(recRow).join("")}${its.some(i=>!i.r)?`<li class="hint">Some recipes in this menu aren't in your cookbook.</li>`:""}</ul></div>`; }
+        <ul class="pl-list">${its.filter(i=>i.r).map(recRow).join("")}${its.some(i=>!i.r)?`<li class="hint">Some recipes in this menu aren't in your cookbook.</li>`:""}${m.uid===me&&!(m.items||[]).length?`<li class="hint">No recipes yet. <a class="link" href="#menu-${esc(m.id)}">Add recipes to this menu</a></li>`:""}</ul>${cookLine(e)}</div>`; }
     const i=its[0]; if(!i||!i.r) return "";
-    return `<div class="pl-entry single"><ul class="pl-list">${recRow(i).replace("</label></li>",`</label><button type="button" class="td-x" data-pdel="${esc(e.k)}" aria-label="Remove">✕</button></li>`)}</ul></div>`;
+    return `<div class="pl-entry single"><ul class="pl-list">${recRow(i).replace("</label></li>",`</label><button type="button" class="td-x" data-pdel="${esc(e.k)}" aria-label="Remove">✕</button></li>`)}</ul>${cookLine(e)}</div>`;
   };
   const up=upcomingHolidays(4);
   app.innerHTML = `<section class="wrap plan-page">
     <div class="section-head" style="margin-top:22px"><h2>Calendar</h2><p><a class="link" href="#menus">My menus${Object.keys(MENUS).length?` (${Object.keys(MENUS).length})`:""}</a></p></div>
     <div class="panel-a cal-box">
       <div class="cal-nav"><button type="button" class="btn sm" id="cal-prev" aria-label="Previous month">‹</button>
-        <div class="cal-title"><b>${first.toLocaleDateString(undefined,{month:"long",year:"numeric"})}</b><span>${esc(hebRange)}</span></div>
+        <div class="cal-title"><b>${first.toLocaleDateString(undefined,{month:"long",year:"numeric"})}</b><span lang="he" dir="rtl">${esc(hebRange)}</span></div>
         <button type="button" class="btn sm" id="cal-next" aria-label="Next month">›</button></div>
       <div class="cal">${["S","M","T","W","T","F","Sh"].map((x,i)=>`<span class="cal-wd${i===6?" shab":""}">${x}</span>`).join("")}${cells.map(cell).join("")}</div>
-      <div class="cal-foot">${k!==today||first.getMonth()!==new Date().getMonth()?`<button type="button" class="link" id="cal-today">Today</button>`:"<span></span>"}<span class="hint">${up.map(u=>`${esc(u.name)} ${u.days===0?"today":u.days===1?"tomorrow":"in "+u.days+" days"}`).slice(0,2).join(" · ")}</span></div>
+      <div class="cal-foot">${k!==today||first.getMonth()!==new Date().getMonth()?`<button type="button" class="link" id="cal-today">Today</button>`:"<span></span>"}<span class="hint">${up.map(u=>`<span lang="he">${esc(u.name)}</span> ${u.days===0?"today":u.days===1?"tomorrow":"in "+u.days+" days"}`).slice(0,2).join(" · ")}</span></div>
     </div>
     <div class="panel-a pl-day" id="pl-day">
       <div class="pl-dhead"><div><h3>${d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})}</h3>
-        <p class="hint">${esc(hebText(h))} · <span lang="he">${hebTextHe(h)}</span></p>
+        <p class="pl-heb" lang="he" dir="rtl">${hebTextHe(h)}</p>
         ${jd.length?`<div class="pl-hols">${jd.map(x=>`<span class="pl-hol k-${x.kind}">${esc(x.name)}</span>`).join("")}</div>`:""}</div></div>
       ${sum.n?`<div class="pl-prog"><div class="tm-bar"><i style="width:${Math.round(sum.done/sum.n*100)}%"></i></div><span>${esc(sum.txt)}</span></div>`:""}
-      ${meals.length ? meals.map(m=>`<div class="pl-meal"><h4>${esc(m)}</h4>${(PLAN.days[k]||[]).filter(e=>e.meal===m).map(entryHTML).join("")}</div>`).join("") : `<p class="hint">Nothing planned for this day yet.</p>`}
+      ${cooks.length?`<div class="pl-cooking"><h4>To cook ${k===today?"today":"this day"}</h4><ul>${cooks.map(c=>`<li class="${c.done?"done":""}"><span class="pl-ctime">${c.time?esc(fmtClock(c.time)):"Any time"}</span><span><b>${esc(c.name)}</b> <small>for ${c.day===k?"this day":keyToDate(c.day).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})} · ${esc((PLAN.days[c.day]||[]).find(x=>x===c.e)?c.e.meal:"")}${c.done?" · made ✓":""}</small></span>${c.day!==k?`<button type="button" class="link" data-day="${c.day}">Open</button>`:""}</li>`).join("")}</ul></div>`:""}
+      ${meals.length ? meals.map(m=>`<div class="pl-meal"><div class="pl-mhead"><h4>${esc(m)}</h4><button type="button" class="link" data-addmeal="${esc(m)}">+ Add</button></div>${(PLAN.days[k]||[]).filter(e=>e.meal===m).map(entryHTML).join("")}</div>`).join("") : `<p class="hint">Nothing planned for this day yet. Pick a meal below, then add a recipe or a menu.</p>`}
       <form class="pl-add" id="pl-add">
         <div class="pl-add-row"><label>Meal ${mealSelect("pl-meal", k)}</label>
-          <label>Add <select id="pl-what"><option value="recipe">a recipe</option>${Object.keys(MENUS).length?`<option value="menu">a menu</option>`:""}</select></label></div>
+          <label>Add <select id="pl-what"><option value="recipe">a recipe</option>${Object.keys(MENUS).length?`<option value="menu">one of my menus</option>`:""}<option value="new">a new menu for this meal</option></select></label></div>
         <div id="pl-pick"><input id="pl-q" type="text" autocomplete="off" placeholder="Type a recipe name or code…" aria-label="Recipe to add"><div class="pre-sugg" id="pl-sugg"></div></div>
       </form>
       ${sum.n?`<div class="row mn-actions"><button type="button" class="btn" id="pl-groc">Add this day to grocery list</button><button type="button" class="btn" id="pl-copy">Copy this day…</button><button type="button" class="btn danger-btn" id="pl-clear">Clear day</button></div><div id="pl-confirm"></div>`:""}
     </div>
     <div class="panel-a pl-week"><h3>This week</h3><p class="hint">${new Date(keyToDate(wkStart)).toLocaleDateString(undefined,{month:"short",day:"numeric"})} – ${keyToDate(addDays(wkStart,6)).toLocaleDateString(undefined,{month:"short",day:"numeric"})}: ${esc(wsum.txt)}</p>
       ${wsum.n?`<div class="row mn-actions"><button type="button" class="btn" id="pl-wgroc">Add the week to grocery list</button></div>`:""}</div>
-    <div class="panel-a"><h3>Coming up</h3><ul class="pl-up">${up.map(u=>`<li><button type="button" class="link" data-day="${dayKey(u.date)}">${esc(u.name)}</button><span class="hint">${u.date.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})} · ${u.days===0?"today":u.days===1?"tomorrow":"in "+u.days+" days"}</span></li>`).join("")}</ul></div>
+    <div class="panel-a"><h3>Coming up</h3><ul class="pl-up">${up.map(u=>`<li><button type="button" class="link" lang="he" data-day="${dayKey(u.date)}">${esc(u.name)}</button><span class="hint">${u.date.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})} · ${u.days===0?"today":u.days===1?"tomorrow":"in "+u.days+" days"}</span></li>`).join("")}</ul></div>
   </section>`;
   const go = (nk, keepMonth) => { planSel=nk; if(!keepMonth){ const x=keyToDate(nk); planMonth=new Date(x.getFullYear(), x.getMonth(), 1); } planPage(); const pd=document.getElementById("pl-day"); if(pd && !keepMonth) pd.scrollIntoView({block:"nearest"}); };
   app.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{ const nk=b.dataset.day; const x=keyToDate(nk);
@@ -2266,6 +2302,17 @@ function planPage(sel){
   const drawPick = () => {
     if(what.value==="menu"){ pick.innerHTML=`<div class="pl-add-row"><select id="pl-menu" aria-label="Menu">${menuOptions()}</select><button type="button" class="btn solid" id="pl-addmenu">Add menu</button></div>`;
       document.getElementById("pl-addmenu").onclick=()=>addEntry({menuId:document.getElementById("pl-menu").value, x:1, done:{}}); return; }
+    if(what.value==="new"){ const ml=()=>document.getElementById("pl-meal").value, dflt=()=>`${ml()} · ${d.toLocaleDateString(undefined,{month:"short",day:"numeric"})}`;
+      pick.innerHTML=`<div class="td-add"><input id="pl-newname" type="text" maxlength="60" value="${esc(dflt())}" aria-label="Name for the new menu"><button type="button" class="btn solid" id="pl-newgo">Make menu</button></div><p class="hint" style="margin-top:6px">It's put on this day and meal, then you add its recipes.</p>`;
+      const nn=document.getElementById("pl-newname"); nn.classList.add("plan-typing");
+      document.getElementById("pl-meal").onchange=()=>{ if(nn.dataset.typed!=="1") nn.value=dflt(); };
+      nn.oninput=()=>{ nn.dataset.typed="1"; };
+      document.getElementById("pl-newgo").onclick=async()=>{ const name=nn.value.trim()||dflt(); const ref=db.collection("menus").doc();
+        const m={uid:me, ownerName:myName(), name, items:[], shared:[], sharedNames:[], created:Date.now(), updated:Date.now()};
+        try{ await ref.set(m); MENUS[ref.id]=Object.assign({id:ref.id}, m);
+          (PLAN.days[k]=PLAN.days[k]||[]).push({k:newKey(), meal:ml(), menuId:ref.id, x:1, done:{}}); await savePlan();
+          menuBack=k; location.hash="menu-"+ref.id; }catch(err){ toast("Couldn't save. Check your connection."); } };
+      return; }
     pick.innerHTML=`<input id="pl-q" type="text" autocomplete="off" placeholder="Type a recipe name or code…" aria-label="Recipe to add"><div class="pre-sugg" id="pl-sugg"></div>`;
     const q2=document.getElementById("pl-q"), sg=document.getElementById("pl-sugg");
     q2.onfocus=()=>q2.classList.add("plan-typing"); q2.onblur=()=>setTimeout(()=>q2.classList.remove("plan-typing"),300);
@@ -2276,6 +2323,17 @@ function planPage(sel){
     q2.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=sg.querySelector("[data-padd]"); if(b) b.click(); } };
   };
   what.onchange=drawPick; drawPick();
+  app.querySelectorAll("[data-addmeal]").forEach(b=>b.onclick=()=>{ const ms=document.getElementById("pl-meal"); ms.value=b.dataset.addmeal; ms.dispatchEvent(new Event("change"));
+    const f=document.getElementById("pl-add"); f.scrollIntoView({block:"center", behavior:"smooth"}); const q2=document.getElementById("pl-q")||document.getElementById("pl-newname"); if(q2) setTimeout(()=>q2.focus(),300); });
+  // when to cook: its own date and time
+  app.querySelectorAll("[data-cook]").forEach(b=>b.onclick=()=>{ const e=(PLAN.days[k]||[]).find(x=>x.k===b.dataset.cook); if(!e) return;
+    const box=b.closest("[data-cookbox]");
+    box.innerHTML=`<label>Cook on <input type="date" class="pc-date" value="${esc(e.cookDate||k)}"></label><label>at <input type="time" class="pc-time" value="${esc(e.cookTime||"")}"></label><button type="button" class="btn sm solid pc-save">Save</button>${e.cookDate||e.cookTime?`<button type="button" class="btn sm pc-clear">Clear</button>`:""}`;
+    box.classList.add("editing","plan-typing");
+    box.querySelector(".pc-save").onclick=()=>{ const cd=box.querySelector(".pc-date").value, ct=box.querySelector(".pc-time").value;
+      e.cookDate = cd && cd!==k ? cd : ""; e.cookTime = ct || ""; if(!e.cookDate && !e.cookTime && cd===k) e.cookDate=k;
+      savePlan(); const y=window.scrollY; planPage(); window.scrollTo(0,y); toast(cookText(e,k) ? cookText(e,k).replace(/^Cook/,"Set to cook") : "Saved"); };
+    const c=box.querySelector(".pc-clear"); if(c) c.onclick=()=>{ delete e.cookDate; delete e.cookTime; savePlan(); const y=window.scrollY; planPage(); window.scrollTo(0,y); }; });
   document.getElementById("pl-add").onsubmit=e=>e.preventDefault();
   const pg=document.getElementById("pl-groc"); if(pg) pg.onclick=()=>addPlanToGrocery(items);
   const wg=document.getElementById("pl-wgroc"); if(wg) wg.onclick=()=>addPlanToGrocery(wk);
@@ -2323,7 +2381,7 @@ function menuEditPage(id){
         :`<small>${it.course?esc(it.course)+" · ":""}${(it.x||1)!==1?fmtNum(it.x)+"×":""}</small>`}</li>`; }).join("");
   const mins=items.map(it=>RECIPES.find(r=>r.id===it.rid)).filter(Boolean).reduce((n,r)=>n+estMinutes(r).total,0);
   app.innerHTML = `<section class="wrap tools-page">
-    <a class="back" href="#menus">← My menus</a>
+    ${menuBack?`<a class="back" href="#plan-${menuBack}">← Back to ${keyToDate(menuBack).toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"})}</a>`:`<a class="back" href="#menus">← My menus</a>`}
     <div class="panel-a">
       ${own?`<div class="td-add"><input id="mi-name" type="text" maxlength="60" value="${esc(m.name)}" aria-label="Menu name"><button type="button" class="btn" id="mi-rename">Rename</button></div>`
         :`<h2 style="margin:0">${esc(m.name)}</h2><p class="hint">Shared with you by ${esc(m.ownerName||"someone")}. Only they can change it.</p>`}
@@ -2388,9 +2446,10 @@ function addToPlanBox(r, btn){
 }
 // Home page: today's menu in one line
 function todayMenuLine(){
-  const items=dayItems(dayKey()).filter(i=>i.r); if(!items.length) return "";
+  const k=dayKey(), items=dayItems(k).filter(i=>i.r), cooks=cookList(k).filter(c=>c.day!==k && !c.done);
   const done=items.filter(i=>i.done).length;
-  return `<a class="td-menu" href="#plan"><span>Today's menu</span><b>${done} of ${items.length} made</b><span class="link">Open</span></a>`;
+  return (items.length?`<a class="td-menu" href="#plan"><span>Today's menu</span><b>${done} of ${items.length} made</b><span class="link">Open</span></a>`:"")
+    + (cooks.length?`<a class="td-menu" href="#plan"><span>To cook today</span><b>${cooks.map(c=>esc(c.name)+(c.time?" · "+fmtClock(c.time):"")).slice(0,2).join(", ")}${cooks.length>2?` +${cooks.length-2}`:""}</b><span class="link">Open</span></a>`:"");
 }
 
 const menuOpen = new Set(["manage"]);   // which menu groups are open
@@ -4558,6 +4617,7 @@ function routePage(){
   if(h==="grocery"){ q.value=""; groceryPage(); window.scrollTo(0,0); return; }
   if(h==="categories"){ q.value=""; categoriesPage(); window.scrollTo(0,0); return; }
   if(h==="plan" || h.startsWith("plan-")){ q.value=""; planPage(h.slice(5)||null); window.scrollTo(0,0); return; }
+  if(!h.startsWith("menu-")) menuBack=null;
   if(h==="menus"){ q.value=""; menusPage(); window.scrollTo(0,0); return; }
   if(h.startsWith("menu-")){ q.value=""; menuEditPage(h.slice(5)); window.scrollTo(0,0); return; }
   if(h==="timers" || h.startsWith("timers-")){ q.value=""; timersPage(h.slice(7)); window.scrollTo(0,0); return; }
