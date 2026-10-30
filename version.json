@@ -1,6 +1,6 @@
 {
-  "web": "3.78",
+  "web": "3.79",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Members who joined before can add an email (optional) to sign in with it and reset their own password."
+  "notes": "Signing up now has an “I am not a robot” check."
 }

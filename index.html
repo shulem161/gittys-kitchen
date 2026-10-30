@@ -1128,7 +1128,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.78";
+const WEB_VERSION = "3.79";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1835,16 +1835,18 @@ function recipe(r){
 const CHEF = '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14a5 5 0 1 1 3.5-8.6A5 5 0 0 1 22 7a4.5 4.5 0 1 1 1 8.9V25H9z"/><path d="M9 21h14"/></svg>';
 let authMode = "signin", authDraft = {};
 // "I'm not a robot" (Google reCAPTCHA). Turned on once the owner adds a site key here.
-const RECAPTCHA_KEY = "";
-let robotId=null, robotTok="";
+const RECAPTCHA_KEY = "6LdpgQcuAAAAALwdaXoSDL5gH2SEhuan0xmz48RX";   // site key (public by design)
+let robotId=null, robotTok="", robotDown=false;
 function robotBox(el){
   robotTok="";
   const draw=()=>{ try{ robotId=grecaptcha.render(el, {sitekey:RECAPTCHA_KEY, callback:t=>{robotTok=t}, "expired-callback":()=>{robotTok=""}}); }catch(e){} };
   if(window.grecaptcha && grecaptcha.render) return draw();
   window.gkRobot=draw;
-  if(!document.getElementById("rc-js")){ const s=document.createElement("script"); s.id="rc-js"; s.async=true; s.src="https://www.google.com/recaptcha/api.js?onload=gkRobot&render=explicit"; document.head.appendChild(s); }
+  if(!document.getElementById("rc-js")){ const s=document.createElement("script"); s.id="rc-js"; s.async=true; s.src="https://www.google.com/recaptcha/api.js?onload=gkRobot&render=explicit";
+    s.onerror=()=>{ robotDown=true; };   // if Google can't be reached, the email link is still required
+    document.head.appendChild(s); }
 }
-const robotOk = () => !!robotTok;
+const robotOk = () => !!robotTok || robotDown;
 function shell(inner){
   app.innerHTML = `<section class="auth wrap">
     <div class="auth-card">

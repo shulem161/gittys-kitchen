@@ -19,6 +19,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
   const ctx = await b.newContext({viewport: {width: 1100, height: 900}, acceptDownloads: true});
   await ctx.route(/gstatic\.com|fonts\.g/, r => r.fulfill({contentType: 'text/javascript', body: ''}));
   await ctx.route(/gstatic\.com\/firebasejs\/.*app-compat/, r => r.fulfill({contentType: 'text/javascript', body: FAKE}));
+  // Stand-in for Google's "I'm not a robot" box
+  await ctx.route(/google\.com\/recaptcha/, r => r.fulfill({contentType: 'text/javascript', body: 'window.grecaptcha={render(el,o){const b=document.createElement("button");b.type="button";b.id="fake-robot";b.textContent="I am not a robot";b.onclick=()=>o.callback("tok");el.appendChild(b);return 1}};window.gkRobot&&gkRobot();'}));
   // Stand-in for the AI recipe reader (Firebase AI Logic)
   await ctx.route(/firebasejs\/12\.\d+\.\d+\/firebase-app\.js/, r => r.fulfill({contentType: 'text/javascript', headers: {'access-control-allow-origin': '*'}, body: 'export function getApps(){return []} export function initializeApp(c,n){return {name:n}}'}));
   await ctx.route(/firebasejs\/12\.\d+\.\d+\/firebase-ai\.js/, r => r.fulfill({contentType: 'text/javascript', headers: {'access-control-allow-origin': '*'}, body: 'export class GoogleAIBackend{} export function getAI(){return {}} export function getGenerativeModel(){return {generateContent: async()=>({response:{text:()=>JSON.stringify({title:"Scanned Test Cake",category:"Cakes",from:"",note:"",parts:[{type:"ingredients",heading:"",items:["2 cups flour"]},{type:"method",heading:"",items:["Bake at 350°F"]}]})}})}}'}));
@@ -27,7 +29,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
   const page = async () => { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(e.message + ' @ ' + (e.stack||'').split('\n').slice(1,3).join(' | '))); await p.goto(F); await p.waitForTimeout(400); return p; };
   const mailOf = name => name.toLowerCase().replace(/\s+/g, '.') + '@example.com';
   // Sign up with name, email and password, then tap the link in the (stand-in) email
-  const join = async (p, name, pw, noConfirm) => { await p.click('[data-mode=create]'); await p.fill('#nm', name); await p.fill('#em', mailOf(name)); await p.fill('#pw', pw); await p.fill('#pw2', pw); await p.click('.primary'); await p.waitForTimeout(600);
+  const join = async (p, name, pw, noConfirm) => { await p.click('[data-mode=create]'); await p.fill('#nm', name); await p.fill('#em', mailOf(name)); await p.fill('#pw', pw); await p.fill('#pw2', pw); await p.click('#fake-robot').catch(() => {}); await p.click('.primary'); await p.waitForTimeout(600);
     if (!noConfirm && await p.locator('#ev-check').count()) { await p.evaluate(() => __fakeVerify()); await p.click('#ev-check'); await p.waitForTimeout(600); } };
 
   try {
@@ -41,6 +43,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('recipes go online', total > 100, total);
     const B0 = await page(); await B0.click('[data-mode=create]'); await B0.fill('#nm', 'Test Member'); await B0.fill('#pw', 'member1'); await B0.fill('#pw2', 'member1'); await B0.click('.primary'); await B0.waitForTimeout(300);
     ok('signing up needs an email', /email address/.test(await B0.locator('.err').innerText()) && (await B0.locator('#nm').inputValue()) === 'Test Member');
+    await B0.fill('#em', 'robot@example.com'); await B0.fill('#pw', 'member1'); await B0.fill('#pw2', 'member1'); await B0.click('.primary'); await B0.waitForTimeout(300);
+    ok("…and the “I'm not a robot” tick", /not a robot/.test(await B0.locator('.err').innerText()) && (await B0.locator('#fake-robot').count()) === 1);
     await B0.close();
     const B = await page(); await join(B, 'Test Member', 'member1', true);
     ok('a new member is asked to confirm their email first', (await B.locator('h2').innerText()) === 'Confirm your email' && await B.evaluate(() => __fakeMails().some(m => m.to === 'test.member@example.com' && m.kind === 'verify')));
@@ -62,10 +66,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('a new profile signing in by name is told to use the email', /Type your email/.test(await C.locator('.err').innerText()));
     await C.fill('#nm', 'test.member@example.com'); await C.fill('#pw', 'wrong1'); await C.click('.primary'); await C.waitForTimeout(400);
     ok('wrong password refused', /isn't right/.test(await C.locator('.err').innerText()));
-    await C.click('[data-mode=create]'); await C.fill('#nm', 'Someone Else'); await C.fill('#em', 'test.member@example.com'); await C.fill('#pw', 'abcdef'); await C.fill('#pw2', 'abcdef'); await C.click('.primary'); await C.waitForTimeout(400);
+    await C.click('[data-mode=create]'); await C.fill('#nm', 'Someone Else'); await C.fill('#em', 'test.member@example.com'); await C.fill('#pw', 'abcdef'); await C.fill('#pw2', 'abcdef'); await C.click('#fake-robot'); await C.click('.primary'); await C.waitForTimeout(400);
     ok('an email can only be on one profile', /already has a profile/.test(await C.locator('.err').innerText()));
     await C.goto(F); await C.waitForTimeout(300);
-    await C.click('[data-mode=create]'); await C.fill('#nm', 'test  member'); await C.fill('#em', 'tm2@example.com'); await C.fill('#pw', 'abcdef'); await C.fill('#pw2', 'abcdef'); await C.click('.primary'); await C.waitForTimeout(400);
+    await C.click('[data-mode=create]'); await C.fill('#nm', 'test  member'); await C.fill('#em', 'tm2@example.com'); await C.fill('#pw', 'abcdef'); await C.fill('#pw2', 'abcdef'); await C.click('#fake-robot'); await C.click('.primary'); await C.waitForTimeout(400);
     ok('duplicate name refused', /already taken/.test(await C.locator('.err').innerText()));
 
     // Admin recipe editing
