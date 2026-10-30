@@ -210,11 +210,14 @@ await check("an unconfirmed email can't go straight to waiting for approval", as
 await check("…or move there before the link is tapped", assertFails(updateDoc(doc(S1, 'users', 's1'), { status: 'pending' })));
 await check('after the link is tapped it asks to join', assertSucceeds(updateDoc(doc(S1ok, 'users', 's1'), { status: 'pending' })));
 await check("…but can't approve itself", assertFails(updateDoc(doc(S1ok, 'users', 's1'), { status: 'approved' })));
-await check("others can't clear someone's sign-in on their name", assertFails(setDoc(doc(S2, 'names', 'gitty schlesinger'), { uid: 's2', email: '' })));
-const GM = env.authenticatedContext('gitty', { email: 'gitty@x.com', email_verified: true }).firestore();
-await check('a member who confirmed a new email saves it', assertSucceeds(updateDoc(doc(GM, 'users', 'gitty'), { email: 'gitty@x.com' })));
-await check("…but not an email they didn't confirm", assertFails(updateDoc(doc(GM, 'users', 'gitty'), { email: 'other@x.com' })));
-await check('…and switches their name to email sign-in', assertSucceeds(setDoc(doc(GM, 'names', 'gitty schlesinger'), { uid: 'gitty', email: '' })));
+await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
+  await setDoc(doc(d, 'names', 'em one'), { uid: 'em1', email: 'mabc@gittys-kitchen.app' });
+  await setDoc(doc(d, 'users', 'em1'), { name: 'Em One', status: 'approved', created: 1, favs: [] }); });
+await check("others can't clear someone's sign-in on their name", assertFails(setDoc(doc(S2, 'names', 'em one'), { uid: 's2', email: '' })));
+const GM = env.authenticatedContext('em1', { email: 'em1@x.com', email_verified: true }).firestore();
+await check('a member who confirmed a new email saves it', assertSucceeds(updateDoc(doc(GM, 'users', 'em1'), { email: 'em1@x.com' })));
+await check("…but not an email they didn't confirm", assertFails(updateDoc(doc(GM, 'users', 'em1'), { email: 'other@x.com' })));
+await check('…and switches their name to email sign-in', assertSucceeds(setDoc(doc(GM, 'names', 'em one'), { uid: 'em1', email: '' })));
 // Team messages: employees and admins only, and only the people in the conversation
 const th = (by, members) => ({ by, lastBy: by, members, names: {}, to: 'admins', rid: 'r-pub', rtitle: 'X', subject: '', msgs: [{ by, name: 'X', text: 'Can you look at this?', at: 1 }], updated: 1, readAt: {}, done: false, created: 1 });
 await check('an employee can write to the admins about a recipe', assertSucceeds(setDoc(doc(EMP, 'threads', 't1'), th('emp', ['emp', 'adm']))));
