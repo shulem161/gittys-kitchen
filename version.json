@@ -1,6 +1,6 @@
 {
-  "web": "3.86",
+  "web": "3.87",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Cleaner Settings drop-down."
+  "notes": "Customers can request recipes. Admins and chosen employees can get phone notices."
 }

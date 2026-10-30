@@ -1,8 +1,17 @@
 (function(){
-const L=()=>{const d=JSON.parse(localStorage.getItem("__fakedb")||'{"users":{},"names":{},"accounts":{}}');d.recipes=d.recipes||{};d.submissions=d.submissions||{};d.photos=d.photos||{};d.feedback=d.feedback||{};d.meta=d.meta||{};d.resets=d.resets||{};d.requests=d.requests||{};d.plans=d.plans||{};d.menus=d.menus||{};d.golive=d.golive||{};d.threads=d.threads||{};return d};
-const W=d=>{localStorage.setItem("__fakedb",JSON.stringify(d));fire()};
+// Each document is its own localStorage key, so pages writing at the same time don't overwrite each other's changes.
+const PFX="__fk|", COLS=["users","names","accounts","recipes","submissions","photos","feedback","meta","resets","requests","plans","menus","golive","threads","notify"];
+const L=()=>{const d={},snap={};COLS.forEach(c=>d[c]={});
+ for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k||!k.startsWith(PFX))continue;const raw=localStorage.getItem(k);snap[k]=raw;const r=k.slice(PFX.length),j=r.indexOf("|"),c=r.slice(0,j),id=r.slice(j+1);
+  if(c==="__mails")d.mails=JSON.parse(raw);else{(d[c]=d[c]||{})[id]=JSON.parse(raw)}}
+ Object.defineProperty(d,"__snap",{value:snap});return d};
+const W=d=>{const snap=d.__snap||{},seen=new Set();
+ Object.keys(d).forEach(c=>{if(c==="mails")return;Object.keys(d[c]||{}).forEach(id=>{const k=PFX+c+"|"+id,s=JSON.stringify(d[c][id]);seen.add(k);if(snap[k]!==s)localStorage.setItem(k,s)})});
+ if(d.mails){const k=PFX+"__mails|x",s=JSON.stringify(d.mails);seen.add(k);if(snap[k]!==s)localStorage.setItem(k,s)}
+ Object.keys(snap).forEach(k=>{if(!seen.has(k))localStorage.removeItem(k)});fire()};
+window.__fakeDB=()=>JSON.parse(JSON.stringify(L()));
 let subs=[];function fire(){setTimeout(()=>subs.forEach(s=>s()),0)}
-window.addEventListener("storage",e=>{if(e.key==="__fakedb")fire()});
+window.addEventListener("storage",e=>{if(e.key&&e.key.startsWith(PFX))fire()});
 const rnd=()=>Math.random().toString(36).slice(2,12);
 let cur=JSON.parse(sessionStorage.getItem("__me")||"null"), al=[];
 const acct=a=>(L().accounts[a.email]||{});
@@ -27,7 +36,7 @@ function doc(col,id){return{_col:col,_id:id,id,
  async update(o){const d=L();if(!d[col][id])throw{code:"not-found"};Object.assign(d[col][id],o);W(d)},
  async delete(){const d=L();delete d[col][id];W(d)},
  onSnapshot(cb){let last;const s=()=>{const v=L()[col][id];const k=JSON.stringify(v);if(k===last)return;last=k;cb({exists:!!v,data:()=>v&&JSON.parse(k)})};subs.push(s);setTimeout(s,5);return()=>{subs=subs.filter(x=>x!==s)}}}}
-const fs={enablePersistence(){return Promise.resolve()},batch(){const ops=[];return{set(ref,o){ops.push([ref,o,0])},update(ref,o){ops.push([ref,o,1])},async commit(){const d=L();ops.forEach(([r,o,u])=>{const v=JSON.parse(JSON.stringify(o));d[r._col][r._id]=u?Object.assign(d[r._col][r._id]||{},v):v});W(d)}}},collection(col){const mk=flt=>({doc:id=>doc(col,id||("a"+Date.now().toString(36)+Math.random().toString(36).slice(2,8))),where:(k,op,v)=>mk(x=>(!flt||flt(x))&&(op==="array-contains"?Array.isArray(x[k])&&x[k].includes(v):x[k]===v)),async get(){const c=L()[col];return {docs:Object.keys(c).filter(id=>!flt||flt(c[id])).map(id=>({id,data:()=>c[id]}))}},onSnapshot(cb){const s=()=>{const c=L()[col];cb({docs:Object.keys(c).filter(id=>!flt||flt(c[id])).map(id=>({id,data:()=>c[id]}))})};subs.push(s);setTimeout(s,5);return()=>{subs=subs.filter(x=>x!==s)}}});return mk(null)}};
+const fs={enablePersistence(){return Promise.resolve()},batch(){const ops=[];return{set(ref,o){ops.push([ref,o,0])},update(ref,o){ops.push([ref,o,1])},async commit(){const d=L();ops.forEach(([r,o,u])=>{const v=JSON.parse(JSON.stringify(o));d[r._col][r._id]=u?Object.assign(d[r._col][r._id]||{},v):v});W(d)}}},collection(col){const mk=flt=>({doc:id=>doc(col,id||("a"+Date.now().toString(36)+Math.random().toString(36).slice(2,8))),where:(k,op,v)=>mk(x=>(!flt||flt(x))&&(op==="array-contains"?Array.isArray(x[k])&&x[k].includes(v):x[k]===v)),async get(){const c=L()[col];return {docs:Object.keys(c).filter(id=>!flt||flt(c[id])).map(id=>({id,data:()=>c[id]}))}},onSnapshot(cb){let last;const s=()=>{const c=L()[col],ids=Object.keys(c).filter(id=>!flt||flt(c[id])).sort(),k=JSON.stringify(ids.map(id=>[id,c[id]]));if(k===last)return;last=k;cb({docs:ids.map(id=>({id,data:()=>c[id]}))})};subs.push(s);setTimeout(s,5);return()=>{subs=subs.filter(x=>x!==s)}}});return mk(null)}};
 const authFn=()=>authObj;authFn.EmailAuthProvider={credential:(e,p)=>({e,p})};
 window.firebase={apps:[],initializeApp(){this.apps.push(1)},auth:authFn,firestore:()=>fs};
 })();

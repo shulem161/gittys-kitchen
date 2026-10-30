@@ -581,6 +581,8 @@ body.guiding{overflow:hidden}
 .gd-next{flex:2;border:0;background:var(--accent);color:var(--paper);font-weight:800 !important}
 .set-app h4{margin:18px 0 4px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .set-url{margin:0 0 8px;overflow-wrap:anywhere}
+.nt-steps{margin:8px 0 12px;padding-left:20px;display:grid;gap:8px;font-size:15px}
+.nt-topic{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}.nt-topic code{padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--line);font-size:14px;overflow-wrap:anywhere}
 .set-links{display:grid;gap:12px}.set-links .panel-a{margin:0}
 .set-ic{flex:none;width:44px;height:44px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}.set-ic svg{width:24px;height:24px}
 .set-link > span:nth-child(2){flex:1}
@@ -1117,7 +1119,7 @@ const PUB_ALLOW = [["suggest","Suggest changes and send new recipes"],["photos",
 let PUB = {allow:{}, cats:{}};
 // Employees: each person has their own permissions (users/{uid}.perms). The everyday ones are on unless switched off;
 // the extras are off unless granted. Public members all share the Public portal settings. Admins can do everything.
-const EXTRA_PERMS = [["edit","Add and edit recipes directly, without approval"],["move","Move recipes to a different category"],["review","Approve suggested recipes and photos"],["answer","Answer recipe requests"],["inbox","Read and answer suggestions & comments"]];
+const EXTRA_PERMS = [["edit","Add and edit recipes directly, without approval"],["move","Move recipes to a different category"],["review","Approve suggested recipes and photos"],["answer","Recipe requests: see them, answer them, and get a notice for new ones"],["inbox","Read and answer suggestions & comments"]];
 const isExtra = k => EXTRA_PERMS.some(x=>x[0]===k);
 // Employee settings (meta/employees) apply to every employee; a person's own Permissions override them.
 let EMP = {allow:{}};
@@ -1139,12 +1141,27 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.86";
+const WEB_VERSION = "3.87";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
   const q = new URLSearchParams({title, click: "https://shulem161.github.io/gittys-kitchen/"+(hash||""), tags: tags||"bell", priority: "4"});
   return fetch("https://ntfy.sh/"+NTFY_TOPIC+"?"+q.toString(), {method:"POST", body: message}).catch(()=>{});
+}
+// Admins and employees can each turn on phone notices (Account settings): a private ntfy topic in notify/{uid}
+function notifyTopic(topic, title, message, hash, tags){
+  const q = new URLSearchParams({title, click: "https://shulem161.github.io/gittys-kitchen/"+(hash||""), tags: tags||"bell", priority: "4"});
+  return fetch("https://ntfy.sh/"+topic+"?"+q.toString(), {method:"POST", body: message}).catch(()=>{});
+}
+async function notifyPeople(uids, title, message, hash, tags){
+  if(!db || offline) return;
+  const list=[...new Set(uids)].filter(u=>u && u!==me && u!==adminUid);   // the owner already hears through the main topic
+  await Promise.all(list.map(async u=>{ try{ const s=await db.collection("notify").doc(u).get(); if(s.exists && s.data().topic) await notifyTopic(s.data().topic, title, message, hash, tags); }catch(e){} }));
+}
+// A new recipe request: the owner, the other admins, and the employees allowed to answer requests
+async function notifyRequest(title, message){
+  notifyAdmin(title, message, "#requests", "cookie");
+  try{ const s=await db.collection("meta").doc("reqwatch").get(); if(s.exists) await notifyPeople(s.data().uids||[], title, message, "#requests", "cookie"); }catch(e){}
 }
 const SITE = "https://shulem161.github.io/gittys-kitchen/";
 const appBuild = (()=>{ const m=navigator.userAgent.match(/GittysKitchenApp\/(\d+)/); return m ? +m[1] : 0; })();
@@ -2856,10 +2873,14 @@ function stopTeam(){ if(unsubThreads){unsubThreads();unsubThreads=null} if(unsub
 let teamSyncT=null;
 function syncTeamList(){ clearTimeout(teamSyncT); teamSyncT=setTimeout(syncTeamNow, 3000); }   // wait for the member list to settle
 function syncTeamNow(){
-  if(!isAdmin() || !db || offline) return;
+  if(!isAdmin() || !db || offline || !members.length) return;
   const list = members.filter(m=>m.status==="approved" && ["owner","admin","employee"].includes(roleOf(m))).map(m=>({uid:m.uid, name:m.name, role:roleOf(m)})).sort((a,b)=>byName(a.name,b.name));
   if(JSON.stringify(list)!==JSON.stringify(TEAM)){ TEAM=list; db.collection("meta").doc("team").set({list}).catch(()=>{}); }
+  // who hears about new recipe requests: every admin, and employees allowed to answer them
+  const uids = members.filter(m=>m.status==="approved" && (["owner","admin"].includes(roleOf(m)) || (roleOf(m)==="employee" && permOf(m,"answer")))).map(m=>m.uid).sort();
+  if(uids.join()!==lastReqWatch){ lastReqWatch=uids.join(); db.collection("meta").doc("reqwatch").set({uids}).catch(()=>{}); }
 }
+let lastReqWatch=null;
 const unreadThreads = () => THREADS.filter(t=>t.lastBy && t.lastBy!==me && (t.updated||0) > ((t.readAt||{})[me]||0) && !t.done).length;
 function threadTitle(t){ return t.subject || (t.rtitle ? `About ${t.rtitle}` : "Message"); }
 function threadWho(t){ const others=Object.entries(t.names||{}).filter(([u])=>u!==me).map(([,n])=>n);
@@ -2879,6 +2900,7 @@ async function startThread(to, text, r){
     msgs:[{by:me, name:myName(), text, at:now}], updated:now, lastBy:me, readAt:{[me]:now}, done:false, created:now};
   await ref.set(t); THREADS.unshift(Object.assign({id:ref.id}, t));
   if(adminUid && membersList.includes(adminUid) && adminUid!==me) notifyAdmin(`${myName()}: ${r?"about "+t.rtitle:"team message"}`, text.slice(0,180), "#team-"+ref.id, "speech_balloon");
+  notifyPeople(membersList, `${myName()}: ${r?"about "+t.rtitle:"team message"}`, text.slice(0,180), "#team-"+ref.id, "speech_balloon");
   return ref.id;
 }
 async function replyThread(t, text){
@@ -2886,6 +2908,7 @@ async function replyThread(t, text){
   await db.collection("threads").doc(t.id).update({msgs, updated:now, lastBy:me, readAt, done:false});
   Object.assign(t, {msgs, updated:now, lastBy:me, readAt, done:false});
   if(adminUid && t.members.includes(adminUid) && adminUid!==me) notifyAdmin(`${myName()} replied`, text.slice(0,180), "#team-"+t.id, "speech_balloon");
+  notifyPeople(t.members, `${myName()} replied`, text.slice(0,180), "#team-"+t.id, "speech_balloon");
 }
 function toSelect(id, dflt){
   const others=(TEAM.length?TEAM:[]).filter(x=>x.uid!==me);
@@ -3112,7 +3135,7 @@ function watchRecipes(){
     if(state==="approved" && !document.querySelector(".editor, .prof-head, .prof-page, .settings, #rqform, .tools-page, #td-new:focus")) route();
   }, ()=>{});
   if(!unsubEmp) unsubEmp = db.collection("meta").doc("employees").onSnapshot(s=>{
-    const d = s.exists ? s.data() : {}; EMP = {allow:d.allow||{}};
+    const d = s.exists ? s.data() : {}; EMP = {allow:d.allow||{}}; syncTeamList();
     if(state==="approved" && !document.querySelector(".editor, .prof-head, .prof-page, .settings, #rqform, .tools-page, #td-new:focus")) route();
   }, ()=>{});
   if(!unsubPub) unsubPub = db.collection("meta").doc("public").onSnapshot(s=>{
@@ -4746,7 +4769,7 @@ ${menuCatalog(RECIPES)}`];
       try{
         await db.collection("requests").doc("q-"+newId()).set({uid:me, byName:myName(), items:list.map(i=>({ask:i.ask, found:i.found})),
           text:asks.join("\n").slice(0,800), photo:photo?photo.thumb:"", status:"open", reply:"", recipeId:"", created:Date.now()});
-        notifyAdmin(`${myName()} is asking for a recipe`, `${myName()} wants a recipe for ${list.map(i=>i.ask).join(", ")}.`, "#requests", "cookie");
+        notifyRequest(`${myName()} is asking for a recipe`, `${myName()} wants a recipe for ${list.map(i=>i.ask).join(", ")}.`);
         F.reset(); photo=null; F.querySelector("#rq-prev").innerHTML="";
         toast(`Sent to ${ADMIN_NAME}`); items.forEach(i=>{ if(list.includes(i)) i.sent=true; }); show(true);
       }catch(x){ if(b){ b.disabled=false; b.textContent="Try again"; } toast("Couldn't send. Check your connection."); }
@@ -4891,6 +4914,33 @@ function settingsPage(){
 }
 applyTextSize();
 
+/* ---------- phone notices for admins and employees (ntfy app) ---------- */
+async function ntfyPanel(){
+  const P=document.getElementById("ntfypanel"); if(!P) return;
+  let topic=""; try{ const s=await db.collection("notify").doc(me).get(); if(s.exists) topic=s.data().topic||""; }catch(e){}
+  const what = may("answer") ? "when someone asks for a recipe, and when the team writes to you" : "when the team writes to you";
+  if(!topic){
+    P.innerHTML=`<h3>Phone notices <span class="hint" style="font-weight:400">optional</span></h3>
+      <p class="hint">Get a notice on your phone ${what}. It uses the free ntfy app.</p>
+      <div class="row mn-actions"><button type="button" class="btn solid" id="nt-on">Turn on</button></div>`;
+    document.getElementById("nt-on").onclick=async e=>{ e.target.disabled=true;
+      try{ await db.collection("notify").doc(me).set({topic:"gk-"+newId()}); ntfyPanel(); }catch(x){ e.target.disabled=false; toast("Couldn't save. Check your connection."); } };
+    return;
+  }
+  P.innerHTML=`<h3>Phone notices <span class="tag" style="vertical-align:2px">On</span></h3>
+    <p class="hint">You get a notice ${what}. To get them on a phone:</p>
+    <ol class="nt-steps">
+      <li>Install the free <b>ntfy</b> app${appBuild?" from the Play Store":`: <a class="link" href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" target="_blank" rel="noopener">Android</a> · <a class="link" href="https://apps.apple.com/app/ntfy/id1625396347" target="_blank" rel="noopener">iPhone</a>`}.</li>
+      <li>In ntfy, tap <b>+</b> and type this name, then tap Subscribe:<div class="nt-topic"><code>${esc(topic)}</code><button type="button" class="btn" id="nt-copy">Copy</button></div></li>
+      <li>Send a test to check it works.</li>
+    </ol>
+    <div class="row mn-actions"><button type="button" class="btn" id="nt-test">Send a test</button><button type="button" class="btn" id="nt-off">Turn off</button></div>
+    <p class="hint">Keep this name private. Anyone with it could see your notices.</p>`;
+  document.getElementById("nt-copy").onclick=()=>copyText(topic);
+  document.getElementById("nt-test").onclick=async()=>{ await notifyTopic(topic, "Test from Gitty's Kitchen", "Notices are working.", "", "white_check_mark"); toast("Test sent. Check your phone."); };
+  document.getElementById("nt-off").onclick=async()=>{ try{ await db.collection("notify").doc(me).delete(); toast("Phone notices are off"); ntfyPanel(); }catch(x){ toast("Couldn't save. Check your connection."); } };
+}
+
 /* ---------- my profile ---------- */
 async function profilePage(mode){
   const acc = mode==="account", A = s => acc ? s : "", P = s => acc ? "" : s;
@@ -4934,6 +4984,7 @@ async function profilePage(mode){
         <p class="err" id="em-err" role="alert" hidden></p><p class="hint" id="em-ok" role="status" hidden></p>
         <div><button class="primary" type="submit">${has?"Change email":"Add email"}</button></div>
       </form></div>`; })()}
+    ${!acc||offline||viewingAs()||isOwner()||!(isTeam()||may("answer"))?"":`<div class="panel-a" id="ntfypanel"></div>`}
     ${!acc||offline?"":`<div class="panel-a" id="rcpanel"><h3>Recovery code</h3>
       <div id="rcbody">${profile.rc?`<p class="hint">You made a recovery code on ${fmtDate(profile.rcAt)}. If you've lost it, make a new one. The old one stops working.</p><button type="button" class="btn" id="rc-make">Make a new code</button>`
         :`<p class="hint">Make a recovery code so you can set a new password yourself if you ever forget it.</p><button type="button" class="primary" id="rc-make">Make a recovery code</button>`}</div></div>`}
@@ -4969,6 +5020,7 @@ async function profilePage(mode){
     list.innerHTML=`<h3>Photos you shared</h3>${myPhotos.length?`<div class="ph-grid" style="margin-top:10px">${myPhotos.map(p=>`<figure class="ph${p.status==="pending"?" wait":""}"><a href="#${esc(p.recipeId)}"><img src="${p.thumb}" alt="${esc(p.recipeTitle||"")}"></a><figcaption>${esc(p.recipeTitle||"")}${p.status==="pending"?" · waiting for approval":""}</figcaption></figure>`).join("")}</div>`:`<p class="hint mempty">No photos yet. Open a recipe you've made and tap Take a photo.</p>`}`;
     list.scrollIntoView({behavior:"smooth",block:"start"}); });
 
+  if(document.getElementById("ntfypanel")) ntfyPanel();
   // recovery code
   const rcb=document.getElementById("rc-make");
   if(rcb) rcb.onclick=async()=>{

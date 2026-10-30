@@ -25,7 +25,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
   await ctx.route(/firebasejs\/12\.\d+\.\d+\/firebase-app\.js/, r => r.fulfill({contentType: 'text/javascript', headers: {'access-control-allow-origin': '*'}, body: 'export function getApps(){return []} export function initializeApp(c,n){return {name:n}}'}));
   await ctx.route(/firebasejs\/12\.\d+\.\d+\/firebase-ai\.js/, r => r.fulfill({contentType: 'text/javascript', headers: {'access-control-allow-origin': '*'}, body: 'export class GoogleAIBackend{} export function getAI(){return {}} export function getGenerativeModel(){return {generateContent: async()=>({response:{text:()=>JSON.stringify({title:"Scanned Test Cake",category:"Cakes",from:"",note:"",parts:[{type:"ingredients",heading:"",items:["2 cups flour"]},{type:"method",heading:"",items:["Bake at 350°F"]}]})}})}}'}));
   await ctx.route(/version\.json/, r => r.fulfill({contentType: 'application/json', body: '{"web":"0","apk":0}'}));
-  const notes = []; await ctx.route(/ntfy\.sh/, r => { notes.push(new URL(r.request().url()).searchParams.get('title')); r.fulfill({status: 200, body: '{}', headers: {'access-control-allow-origin': '*'}}); });
+  const notes = [], ntfyPaths = []; await ctx.route(/ntfy\.sh/, r => { notes.push(new URL(r.request().url()).searchParams.get('title')); ntfyPaths.push(new URL(r.request().url()).pathname); r.fulfill({status: 200, body: '{}', headers: {'access-control-allow-origin': '*'}}); });
   const page = async () => { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(e.message + ' @ ' + (e.stack||'').split('\n').slice(1,3).join(' | '))); await p.goto(F); await p.waitForTimeout(400); return p; };
   const mailOf = name => name.toLowerCase().replace(/\s+/g, '.') + '@example.com';
   // Sign up with name, email and password, then tap the link in the (stand-in) email
@@ -213,7 +213,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.waitForTimeout(800);
     await A.waitForTimeout(5000);
     ok('member list has no duplicate after reset', (await A.locator('.mwho b').allInnerTexts()).filter(x => /Test Member Two/.test(x)).length === 1, [await A.locator('.mwho b').allInnerTexts(), await A.evaluate(() => members.map(m => [m.uid, m.name, m.from, m.moved, m.status].join(':')))]);
-    ok("member's messages follow them", await A.evaluate(o => Object.values(JSON.parse(localStorage.__fakedb).feedback).every(x => x.uid !== o), R0));
+    ok("member's messages follow them", await A.evaluate(o => Object.values(__fakeDB().feedback).every(x => x.uid !== o), R0));
     await W.goto(F); await W.waitForTimeout(500);
     ok('members from before emails are invited (not made) to add one', (await W.locator('#enudge').count()) === 1 && (await B.evaluate(() => document.querySelectorAll('#enudge').length)) === 0);
     await W.click('#en-add'); await W.waitForTimeout(600);
@@ -691,6 +691,27 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('marking done moves it to Done', (await V.locator('details .tm-row', {hasText: '375°F'}).count()) === 1);
     await PU.goto(F + '#team'); await PU.waitForTimeout(400);
     ok("public members can't open Team messages", (await PU.locator('#tn-form').count()) === 0 && await PU.evaluate(() => THREADS.length === 0));
+
+    // Phone notices, and recipe requests from customers
+    await V.goto(F + '#account'); await V.waitForTimeout(700);
+    ok('employees can turn on phone notices in Account settings', (await V.locator('#nt-on').count()) === 1 && (await PU.evaluate(() => isPublic())));
+    await V.click('#nt-on'); await V.waitForTimeout(700);
+    const vtopic = (await V.locator('.nt-topic code').innerText()).trim();
+    ok('…which gives them their own private topic, with a test button', /^gk-[0-9a-f]{24}$/.test(vtopic) && (await V.locator('#nt-test').count()) === 1, vtopic);
+    const vuid = await V.evaluate(() => me), vname = await V.evaluate(() => myName());
+    await A.goto(F + '#admin'); await A.waitForTimeout(500);
+    if (!(await A.locator(`[data-pk=answer][data-pu="${vuid}"]`).count())) { await A.locator('.mrow', {hasText: vname}).locator('[data-act=perms]').click(); await A.waitForTimeout(300); }
+    await A.locator(`[data-pk=answer][data-pu="${vuid}"]`).check(); await A.waitForTimeout(4500);
+    ok('choosing an employee for recipe requests means they hear about new ones', await A.evaluate(u => ((__fakeDB().meta.reqwatch || {}).uids || []).includes(u), vuid));
+    await PU.goto(F + '#requests'); await PU.waitForTimeout(500);
+    const nBefore = ntfyPaths.length;
+    await PU.fill('#rq-text', 'Quince jelly from Bubby'); await PU.click('#rqform .primary'); await PU.waitForTimeout(2000);
+    ok('customers can ask for a recipe, and the admin hears about it', notes.slice(-4).some(n => /asking for a recipe/.test(n)));
+    ok('…and so does the chosen employee, on their own phone', ntfyPaths.slice(nBefore).includes('/' + vtopic), ntfyPaths.slice(nBefore));
+    await A.locator(`[data-pk=answer][data-pu="${vuid}"]`).uncheck(); await A.waitForTimeout(4500);
+    ok('taking it away stops the notices', await A.evaluate(u => !((__fakeDB().meta.reqwatch || {}).uids || []).includes(u), vuid));
+    await PU.goto(F + '#account'); await PU.waitForTimeout(500);
+    ok("customers don't get the phone notices setting", (await PU.locator('#ntfypanel').count()) === 0);
 
     // Search
     await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);
