@@ -9,7 +9,7 @@ const env = await initializeTestEnvironment({
   firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8080 },
 });
 let pass = 0, fail = 0;
-const check = async (name, p) => { try { await p; pass++; console.log('PASS', name); } catch (e) { fail++; console.log('FAIL', name, '→', e.message.split('\n')[0]); } };
+const check = async (name, p) => { try { await p; pass++; console.log('PASS', name); } catch (e) { fail++; console.log('FAIL', name, '→', e.message.split('\n')[0]); console.log('::warning::FAIL ' + name + ' → ' + e.message.split('\n')[0].slice(0, 200)); } };
 
 await env.withSecurityRulesDisabled(async c => {
   const d = c.firestore();
