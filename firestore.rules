@@ -95,6 +95,15 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['allow', 'cats'])
         && request.resource.data.allow is map && request.resource.data.cats is map;
     }
+    // Member numbers: the next one to give out
+    match /meta/counter {
+      allow get, write: if isAdmin();
+    }
+    // Customers, for employees allowed to log in as one
+    match /meta/customers {
+      allow get: if isAdmin() || extra('viewas');
+      allow write: if isAdmin() && request.resource.data.keys().hasOnly(['list']) && request.resource.data.list is list;
+    }
     // Who hears about new recipe requests (admins, and employees allowed to answer them).
     match /meta/reqwatch {
       allow get: if approvedMember();
@@ -245,6 +254,8 @@ service cloud.firestore {
     // Each person's own calendar: only they can see or change it.
     match /plans/{uid} {
       allow read, write: if approvedMember() && request.auth.uid == uid;
+      // "Log in as": admins, and employees allowed to look in as a customer
+      allow read: if isAdmin() || (extra('viewas') && get(/databases/$(database)/documents/users/$(uid)).data.get('role', 'public') == 'public');
     }
 
     // Menus: the person who made one changes it; people it's shared with can read it.
@@ -260,7 +271,7 @@ service cloud.firestore {
 
     // Team messages: only employees and admins, and only the people in the conversation.
     match /threads/{id} {
-      allow read: if isTeam() && request.auth.uid in resource.data.members;
+      allow read: if (isTeam() && request.auth.uid in resource.data.members) || isAdmin();
       allow create: if isTeam()
         && request.resource.data.by == request.auth.uid && request.resource.data.lastBy == request.auth.uid
         && request.resource.data.members is list && request.auth.uid in request.resource.data.members
@@ -277,8 +288,8 @@ service cloud.firestore {
     }
 
     match /menus/{id} {
-      allow read: if approvedMember()
-        && (resource.data.uid == request.auth.uid || request.auth.uid in resource.data.get('shared', []));
+      allow read: if isAdmin() || (approvedMember()
+        && (resource.data.uid == request.auth.uid || request.auth.uid in resource.data.get('shared', [])));
       allow create: if approvedMember() && request.resource.data.uid == request.auth.uid
         && request.resource.data.name is string && request.resource.data.name.size() <= 60
         && request.resource.data.items is list && request.resource.data.items.size() <= 60
@@ -295,6 +306,7 @@ service cloud.firestore {
     // only the admin can approve, deny or remove them.
     match /users/{uid} {
       allow get: if signedIn() && (request.auth.uid == uid || isAdmin()
+        || (extra('viewas') && resource.data.status == 'approved' && resource.data.get('role', 'public') == 'public')
         // after a reset, the new sign-in may read the old profile to copy it
         || get(/databases/$(database)/documents/names/$(resource.data.name.lower())).data.uid == request.auth.uid);
       allow list: if isAdmin();
@@ -306,13 +318,15 @@ service cloud.firestore {
                  || (request.resource.data.status == 'pending' && request.auth.token.email_verified == true)
                  || (request.resource.data.status == 'approved' && isOwner())))
           // after a reset: copy of the old profile, same name and same approval
-          || (request.resource.data.keys().hasOnly(['name', 'status', 'created', 'favs', 'was', 'from', 'role', 'email'])
+          || (request.resource.data.keys().hasOnly(['name', 'status', 'created', 'favs', 'was', 'from', 'role', 'email', 'no', 'prefs'])
+             && request.resource.data.get('no', 0) == get(/databases/$(database)/documents/users/$(request.resource.data.from)).data.get('no', 0)
              && request.resource.data.from is string
              && request.resource.data.get('role', 'public') == get(/databases/$(database)/documents/users/$(request.resource.data.from)).data.get('role', 'public')
              && get(/databases/$(database)/documents/users/$(request.resource.data.from)).data.name == request.resource.data.name
              && get(/databases/$(database)/documents/users/$(request.resource.data.from)).data.status == request.resource.data.status));
       // The owner can change anyone. Admins can change employees and public members, but can't make admins.
-      allow update: if isOwner()
+      allow update: if (!('no' in resource.data) || request.resource.data.get('no', 0) == resource.data.no)
+        && (isOwner()
         || (isAdmin() && canManage(uid) && request.resource.data.get('role', 'public') in ['public', 'employee'])
         // admins tidy up after a member's password reset (moved), on any profile but the owner's
         || (isAdmin() && uid != ownerUid() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['moved']))
@@ -340,7 +354,10 @@ service cloud.firestore {
             && request.resource.data.name.lower() != 'shulem schlesinger'
             && resource.data.name.lower() != 'shulem schlesinger'
             && (!('was' in request.resource.data) || (request.resource.data.was is list && request.resource.data.was.size() <= 20))
-            && get(/databases/$(database)/documents/names/$(request.resource.data.name.lower())).data.uid == request.auth.uid);
+            && get(/databases/$(database)/documents/names/$(request.resource.data.name.lower())).data.uid == request.auth.uid)
+        // an admin gives an approved member their number (once)
+        || (isAdmin() && !('no' in resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['no'])
+            && request.resource.data.no is int && request.resource.data.no > 1000));
       allow delete: if (isAdmin() && canManage(uid)) || (signedIn() && request.auth.uid == uid)
         || (signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.from == uid);
     }

@@ -185,7 +185,7 @@ await check('an admin can approve it', assertSucceeds(updateDoc(doc(ADM, 'golive
 // Calendars and menus: each person's own; menus can be shared
 await check('a member can save their own calendar', assertSucceeds(setDoc(doc(EMP, 'plans', 'emp'), { days: { '2026-10-30': [{ k: 'a', meal: 'Supper', rid: 'r-pub', x: 1, done: false }] } })));
 await check("nobody else can read someone's calendar", assertFails(getDoc(doc(PUB, 'plans', 'emp'))));
-await check("…not even an admin", assertFails(getDoc(doc(ADM, 'plans', 'emp'))));
+await check("…except an admin using Log in as", assertSucceeds(getDoc(doc(ADM, 'plans', 'emp'))));
 const mn = (uid, shared) => ({ uid, ownerName: 'X', name: 'Friday night', items: [{ rid: 'r-pub', x: 1, course: 'Fish' }], shared, sharedNames: [] });
 await check('a member can make a menu', assertSucceeds(setDoc(doc(EMP, 'menus', 'm1'), mn('emp', ['pub']))));
 await check("can't make a menu in someone else's name", assertFails(setDoc(doc(EMP, 'menus', 'm2'), mn('pub', []))));
@@ -226,6 +226,22 @@ await check('the member can turn it off', assertSucceeds(deleteDoc(doc(EMP, 'not
 await check('admins set who hears about requests', assertSucceeds(setDoc(doc(ADM, 'meta', 'reqwatch'), { uids: ['adm', 'emp'] })));
 await check("employees can't", assertFails(setDoc(doc(EMP, 'meta', 'reqwatch'), { uids: ['emp'] })));
 await check('customers can read it', assertSucceeds(getDoc(doc(PUB, 'meta', 'reqwatch'))));
+// Log in as: employees allowed to may look in as customers only
+await setDoc(doc(PUB, 'plans', 'pub'), { days: {} });
+await check("an employee can't look at a customer's profile unless allowed", assertFails(getDoc(doc(as('ed'), 'users', 'pub'))));
+await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'users', 'ed'), { perms: { viewas: true } }, { merge: true }); });
+await check("…once allowed, they can", assertSucceeds(getDoc(doc(as('ed'), 'users', 'pub'))));
+await check("…and the customer's calendar", assertSucceeds(getDoc(doc(as('ed'), 'plans', 'pub'))));
+await check("…but not another employee's profile", assertFails(getDoc(doc(as('ed'), 'users', 'emp'))));
+await check("…or calendar", assertFails(getDoc(doc(as('ed'), 'plans', 'emp'))));
+await check('admins keep the customer list for them', assertSucceeds(setDoc(doc(ADM, 'meta', 'customers'), { list: [{ uid: 'pub', name: 'Pub' }] })));
+await check('…which they can read', assertSucceeds(getDoc(doc(as('ed'), 'meta', 'customers'))));
+await check("…and other employees can't", assertFails(getDoc(doc(EMP, 'meta', 'customers'))));
+// Member numbers never change
+await check('an admin gives a member their number', assertSucceeds(updateDoc(doc(ADM, 'users', 'pub'), { no: 1005 })));
+await check("…which nobody can change, not even the owner", assertFails(updateDoc(doc(OWN, 'users', 'pub'), { no: 1006 })));
+await check("…or take away", assertFails(setDoc(doc(OWN, 'users', 'pub'), { name: 'Pub', status: 'approved', created: 1, favs: [] })));
+await check("the member can't give themselves one", assertFails(updateDoc(doc(EMP, 'users', 'emp'), { no: 1001 })));
 // Team messages: employees and admins only, and only the people in the conversation
 const th = (by, members) => ({ by, lastBy: by, members, names: {}, to: 'admins', rid: 'r-pub', rtitle: 'X', subject: '', msgs: [{ by, name: 'X', text: 'Can you look at this?', at: 1 }], updated: 1, readAt: {}, done: false, created: 1 });
 await check('an employee can write to the admins about a recipe', assertSucceeds(setDoc(doc(EMP, 'threads', 't1'), th('emp', ['emp', 'adm']))));

@@ -1,6 +1,6 @@
 {
-  "web": "3.87",
+  "web": "3.88",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Customers can request recipes. Admins and chosen employees can get phone notices."
+  "notes": "Log in as a particular customer or employee (search by name, email or number). Member numbers for everyone."
 }

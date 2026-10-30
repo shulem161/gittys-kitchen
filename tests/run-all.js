@@ -661,7 +661,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.click('#va-back'); await A.waitForTimeout(1500);
     await A.goto(F + '#admin'); await A.waitForTimeout(400); await A.locator('.mrow', {hasText: vn4}).locator('[data-act=perms]').click(); await A.waitForTimeout(200);
     await A.locator('[data-pk=edit]').check(); await A.waitForTimeout(800);
-    await A.goto(F + '#viewas'); await A.waitForTimeout(400); await A.selectOption('#va-emp', {label: vn4 + ' · own permissions'}); await A.click('#va-empgo'); await A.waitForTimeout(1500);
+    await A.goto(F + '#viewas'); await A.waitForTimeout(400); await A.fill('#va-q', vn4.slice(0, 6)); await A.waitForTimeout(100); await A.locator('.va-person', {hasText: vn4}).click(); await A.waitForTimeout(1500);
     ok('the owner can log in as one particular employee, with their own permissions', new RegExp(vn4).test(await A.locator('#viewas-bar').innerText().catch(() => '')) && await A.evaluate(() => may('edit') && myRole() === 'employee'));
     await A.click('#va-back'); await A.waitForTimeout(1500);
     await A.goto(F + '#admin'); await A.waitForTimeout(400); await A.locator('.mrow', {hasText: vn4}).locator('[data-act=perms]').click(); await A.waitForTimeout(200);
@@ -712,6 +712,39 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('taking it away stops the notices', await A.evaluate(u => !((__fakeDB().meta.reqwatch || {}).uids || []).includes(u), vuid));
     await PU.goto(F + '#account'); await PU.waitForTimeout(500);
     ok("customers don't get the phone notices setting", (await PU.locator('#ntfypanel').count()) === 0);
+
+    // Member numbers
+    ok('every approved member has their own member number', await A.evaluate(() => { const n = members.filter(m => m.status === 'approved').map(m => m.no); return n.every(x => x > 1000) && new Set(n).size === n.length; }));
+    ok('…shown in Account settings', /^\d{4,}$/.test((await PU.locator('.acc-no b').innerText()).trim()));
+    const puNo = String(await PU.evaluate(() => profile.no));
+
+    // Log in as one particular customer, found by email or number
+    await PU.goto(F + '#r-croissants'); await PU.waitForTimeout(400); if ((await PU.locator('#fav[aria-pressed=false]').count())) { await PU.click('#fav'); await PU.waitForTimeout(400); }
+    await A.goto(F + '#viewas'); await A.waitForTimeout(400); await A.fill('#va-q', 'public.paula@'); await A.waitForTimeout(100);
+    ok('Log in as finds a customer by email', (await A.locator('.va-person').count()) === 1 && /Public Paula/.test(await A.locator('.va-person').innerText()));
+    await A.fill('#va-q', puNo); await A.waitForTimeout(100);
+    ok('…or by member number', (await A.locator('.va-person', {hasText: 'Public Paula'}).count()) === 1);
+    await A.locator('.va-person', {hasText: 'Public Paula'}).click(); await A.waitForTimeout(1800);
+    await A.goto(F); await A.waitForTimeout(600);
+    ok('…and shows their home page with their name', /Public Paula/i.test(await A.locator('.hello .eyebrow').innerText()) && /Public Paula/.test(await A.locator('#viewas-bar').innerText()) && await A.evaluate(() => isPublic()));
+    ok('…with their favorites', await A.evaluate(() => favs().includes('r-croissants')));
+    await A.evaluate(() => setFavs([])); await A.waitForTimeout(300);
+    ok("…and nothing done while looking is saved", await PU.evaluate(() => favs().includes('r-croissants')) && /Nothing is saved/.test(await A.locator('#toast').innerText()));
+    await A.click('#va-back'); await A.waitForTimeout(1500);
+    // Employees may look in as customers only, and only when allowed
+    await V.goto(F); await V.waitForTimeout(400); await V.click('#avbtn'); await V.waitForTimeout(200);
+    ok("employees can't log in as anyone unless allowed", (await V.locator('.menu a[href="#viewas"]').count()) === 0);
+    await V.click('#avbtn');
+    await A.goto(F + '#admin'); await A.waitForTimeout(500);
+    if (!(await A.locator(`[data-pk=viewas][data-pu="${vuid}"]`).count())) { await A.locator('.mrow', {hasText: vname}).locator('[data-act=perms]').click(); await A.waitForTimeout(300); }
+    await A.locator(`[data-pk=viewas][data-pu="${vuid}"]`).check(); await A.waitForTimeout(4500);
+    await V.goto(F + '#viewas'); await V.waitForTimeout(900);
+    const vaTxt = await V.locator('#va-people').innerText();
+    ok('an allowed employee can log in as customers only', (await V.locator('[data-va]').count()) === 1 && (await V.locator('[data-va=public]').count()) === 1 && /Public Paula/.test(vaTxt) && !/Shulem/.test(vaTxt), vaTxt);
+    await V.locator('.va-person', {hasText: 'Public Paula'}).click(); await V.waitForTimeout(1800);
+    ok('…and sees what that customer sees', /Public Paula/.test(await V.locator('#viewas-bar').innerText().catch(() => '')) && await V.evaluate(() => isPublic() && favs().includes('r-croissants')));
+    await V.click('#va-back'); await V.waitForTimeout(1500);
+    await A.locator(`[data-pk=viewas][data-pu="${vuid}"]`).uncheck(); await A.waitForTimeout(800);
 
     // Search
     await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);
