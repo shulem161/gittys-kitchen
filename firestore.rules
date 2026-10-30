@@ -95,6 +95,12 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['allow', 'cats'])
         && request.resource.data.allow is map && request.resource.data.cats is map;
     }
+    // Who hears about new recipe requests (admins, and employees allowed to answer them).
+    match /meta/reqwatch {
+      allow get: if approvedMember();
+      allow write: if isAdmin() && request.resource.data.keys().hasOnly(['uids'])
+        && request.resource.data.uids is list && request.resource.data.uids.size() <= 300;
+    }
     // Who is on the team (owner, admins, employees), so employees can pick who to write to.
     match /meta/team {
       allow get: if isTeam();
@@ -242,6 +248,16 @@ service cloud.firestore {
     }
 
     // Menus: the person who made one changes it; people it's shared with can read it.
+    // Phone notices: each person's own private ntfy topic. Members may read it to send them a notice.
+    match /notify/{uid} {
+      allow get: if approvedMember();
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['topic'])
+        && request.resource.data.topic is string
+        && request.resource.data.topic.size() >= 16 && request.resource.data.topic.size() <= 64;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
     // Team messages: only employees and admins, and only the people in the conversation.
     match /threads/{id} {
       allow read: if isTeam() && request.auth.uid in resource.data.members;

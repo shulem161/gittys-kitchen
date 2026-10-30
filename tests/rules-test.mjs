@@ -218,6 +218,14 @@ const GM = env.authenticatedContext('em1', { email: 'em1@x.com', email_verified:
 await check('a member who confirmed a new email saves it', assertSucceeds(updateDoc(doc(GM, 'users', 'em1'), { email: 'em1@x.com' })));
 await check("…but not an email they didn't confirm", assertFails(updateDoc(doc(GM, 'users', 'em1'), { email: 'other@x.com' })));
 await check('…and switches their name to email sign-in', assertSucceeds(setDoc(doc(GM, 'names', 'em one'), { uid: 'em1', email: '' })));
+// Phone notices and who hears about recipe requests
+await check('a member can turn on their own phone notices', assertSucceeds(setDoc(doc(EMP, 'notify', 'emp'), { topic: 'gk-0123456789abcdef0123' })));
+await check("…not for someone else", assertFails(setDoc(doc(EMP, 'notify', 'adm'), { topic: 'gk-0123456789abcdef0123' })));
+await check('a customer can read it to send a notice', assertSucceeds(getDoc(doc(PUB, 'notify', 'emp'))));
+await check('the member can turn it off', assertSucceeds(deleteDoc(doc(EMP, 'notify', 'emp'))));
+await check('admins set who hears about requests', assertSucceeds(setDoc(doc(ADM, 'meta', 'reqwatch'), { uids: ['adm', 'emp'] })));
+await check("employees can't", assertFails(setDoc(doc(EMP, 'meta', 'reqwatch'), { uids: ['emp'] })));
+await check('customers can read it', assertSucceeds(getDoc(doc(PUB, 'meta', 'reqwatch'))));
 // Team messages: employees and admins only, and only the people in the conversation
 const th = (by, members) => ({ by, lastBy: by, members, names: {}, to: 'admins', rid: 'r-pub', rtitle: 'X', subject: '', msgs: [{ by, name: 'X', text: 'Can you look at this?', at: 1 }], updated: 1, readAt: {}, done: false, created: 1 });
 await check('an employee can write to the admins about a recipe', assertSucceeds(setDoc(doc(EMP, 'threads', 't1'), th('emp', ['emp', 'adm']))));
