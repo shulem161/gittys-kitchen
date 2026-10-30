@@ -157,9 +157,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     const pst = (await B.locator('.pstat').allInnerTexts()).join(' | ');
     ok('profile shows my activity', /1\s+favorite\b/.test(pst) && /photos? shared/.test(pst) && !/…/.test(pst), pst);
     ok('profile links to Account settings and Website settings', (await B.locator('.set-links a[href="#account"]').count()) === 1 && (await B.locator('.set-links a[href="#settings-look"]').count()) === 1);
-    await B.goto(F + '#settings'); await B.waitForTimeout(400);
-    ok('Settings has two sections: Account and Website', /Account settings/.test(await B.locator('.settings').innerText()) && /Website settings/.test(await B.locator('.settings').innerText()));
-    await B.click('a[href="#account"]'); await B.waitForTimeout(500);
+    await B.click('#avbtn'); await B.waitForTimeout(200);
+    const mt = await B.locator('.menu').innerText();
+    ok('the menu has Account settings and Website settings as two separate items', /Account settings/.test(mt) && /Website settings/.test(mt) && (await B.locator('.menu a[href="#settings"]').count()) === 0);
+    await B.click('.menu a[href="#account"]'); await B.waitForTimeout(500);
     ok('Account settings has name, email, password and recovery code', (await B.locator('#nameform').count()) === 1 && (await B.locator('#emform').count()) === 1 && (await B.locator('#pwform').count()) === 1 && (await B.locator('#rcpanel').count()) === 1 && (await B.locator('.pstat').count()) === 0);
     await B.fill('#pw-old', 'nope99'); await B.fill('#pw-new', 'member2'); await B.fill('#pw-new2', 'member2'); await B.click('#pwform .primary'); await B.waitForTimeout(400);
     ok('profile refuses wrong current password', /isn't right/.test(await B.locator('#pw-err').innerText()));
@@ -229,7 +230,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('…without sideways scrolling on a phone', await W.evaluate(() => document.documentElement.scrollWidth) <= 392);
     await W.goto(F + '#settings-look'); await W.waitForTimeout(300); await W.click('#app [data-tsize="1"]'); await W.waitForTimeout(200); await W.setViewportSize({width: 1100, height: 900});
     ok('Settings shows the website link and a full Android app download', await W.evaluate(() => /github\.io\/gittys-kitchen/.test(document.querySelector('.set-url a').href) && /Gittys-Kitchen\.apk$/.test(document.getElementById('set-apk').href)));
-    ok('the account menu has Settings', await W.evaluate(() => !!document.querySelector('#acct a[href="#settings"]') || /href="#settings"/.test(document.body.innerHTML)));
+    ok('Website settings is titled for the website', /Website settings/.test(await W.evaluate(() => LOOK_SET())));
     await W.goto(F + '#account'); await W.waitForTimeout(500);
     ok('a profile without an email can add one', /Add your email/.test(await W.locator('.admin').innerText()));
     await W.fill('#em-new', 'tm.two@example.com'); await W.fill('#em-pw', 'member3'); await W.click('#emform .primary'); await W.waitForTimeout(500);

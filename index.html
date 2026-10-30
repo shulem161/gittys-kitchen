@@ -1139,7 +1139,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.83";
+const WEB_VERSION = "3.84";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1584,7 +1584,7 @@ function home(){
   const db0=document.getElementById("dl-book"); if(db0) db0.onclick=()=>downloadBook(CATS.filter(c=>RECIPES.some(r=>r.c===c)), db0);
   wireToday();
   const ena=document.getElementById("en-add"); if(ena) ena.onclick=()=>sessionStorage.setItem("gk-goemail","1");
-  const enn=document.getElementById("en-no"); if(enn) enn.onclick=()=>{ store("gk-emailnudge-"+me, 1); document.getElementById("enudge").remove(); toast("You can add it any time in Settings, Account settings"); };
+  const enn=document.getElementById("en-no"); if(enn) enn.onclick=()=>{ store("gk-emailnudge-"+me, 1); document.getElementById("enudge").remove(); toast("You can add it any time in Account settings"); };
 }
 
 function tabs(active){
@@ -3057,7 +3057,8 @@ function openMenu(confirming){
     ${teamItem}
     ${group("manage","Manage", manage, manageN)}
     ${group("recipes","Recipes", recipes, 0)}
-    <a href="#settings" role="menuitem" class="m-team">Settings <span class="n">account · website</span></a>
+    <a href="#account" role="menuitem" class="m-team">Account settings <span class="n">name · email · password</span></a>
+    <a href="#settings-look" role="menuitem" class="m-team">${LOOK_SET()} <span class="n">screen · design · text</span></a>
     ${group("app","App", [
       isAdmin()?`<button type="button" role="menuitem" id="m-ntfy">Send test notification <span class="n"></span></button>`:"",
       `<button type="button" role="menuitem" id="m-upd">Check for updates <span class="n">v${WEB_VERSION}</span></button>`,
@@ -4854,19 +4855,11 @@ function wireLooks(){
 const TEXT_SIZES = [["1","Normal"],["1.12","Large"],["1.25","Extra large"]];
 const myTextSize = () => store("gk-textsize") || "1";
 function applyTextSize(){ const z=myTextSize(); app.style.zoom = z==="1" ? "" : z; }
-function settingsHub(){
-  app.innerHTML = `<section class="wrap admin settings">
-    <div class="section-head" style="margin-top:28px"><h2>Settings</h2><p>${esc(myName())}</p></div>
-    <div class="set-links">
-      <a class="panel-a set-link" href="#account"><span class="set-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg></span><span><b>Account settings</b><small>Your name, email, password and recovery code. Sign out.</small></span><span aria-hidden="true">›</span></a>
-      <a class="panel-a set-link" href="#settings-look"><span class="set-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7H16a5 5 0 0 0 5-5c0-4-4-7.2-9-7.2z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15.5" cy="7.5" r="1.2"/></svg></span><span><b>Website settings</b><small>How the cookbook looks to you: light or dark screen, design, text size, home page. Also the app download.</small></span><span aria-hidden="true">›</span></a>
-    </div></section>`;
-}
+const LOOK_SET = () => appBuild ? "App settings" : "Website settings";
 function settingsPage(){
   const seg = (name, opts, cur) => `<div class="seg" role="radiogroup" aria-label="${name}">${opts.map(([k,l])=>`<button type="button" role="radio" data-${name}="${k}" aria-checked="${cur===k}">${l}</button>`).join("")}</div>`;
   app.innerHTML = `<section class="wrap admin settings">
-    <a class="back" href="#settings" style="margin-top:20px;display:inline-block">← Settings</a>
-    <div class="section-head" style="margin-top:8px"><h2>Website settings</h2><p>For this ${appBuild?"phone":"device"}</p></div>
+    <div class="section-head" style="margin-top:28px"><h2>${LOOK_SET()}</h2><p>For this ${appBuild?"phone":"device"}</p></div>
     <div class="panel-a"><h3>Screen</h3>
       ${seg("theme", [["light","Light"],["dark","Dark"],["auto","Automatic"]], myTheme())}
       <p class="hint" style="margin-top:8px">Automatic follows your ${appBuild?"phone":"device"}'s setting. Also used for the step-by-step cooking guide.</p></div>
@@ -4907,8 +4900,7 @@ async function profilePage(mode){
   const changed=RECIPES.filter(r=>mine(r).some(h=>h.a==="changed"));
   const stat=(n,label,href)=>`<a class="pstat" href="${href}"><b>${n}</b><span>${label}</span></a>`;
   app.innerHTML = `<section class="wrap admin${acc?" prof-page":""}">
-    ${A(`<a class="back" href="#settings" style="margin-top:20px;display:inline-block">← Settings</a>
-    <div class="section-head" style="margin-top:8px"><h2>Account settings</h2><p>${esc(name)} · ${ROLE_LABEL[myRole()]}</p></div>`)}
+    ${A(`<div class="section-head" style="margin-top:28px"><h2>Account settings</h2><p>${esc(name)} · ${ROLE_LABEL[myRole()]}</p></div>`)}
     ${P(`<div class="panel-a prof-head" style="margin-top:28px">
       <span class="avatar xl">${esc(initial(name))}</span>
       <div><h2>${esc(name)}</h2>
@@ -4924,7 +4916,7 @@ async function profilePage(mode){
     <div class="panel-a" id="prof-list" hidden></div>
     <div class="set-links">
       <a class="panel-a set-link" href="#account"><span><b>Account settings</b><small>Name, email, password, recovery code</small></span><span aria-hidden="true">›</span></a>
-      <a class="panel-a set-link" href="#settings-look"><span><b>Website settings</b><small>Light or dark screen, design, text size, home page</small></span><span aria-hidden="true">›</span></a>
+      <a class="panel-a set-link" href="#settings-look"><span><b>${LOOK_SET()}</b><small>Light or dark screen, design, text size, home page${appBuild?"":", app download"}</small></span><span aria-hidden="true">›</span></a>
     </div>`)}
     ${!acc||offline?"":`<div class="panel-a"><h3>Change name</h3>
       <form id="nameform" class="pw-form" novalidate>
@@ -5281,7 +5273,7 @@ function routePage(){
     q.value=""; toast("That isn't available in your portal."); history.replaceState(null,"",location.pathname+location.search); home(); return; }
   if(!offline && h.startsWith("edit-")){ const er=RECIPES.find(x=>x.id===h.slice(5)); if(er){ q.value=""; editor(er); window.scrollTo(0,0); return; } }
   if(h==="profile"){ q.value=""; profilePage(); window.scrollTo(0,0); return; }
-  if(h==="settings"){ q.value=""; settingsHub(); window.scrollTo(0,0); return; }
+  if(h==="settings"){ q.value=""; settingsPage(); window.scrollTo(0,0); return; }
   if(h==="settings-look"){ q.value=""; settingsPage(); window.scrollTo(0,0); return; }
   if(h==="account"){ q.value=""; profilePage("account"); window.scrollTo(0,0); return; }
   if(h==="inbox" && may("inbox")){ q.value=""; inboxPage(); window.scrollTo(0,0); return; }
