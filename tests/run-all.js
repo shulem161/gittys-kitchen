@@ -729,6 +729,16 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await PU.locator('[data-gxrm="1"]').click(); await PU.waitForTimeout(300);
     ok('…and taken off again', !/paper towels/.test((await PU.locator('.glist').allInnerTexts()).join(' ')));
 
+    // Make a recipe better with AI
+    await A.goto(F + '#new'); await A.waitForTimeout(400); await A.fill('#ed-t', 'Quick Cake');
+    await A.locator('.sec-items').nth(0).fill('flour 2 cups'); await A.locator('.sec-items').nth(1).fill('mix and bake');
+    ok('the recipe editor offers “Make it better with AI”', (await A.locator('#ed-ai').count()) === 1);
+    await A.click('#ed-ai'); await A.waitForTimeout(800);
+    const aiSecs = await A.locator('.sec-items').evaluateAll(els => els.map(e => e.value));
+    ok('…which rewrites the ingredients and steps', aiSecs[0] === '2 cups flour' && aiSecs[1] === 'Bake at 350°F' && (await A.locator('.sec-k').nth(1).inputValue()) === 'step' && (await A.locator('#ed-t').inputValue()) === 'Quick Cake', aiSecs);
+    await A.click('#ed-ai-undo'); await A.waitForTimeout(300);
+    ok('…and can be undone', (await A.locator('.sec-items').evaluateAll(els => els.map(e => e.value))).join('|') === 'flour 2 cups|mix and bake');
+
     // Member numbers
     ok('every approved member has their own member number', await A.evaluate(() => { const n = members.filter(m => m.status === 'approved').map(m => m.no); return n.every(x => x > 1000) && new Set(n).size === n.length; }));
     await PU.goto(F + '#account'); await PU.waitForTimeout(500);

@@ -588,6 +588,8 @@ body.guiding{overflow:hidden}
 .va-person{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);text-align:left;font:inherit;cursor:pointer}
 .va-person b{display:block}.va-person small{display:block;color:var(--muted);font-size:13px;overflow-wrap:anywhere}.va-person > span:nth-child(2){flex:1;min-width:0}
 .va-go{flex:none;padding:8px 14px;border-radius:999px;background:var(--accent);color:var(--paper);font-weight:700;font-size:14px}
+.ai-box{display:grid;gap:10px;margin:14px 0 6px;padding:14px;border-radius:14px;border:1px dashed var(--accent);background:var(--accent-soft)}
+.ai-box b{display:block;font-size:16px}.ai-box span{display:block;font-size:14px;color:var(--muted);margin-top:2px}.ai-box .hint:empty{display:none}
 .set-links{display:grid;gap:12px}.set-links .panel-a{margin:0}
 .set-ic{flex:none;width:44px;height:44px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}.set-ic svg{width:24px;height:24px}
 .set-link > span:nth-child(2){flex:1}
@@ -1157,7 +1159,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.90";
+const WEB_VERSION = "3.91";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -3260,8 +3262,26 @@ function adminBanner(){
 }
 
 /* ---------- recipe editor (admin) ---------- */
+let edAiUndo = null;
+// "Make it better with AI": tidy ingredients and write clear, complete steps from what the cook wrote
+function improvePrompt(title, serves, secs){
+  const written = secs.filter(s=>s.items.trim()).map(s=>`${s.ing?"INGREDIENTS":"STEPS"}${s.h?" ("+s.h+")":""}:\n${s.items.trim()}`).join("\n\n");
+  return `You help a family write recipes for their kosher cookbook, "Gitty's Kitchen".
+Recipe name: "${String(title||"(no name yet)").replace(/"/g,"'")}"${serves?`\nServes: ${serves}`:""}
+What the cook wrote (in their own words; it may be short, messy or incomplete):
+${written}
+
+Rewrite it as a clear, complete recipe that anyone can follow:
+- Ingredients: one per line, amount first ("2 cups flour", "3 large eggs", "1 tsp salt"). Keep every ingredient and amount the cook gave. Only fill in an amount when it's obviously missing, and then use a sensible amount. Don't add new ingredients except basics clearly needed by the steps (like oil for greasing), and never mix meat and dairy.
+- Steps: one action per line, in order, starting with a verb. Say exactly what to do with each ingredient, the pan or pot and its size when it matters, the oven temperature in °F, the heat on the stove, how long, and how to tell when it's done. Short, plain sentences. No numbering.
+- Keep parts the cook used (like Dough, Filling, Topping) as separate parts with headings. Put "Preheat the oven" first when it bakes.
+- If the cook gave a time or number of servings, keep them; if not, estimate.
+- Write only English. Fractions like ½ ¼ ¾ ⅓.
+Answer with JSON only:
+{"parts":[{"kind":"ingredients"|"steps","heading":"", "items":["..."]}], "serves":"e.g. 8 or Makes 2 dozen", "time":"e.g. 1 hr 15 min", "note":"one short tip, or empty"}`;
+}
 function editor(r, cat, sub, draft){
-  const isNew = !r;
+  const isNew = !r; edAiUndo = null;
   const suggest = !(sub ? may("review") : may("edit"));
   const editOf = r ? r.id : (sub && sub.editOf ? sub.editOf : "");
   const target = editOf ? RECIPES.find(x=>x.id===editOf) : null;
@@ -3317,6 +3337,8 @@ function editor(r, cat, sub, draft){
             <textarea class="sec-items" rows="${Math.max(4,Math.min(14,s.items.split("\n").length+1))}" placeholder="${s.ing?"2 cups flour\n3 eggs":"Mix the flour and eggs\nBake at 350°F for 30 minutes"}">${esc(s.items)}</textarea>
           </div>`).join("")}</div>
         <div class="tools"><button type="button" class="btn" data-add="ing">+ Ingredients</button><button type="button" class="btn" data-add="step">+ Method</button></div>
+        ${offline||!can("ai")?"":`<div class="ai-box"><div><b>✨ Make it better with AI</b><span>Write the basics in your own words. AI tidies the ingredients and turns your steps into clear, complete instructions: what to do, in what order, the oven heat, the pan and how long. You can undo it.</span></div>
+          <div class="row"><button type="button" class="btn solid" id="ed-ai">Make it better</button>${edAiUndo?`<button type="button" class="btn" id="ed-ai-undo">Undo</button>`:""}</div><p class="hint" id="ed-ai-msg" role="status"></p></div>`}
         <p class="err" id="ed-err" role="alert" hidden></p>
         <div class="ed-actions">
           <button class="primary" type="submit">${sub?"Approve and publish":suggest?"Send for approval":isNew?"Add recipe":"Save changes"}</button>
@@ -3327,7 +3349,7 @@ function editor(r, cat, sub, draft){
     const F=document.getElementById("edform");
     const sel=F.querySelector("#ed-c"), cn=F.querySelector("#ed-cn");
     sel.onchange=()=>{ cn.hidden = sel.value!=="__new"; if(!cn.hidden) cn.focus(); };
-    const sync=()=>{ F.querySelectorAll(".sec").forEach((el,i)=>{ secs[i].ing = el.querySelector(".sec-k").value==="ing"; secs[i].h=el.querySelector(".sec-h").value; secs[i].items=el.querySelector(".sec-items").value; }); };
+    const sync=()=>{ if(secs.__skip){ delete secs.__skip; return; } F.querySelectorAll(".sec").forEach((el,i)=>{ secs[i].ing = el.querySelector(".sec-k").value==="ing"; secs[i].h=el.querySelector(".sec-h").value; secs[i].items=el.querySelector(".sec-items").value; }); };
     const keep=()=>({t:F.querySelector("#ed-t").value, c:sel.value, cn:cn.value, by:F.querySelector("#ed-by").value, n:F.querySelector("#ed-n").value, k:F.querySelector("#ed-k").value, sv:F.querySelector("#ed-serves").value, tm:F.querySelector("#ed-time").value, sc:F.querySelector("#ed-sec").value, pb:F.querySelector("#ed-pub")?F.querySelector("#ed-pub").checked:null});
     // linked recipes picker
     const pq=F.querySelector("#ed-pre-q"), ps=F.querySelector("#ed-pre-sugg");
@@ -3347,6 +3369,29 @@ function editor(r, cat, sub, draft){
     F.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>{ sync(); const i=+b.closest(".sec").dataset.i, j=i+(+b.dataset.mv); [secs[i],secs[j]]=[secs[j],secs[i]]; secs.__skip=1; redraw(); });
     F.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ sync(); secs.splice(+b.closest(".sec").dataset.i,1); redraw(); });
     F.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{ sync(); secs.push({ing:b.dataset.add==="ing",h:"",items:""}); redraw(); });
+    const aib=F.querySelector("#ed-ai");
+    if(aib) aib.onclick=async()=>{
+      sync(); const msg=F.querySelector("#ed-ai-msg"), title=F.querySelector("#ed-t").value.trim();
+      if(!secs.some(s=>s.items.trim())){ msg.textContent="Write at least the ingredients or a few words about how to make it first."; return; }
+      aib.disabled=true; msg.textContent="Working on it… this takes about half a minute.";
+      try{
+        const res=await askReader([improvePrompt(title, F.querySelector("#ed-serves").value.trim(), secs)]);
+        const j=JSON.parse(res.response.text().trim().replace(/^```(?:json)?\s*/,"").replace(/```$/,""));
+        const parts=(j.parts||[]).filter(x=>x && Array.isArray(x.items) && x.items.length).map(x=>({ing:!/^(steps|method)$/i.test(x.kind||x.type||""), h:String(x.heading||"").slice(0,40), items:x.items.map(s=>String(s).trim()).filter(Boolean).join("\n")}));
+        if(!parts.length) throw new Error("empty");
+        edAiUndo = secs.map(s=>Object.assign({},s));
+        secs.splice(0, secs.length, ...parts); secs.__skip=1;
+        redraw();
+        const G=document.getElementById("edform");
+        if(j.serves && !G.querySelector("#ed-serves").value.trim()) G.querySelector("#ed-serves").value=String(j.serves).slice(0,40);
+        if(j.time && !G.querySelector("#ed-time").value.trim()) G.querySelector("#ed-time").value=String(j.time).slice(0,40);
+        if(j.note && !G.querySelector("#ed-n").value.trim()) G.querySelector("#ed-n").value=String(j.note).slice(0,300);
+        G.querySelector("#ed-ai-msg").textContent="Done. Read it over, change anything you like, then save. Not right? Tap Undo.";
+        G.querySelector(".ai-box").scrollIntoView({block:"center"});
+      }catch(e){ aib.disabled=false; msg.textContent="The AI couldn't do it right now. Try again in a minute."; }
+    };
+    const aiu=F.querySelector("#ed-ai-undo");
+    if(aiu) aiu.onclick=()=>{ if(!edAiUndo) return; secs.splice(0, secs.length, ...edAiUndo); edAiUndo=null; secs.__skip=1; redraw(); toast("Back to what you wrote"); };
     F.querySelectorAll(".sec-k").forEach(s=>s.onchange=()=>sync());
     const del=F.querySelector("#ed-del");
     if(del) del.onclick=()=>{

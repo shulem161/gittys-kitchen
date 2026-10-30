@@ -1,6 +1,6 @@
 {
-  "web": "3.90",
+  "web": "3.91",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Request a recipe on the home page for customers; add any item to the grocery list; Kitchen tools in the menu."
+  "notes": "Make it better with AI: write the basics, AI writes clear instructions."
 }
