@@ -212,12 +212,19 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('“Add email” opens the email box in My profile', /#profile/.test(await W.evaluate(() => location.hash)) && await W.evaluate(() => document.activeElement && document.activeElement.id === 'em-new'));
     await W.goto(F); await W.waitForTimeout(400); await W.click('#en-no'); await W.waitForTimeout(200); await W.reload(); await W.waitForTimeout(600);
     ok('“Not now” hides the invitation', (await W.locator('#enudge').count()) === 0);
-    await W.goto(F + '#profile'); await W.waitForTimeout(500);
-    await W.click('[data-theme-pick=dark]'); await W.waitForTimeout(200);
+    await W.goto(F + '#settings'); await W.waitForTimeout(500);
+    await W.click('#app [data-theme=dark]'); await W.waitForTimeout(200);
     const darkBg = await W.evaluate(() => [document.documentElement.dataset.theme, getComputedStyle(document.body).backgroundColor]);
-    await W.click('[data-theme-pick=light]'); await W.waitForTimeout(200);
-    ok('My profile can switch to a dark or light screen', darkBg[0] === 'dark' && darkBg[1] !== await W.evaluate(() => getComputedStyle(document.body).backgroundColor) && await W.evaluate(() => document.documentElement.dataset.theme === 'light'), darkBg);
-    await W.click('[data-theme-pick=auto]'); await W.waitForTimeout(200);
+    await W.click('#app [data-theme=light]'); await W.waitForTimeout(200);
+    ok('Settings can switch to a dark or light screen', darkBg[0] === 'dark' && darkBg[1] !== await W.evaluate(() => getComputedStyle(document.body).backgroundColor) && await W.evaluate(() => document.documentElement.dataset.theme === 'light'), darkBg);
+    await W.click('#app [data-theme=auto]'); await W.waitForTimeout(200);
+    await W.click('#app [data-tsize="1.25"]'); await W.waitForTimeout(200);
+    ok('Settings can make the text bigger', await W.evaluate(() => getComputedStyle(app).zoom === '1.25'));
+    await W.setViewportSize({width: 390, height: 844}); await W.goto(F + '#r-croissants'); await W.waitForTimeout(400);
+    ok('…without sideways scrolling on a phone', await W.evaluate(() => document.documentElement.scrollWidth) <= 392);
+    await W.goto(F + '#settings'); await W.waitForTimeout(300); await W.click('#app [data-tsize="1"]'); await W.waitForTimeout(200); await W.setViewportSize({width: 1100, height: 900});
+    ok('the account menu has Settings', await W.evaluate(() => !!document.querySelector('#acct a[href="#settings"]') || /href="#settings"/.test(document.body.innerHTML)));
+    await W.goto(F + '#profile'); await W.waitForTimeout(500);
     ok('a profile without an email can add one', /Add your email/.test(await W.locator('.admin').innerText()));
     await W.fill('#em-new', 'tm.two@example.com'); await W.fill('#em-pw', 'member3'); await W.click('#emform .primary'); await W.waitForTimeout(500);
     ok('…by tapping a link sent to it', /We sent a link/.test(await W.locator('#em-ok').innerText()) && await W.evaluate(() => __fakeMails().some(m => m.to === 'tm.two@example.com' && m.kind === 'change')));
@@ -292,7 +299,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // Today's to-do list: on the home page only when there's something to do soon (each person's choice)
     await A.goto(F); await A.waitForTimeout(300);
     ok('no to-do box on the home page when nothing is coming up', (await A.locator('#today').count()) === 0);
-    await A.goto(F + '#profile'); await A.waitForTimeout(300); await A.selectOption('#pref-todo', '-1'); await A.waitForTimeout(300);
+    await A.goto(F + '#settings'); await A.waitForTimeout(300); await A.selectOption('#pref-todo', '-1'); await A.waitForTimeout(300);
     ok('the choice is saved to the profile', await A.evaluate(() => profile.prefs && profile.prefs.todoDays === -1));
     await A.goto(F); await A.waitForTimeout(300);
     await A.fill('#td-new', 'Take out the chicken'); await A.click('#td-form .solid'); await A.waitForTimeout(200);
@@ -307,7 +314,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.evaluate(() => { const v = store(uk('today')); v.day = '2000-01-01'; store(uk('today'), v); }); await A.goto(F + '#categories'); await A.goto(F); await A.waitForTimeout(300);
     const td2 = await A.locator('#today').innerText();
     ok('next day: finished tasks go, unfinished stay', !/Take out the chicken/.test(td2) && /Make Challah/.test(td2) && /from before/.test(td2), td2);
-    await A.goto(F + '#profile'); await A.waitForTimeout(300); await A.selectOption('#pref-todo', '3'); await A.waitForTimeout(300);
+    await A.goto(F + '#settings'); await A.waitForTimeout(300); await A.selectOption('#pref-todo', '3'); await A.waitForTimeout(300);
     await A.goto(F); await A.waitForTimeout(300);
     ok('with "next 3 days" it shows while there is a to-do today', (await A.locator('#today').count()) === 1);
     await A.evaluate(() => { const v = tdStore(); v.items = []; tdSave(v); }); await A.goto(F + '#categories'); await A.goto(F); await A.waitForTimeout(300);
@@ -353,8 +360,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     const bc = await A.locator('.rc .nochip').allInnerTexts();
     ok('category lists recipes by code', bc.length >= 2 && bc.every((c, i) => !i || bc[i - 1].localeCompare(c, undefined, {numeric: true}) < 0) && (await A.locator('.rc').first().locator('.nochip').count()) === 1, bc);
     ok('New recipes is first in the category bar', /^New recipes/.test(await A.locator('.tabs .tab').first().innerText()));
-    await A.goto(F + '#profile'); await A.waitForTimeout(400);
-    ok('profile has five designs to choose from', (await A.locator('#lookpanel .look').count()) === 5);
+    await A.goto(F + '#settings'); await A.waitForTimeout(400);
+    ok('Settings has five designs to choose from', (await A.locator('#lookpanel .look').count()) === 5);
     await A.click('#lookpanel [data-look="garden"]'); await A.waitForTimeout(200);
     ok('choosing a design changes the look', await A.evaluate(() => document.documentElement.dataset.look) === 'garden');
     await A.click('#lookpanel [data-look="classic"]'); await A.waitForTimeout(200);
