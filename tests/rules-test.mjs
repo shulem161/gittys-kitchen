@@ -4,6 +4,7 @@ import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebas
 import { doc, setDoc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { readFileSync } from 'fs';
 
+process.on('unhandledRejection', e => { console.log('::warning::CRASH ' + String(e && e.message || e).split('\n').slice(0, 3).join(' | ').slice(0, 400)); process.exit(1); });
 const env = await initializeTestEnvironment({
   projectId: 'demo-gk',
   firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8080 },
