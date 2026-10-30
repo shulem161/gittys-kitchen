@@ -4,6 +4,7 @@ import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebas
 import { doc, setDoc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { readFileSync } from 'fs';
 
+process.on('unhandledRejection', e => { console.log('::warning::CRASH ' + String(e && e.message || e).split('\n').slice(0, 3).join(' | ').slice(0, 400)); process.exit(1); });
 const env = await initializeTestEnvironment({
   projectId: 'demo-gk',
   firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8080 },
@@ -256,6 +257,20 @@ await check("…or read someone's rating", assertFails(getDoc(doc(EMP, 'ratings'
 await setDoc(doc(EMP, 'threads', 'pf1'), { by: 'emp', lastBy: 'emp', members: ['emp', 'adm'], names: {}, to: 'admins', rid: 'r-pub', rtitle: 'X', subject: '', msgs: [{ by: 'emp', name: 'X', text: 'Please proofread', at: 1 }], updated: 1, readAt: {}, done: false, created: 1, kind: 'proof', checks: {} });
 await check('the admin can mark it', assertSucceeds(updateDoc(doc(ADM, 'threads', 'pf1'), { checks: { adm: { ok: true, at: 2 } }, lastBy: 'adm', updated: 2 })));
 await check("…but not mark it for someone else", assertFails(updateDoc(doc(ADM, 'threads', 'pf1'), { checks: { adm: { ok: true, at: 2 }, emp: { ok: true, at: 2 } }, lastBy: 'adm' })));
+// Recipe inboxes: three different people
+await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
+  await setDoc(doc(d, 'recipes', 'r-ib'), { c: 'Cakes', t: 'Inbox cake', pub: true, rv: 'proof', s: [] });
+  await setDoc(doc(d, 'users', 'pr1'), { name: 'Pr One', status: 'approved', role: 'employee', perms: { proofread: true, review: true, release: true }, created: 1, favs: [] });
+  await setDoc(doc(d, 'users', 'pr2'), { name: 'Pr Two', status: 'approved', role: 'employee', perms: { review: true, release: true }, created: 1, favs: [] }); });
+const PR1 = as('pr1'), PR2 = as('pr2');
+await check("an employee without the permission can't move a recipe on", assertFails(updateDoc(doc(EMP, 'recipes', 'r-ib'), { rv: 'approve', rvUids: ['emp'] })));
+await check('…but can ask for it', assertSucceeds(updateDoc(doc(EMP, 'recipes', 'r-ib'), { rvAsk: [{ uid: 'emp', name: 'Emp', at: 1 }] })));
+await check('a proofreader moves it to For approval', assertSucceeds(updateDoc(doc(PR1, 'recipes', 'r-ib'), { rv: 'approve', rvUids: ['pr1', 'emp'], rvAsk: [], rvLog: [] })));
+await check("…and can't approve it too", assertFails(updateDoc(doc(PR1, 'recipes', 'r-ib'), { rv: 'release' })));
+await check("…nor can the person who asked", assertFails(updateDoc(doc(EMP, 'recipes', 'r-ib'), { rv: 'release' })));
+await check('someone else approves it', assertSucceeds(updateDoc(doc(PR2, 'recipes', 'r-ib'), { rv: 'release', rvUids: ['pr1', 'emp', 'pr2'] })));
+await check("…and can't release it too", assertFails(updateDoc(doc(PR2, 'recipes', 'r-ib'), { rv: '', pub: true })));
+await check('a third person releases it', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-ib'), { rv: '', pub: false })));
 // Team messages: employees and admins only, and only the people in the conversation
 const th = (by, members) => ({ by, lastBy: by, members, names: {}, to: 'admins', rid: 'r-pub', rtitle: 'X', subject: '', msgs: [{ by, name: 'X', text: 'Can you look at this?', at: 1 }], updated: 1, readAt: {}, done: false, created: 1 });
 await check('an employee can write to the admins about a recipe', assertSucceeds(setDoc(doc(EMP, 'threads', 't1'), th('emp', ['emp', 'adm']))));
