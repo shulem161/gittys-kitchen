@@ -60,6 +60,12 @@ service cloud.firestore {
                 ? request.resource.data.get('pub', true) == (!exists(p) || get(p).data.get('cats', {}).get(request.resource.data.c, true) != false)
                 : request.resource.data.get('pub', null) == resource.data.get('pub', null)));
     }
+    // Recipe inboxes: three different people. Whoever proofread can't approve; neither of them can release.
+    function rvSteps() {
+      let was = resource.data.get('rv', ''), now = request.resource.data.get('rv', '');
+      return !(((was == 'approve' && now == 'release') || (was == 'release' && now == ''))
+               && request.auth.uid in resource.data.get('rvUids', []));
+    }
     // Admins may manage employees and public members, but never the owner or another admin.
     function canManage(uid) {
       return isOwner()
@@ -200,7 +206,17 @@ service cloud.firestore {
       allow read: if isAdmin()
         || (approvedMember() && (myRole() != 'public' || resource.data.get('pub', false) == true));
       // Only admins move recipes to another category; employees ask (golive, kind "move").
-      allow write: if publishOk();
+      allow write: if publishOk()
+        // Recipe inboxes: proofreaders, approvers and releasers move a recipe along (rv); releasers choose public or team only
+        || (resource != null && (extra('proofread') || extra('review') || extra('release'))
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog'])
+            && rvSteps())
+        || (resource != null && extra('release')
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub'])
+            && rvSteps())
+        // anyone on the team can ask for a recipe to be moved up
+        || (resource != null && approvedMember() && myRole() != 'public'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rvAsk']));
     }
 
     // Employees asking for a recipe to be shown to public members. Admins decide.
@@ -209,18 +225,30 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.status == 'open'
         && request.resource.data.keys().hasOnly(['uid', 'byName', 'rid', 'title', 'status', 'created', 'kind', 'to', 'sec', 'from']);
-      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
-      allow update: if isAdmin();
+      allow read: if isAdmin() || extra('release') || extra('review') || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update: if isAdmin() || extra('release') || extra('review');
       allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+    }
+
+    // Who hears about each recipe inbox (admins, and employees allowed to work in it).
+    match /meta/{w} {
+      allow get: if approvedMember() && w in ['watch-proof', 'watch-approve', 'watch-release'];
+      allow write: if isAdmin() && w in ['watch-proof', 'watch-approve', 'watch-release']
+        && request.resource.data.keys().hasOnly(['uids']) && request.resource.data.uids is list;
     }
 
     // Recipes sent in by members. Only the admin sees all of them and decides.
     match /submissions/{id} {
-      allow create: if can('suggest')
+      allow create: if (can('suggest') || extra('edit') || isAdmin())
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.status == 'pending';
-      allow read: if extra('review') || (signedIn() && resource.data.uid == request.auth.uid);
-      allow update: if extra('review');
+      allow read: if extra('review') || extra('proofread') || extra('release') || (signedIn() && resource.data.uid == request.auth.uid);
+      // three different people: whoever proofread can't approve; neither of them can release
+      allow update: if (extra('review') || extra('proofread') || extra('release'))
+        && (request.resource.data.get('stage', '') != 'release' || resource.data.get('stage', '') == 'release'
+            || !(request.auth.uid in resource.data.get('uids', [])))
+        && (request.resource.data.status != 'approved' || resource.data.status == 'approved'
+            || !(request.auth.uid in resource.data.get('uids', [])));
       allow delete: if extra('review')
         || (signedIn() && resource.data.uid == request.auth.uid && resource.data.status == 'pending');
     }
