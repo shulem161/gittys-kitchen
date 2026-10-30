@@ -125,6 +125,10 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.keys().hasOnly(['uid', 'email']);
       allow delete: if (isAdmin() && canManage(resource.data.uid)) || (signedIn() && resource.data.uid == request.auth.uid);
+      // Someone who now signs in with their own email clears the made-up address on their name.
+      allow update: if signedIn() && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'email']) && request.resource.data.email == '';
       // Forgot password: a valid reset or recovery code moves the name to a new sign-in.
       allow update: if signedIn()
         && request.resource.data.uid == request.auth.uid
@@ -280,11 +284,13 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if signedIn() && request.auth.uid == uid
         && get(/databases/$(database)/documents/names/$(request.resource.data.name.lower())).data.uid == request.auth.uid
-        && ((request.resource.data.keys().hasOnly(['name', 'status', 'created', 'favs'])
-             && (request.resource.data.status == 'pending'
+        && ((request.resource.data.keys().hasOnly(['name', 'status', 'created', 'favs', 'email'])
+             // new sign-ups give their own email and must confirm it before their request reaches the admin
+             && ((request.resource.data.status == 'unverified' && request.resource.data.get('email', '') == request.auth.token.email)
+                 || (request.resource.data.status == 'pending' && request.auth.token.email_verified == true)
                  || (request.resource.data.status == 'approved' && isOwner())))
           // after a reset: copy of the old profile, same name and same approval
-          || (request.resource.data.keys().hasOnly(['name', 'status', 'created', 'favs', 'was', 'from', 'role'])
+          || (request.resource.data.keys().hasOnly(['name', 'status', 'created', 'favs', 'was', 'from', 'role', 'email'])
              && request.resource.data.from is string
              && request.resource.data.get('role', 'public') == get(/databases/$(database)/documents/users/$(request.resource.data.from)).data.get('role', 'public')
              && get(/databases/$(database)/documents/users/$(request.resource.data.from)).data.name == request.resource.data.name
@@ -294,6 +300,17 @@ service cloud.firestore {
         || (isAdmin() && canManage(uid) && request.resource.data.get('role', 'public') in ['public', 'employee'])
         // admins tidy up after a member's password reset (moved), on any profile but the owner's
         || (isAdmin() && uid != ownerUid() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['moved']))
+        // the email link was tapped: the join request goes to the admin
+        || (signedIn() && request.auth.uid == uid
+            && resource.data.status == 'unverified' && request.resource.data.status == 'pending'
+            && request.auth.token.email_verified == true
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
+        // a member's own confirmed email
+        || (signedIn() && request.auth.uid == uid
+            && resource.data.status == 'approved'
+            && request.auth.token.email_verified == true
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email'])
+            && request.resource.data.email == request.auth.token.email)
         || (signedIn() && request.auth.uid == uid
             && resource.data.status == 'approved'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favs', 'rc', 'rcAt', 'prefs'])

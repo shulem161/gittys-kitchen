@@ -198,6 +198,23 @@ await check("…or list all menus", assertFails(fs.getDocs(fs.collection(as('rev
 await check('the owner can change it', assertSucceeds(updateDoc(doc(EMP, 'menus', 'm1'), { name: 'Shabbos night' })));
 await check("the owner can't hand it to someone else", assertFails(updateDoc(doc(EMP, 'menus', 'm1'), { uid: 'pub' })));
 await check('the owner can delete it', assertSucceeds(deleteDoc(doc(EMP, 'menus', 'm1'))));
+// Signing up with an email that must be confirmed
+const S1 = env.authenticatedContext('s1', { email: 's1@x.com', email_verified: false }).firestore();
+const S1ok = env.authenticatedContext('s1', { email: 's1@x.com', email_verified: true }).firestore();
+const S2 = env.authenticatedContext('s2', { email: 's2@x.com', email_verified: false }).firestore();
+await check('a new sign-up claims a name without storing the email there', assertSucceeds(setDoc(doc(S1, 'names', 'sara one'), { uid: 's1', email: '' })));
+await check('…and saves a profile waiting for email confirmation', assertSucceeds(setDoc(doc(S1, 'users', 's1'), { name: 'Sara One', status: 'unverified', created: 1, favs: [], email: 's1@x.com' })));
+await check("…with someone else's email: refused", assertFails(setDoc(doc(S1, 'users', 's1'), { name: 'Sara One', status: 'unverified', created: 1, favs: [], email: 'boss@x.com' })));
+await setDoc(doc(S2, 'names', 'sara two'), { uid: 's2', email: '' }).catch(() => {});
+await check("an unconfirmed email can't go straight to waiting for approval", assertFails(setDoc(doc(S2, 'users', 's2'), { name: 'Sara Two', status: 'pending', created: 1, favs: [], email: 's2@x.com' })));
+await check("…or move there before the link is tapped", assertFails(updateDoc(doc(S1, 'users', 's1'), { status: 'pending' })));
+await check('after the link is tapped it asks to join', assertSucceeds(updateDoc(doc(S1ok, 'users', 's1'), { status: 'pending' })));
+await check("…but can't approve itself", assertFails(updateDoc(doc(S1ok, 'users', 's1'), { status: 'approved' })));
+await check("others can't clear someone's sign-in on their name", assertFails(setDoc(doc(S2, 'names', 'gitty schlesinger'), { uid: 's2', email: '' })));
+const GM = env.authenticatedContext('gitty', { email: 'gitty@x.com', email_verified: true }).firestore();
+await check('a member who confirmed a new email saves it', assertSucceeds(updateDoc(doc(GM, 'users', 'gitty'), { email: 'gitty@x.com' })));
+await check("…but not an email they didn't confirm", assertFails(updateDoc(doc(GM, 'users', 'gitty'), { email: 'other@x.com' })));
+await check('…and switches their name to email sign-in', assertSucceeds(setDoc(doc(GM, 'names', 'gitty schlesinger'), { uid: 'gitty', email: '' })));
 // Team messages: employees and admins only, and only the people in the conversation
 const th = (by, members) => ({ by, lastBy: by, members, names: {}, to: 'admins', rid: 'r-pub', rtitle: 'X', subject: '', msgs: [{ by, name: 'X', text: 'Can you look at this?', at: 1 }], updated: 1, readAt: {}, done: false, created: 1 });
 await check('an employee can write to the admins about a recipe', assertSucceeds(setDoc(doc(EMP, 'threads', 't1'), th('emp', ['emp', 'adm']))));
