@@ -211,11 +211,10 @@ service cloud.firestore {
       allow read: if isAdmin()
         || (approvedMember() && (myRole() != 'public' || resource.data.get('pub', false) == true));
       // Only admins move recipes to another category; employees ask (golive, kind "move").
-      // anyone on the team can ask for a recipe to be moved up
-      allow update: if isTeam() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rvAsk']);
-      // anyone on the team can put a recipe into Need to proofread, so it can go public after the three steps
-      allow update: if isTeam() && resource.data.get('rv', '') == '' && request.resource.data.rv == 'proof'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog']);
+      // anyone on the team can ask for a recipe to be moved up, or put a hidden one into Need to proofread
+      allow update: if isTeam() && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rvAsk'])
+        || (resource.data.get('rv', '') == '' && request.resource.data.get('rv', '') == 'proof'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog'])));
       allow write: if (publishOk() && noRvChange())
         // Recipe inboxes: proofreaders, approvers and releasers move a recipe along (rv); releasers choose public or team only
         || (resource != null && (extra('proofread') || extra('review') || extra('release'))
