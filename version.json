@@ -1,6 +1,6 @@
 {
-  "web": "3.82",
+  "web": "3.83",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Settings now has the website link and a download for the Android app."
+  "notes": "Settings is now split in two: Account settings and Website settings."
 }

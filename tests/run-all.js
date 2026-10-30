@@ -156,6 +156,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('menu opens my profile', /Test Member/.test(await B.locator('.prof-head').innerText()));
     const pst = (await B.locator('.pstat').allInnerTexts()).join(' | ');
     ok('profile shows my activity', /1\s+favorite\b/.test(pst) && /photos? shared/.test(pst) && !/…/.test(pst), pst);
+    ok('profile links to Account settings and Website settings', (await B.locator('.set-links a[href="#account"]').count()) === 1 && (await B.locator('.set-links a[href="#settings-look"]').count()) === 1);
+    await B.goto(F + '#settings'); await B.waitForTimeout(400);
+    ok('Settings has two sections: Account and Website', /Account settings/.test(await B.locator('.settings').innerText()) && /Website settings/.test(await B.locator('.settings').innerText()));
+    await B.click('a[href="#account"]'); await B.waitForTimeout(500);
+    ok('Account settings has name, email, password and recovery code', (await B.locator('#nameform').count()) === 1 && (await B.locator('#emform').count()) === 1 && (await B.locator('#pwform').count()) === 1 && (await B.locator('#rcpanel').count()) === 1 && (await B.locator('.pstat').count()) === 0);
     await B.fill('#pw-old', 'nope99'); await B.fill('#pw-new', 'member2'); await B.fill('#pw-new2', 'member2'); await B.click('#pwform .primary'); await B.waitForTimeout(400);
     ok('profile refuses wrong current password', /isn't right/.test(await B.locator('#pw-err').innerText()));
     await B.fill('#pw-old', 'member1'); await B.click('#pwform .primary'); await B.waitForTimeout(500);
@@ -164,11 +169,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('new password works', (await P.locator('.eyebrow').innerText().catch(() => '')).includes('TEST MEMBER'));
 
     // Change name
-    await B.goto(F + '#profile'); await B.waitForTimeout(500);
+    await B.goto(F + '#account'); await B.waitForTimeout(500);
     await B.fill('#nm-new', 'shulem  schlesinger'); await B.click('#nameform .primary'); await B.waitForTimeout(500);
     ok("member can't take the admin's name", /already taken/.test(await B.locator('#nm-err').innerText()));
     await B.fill('#nm-new', 'Test Member Two'); await B.click('#nameform .primary'); await B.waitForTimeout(700);
-    ok('member can change name', (await B.locator('.prof-head h2').innerText()) === 'Test Member Two');
+    ok('member can change name', await B.evaluate(() => myName()) === 'Test Member Two' && /Test Member Two/.test(await B.locator('.section-head p').innerText()));
     ok('admin is told about the new name', notes.some(n => /Test Member is now Test Member Two/.test(n)), notes.slice(-2));
     const R = await page(); await R.fill('#nm', 'Test Member'); await R.fill('#pw', 'member2'); await R.click('.primary'); await R.waitForTimeout(400);
     ok('old name no longer signs in', /no member/i.test(await R.locator('.err').innerText()));
@@ -177,13 +182,13 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await R.fill('#nm', 'test.member@example.com'); await R.fill('#pw', 'member2'); await R.click('.primary'); await R.waitForTimeout(500);
     ok('new name shows after signing in', (await R.locator('.eyebrow').innerText().catch(() => '')).includes('TEST MEMBER TWO'));
     // Admin renames themselves and stays admin
-    await A.goto(F + '#profile'); await A.waitForTimeout(500);
+    await A.goto(F + '#account'); await A.waitForTimeout(500);
     await A.fill('#nm-new', 'Shulem'); await A.click('#nameform .primary'); await A.waitForTimeout(800);
-    ok('admin can change name', (await A.locator('.prof-head h2').innerText()) === 'Shulem');
-    ok('admin stays admin after rename', await A.evaluate(() => isAdmin()) && /Owner/.test(await A.locator('.prof-head .hint').innerText()));
+    ok('admin can change name', await A.evaluate(() => myName()) === 'Shulem');
+    ok('admin stays admin after rename', await A.evaluate(() => isAdmin()) && /Owner/.test(await A.locator('.section-head p').innerText()));
     await R.goto(F + '#feedback'); await R.waitForTimeout(500);
     ok('members see the new admin name', /^Shulem reads/.test(await R.locator('.section-head p').first().innerText()));
-    await R.goto(F + '#profile'); await R.waitForTimeout(400); await R.fill('#nm-new', 'Shulem'); await R.click('#nameform .primary'); await R.waitForTimeout(500);
+    await R.goto(F + '#account'); await R.waitForTimeout(400); await R.fill('#nm-new', 'Shulem'); await R.click('#nameform .primary'); await R.waitForTimeout(500);
     ok("member can't take the admin's new name", /already taken/.test(await R.locator('#nm-err').innerText()));
     const Q = await page(); await Q.evaluate(() => localStorage.removeItem('gk-admin')); await Q.reload(); await Q.waitForTimeout(400);
     await Q.fill('#nm', 'shulem.schlesinger@example.com'); await Q.fill('#pw', 'admin123'); await Q.click('.primary'); await Q.waitForTimeout(800);
@@ -209,10 +214,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await W.goto(F); await W.waitForTimeout(500);
     ok('members from before emails are invited (not made) to add one', (await W.locator('#enudge').count()) === 1 && (await B.evaluate(() => document.querySelectorAll('#enudge').length)) === 0);
     await W.click('#en-add'); await W.waitForTimeout(600);
-    ok('“Add email” opens the email box in My profile', /#profile/.test(await W.evaluate(() => location.hash)) && await W.evaluate(() => document.activeElement && document.activeElement.id === 'em-new'));
+    ok('“Add email” opens the email box in Account settings', /#account/.test(await W.evaluate(() => location.hash)) && await W.evaluate(() => document.activeElement && document.activeElement.id === 'em-new'));
     await W.goto(F); await W.waitForTimeout(400); await W.click('#en-no'); await W.waitForTimeout(200); await W.reload(); await W.waitForTimeout(600);
     ok('“Not now” hides the invitation', (await W.locator('#enudge').count()) === 0);
-    await W.goto(F + '#settings'); await W.waitForTimeout(500);
+    await W.goto(F + '#settings-look'); await W.waitForTimeout(500);
     await W.click('#app [data-theme=dark]'); await W.waitForTimeout(200);
     const darkBg = await W.evaluate(() => [document.documentElement.dataset.theme, getComputedStyle(document.body).backgroundColor]);
     await W.click('#app [data-theme=light]'); await W.waitForTimeout(200);
@@ -222,10 +227,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Settings can make the text bigger', await W.evaluate(() => getComputedStyle(app).zoom === '1.25'));
     await W.setViewportSize({width: 390, height: 844}); await W.goto(F + '#r-croissants'); await W.waitForTimeout(400);
     ok('…without sideways scrolling on a phone', await W.evaluate(() => document.documentElement.scrollWidth) <= 392);
-    await W.goto(F + '#settings'); await W.waitForTimeout(300); await W.click('#app [data-tsize="1"]'); await W.waitForTimeout(200); await W.setViewportSize({width: 1100, height: 900});
+    await W.goto(F + '#settings-look'); await W.waitForTimeout(300); await W.click('#app [data-tsize="1"]'); await W.waitForTimeout(200); await W.setViewportSize({width: 1100, height: 900});
     ok('Settings shows the website link and a full Android app download', await W.evaluate(() => /github\.io\/gittys-kitchen/.test(document.querySelector('.set-url a').href) && /Gittys-Kitchen\.apk$/.test(document.getElementById('set-apk').href)));
     ok('the account menu has Settings', await W.evaluate(() => !!document.querySelector('#acct a[href="#settings"]') || /href="#settings"/.test(document.body.innerHTML)));
-    await W.goto(F + '#profile'); await W.waitForTimeout(500);
+    await W.goto(F + '#account'); await W.waitForTimeout(500);
     ok('a profile without an email can add one', /Add your email/.test(await W.locator('.admin').innerText()));
     await W.fill('#em-new', 'tm.two@example.com'); await W.fill('#em-pw', 'member3'); await W.click('#emform .primary'); await W.waitForTimeout(500);
     ok('…by tapping a link sent to it', /We sent a link/.test(await W.locator('#em-ok').innerText()) && await W.evaluate(() => __fakeMails().some(m => m.to === 'tm.two@example.com' && m.kind === 'change')));
@@ -300,7 +305,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // Today's to-do list: on the home page only when there's something to do soon (each person's choice)
     await A.goto(F); await A.waitForTimeout(300);
     ok('no to-do box on the home page when nothing is coming up', (await A.locator('#today').count()) === 0);
-    await A.goto(F + '#settings'); await A.waitForTimeout(300); await A.selectOption('#pref-todo', '-1'); await A.waitForTimeout(300);
+    await A.goto(F + '#settings-look'); await A.waitForTimeout(300); await A.selectOption('#pref-todo', '-1'); await A.waitForTimeout(300);
     ok('the choice is saved to the profile', await A.evaluate(() => profile.prefs && profile.prefs.todoDays === -1));
     await A.goto(F); await A.waitForTimeout(300);
     await A.fill('#td-new', 'Take out the chicken'); await A.click('#td-form .solid'); await A.waitForTimeout(200);
@@ -315,7 +320,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.evaluate(() => { const v = store(uk('today')); v.day = '2000-01-01'; store(uk('today'), v); }); await A.goto(F + '#categories'); await A.goto(F); await A.waitForTimeout(300);
     const td2 = await A.locator('#today').innerText();
     ok('next day: finished tasks go, unfinished stay', !/Take out the chicken/.test(td2) && /Make Challah/.test(td2) && /from before/.test(td2), td2);
-    await A.goto(F + '#settings'); await A.waitForTimeout(300); await A.selectOption('#pref-todo', '3'); await A.waitForTimeout(300);
+    await A.goto(F + '#settings-look'); await A.waitForTimeout(300); await A.selectOption('#pref-todo', '3'); await A.waitForTimeout(300);
     await A.goto(F); await A.waitForTimeout(300);
     ok('with "next 3 days" it shows while there is a to-do today', (await A.locator('#today').count()) === 1);
     await A.evaluate(() => { const v = tdStore(); v.items = []; tdSave(v); }); await A.goto(F + '#categories'); await A.goto(F); await A.waitForTimeout(300);
@@ -361,7 +366,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     const bc = await A.locator('.rc .nochip').allInnerTexts();
     ok('category lists recipes by code', bc.length >= 2 && bc.every((c, i) => !i || bc[i - 1].localeCompare(c, undefined, {numeric: true}) < 0) && (await A.locator('.rc').first().locator('.nochip').count()) === 1, bc);
     ok('New recipes is first in the category bar', /^New recipes/.test(await A.locator('.tabs .tab').first().innerText()));
-    await A.goto(F + '#settings'); await A.waitForTimeout(400);
+    await A.goto(F + '#settings-look'); await A.waitForTimeout(400);
     ok('Settings has five designs to choose from', (await A.locator('#lookpanel .look').count()) === 5);
     await A.click('#lookpanel [data-look="garden"]'); await A.waitForTimeout(200);
     ok('choosing a design changes the look', await A.evaluate(() => document.documentElement.dataset.look) === 'garden');
@@ -646,7 +651,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.click('#avbtn');
     await A.goto(F + '#viewas'); await A.waitForTimeout(300); await A.click('[data-va=employee]'); await A.waitForTimeout(1500);
     ok('seeing it as an employee', /an employee/.test(await A.locator('#viewas-bar').innerText().catch(() => '')) && await A.evaluate(() => RECIPES.some(r => r.id === 'r-challah') && !isAdmin() && myRole() === 'employee'));
-    await A.goto(F + '#profile'); await A.waitForTimeout(300);
+    await A.goto(F + '#account'); await A.waitForTimeout(300);
     ok("previews never offer to delete your own profile", (await A.locator('#prof-del').count()) === 0);
     // one particular employee, with their own permissions
     const vn4 = await V.evaluate(() => myName());
