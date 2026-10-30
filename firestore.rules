@@ -104,6 +104,24 @@ service cloud.firestore {
       allow get: if isAdmin() || extra('viewas');
       allow write: if isAdmin() && request.resource.data.keys().hasOnly(['list']) && request.resource.data.list is list;
     }
+    // Likes and dislikes on recipes: everyone rates for themselves; admins see them all.
+    match /ratings/{id} {
+      allow get: if signedIn() && (id.matches('.*_' + request.auth.uid) || extra('ratings'));
+      allow list: if extra('ratings');
+      allow create, update: if approvedMember() && id == request.resource.data.rid + '_' + request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.v in [1, -1]
+        && (request.resource.data.v == 1 || request.resource.data.reason in ['unclear', 'notgood', 'photo', 'amounts', 'timeheat', 'noing', 'nostep', 'hard', 'other'])
+        && request.resource.data.text is string && request.resource.data.text.size() <= 400
+        && request.resource.data.keys().hasOnly(['rid', 'uid', 'name', 'v', 'reason', 'text', 'at']);
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+    // Who hears about likes and dislikes (admins, and employees allowed to see them).
+    match /meta/ratewatch {
+      allow get: if approvedMember();
+      allow write: if isAdmin() && request.resource.data.keys().hasOnly(['uids'])
+        && request.resource.data.uids is list && request.resource.data.uids.size() <= 300;
+    }
     // Who hears about new recipe requests (admins, and employees allowed to answer them).
     match /meta/reqwatch {
       allow get: if approvedMember();
@@ -278,7 +296,9 @@ service cloud.firestore {
         && request.resource.data.msgs[0].by == request.auth.uid
         && request.resource.data.msgs[0].text is string && request.resource.data.msgs[0].text.size() <= 1500;
       allow update: if isTeam() && request.auth.uid in resource.data.members
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['msgs', 'updated', 'lastBy', 'readAt', 'done'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['msgs', 'updated', 'lastBy', 'readAt', 'done', 'checks'])
+        // proofreading: each person marks only their own check
+        && (!('checks' in request.resource.data) || request.resource.data.checks.diff(resource.data.get('checks', {})).affectedKeys().hasOnly([request.auth.uid]))
         && request.resource.data.msgs is list && request.resource.data.msgs.size() <= 200
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastBy'])
             || request.resource.data.lastBy == request.auth.uid);
