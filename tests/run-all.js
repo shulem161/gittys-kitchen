@@ -180,7 +180,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('admin is told about the reset', notes.some(n => /set a new password/.test(n)), notes.slice(-2));
     await A.waitForTimeout(800);
     await A.waitForTimeout(5000);
-    ok('member list has no duplicate after reset', (await A.locator('.mwho b').allInnerTexts()).filter(x => /Test Member Two/.test(x)).length === 1, await A.locator('.mwho b').allInnerTexts());
+    ok('member list has no duplicate after reset', (await A.locator('.mwho b').allInnerTexts()).filter(x => /Test Member Two/.test(x)).length === 1, [await A.locator('.mwho b').allInnerTexts(), await A.evaluate(() => members.map(m => [m.uid, m.name, m.from, m.moved, m.status].join(':')))]);
     ok("member's messages follow them", await A.evaluate(o => Object.values(JSON.parse(localStorage.__fakedb).feedback).every(x => x.uid !== o), R0));
     await W.goto(F + '#profile'); await W.waitForTimeout(500); await W.click('#rc-make'); await W.waitForTimeout(600);
     const own = await W.locator('.codebox.big b').innerText();
@@ -325,10 +325,15 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('bottom bar marks Categories', (await A.locator('#tabbar [aria-current=page]').innerText()).includes('Categories'));
     await A.goto(F + '#r-challah'); await A.waitForTimeout(300);
     ok('recipe page hides the bottom bar and shows Start cooking', !(await A.locator('#tabbar').isVisible()) && await A.locator('#cook').isVisible());
-    await A.click('#cook'); await A.waitForTimeout(200);
+    await A.click('#cook'); await A.waitForTimeout(300);
     const cookOn = (await A.locator('#cook').innerText()).trim();
-    await A.click('#cook'); await A.waitForTimeout(200);
-    ok('Start cooking turns into Stop cooking, and back', cookOn === 'Stop cooking' && (await A.locator('#cook').innerText()).trim() === 'Start cooking', cookOn);
+    ok('Start cooking opens a step-by-step guide at step 1', await A.locator('#guide').isVisible() && /STEP 1 OF \d+/.test(await A.locator('.gd-count').innerText()));
+    await A.click('#gd-next'); await A.waitForTimeout(200);
+    ok('Next step goes to step 2 and ticks off step 1', /STEP 2 OF/.test(await A.locator('.gd-count').innerText()) && (await A.locator('.step[data-k="0"].done').count()) === 1);
+    await A.click('#gd-back'); await A.waitForTimeout(200);
+    ok('Back goes to step 1 again', /STEP 1 OF/.test(await A.locator('.gd-count').innerText()) && (await A.locator('.step[data-k="0"].done').count()) === 0);
+    await A.click('#gd-close'); await A.waitForTimeout(300);
+    ok('Close ends cooking: Start cooking turns into Stop cooking, and back', cookOn === 'Stop cooking' && !(await A.locator('#guide').isVisible()) && (await A.locator('#cook').innerText()).trim() === 'Start cooking', cookOn);
     ok('steps with a time get a timer button', (await A.locator('.tbtn').count()) >= 1);
     await A.locator('.tbtn').first().click({force: true}); await A.waitForTimeout(300);
     ok('timer button starts a timer and does not tick the step', (await A.evaluate(() => TIMERS.length)) === 1 && (await A.locator('.step.done').count()) === 0);
@@ -603,6 +608,30 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#admin'); await A.waitForTimeout(400); await A.locator('.mrow', {hasText: vn4}).locator('[data-act=perms]').click(); await A.waitForTimeout(200);
     await A.locator('[data-pk=edit]').uncheck(); await A.waitForTimeout(800);
     ok('Back to my view brings everything back', (await A.locator('#viewas-bar').count()) === 0 && await A.evaluate(() => isOwner() && isAdmin()));
+
+    // Team messages about a recipe
+    const PU = await page(); await join(PU, 'Public Paula', 'pub456');
+    await A.goto(F + '#admin'); await A.waitForTimeout(600); await A.locator('.mrow', {hasText: 'Public Paula'}).locator('[data-act=approve]').click(); await A.waitForTimeout(1500);
+    await V.goto(F + '#r-croissants'); await V.waitForTimeout(800); await PU.goto(F + '#r-croissants'); await PU.waitForTimeout(400);
+    ok('employees see "Ask the team about this" on a recipe; public members do not', (await V.locator('#askteam-btn').count()) === 1 && (await PU.locator('#askteam-btn').count()) === 0);
+    await V.click('#askteam-btn'); await V.waitForTimeout(200);
+    ok('the team list lets an employee pick the admins or one person', await V.locator('#at-to option').count() >= 3);
+    await V.selectOption('#at-to', 'admins'); await V.fill('#at-text', 'Can you check the oven time on this one?'); await V.click('#at-send'); await V.waitForTimeout(800);
+    ok('sending opens the conversation with the recipe attached', /^#team-/.test(await V.evaluate(() => location.hash)) && (await V.locator('.tm-recipe[href="#r-croissants"]').count()) === 1);
+    ok('the owner gets a phone notice', notes.some(n => /: about /.test(n)), notes.slice(-2));
+    await V.goto(F); await A.goto(F + '#team'); await A.waitForTimeout(800);
+    ok('the admin sees it as new in Team messages', (await A.locator('.tm-row.unread', {hasText: 'oven time'}).count()) === 1 && await A.evaluate(() => unreadThreads() === 1));
+    await A.locator('.tm-row', {hasText: 'oven time'}).click(); await A.waitForTimeout(600);
+    await A.fill('#tm-reply', 'Fixed it, 375°F now.'); await A.click('#tm-form button'); await A.waitForTimeout(800);
+    ok('opening it marks it read', await A.evaluate(() => unreadThreads() === 0));
+    await V.goto(F + '#team'); await V.waitForTimeout(800);
+    ok('the employee sees the reply as new', (await V.locator('.tm-row.unread', {hasText: '375°F'}).count()) === 1);
+    await V.locator('.tm-row', {hasText: '375°F'}).click(); await V.waitForTimeout(600);
+    await V.click('#tm-done'); await V.waitForTimeout(600);
+    await V.goto(F + '#team'); await V.waitForTimeout(500);
+    ok('marking done moves it to Done', (await V.locator('details .tm-row', {hasText: '375°F'}).count()) === 1);
+    await PU.goto(F + '#team'); await PU.waitForTimeout(400);
+    ok("public members can't open Team messages", (await PU.locator('#tn-form').count()) === 0 && await PU.evaluate(() => THREADS.length === 0));
 
     // Search
     await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);

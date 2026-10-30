@@ -1,6 +1,6 @@
 {
-  "web": "3.75",
+  "web": "3.76",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Log in as… now also lets you look as one particular employee, with their own permissions."
+  "notes": "Team messages about a recipe for employees and admins. Start cooking now walks you through the recipe one step at a time."
 }

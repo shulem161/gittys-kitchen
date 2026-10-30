@@ -538,6 +538,42 @@ body.viewing-as .bar{top:calc(env(safe-area-inset-top,0px) + 42px)}
 .viewas-bar span{overflow:hidden;text-overflow:ellipsis}
 .viewas-bar .btn{padding:4px 12px;font-size:13px;background:#fff;color:#1B2638;border-color:#fff;font-weight:700}
 .menu a.m-viewas{font-weight:600;color:var(--accent)}
+.menu a.m-team{font-weight:600}
+.tm-list2{display:grid}
+.tm-row{display:grid;gap:2px;padding:10px 4px;border-bottom:1px solid var(--line);text-decoration:none;color:var(--ink)}
+.tm-row.unread b::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#C2581A;margin-right:6px;vertical-align:1px}
+.tm-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.tm-sub{font-size:13.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tm-to{font-weight:600;color:var(--accent)}
+.tm-recipe{display:flex;gap:10px;align-items:center;margin:10px 0;padding:8px;border:1px solid var(--line);border-radius:12px;background:var(--bg);text-decoration:none;color:var(--ink)}
+.tm-recipe .rc-th{width:44px;height:44px}.tm-recipe .rc-th span{display:block;width:100%;height:100%;background:center/cover;border-radius:10px}
+.tm-recipe small{display:block;color:var(--accent);font-weight:600}
+.tm-msgs{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:10px}
+.tm-msgs li{display:grid;justify-items:start;gap:2px}.tm-msgs li.me{justify-items:end}
+.tm-bub{max-width:85%;padding:9px 12px;border-radius:14px 14px 14px 4px;background:var(--bg);border:1px solid var(--line);font-size:15px;overflow-wrap:anywhere}
+.tm-msgs li.me .tm-bub{border-radius:14px 14px 4px 14px;background:var(--accent);border-color:var(--accent);color:var(--paper)}
+#tm-reply,#tn-text,#at-text{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;font-size:15px;box-sizing:border-box}
+#guide{position:fixed;inset:0;z-index:50;background:#10213a;color:#fff;display:flex;flex-direction:column;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+#guide[hidden]{display:none}
+body.guiding{overflow:hidden}
+.gd-top{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px 20px 0}
+.gd-close{min-height:44px;padding:0 16px;border-radius:12px;border:1px solid #3a5070;background:none;color:#fff;font:600 15px/1 inherit;cursor:pointer}
+.gd-name{font-size:14.5px;font-weight:600;color:#b9c9de;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gd-bar{margin:16px 20px 0;height:8px;border-radius:4px;background:#2a3d5a}.gd-bar div{height:8px;border-radius:4px;background:#5aa2ff;transition:width .25s}
+.gd-body{flex:1;overflow-y:auto;padding:0 20px 20px;max-width:760px;width:100%;margin:0 auto;box-sizing:border-box}
+.gd-count{margin:24px 0 0;font-size:15px;font-weight:700;letter-spacing:.05em;color:#8fb7ea}
+.gd-text{margin:12px 0 0;font-size:clamp(24px,6.4vw,36px);line-height:1.3;font-weight:650;overflow-wrap:anywhere}
+.gd-text a{color:#9cc8ff}.gd-text .temp{color:#ffb57d;font-weight:800}
+.gd-timer{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:58px;margin-top:22px;border-radius:16px;border:2px solid #5aa2ff;background:none;color:#fff;font:700 18px/1.2 inherit;cursor:pointer}
+.gd-timer svg{width:24px;height:24px}
+.gd-run{display:grid;gap:6px;margin:14px 0 0}.gd-run span{display:flex;align-items:center;gap:8px;color:#ffd2ad;font-size:15px}.gd-run svg{width:18px;height:18px}.gd-run b{font-variant-numeric:tabular-nums;font-size:18px;color:#fff}
+.gd-ings{margin-top:22px;padding:16px;border-radius:16px;background:#1a2f4f}
+.gd-ings p{margin:0;font-size:13px;font-weight:700;letter-spacing:.05em;color:#8fb7ea}
+.gd-ings ul{margin:8px 0 0;padding:0;list-style:none;font-size:18px;line-height:1.5}.gd-ings b{color:#ffd2ad}
+.gd-nav{display:flex;gap:12px;padding:14px 20px 22px;max-width:760px;width:100%;margin:0 auto;box-sizing:border-box}
+.gd-nav button{min-height:68px;border-radius:18px;font:700 20px/1 inherit;cursor:pointer}
+.gd-back{flex:1;border:2px solid #3a5070;background:none;color:#fff}.gd-back:disabled{opacity:.35;cursor:default}
+.gd-next{flex:2;border:0;background:#5aa2ff;color:#0b1a30;font-weight:800 !important}
 .va-opts{display:grid;gap:8px}
 .va-opt{display:grid;gap:2px;text-align:left;padding:14px 16px;border:2px solid var(--line);border-radius:14px;background:var(--paper);color:var(--ink);cursor:pointer;font:inherit}
 .va-opt b{font-size:17px}.va-opt span{font-size:13.5px;color:var(--muted)}
@@ -1088,7 +1124,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.75";
+const WEB_VERSION = "3.76";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1168,6 +1204,7 @@ function boot(){
     if(unsubEmp){unsubEmp();unsubEmp=null}
     stopPlans();
     if(unsubGolive){unsubGolive();unsubGolive=null;GOLIVE=[]}
+    stopTeam();
     if(unsubDupes){unsubDupes();unsubDupes=null;DUP_IGNORE=new Set()}
     if(unsubSubs){unsubSubs();unsubSubs=null;subs=[]}
     if(unsubPendingPhotos){unsubPendingPhotos();unsubPendingPhotos=null;pendingPhotos=[]}
@@ -1188,7 +1225,7 @@ function boot(){
       cacheProfile(); renderAcct();
       if(isAdmin() && !unsubAll) watchMembers();
       if(isAdmin()) watchDupes();
-      if(profile.status==="approved") watchGolive();
+      if(profile.status==="approved"){ watchGolive(); watchTeam(); }
       if(state==="approved"){ watchPlans(); watchRecipes(); watchSubs(); watchPendingPhotos(); watchFeedback(); watchRequests(); if(!update){ lastUpdCheck=Date.now(); checkUpdates(false); } else renderUpdateBar(); }
       if(was!==state || state!=="approved") route();
     }, ()=>{
@@ -1210,7 +1247,7 @@ function watchMembers(){
     members = s.docs.map(d=>Object.assign({uid:d.id},d.data())).sort((a,b)=>(b.created||0)-(a.created||0));
     // give the member's own reset a few seconds to finish before tidying up after it
     members.filter(m=>m.from && !m.moved && !migrating.has(m.uid)).forEach(m=>{ migrating.add(m.uid); setTimeout(()=>{ migrating.delete(m.uid); migrateMember(m); }, 4000); });
-    renderAcct();
+    renderAcct(); syncTeamList();
     if(location.hash==="#admin") route();
   }, ()=>{});
 }
@@ -1635,6 +1672,7 @@ function recipe(r){
       ${sx!==1?`<p class="hint scale-note">Amounts are for ${fmtNum(sx)}× the recipe. Pan size and baking time may need adjusting.</p>`:""}
       <div class="tools">
         ${recipesOnline&&!offline&&(can("suggest")||may("edit"))?`<a class="btn solid" href="#edit-${r.id}">${may("edit")?"Edit recipe":"Suggest changes"}</a>`:""}
+        ${isTeam()&&!offline?`<button class="btn" id="askteam-btn" type="button">${TOOL_IC.ask.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Ask the team about this</button>`:""}
         ${may("move")&&recipesOnline&&!offline?`<button class="btn" id="mv-btn" type="button">Move to another category</button>`:""}
         ${myRole()==="employee"&&recipesOnline&&!offline?(pubVisible(r)?`<span class="btn pub-state live" aria-disabled="true">Live ✓</span>`:myGolive(r.id)?`<span class="btn pub-state" aria-disabled="true">Asked to go live ✓</span>`:`<button class="btn solid" id="gl-btn" type="button">Request to go live</button>`):""}
         ${isAdmin()&&recipesOnline&&!offline?`<button class="btn${pubVisible(r)?" live":" solid"}" id="pubtog" type="button" aria-pressed="${pubVisible(r)}" title="${pubVisible(r)?"Public members can see it. Tap to take it off.":"Public members can't see it. Tap to make it live."}">${pubVisible(r)?"Live ✓":"Go live"}</button>`:""}
@@ -1716,11 +1754,13 @@ function recipe(r){
     const on = await screenOn(true);
     if(on && w){ w.setAttribute("aria-pressed","true"); w.textContent="Screen stays on"; }
     b.textContent="Stop cooking"; b.classList.add("cooking"); b.setAttribute("aria-pressed","true");
+    if(openGuide(r)) return;
     const tb=app.querySelector(".rtabs"), first=app.querySelector(".step:not(.done)");
     if(tb && getComputedStyle(tb).display!=="none") window.scrollTo(0, tb.offsetTop-70); else if(first) first.scrollIntoView({block:"center"});
     toast(on ? "Screen stays on while you cook. Tap a step when it's done." : "Tap a step when it's done.");
   };
   const mvb=document.getElementById("mv-btn"); if(mvb) mvb.onclick=e=>moveBox(r, e.currentTarget);
+  const atb=document.getElementById("askteam-btn"); if(atb) atb.onclick=e=>askTeamBox(r, e.currentTarget);
   const glb=document.getElementById("gl-btn"); if(glb) glb.onclick=async()=>{ glb.disabled=true;
     try{ await requestGolive(r); glb.outerHTML='<span class="btn pub-state" aria-disabled="true">Asked to go live ✓</span>'; toast("Sent to the admins"); }catch(e){ glb.disabled=false; toast("Couldn't send. Check your connection."); } };
   const pt=document.getElementById("pubtog");
@@ -2039,7 +2079,7 @@ function renderAcct(){
   const ob=document.getElementById("offbar"); if(ob) ob.hidden = !(offline && state==="approved");
   if(state!=="approved"){ acct.innerHTML=""; return; }
   const open=!!acct.querySelector(".menu");
-  const pc = (isAdmin()||may("review")||may("answer")||may("inbox")) ? pendingCount() : 0;
+  const pc = ((isAdmin()||may("review")||may("answer")||may("inbox")) ? pendingCount() : 0) + (isTeam() ? unreadThreads() : 0);
   acct.innerHTML = `<button class="avatar" id="avbtn" aria-label="Account menu for ${esc(myName())}${pc?`, ${pc} waiting for approval`:""}" aria-haspopup="true">${esc(initial(myName()))}${pc?`<span class="dot">${pc}</span>`:""}</button>`;
   document.getElementById("avbtn").onclick = e=>{ e.stopPropagation(); acct.querySelector(".menu") ? closeMenu() : openMenu(); };
   if(open) openMenu();
@@ -2686,6 +2726,192 @@ function wireGolive(){
     catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); } });
 }
 
+/* ---------- team messages (employees and admins only) ----------
+   threads/{id}: {by, members:[uid…], names:{uid:name}, to ("team"|"admins"|uid), rid, rtitle, subject, msgs:[{by,name,text,at}],
+                  updated, lastBy, readAt:{uid:ms}, done}
+   meta/team: {list:[{uid,name,role}]} kept up to date by admins, so employees can pick who to write to. */
+let THREADS = [], TEAM = [], unsubThreads = null, unsubTeam = null;
+const isTeam = () => !!profile && profile.status==="approved" && (isAdmin() || myRole()==="employee");
+function watchTeam(){
+  if(!db || offline || !isTeam()) return;
+  if(!unsubTeam) unsubTeam = db.collection("meta").doc("team").onSnapshot(s=>{ TEAM = (s.exists && s.data().list) || []; }, ()=>{});
+  if(!unsubThreads) unsubThreads = db.collection("threads").where("members","array-contains",me).onSnapshot(s=>{
+    THREADS = s.docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(b.updated||0)-(a.updated||0)); renderAcct();
+    const h=location.hash;
+    if((h==="#team" || h.startsWith("#team-")) && !document.querySelector("#tm-reply:focus, #tn-text:focus")){ const y=window.scrollY; route(); window.scrollTo(0, h.startsWith("#team-") ? document.body.scrollHeight : y); }
+  }, ()=>{});
+}
+function stopTeam(){ if(unsubThreads){unsubThreads();unsubThreads=null} if(unsubTeam){unsubTeam();unsubTeam=null} THREADS=[]; TEAM=[]; }
+// Admins keep the team list current (from the member list they already have)
+let teamSyncT=null;
+function syncTeamList(){ clearTimeout(teamSyncT); teamSyncT=setTimeout(syncTeamNow, 3000); }   // wait for the member list to settle
+function syncTeamNow(){
+  if(!isAdmin() || !db || offline) return;
+  const list = members.filter(m=>m.status==="approved" && ["owner","admin","employee"].includes(roleOf(m))).map(m=>({uid:m.uid, name:m.name, role:roleOf(m)})).sort((a,b)=>byName(a.name,b.name));
+  if(JSON.stringify(list)!==JSON.stringify(TEAM)){ TEAM=list; db.collection("meta").doc("team").set({list}).catch(()=>{}); }
+}
+const unreadThreads = () => THREADS.filter(t=>t.lastBy && t.lastBy!==me && (t.updated||0) > ((t.readAt||{})[me]||0) && !t.done).length;
+function threadTitle(t){ return t.subject || (t.rtitle ? `About ${t.rtitle}` : "Message"); }
+function threadWho(t){ const others=Object.entries(t.names||{}).filter(([u])=>u!==me).map(([,n])=>n);
+  return t.to==="team" ? "Whole team" : t.to==="admins" ? "Admins" : others.join(", ") || "Just you"; }
+// Who a new message goes to
+function recipientsFor(to){
+  const team = TEAM.length ? TEAM : [{uid:me, name:myName(), role:myRole()}];
+  if(to==="team") return team;
+  if(to==="admins") return team.filter(x=>x.role==="owner"||x.role==="admin");
+  return team.filter(x=>x.uid===to);
+}
+async function startThread(to, text, r){
+  const rec=recipientsFor(to), names={[me]:myName()}; rec.forEach(x=>names[x.uid]=x.name);
+  const membersList=[...new Set([me, ...rec.map(x=>x.uid)])], now=Date.now();
+  const ref=db.collection("threads").doc();
+  const t={by:me, members:membersList, names, to, rid:r?r.id:"", rtitle:r?r.t.replace(/^Untitled: /,""):"", subject:r?"":text.slice(0,60),
+    msgs:[{by:me, name:myName(), text, at:now}], updated:now, lastBy:me, readAt:{[me]:now}, done:false, created:now};
+  await ref.set(t); THREADS.unshift(Object.assign({id:ref.id}, t));
+  if(adminUid && membersList.includes(adminUid) && adminUid!==me) notifyAdmin(`${myName()}: ${r?"about "+t.rtitle:"team message"}`, text.slice(0,180), "#team-"+ref.id, "speech_balloon");
+  return ref.id;
+}
+async function replyThread(t, text){
+  const now=Date.now(), msgs=[...(t.msgs||[]), {by:me, name:myName(), text, at:now}].slice(-200), readAt=Object.assign({}, t.readAt||{}, {[me]:now});
+  await db.collection("threads").doc(t.id).update({msgs, updated:now, lastBy:me, readAt, done:false});
+  Object.assign(t, {msgs, updated:now, lastBy:me, readAt, done:false});
+  if(adminUid && t.members.includes(adminUid) && adminUid!==me) notifyAdmin(`${myName()} replied`, text.slice(0,180), "#team-"+t.id, "speech_balloon");
+}
+function toSelect(id, dflt){
+  const others=(TEAM.length?TEAM:[]).filter(x=>x.uid!==me);
+  return `<select id="${id}" aria-label="Send to"><option value="team" ${dflt==="team"?"selected":""}>Everyone on the team</option><option value="admins" ${dflt==="admins"?"selected":""}>The admins</option>${others.length?`<optgroup label="One person">${others.map(x=>`<option value="${esc(x.uid)}">${esc(x.name)}${x.role==="employee"?"":" ("+ROLE_LABEL[x.role].toLowerCase()+")"}</option>`).join("")}</optgroup>`:""}</select>`;
+}
+// On a recipe page
+function askTeamBox(r, btn){
+  const old=document.getElementById("askteam"); if(old){ old.remove(); return; }
+  const box=document.createElement("div"); box.id="askteam"; box.className="dlpick";
+  const open=THREADS.filter(t=>t.rid===r.id && !t.done);
+  box.innerHTML=`<b>Ask the team about “${esc(r.t.replace(/^Untitled: /,""))}”</b>
+    ${open.length?`<p class="hint" style="margin-top:6px">Already talking about it: ${open.map(t=>`<a class="link" href="#team-${esc(t.id)}">${esc(threadWho(t))}</a>`).join(", ")}</p>`:""}
+    <div class="pl-add-row" style="margin-top:8px"><label>To ${toSelect("at-to", isAdmin()?"team":"admins")}</label></div>
+    <textarea id="at-text" rows="3" maxlength="1500" placeholder="e.g. Can you check the oven time? It burnt at 400°F." style="width:100%;margin-top:8px"></textarea>
+    <div class="row" style="margin-top:8px"><button type="button" class="btn solid" id="at-send">Send</button><button type="button" class="btn" id="at-no">Cancel</button></div>`;
+  btn.closest(".tools").after(box); document.getElementById("at-text").focus();
+  document.getElementById("at-no").onclick=()=>box.remove();
+  document.getElementById("at-send").onclick=async e=>{ const text=document.getElementById("at-text").value.trim(); if(!text){ document.getElementById("at-text").focus(); return; }
+    e.target.disabled=true; try{ const id=await startThread(document.getElementById("at-to").value, text, r); box.remove(); toast("Sent"); location.hash="team-"+id; }
+    catch(err){ e.target.disabled=false; toast("Couldn't send. Check your connection."); } };
+}
+function teamPage(){
+  const open=THREADS.filter(t=>!t.done), done=THREADS.filter(t=>t.done);
+  const row = t => { const last=(t.msgs||[])[ (t.msgs||[]).length-1 ]||{}, unread=t.lastBy!==me && (t.updated||0)>((t.readAt||{})[me]||0) && !t.done;
+    return `<a class="tm-row${unread?" unread":""}" href="#team-${esc(t.id)}"><div class="tm-top"><b>${esc(threadTitle(t))}</b><span class="hint">${fmtWhen(t.updated)}</span></div>
+      <div class="tm-sub"><span class="tm-to">${esc(threadWho(t))}</span> · ${esc(last.by===me?"You":last.name||"")}: ${esc((last.text||"").slice(0,90))}</div></a>`; };
+  app.innerHTML = `<section class="wrap tools-page">
+    <div class="section-head" style="margin-top:28px"><h2>Team messages</h2><p>Only employees and admins see these</p></div>
+    <form class="panel-a" id="tn-form"><h3>New message</h3>
+      <div class="pl-add-row"><label>To ${toSelect("tn-to", isAdmin()?"team":"admins")}</label></div>
+      <textarea id="tn-text" rows="3" maxlength="1500" placeholder="Write a message… To ask about a recipe, use “Ask the team” on the recipe itself." style="width:100%;margin-top:8px"></textarea>
+      <div style="margin-top:8px"><button class="btn solid" type="submit">Send</button></div></form>
+    <div class="panel-a"><h3>Conversations</h3>${open.length?`<div class="tm-list2">${open.map(row).join("")}</div>`:`<p class="hint">No open conversations.</p>`}</div>
+    ${done.length?`<details class="panel-a"><summary><b>Done</b> <span class="hint">${done.length}</span></summary><div class="tm-list2">${done.map(row).join("")}</div></details>`:""}
+  </section>`;
+  document.getElementById("tn-form").onsubmit=async e=>{ e.preventDefault(); const text=document.getElementById("tn-text").value.trim(); if(!text) return;
+    try{ const id=await startThread(document.getElementById("tn-to").value, text, null); toast("Sent"); location.hash="team-"+id; }catch(err){ toast("Couldn't send. Check your connection."); } };
+}
+const fmtWhen = ms => { if(!ms) return ""; const d=new Date(ms), now=new Date();
+  return d.toDateString()===now.toDateString() ? d.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}) : d.toLocaleDateString(undefined,{month:"short",day:"numeric"}); };
+function threadPage(id){
+  const t=THREADS.find(x=>x.id===id);
+  if(!t){ app.innerHTML=`<section class="wrap"><p class="hint" style="margin-top:28px">This conversation isn't here. <a class="link" href="#team">Team messages</a></p></section>`; return; }
+  const r=t.rid && RECIPES.find(x=>x.id===t.rid);
+  app.innerHTML = `<section class="wrap tools-page thread">
+    <a class="back" href="#team">← Team messages</a>
+    <div class="panel-a"><div class="tm-top"><h3 style="margin:0">${esc(threadTitle(t))}</h3><span class="hint">${esc(threadWho(t))}</span></div>
+      ${t.rid?`<a class="tm-recipe" href="#${esc(t.rid)}">${r?`<span class="rc-th">${r.cover?`<span style="background-image:url('${r.cover}')"></span>`:icon(r.c)}</span><span><b>${esc(r.t.replace(/^Untitled: /,""))}</b><small>${esc(codeOf(r)||r.c)} · Open the recipe</small></span>`:`<span><b>${esc(t.rtitle)}</b><small>This recipe isn't in the cookbook any more</small></span>`}</a>`:""}
+      <ul class="tm-msgs">${(t.msgs||[]).map(m=>`<li class="${m.by===me?"me":""}"><div class="tm-bub">${esc(m.text).replace(/\n/g,"<br>")}</div><span class="hint">${esc(m.by===me?"You":m.name)} · ${fmtWhen(m.at)}</span></li>`).join("")}</ul>
+      <form class="td-add" id="tm-form" style="margin-top:10px"><textarea id="tm-reply" rows="2" maxlength="1500" placeholder="Reply…" style="flex:1"></textarea><button class="btn solid" type="submit">Send</button></form>
+      <div class="row mn-actions" style="margin-top:10px"><button type="button" class="btn" id="tm-done">${t.done?"Open it again":"Mark done"}</button></div>
+    </div></section>`;
+  // read
+  const now=Date.now(); if(((t.readAt||{})[me]||0) < (t.updated||0)){ t.readAt=Object.assign({}, t.readAt||{}, {[me]:now}); db.collection("threads").doc(t.id).update({readAt:t.readAt}).catch(()=>{}); renderAcct(); }
+  document.getElementById("tm-form").onsubmit=async e=>{ e.preventDefault(); const ta=document.getElementById("tm-reply"), text=ta.value.trim(); if(!text) return;
+    try{ await replyThread(t, text); ta.value=""; threadPage(id); window.scrollTo(0, document.body.scrollHeight); }catch(err){ toast("Couldn't send. Check your connection."); } };
+  document.getElementById("tm-done").onclick=async()=>{ const v=!t.done; try{ await db.collection("threads").doc(t.id).update({done:v}); t.done=v; toast(v?"Marked done":"Opened again"); threadPage(id); }catch(e){ toast("Couldn't save. Check your connection."); } };
+}
+
+/* ---------- Start cooking: a step-by-step guide, one big step at a time ---------- */
+const GUIDE_STOP = new Set("about with into then until from each over have will your this that them they cups cup tbsp tsp teaspoon teaspoons tablespoon tablespoons ounce ounces pound pounds large small medium pinch dash package packages container can cans jar whole fresh chopped diced sliced ground grated minced melted softened beaten optional taste more less plus some few little very well".split(" "));
+const guideWords = name => String(name).toLowerCase().replace(/\[\[[^\]]*\]\]|\([^)]*\)/g," ").split(/[^a-zÀ-ɏ]+/).filter(w=>w.length>=4 && !GUIDE_STOP.has(w)).map(w=>w.replace(/(ies)$/,"y").replace(/(oes|es|s)$/,m=>m==="oes"?"o":""));
+function guideSteps(r, sx){
+  const out=[]; let k=0;
+  buildParts(r).forEach((p,pi,all)=>{
+    const ings=p.ing.flatMap(g=>g.items).map(t=>{ const [qty,name]=scaledQty(t,sx); return {qty, name, words:guideWords(name)}; });
+    p.steps.forEach(g=>g.items.forEach(t=>{
+      const low=String(t).toLowerCase(), these=ings.filter(i=>i.words.length && i.words.some(w=>low.includes(w)));
+      out.push({k:k++, text:t, group:g.title||"", part:all.length>1?`Part ${pi+1} of ${all.length}`:"", ings:these, times:findTimes(t)});
+    }));
+  });
+  return out;
+}
+let guideOn = null;   // {r, steps, i}
+function openGuide(r){
+  const sx=scaleNow[r.id]||1, steps=guideSteps(r, sx);
+  if(!steps.length) return false;
+  const saved=store(uk(r.id))||{i:[],s:[]}, first=steps.findIndex(s=>!saved.s.includes(s.k));
+  guideOn={r, steps, i:first<0?0:first};
+  let g=document.getElementById("guide");
+  if(!g){ g=document.createElement("div"); g.id="guide"; g.setAttribute("role","dialog"); g.setAttribute("aria-modal","true"); document.body.appendChild(g); }
+  g.hidden=false; document.body.classList.add("guiding");
+  try{ history.pushState({guide:1}, ""); }catch(e){}
+  drawGuide(); return true;
+}
+function closeGuide(fromBack){
+  const g=document.getElementById("guide"); if(!g || g.hidden) return;
+  g.hidden=true; document.body.classList.remove("guiding");
+  const r=guideOn&&guideOn.r; guideOn=null;
+  if(!fromBack && history.state && history.state.guide){ try{ history.back(); }catch(e){} }
+  if(r && cookingNow===r.id){ const b=document.getElementById("cook"); if(b) b.click(); else cookingNow=null; }   // closing the guide stops cooking
+}
+window.addEventListener("popstate", ()=>{ if(guideOn) closeGuide(true); });
+function guideMark(k, done){
+  const r=guideOn.r, saved=store(uk(r.id))||{i:[],s:[]}, s=new Set(saved.s); done?s.add(k):s.delete(k);
+  store(uk(r.id), {i:saved.i, s:[...s]});
+  const el=app.querySelector(`.step[data-k="${k}"]`); if(el){ el.classList.toggle("done",done); el.setAttribute("aria-pressed",done); }
+}
+function drawGuide(){
+  const g=document.getElementById("guide"); if(!g||!guideOn) return;
+  const {r, steps, i}=guideOn, st=steps[i], n=steps.length, last=i===n-1, title=r.t.replace(/^Untitled: /,"");
+  const running = TIMERS.filter(x=>x.rid===r.id && !x.rang && x.end);
+  g.innerHTML=`<div class="gd-top"><button type="button" class="gd-close" id="gd-close">Close</button><span class="gd-name">${esc(title)}${codeOf(r)?" · "+esc(codeOf(r)):""}</span></div>
+    <div class="gd-bar" aria-hidden="true"><div style="width:${Math.round((i+1)/n*100)}%"></div></div>
+    <div class="gd-body" id="gd-body">
+      <p class="gd-count">STEP ${i+1} OF ${n}${st.part?` · ${esc(st.part.toUpperCase())}`:""}${st.group?` · ${esc(st.group.toUpperCase())}`:""}</p>
+      <p class="gd-text">${linkify(hiTemps(st.text))}</p>
+      ${st.times.map(x=>`<button type="button" class="gd-timer" data-gsec="${x.sec}">${TIMER_IC}Start ${esc(x.label)} timer</button>`).join("")}
+      ${running.length?`<p class="gd-run">${running.map(x=>`<span data-gend="${x.end}">${TIMER_IC}<b>${clockTxt(tLeft(x))}</b> ${esc(x.label.replace(title+" · ",""))}</span>`).join("")}</p>`:""}
+      ${st.ings.length?`<div class="gd-ings"><p>FOR THIS STEP</p><ul>${st.ings.map(x=>`<li>${x.qty?`<b>${esc(x.qty)}</b> `:""}${esc(x.name.replace(/\[\[[^\]]*\]\]/g,""))}</li>`).join("")}</ul></div>`:""}
+    </div>
+    <div class="gd-nav"><button type="button" class="gd-back" id="gd-back" ${i===0?"disabled":""}>Back</button><button type="button" class="gd-next" id="gd-next">${last?"Finish":"Next step"}</button></div>`;
+  g.setAttribute("aria-label", `${title}, step ${i+1} of ${n}`);
+  document.getElementById("gd-close").onclick=()=>closeGuide();
+  document.getElementById("gd-back").onclick=()=>guideGo(-1);
+  document.getElementById("gd-next").onclick=()=>guideGo(1);
+  g.querySelectorAll("[data-gsec]").forEach(b=>b.onclick=()=>{ startTimer(+b.dataset.gsec, `${title} · step ${i+1}`, r.id); toast(`Timer started: ${fmtDur(+b.dataset.gsec)}`); drawGuide(); });
+  g.querySelectorAll("a").forEach(a=>a.addEventListener("click", ()=>closeGuide()));
+  document.getElementById("gd-body").scrollTop=0;
+}
+function guideGo(d){
+  if(!guideOn) return;
+  const {steps}=guideOn;
+  if(d>0){ guideMark(steps[guideOn.i].k, true);
+    if(guideOn.i===steps.length-1){ toast("All done. Enjoy!"); closeGuide(); return; } }
+  else guideMark(steps[guideOn.i-1>=0?guideOn.i-1:0].k, false);
+  guideOn.i=Math.max(0, Math.min(steps.length-1, guideOn.i+d)); drawGuide();
+}
+document.addEventListener("keydown", e=>{ if(!guideOn || e.target.closest("input,textarea,select")) return;
+  if(e.key==="ArrowRight"){ e.preventDefault(); guideGo(1); } else if(e.key==="ArrowLeft" && guideOn.i>0){ e.preventDefault(); guideGo(-1); } else if(e.key==="Escape") closeGuide(); });
+(()=>{ let x0=null, y0=0;
+  document.addEventListener("touchstart", e=>{ if(guideOn && e.target.closest("#guide")){ x0=e.touches[0].clientX; y0=e.touches[0].clientY; } }, {passive:true});
+  document.addEventListener("touchend", e=>{ if(x0===null || !guideOn) return; const dx=e.changedTouches[0].clientX-x0, dy=e.changedTouches[0].clientY-y0; x0=null;
+    if(Math.abs(dx)>70 && Math.abs(dx)>Math.abs(dy)*1.5){ if(dx<0) guideGo(1); else if(guideOn.i>0) guideGo(-1); } }, {passive:true}); })();
+setInterval(()=>{ document.querySelectorAll("#guide [data-gend]").forEach(s=>{ const b=s.querySelector("b"); if(b) b.textContent=clockTxt((+s.dataset.gend-Date.now())/1000); }); }, 1000);
+
 const menuOpen = new Set(["manage"]);   // which menu groups are open
 function openMenu(confirming){
   if(confirming) menuOpen.add("app");
@@ -2715,8 +2941,10 @@ function openMenu(confirming){
     !may("inbox")&&can("feedback") ? item("#feedback","Suggestions &amp; comments") : "",
   ].filter(Boolean);
   const group = (key,title,items,n) => items.length ? `<details class="mgroup" data-mg="${key}" ${menuOpen.has(key)?"open":""}><summary>${title}<span class="n${n?" hot":""}">${n?n+" waiting":""}</span></summary>${items.join("")}</details>` : "";
+  const teamItem = isTeam()&&!offline ? `<a href="#team" role="menuitem" class="m-team">Team messages <span class="n${unreadThreads()?" hot":""}">${unreadThreads()?unreadThreads()+" new":""}</span></a>` : "";
   m.innerHTML = `<a class="who" href="#profile" role="menuitem"><b>${esc(myName())}</b><span>${ROLE_LABEL[myRole()]}${offline?" · offline":""} · My profile</span></a>
     ${realAdmin()?`<a href="#viewas" role="menuitem" class="m-viewas">Log in as… <span class="n">${viewingAs()?ROLE_LABEL[viewingAs()].replace("Public","Customer"):"admin · employee · customer"}</span></a>`:""}
+    ${teamItem}
     ${group("manage","Manage", manage, manageN)}
     ${group("recipes","Recipes", recipes, 0)}
     ${group("app","App", [
@@ -4842,7 +5070,7 @@ function setNav(){
   const k = !h ? (q.value.trim() ? "" : "home") : (h==="categories"||h==="recent"||h.startsWith("recent-")||/^c-/.test(h)) ? "cats" : h==="grocery" ? "grocery" : /^timers/.test(h) ? "timers" : h==="profile" ? "me" : /^(plan|menus$|menu-)/.test(h) ? "plan" : "";
   document.querySelectorAll("#tabbar [data-nav]").forEach(a=>{ if(a.dataset.nav===k) a.setAttribute("aria-current","page"); else a.removeAttribute("aria-current"); });
 }
-function route(){ document.body.classList.remove("on-recipe"); routePage(); setNav(); tickTimers(); }
+function route(){ if(guideOn && location.hash.slice(1)!==guideOn.r.id) closeGuide(true); document.body.classList.remove("on-recipe"); routePage(); setNav(); tickTimers(); }
 
 function routePage(){
   closeMenu(); stopRecipePhotos();
@@ -4873,6 +5101,8 @@ function routePage(){
   if(h==="grocery"){ q.value=""; groceryPage(); window.scrollTo(0,0); return; }
   if(h==="categories"){ q.value=""; categoriesPage(); window.scrollTo(0,0); return; }
   if(h.startsWith("move-") && may("move")){ const mc=CATS.find(x=>slug(x)==="c-"+h.slice(5)); if(mc){ q.value=""; movePage(mc); window.scrollTo(0,0); return; } }
+  if(h==="team" && isTeam()){ q.value=""; teamPage(); window.scrollTo(0,0); return; }
+  if(h.startsWith("team-") && isTeam()){ q.value=""; threadPage(h.slice(5)); window.scrollTo(0, document.body.scrollHeight); return; }
   if(h==="plan" || h.startsWith("plan-")){ q.value=""; planPage(h.slice(5)||null); window.scrollTo(0,0); return; }
   if(!h.startsWith("menu-")) menuBack=null;
   if(h==="menus"){ q.value=""; menusPage(); window.scrollTo(0,0); return; }

@@ -28,6 +28,7 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'public');
     }
     function isAdmin() { return isOwner() || (approvedMember() && myRole() == 'admin'); }
+    function isTeam() { return isAdmin() || (approvedMember() && myRole() == 'employee'); }
     // Employee settings (meta/employees) for all employees; a person's own perms override them.
     function empAllow(k, d) {
       let e = /databases/$(database)/documents/meta/employees;
@@ -93,6 +94,12 @@ service cloud.firestore {
       allow write: if isAdmin()
         && request.resource.data.keys().hasOnly(['allow', 'cats'])
         && request.resource.data.allow is map && request.resource.data.cats is map;
+    }
+    // Who is on the team (owner, admins, employees), so employees can pick who to write to.
+    match /meta/team {
+      allow get: if isTeam();
+      allow write: if isAdmin() && request.resource.data.keys().hasOnly(['list'])
+        && request.resource.data.list is list && request.resource.data.list.size() <= 300;
     }
     match /meta/codes {
       allow get: if signedIn();
@@ -231,6 +238,24 @@ service cloud.firestore {
     }
 
     // Menus: the person who made one changes it; people it's shared with can read it.
+    // Team messages: only employees and admins, and only the people in the conversation.
+    match /threads/{id} {
+      allow read: if isTeam() && request.auth.uid in resource.data.members;
+      allow create: if isTeam()
+        && request.resource.data.by == request.auth.uid && request.resource.data.lastBy == request.auth.uid
+        && request.resource.data.members is list && request.auth.uid in request.resource.data.members
+        && request.resource.data.members.size() <= 300
+        && request.resource.data.msgs is list && request.resource.data.msgs.size() == 1
+        && request.resource.data.msgs[0].by == request.auth.uid
+        && request.resource.data.msgs[0].text is string && request.resource.data.msgs[0].text.size() <= 1500;
+      allow update: if isTeam() && request.auth.uid in resource.data.members
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['msgs', 'updated', 'lastBy', 'readAt', 'done'])
+        && request.resource.data.msgs is list && request.resource.data.msgs.size() <= 200
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastBy'])
+            || request.resource.data.lastBy == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
     match /menus/{id} {
       allow read: if approvedMember()
         && (resource.data.uid == request.auth.uid || request.auth.uid in resource.data.get('shared', []));
