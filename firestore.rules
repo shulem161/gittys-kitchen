@@ -61,6 +61,10 @@ service cloud.firestore {
                 : request.resource.data.get('pub', null) == resource.data.get('pub', null)));
     }
     // Recipe inboxes: three different people. Whoever proofread can't approve; neither of them can release.
+    // Ordinary edits never move a recipe between inboxes
+    function noRvChange() {
+      return resource == null || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rv', 'rvUids', 'rvAsk', 'rvLog', 'rvNote', 'rvNoteBy']);
+    }
     function rvSteps() {
       let was = resource.data.get('rv', '');
       let now = request.resource.data.get('rv', '');
@@ -207,17 +211,16 @@ service cloud.firestore {
       allow read: if isAdmin()
         || (approvedMember() && (myRole() != 'public' || resource.data.get('pub', false) == true));
       // Only admins move recipes to another category; employees ask (golive, kind "move").
-      allow write: if publishOk()
+      // anyone on the team can ask for a recipe to be moved up
+      allow update: if isTeam() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rvAsk']);
+      allow write: if (publishOk() && noRvChange())
         // Recipe inboxes: proofreaders, approvers and releasers move a recipe along (rv); releasers choose public or team only
         || (resource != null && (extra('proofread') || extra('review') || extra('release'))
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog'])
             && rvSteps())
         || (resource != null && extra('release')
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub'])
-            && rvSteps())
-        // anyone on the team can ask for a recipe to be moved up
-        || (resource != null && approvedMember() && myRole() != 'public'
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rvAsk']));
+            && rvSteps());
     }
 
     // Employees asking for a recipe to be shown to public members. Admins decide.
