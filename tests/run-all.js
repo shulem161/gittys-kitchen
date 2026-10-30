@@ -231,6 +231,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await W.setViewportSize({width: 390, height: 844}); await W.goto(F + '#r-croissants'); await W.waitForTimeout(400);
     ok('…without sideways scrolling on a phone', await W.evaluate(() => document.documentElement.scrollWidth) <= 392);
     await W.goto(F + '#settings-look'); await W.waitForTimeout(300); await W.click('#app [data-tsize="1"]'); await W.waitForTimeout(200); await W.setViewportSize({width: 1100, height: 900});
+    ok('Check for updates is in Website settings', (await W.locator('#set-upd').count()) === 1);
     ok('Settings shows the website link and a full Android app download', await W.evaluate(() => /github\.io\/gittys-kitchen/.test(document.querySelector('.set-url a').href) && /Gittys-Kitchen\.apk$/.test(document.getElementById('set-apk').href)));
     ok('Website settings is titled for the website', /Website settings/.test(await W.evaluate(() => LOOK_SET())));
     await W.goto(F + '#account'); await W.waitForTimeout(500);
@@ -524,7 +525,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('…and take it away again', await V.evaluate(() => !may('answer')));
     await A.goto(F); await A.waitForTimeout(400); await A.click('#avbtn'); await A.waitForTimeout(200);
     const menuTxt = await A.locator('.menu').innerText();
-    ok('account menu is grouped and short', (await A.locator('.menu .mgroup').count()) === 5 && /Employee settings/.test(menuTxt), menuTxt.slice(0, 300));
+    ok('account menu is grouped and short', (await A.locator('.menu .mgroup').count()) === 4 && !/Check for updates/.test(menuTxt) && /Employee settings/.test(menuTxt), menuTxt.slice(0, 300));
     await A.click('.menu details[data-mg=tools] summary'); await A.waitForTimeout(200);
     const toolsTxt = await A.locator('.menu details[data-mg=tools]').innerText();
     ok('the menu has a Kitchen tools drop-down with all the tools', ['Grocery list', 'Timers', 'Calendar', 'Calculator', 'Menu ideas', 'Scan a recipe', 'Recipe requests'].every(x => toolsTxt.includes(x)), toolsTxt);

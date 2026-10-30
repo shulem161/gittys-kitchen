@@ -1159,7 +1159,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.91";
+const WEB_VERSION = "3.92";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -3165,22 +3165,12 @@ function openMenu(confirming){
       offline||!can("feedback")||may("inbox") ? "" : item("#feedback","Suggestions &amp; comments"),
     ].filter(Boolean), 0)}
     ${group("settings","Settings", [item("#account","Account settings"), item("#settings-look", LOOK_SET())], 0)}
-    ${group("app","App", [
-      isAdmin()?`<button type="button" role="menuitem" id="m-ntfy">Send test notification <span class="n"></span></button>`:"",
-      `<button type="button" role="menuitem" id="m-upd">Check for updates <span class="n">v${WEB_VERSION}</span></button>`,
-      isAdmin()||offline||viewingAs() ? "" : confirming?`<div class="confirm">Delete your profile and favorites? You'd need to ask to join again.
-        <div class="row"><button type="button" class="btn warn" id="m-yes">Delete</button><button type="button" class="btn" id="m-no">Cancel</button></div></div>`
-        :`<button type="button" role="menuitem" class="danger" id="m-del">Delete my profile</button>`].filter(Boolean), 0)}
     <button type="button" role="menuitem" id="m-out" class="m-out">Sign out</button>`;
   m.querySelectorAll(".mgroup").forEach(d=>d.addEventListener("toggle",()=>{ d.open ? menuOpen.add(d.dataset.mg) : menuOpen.delete(d.dataset.mg); }));
   m.onclick=e=>e.stopPropagation();
   acct.appendChild(m);
   m.querySelectorAll('a').forEach(a=>a.onclick=closeMenu);
   m.querySelector('#m-out').onclick=signOut;
-  m.querySelector('#m-upd').onclick=()=>{ closeMenu(); checkUpdates(true); };
-  const nt=m.querySelector('#m-ntfy'); if(nt) nt.onclick=async()=>{ closeMenu(); const r=await notifyAdmin("Test from Gitty's Kitchen","Notifications are working.","","white_check_mark"); toast(r&&r.ok?"Test sent. Check your device.":"Couldn't send. Check your internet connection."); };
-  const del=m.querySelector('#m-del'); if(del) del.onclick=()=>openMenu(true);
-  const yes=m.querySelector('#m-yes'); if(yes){ yes.onclick=()=>{ closeMenu(); deleteMe(); }; m.querySelector('#m-no').onclick=()=>openMenu(false); }
 }
 document.addEventListener("click",closeMenu);
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeMenu(); });
@@ -5050,7 +5040,7 @@ function settingsPage(){
       <p class="hint">Otherwise it stays out of the way. Today's to-do list is always on the Calendar, on today's date.</p></div>`:""}
     <div class="panel-a set-app"><h3>App</h3>
       <p>Version ${WEB_VERSION}${appBuild?` · Android app ${appBuild}`:""}</p>
-      <div class="row mn-actions"><button type="button" class="btn" id="set-upd">Check for updates</button></div>
+      <div class="row mn-actions"><button type="button" class="btn" id="set-upd">Check for updates</button>${isAdmin()?`<button type="button" class="btn" id="set-ntfy">Send a test notification</button>`:""}</div>
       <h4>Website</h4>
       <p class="set-url"><a class="link" href="${SITE}" target="_blank" rel="noopener">${SITE.replace(/^https:\/\//,"").replace(/\/$/,"")}</a></p>
       <div class="row mn-actions"><button type="button" class="btn" id="set-copy">Copy link</button>${navigator.share?`<button type="button" class="btn" id="set-share">Share</button>`:""}</div>
@@ -5062,6 +5052,7 @@ function settingsPage(){
   app.querySelectorAll("[data-tsize]").forEach(b=>b.onclick=()=>{ store("gk-textsize", b.dataset.tsize==="1"?null:b.dataset.tsize); applyTextSize(); settingsPage(); });
   const pt=document.getElementById("pref-todo"); if(pt) pt.onchange=()=>{ setPref("todoDays", +pt.value); toast("Saved"); };
   document.getElementById("set-upd").onclick=()=>checkUpdates(true);
+  const stn=document.getElementById("set-ntfy"); if(stn) stn.onclick=async()=>{ const r=await notifyAdmin("Test from Gitty's Kitchen","Notifications are working.","","white_check_mark"); toast(r&&r.ok?"Test sent. Check your device.":"Couldn't send. Check your connection."); };
   document.getElementById("set-copy").onclick=()=>copyText(SITE);
   document.getElementById("set-apkcopy").onclick=()=>copyText(SITE+"Gittys-Kitchen.apk");
   const ssh=document.getElementById("set-share"); if(ssh) ssh.onclick=()=>navigator.share({title:"Gitty's Kitchen", text:"Our family cookbook", url:SITE}).catch(()=>{});
