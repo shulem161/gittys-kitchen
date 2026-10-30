@@ -62,7 +62,8 @@ service cloud.firestore {
     }
     // Recipe inboxes: three different people. Whoever proofread can't approve; neither of them can release.
     function rvSteps() {
-      let was = resource.data.get('rv', ''), now = request.resource.data.get('rv', '');
+      let was = resource.data.get('rv', '');
+      let now = request.resource.data.get('rv', '');
       return !(((was == 'approve' && now == 'release') || (was == 'release' && now == ''))
                && request.auth.uid in resource.data.get('rvUids', []));
     }
