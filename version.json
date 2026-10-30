@@ -1,6 +1,6 @@
 {
-  "web": "4.00",
+  "web": "4.01",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Shorter Public / Team only tag on recipes."
+  "notes": "Inbox settings; every recipe goes public only through the three steps."
 }

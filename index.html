@@ -625,6 +625,10 @@ body.guiding{overflow:hidden}
 :root[data-theme="dark"] .aud.pub{background:#1E3D28;color:#BDEBCB}:root[data-theme="dark"] .aud.priv{background:#3A2E15;color:#F0D49A}
 .rv-log{margin:6px 0 0;font-size:14px}.rv-log summary{cursor:pointer;color:var(--accent);font-weight:600}.rv-log ul{margin:6px 0 0;padding-left:18px}
 .lock{display:inline-block;padding:6px 10px;border-radius:10px;background:var(--bg);border:1px solid var(--line);font-size:13.5px}
+.ibs-wrap{overflow-x:auto;margin-top:10px}.ibs{width:100%;border-collapse:collapse;font-size:14.5px}
+.ibs th,.ibs td{padding:8px;border-bottom:1px solid var(--line);text-align:center;vertical-align:middle}.ibs thead th{font-size:13px;color:var(--muted)}
+.ibs tbody th{text-align:left}.ibs tbody th small{display:block;color:var(--muted);font-weight:400;font-size:12.5px}
+.ibs-c input{width:22px;height:22px}.ibs-all{color:var(--accent);font-weight:800}
 .rv-bar{margin:8px 0 2px;padding:10px 12px;border:1px dashed var(--accent);border-radius:12px;background:var(--accent-soft);display:grid;gap:6px;font-size:14.5px}
 .rv-bar .row:empty{display:none}
 .rv-list{list-style:none;margin:0;padding:0}.rv-list > li{padding:10px 0;border-bottom:1px solid var(--line)}.rv-list > li[hidden]{display:none}
@@ -1212,7 +1216,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.00";
+const WEB_VERSION = "4.01";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1843,12 +1847,12 @@ function recipe(r){
       ${sx!==1?`<p class="hint scale-note">Amounts are for ${fmtNum(sx)}× the recipe. Pan size and baking time may need adjusting.</p>`:""}
       <div class="tools">
         ${recipesOnline&&!offline&&(can("suggest")||may("edit"))?`<a class="btn solid" href="#edit-${r.id}">${may("edit")?"Edit recipe":"Suggest changes"}</a>`:""}
-        ${isTeam()&&!offline?`<button class="btn" id="proof-btn" type="button">✓ Send to proofread</button>`:""}
+        ${isTeam()&&!offline&&!r.rv?`<button class="btn" id="proof-btn" type="button">✓ Ask someone to proofread</button>`:""}
         ${isTeam()&&!offline?`<button class="btn" id="askteam-btn" type="button">${TOOL_IC.ask.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Ask the team about this</button>`:""}
         ${isAdmin()&&recipesOnline&&!offline?`<button class="btn" id="mv-btn" type="button">Move to another category</button>`:""}
         ${myRole()==="employee"&&recipesOnline&&!offline?(myMoveAsk(r.id)?`<span class="btn pub-state" aria-disabled="true">Asked to move to ${esc(myMoveAsk(r.id).to)} ✓</span>`:`<button class="btn" id="mv-btn" type="button">Ask to move to another category</button>`):""}
-        ${myRole()==="employee"&&recipesOnline&&!offline?(pubVisible(r)?`<span class="btn pub-state live" aria-disabled="true">Live ✓</span>`:myGolive(r.id)?`<span class="btn pub-state" aria-disabled="true">Asked to go live ✓</span>`:`<button class="btn solid" id="gl-btn" type="button">Request to go live</button>`):""}
-        ${isAdmin()&&recipesOnline&&!offline?`<button class="btn${pubVisible(r)?" live":" solid"}" id="pubtog" type="button" aria-pressed="${pubVisible(r)}" title="${pubVisible(r)?"Public members can see it. Tap to take it off.":"Public members can't see it. Tap to make it live."}">${pubVisible(r)?"Live ✓":"Go live"}</button>`:""}
+        ${isTeam()&&!isPublic()&&recipesOnline&&!offline&&!r.rv&&!pubVisible(r)?`<button class="btn" id="go3-btn" type="button">🌐 Send through the 3 steps to go public</button>`:""}
+
         <button class="btn" id="toplan-btn" type="button">${TOOL_IC.cal}Add to calendar</button>
         <a class="btn" href="#timers-${r.id}">${TIMER_IC.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Set a timer</a>
         <button class="btn fav" id="fav" aria-pressed="${isFav}">${HEART}${isFav?"Saved to favorites":"Save to favorites"}</button>
@@ -1939,12 +1943,7 @@ function recipe(r){
   const atb=document.getElementById("askteam-btn"); if(atb) atb.onclick=e=>askTeamBox(r, e.currentTarget);
   const pfb=document.getElementById("proof-btn"); if(pfb) pfb.onclick=e=>askTeamBox(r, e.currentTarget, "proof");
   const pst=proofStatus(r.id); if(pst && pfb) pfb.insertAdjacentHTML("afterend", pst);
-  const glb=document.getElementById("gl-btn"); if(glb) glb.onclick=async()=>{ glb.disabled=true;
-    try{ await requestGolive(r); glb.outerHTML='<span class="btn pub-state" aria-disabled="true">Asked to go live ✓</span>'; toast("Sent to the admins"); }catch(e){ glb.disabled=false; toast("Couldn't send. Check your connection."); } };
-  const pt=document.getElementById("pubtog");
-  if(pt) pt.onclick=async()=>{ const v=!pubVisible(r); pt.disabled=true;
-    try{ await db.collection("recipes").doc(r.id).update({pub:v}); r.pub=v; pt.setAttribute("aria-pressed",v); pt.textContent=v?"Live ✓":"Go live"; pt.classList.toggle("live",v); pt.classList.toggle("solid",!v); toast(v?"Live: public members can see it":"Not live: public members can't see it"); }
-    catch(e){ toast("Couldn't save. Check your connection."); } pt.disabled=false; };
+  const g3=document.getElementById("go3-btn"); if(g3) g3.onclick=async()=>{ g3.disabled=true; if(await rvEnter(r)) recipe(r); else g3.disabled=false; };
   document.getElementById("toplan-btn").onclick=e=>addToPlanBox(r, e.currentTarget);
   const tdr=document.getElementById("td-rec"); if(tdr) tdr.onclick=e=>{ const b=e.currentTarget, nm=r.t.replace("Untitled: ","");
     if(inToday(r.id)){ const v=tdStore(); v.items=v.items.filter(x=>!(x.rid===r.id&&!x.done)); tdSave(v); b.setAttribute("aria-pressed","false"); b.textContent="Add to today"; toast("Taken off today's list"); }
@@ -2202,7 +2201,7 @@ function publicPage(){
       <div class="pub-hits" id="pub-hits"></div>
       <ul class="pub-cats">${CATS.map(c=>{ const x=sum(c);
         return `<li data-pcat="${esc(c)}"><div class="pub-top"><div><b>${esc(c)}</b><span class="hint" data-psum>${x.txt}</span></div>
-          <div class="pub-btns"><button type="button" class="btn sm${x.on===x.n&&x.n?" on":""}" data-pc="${esc(c)}" data-pv="1">Show all</button><button type="button" class="btn sm${!x.on&&x.n?" on":""}" data-pc="${esc(c)}" data-pv="0">Hide all</button></div></div>
+          <div class="pub-btns"><button type="button" class="btn sm${x.on===x.n&&x.n?" on":""}" data-pc="${esc(c)}" data-pv="1">Send hidden ones to go public</button><button type="button" class="btn sm${!x.on&&x.n?" on":""}" data-pc="${esc(c)}" data-pv="0">Hide all</button></div></div>
           ${x.n?`<details class="pub-pick" data-pd="${esc(c)}" ${pubOpen.has(c)?"open":""}><summary>Choose recipes</summary><div class="pub-list">${pubOpen.has(c)?recList(c):""}</div></details>`:""}</li>`; }).join("")}</ul>
     </div>
   </section>`;
@@ -2214,6 +2213,7 @@ function publicPage(){
     const [sb,hb]=li.querySelectorAll("[data-pc]"); sb.classList.toggle("on", x.on===x.n&&x.n>0); hb.classList.toggle("on", !x.on&&x.n>0); };
   const wireBoxes = root => root.querySelectorAll("[data-pr]").forEach(cb=>cb.onchange=async()=>{
     const r=RECIPES.find(y=>y.id===cb.dataset.pr); if(!r) return; const v=cb.checked;
+    if(v){ cb.checked=false; if(r.rv){ toast(`It's already in ${INBOX_NAME[r.rv]}. It goes public after the three steps.`); return; } await rvEnter(r); return; }
     app.querySelectorAll(`[data-pr="${CSS.escape(r.id)}"]`).forEach(o=>o.checked=v);
     try{ await db.collection("recipes").doc(r.id).update({pub:v}); r.pub=v; refresh(r.c); }
     catch(e){ app.querySelectorAll(`[data-pr="${CSS.escape(r.id)}"]`).forEach(o=>o.checked=!v); toast("Couldn't save. Check your connection."); } });
@@ -2227,6 +2227,10 @@ function publicPage(){
     wireBoxes(hits); };
   app.querySelectorAll("[data-pa]").forEach(c=>c.onchange=async()=>{ try{ await savePub({allow:{[c.dataset.pa]:c.checked}}); toast(c.checked?"Public members can do this now":"Public members can't do this now"); }catch(e){ c.checked=!c.checked; toast("Couldn't save. Check your connection."); } });
   app.querySelectorAll("[data-pc]").forEach(b=>b.onclick=async()=>{ const c=b.dataset.pc, v=b.dataset.pv==="1";
+    if(v){ const L=RECIPES.filter(r=>r.c===c && !pubVisible(r) && !r.rv); b.disabled=true;
+      try{ for(let i=0;i<L.length;i+=400){ const bt=db.batch(); L.slice(i,i+400).forEach(r=>bt.update(db.collection("recipes").doc(r.id),{rv:"proof", rvUids:[], rvAsk:[], rvBy:myName(), rvAt:Date.now(), rvLog:[...(r.rvLog||[]), {from:"", to:"proof", by:myName(), uid:me, at:Date.now()}].slice(-30)})); await bt.commit(); }
+        L.forEach(r=>{ r.rv="proof"; r.rvUids=[]; }); toast(L.length?`${L.length} hidden ${L.length===1?"recipe went":"recipes went"} to Need to proofread. They go public after the three steps.`:"Nothing hidden to send"); renderAcct(); }
+      catch(e){ toast("Couldn't save. Check your connection."); } const y=window.scrollY; publicPage(); window.scrollTo(0,y); return; }
     const ids=RECIPES.filter(r=>r.c===c).map(r=>r.id); b.disabled=true; b.textContent="Saving…";
     try{ await savePub({cats:{[c]:v}});
       for(let i=0;i<ids.length;i+=400){ const bt=db.batch(); ids.slice(i,i+400).forEach(id=>bt.update(db.collection("recipes").doc(id),{pub:v})); await bt.commit(); }
@@ -3358,7 +3362,7 @@ function openMenu(confirming){
       offline||!can("requests") ? "" : item("#requests", may("answer")?"Recipe requests":"Request a recipe", may("answer")&&openRequests()?openRequests()+" waiting":"", may("answer")&&openRequests()),
       offline||!can("feedback")||may("inbox") ? "" : item("#feedback","Suggestions &amp; comments"),
     ].filter(Boolean), 0)}
-    ${group("settings","Settings", [item("#account","Account settings"), item("#settings-look", LOOK_SET())], 0)}
+    ${group("settings","Settings", [item("#account","Account settings"), item("#settings-look", LOOK_SET()), isAdmin()?item("#inbox-settings","Inbox settings"):""].filter(Boolean), 0)}
     <button type="button" role="menuitem" id="m-out" class="m-out">Sign out</button>`;
   m.querySelectorAll(".mgroup").forEach(d=>d.addEventListener("toggle",()=>{ d.open ? menuOpen.add(d.dataset.mg) : menuOpen.delete(d.dataset.mg); }));
   m.onclick=e=>e.stopPropagation();
@@ -3663,7 +3667,7 @@ function rvMove(r, to, extra, msg){
   const uids = to==="proof" ? [] : [...new Set([...(r.rvUids||[]), me, ...asked.map(a=>a.uid)])];
   return setRv(r, Object.assign({rv:to, rvBy:myName(), rvAt:now, rvUids:uids, rvAsk:[], rvLog:[...(r.rvLog||[]), entry].slice(-30)}, extra||{}), msg);
 }
-const RV_STEP = {approve:"Proofread ✓ → For approval", release:"Approved → Ready to release", done:"Released", proof:"Sent back to Need to proofread"};
+const RV_STEP = {approve:"Proofread ✓ → For approval", release:"Approved → Ready to release", done:"Released", proof:"Put in Need to proofread"};
 const rvLogHTML = log => log.slice().reverse().map(e=>`<li><b>${RV_STEP[e.to]||e.to}${e.to==="done"?(e.pub===false?" for the team only":" to the public"):""}</b> · moved up by ${esc(e.by)}${(e.asked||[]).length?`, asked by ${e.asked.map(a=>esc(a.name)).join(", ")}`:""} · ${fmtDate(e.at)}</li>`).join("");
 // Everything one person moved up (or asked to move up), newest first
 const movedUp = () => { const u=who(), out=[];
@@ -3671,6 +3675,12 @@ const movedUp = () => { const u=who(), out=[];
   subs.forEach(s=>(s.log||[]).forEach(e=>{ if(e.to!=="proof" && e.uid===u) out.push({rid:s.recipeId||"", t:s.t, e}); }));
   return out.sort((a,b)=>b.e.at-a.e.at); };
 const rvLocked = r => (r.rv==="approve"||r.rv==="release") && (r.rvUids||[]).includes(me);
+// Into Need to proofread, so it can go public after the three steps
+async function rvEnter(r){
+  const ok = await setRv(r, {rv:"proof", rvUids:[], rvAsk:[], rvBy:myName(), rvAt:Date.now(), rvLog:[...(r.rvLog||[]), {from:"", to:"proof", by:myName(), uid:me, at:Date.now()}].slice(-30)}, "Sent to Need to proofread. It goes public after the three steps.");
+  if(ok) notifyWatchers("watch-proof", `${myName()} wants a recipe to go public`, `“${r.t}” is in Need to proofread.`, "#"+r.id, "eyes");
+  return ok;
+}
 const rvActs = {
   ok: r => rvMove(r, "approve", {rvNote:"", rvNoteBy:""}, "Proofread ✓ – now in For approval"),
   approve: r => rvMove(r, "release", null, "Approved – now in Ready to release"),
@@ -3687,8 +3697,8 @@ function rvButtons(r){
   const st=r.rv; if(!st) return "";
   if(rvLocked(r) && ((st==="approve" && may("review")) || (st==="release" && may("release")))) return `<span class="hint lock">🔒 You moved this one up already, so someone else has to do the next step.</span>`;
   if((r.rvAsk||[]).some(a=>a.uid===me) && !((st==="proof"&&may("proofread"))||(st==="approve"&&may("review"))||(st==="release"&&may("release")))) return `<span class="hint lock">You asked to move it up. You count as moving it, so you can't do the step after.</span>`;
-  if(st==="proof" && may("proofread")) return `<button type="button" class="btn sm solid" data-rv="ok" data-rid="${esc(r.id)}">✓ Looks good</button><button type="button" class="btn sm" data-rv="fix" data-rid="${esc(r.id)}">✗ Needs changes</button>`;
-  if(st==="approve" && may("review")) return `<button type="button" class="btn sm solid" data-rv="approve" data-rid="${esc(r.id)}">Approve</button><button type="button" class="btn sm" data-rv="back" data-rid="${esc(r.id)}">Back to proofread</button>`;
+  if(st==="proof" && may("proofread")) return `<button type="button" class="btn sm solid" data-rv="ok" data-rid="${esc(r.id)}">✓ Proofread – send to For approval</button><button type="button" class="btn sm" data-rv="fix" data-rid="${esc(r.id)}">✗ Needs changes</button>`;
+  if(st==="approve" && may("review")) return `<button type="button" class="btn sm solid" data-rv="approve" data-rid="${esc(r.id)}">✓ Approve – send to Ready to release</button><button type="button" class="btn sm" data-rv="back" data-rid="${esc(r.id)}">Back to proofread</button>`;
   if(st==="release" && may("release")) return `<button type="button" class="btn sm solid" data-rv="pub" data-rid="${esc(r.id)}">🌐 Release to the public</button><button type="button" class="btn sm" data-rv="priv" data-rid="${esc(r.id)}">🔒 Release for the team only</button>`;
   // everyone else on the team can ask the people who may do it
   if(isTeam() && !isPublic()) return `<button type="button" class="btn sm" data-rv="ask" data-rid="${esc(r.id)}">Ask to move it to the next step</button>`;
@@ -3783,8 +3793,8 @@ function recipeInbox(stage){
   const steps=`<ol class="ib-steps">${INBOXES.map(([st,l,p],i)=>`<li class="${st===stage?"on":""}">${may(p)?`<a href="#${st}">`:"<span>"}<b>${i+1}</b> ${l}${inboxCount(st)?` <span class="count">${inboxCount(st)}</span>`:""}${may(p)?"</a>":"</span>"}</li>`).join("")}</ol>`;
   // Three different people: whoever proofread it can't approve it, and neither of them can release it
   const lockMsg = s => (stage==="approve"||stage==="release") && ((s.uids||[]).includes(me) || s.proofUid===me || s.approvedUid===me) ? "You moved this one up already, so someone else has to do the next step." : "";
-  const acts = s => lockMsg(s) ? `<span class="hint lock">🔒 ${lockMsg(s)}</span>` : stage==="proof" ? `<button type="button" class="btn solid" data-ib="ok">✓ Looks good</button><button type="button" class="btn" data-ib="fix">✗ Needs changes</button><a class="btn" href="#review-${esc(s.id)}">Edit</a><button type="button" class="btn" data-ib="ask-reject">Decline</button>`
-    : stage==="approve" ? `<button type="button" class="btn solid" data-ib="approve">Approve</button><a class="btn" href="#review-${esc(s.id)}">Edit</a><button type="button" class="btn" data-ib="back">Back to proofread</button><button type="button" class="btn" data-ib="ask-reject">Decline</button>`
+  const acts = s => lockMsg(s) ? `<span class="hint lock">🔒 ${lockMsg(s)}</span>` : stage==="proof" ? `<button type="button" class="btn solid" data-ib="ok">✓ Proofread – send to For approval</button><button type="button" class="btn" data-ib="fix">✗ Needs changes</button><a class="btn" href="#review-${esc(s.id)}">Edit</a><button type="button" class="btn" data-ib="ask-reject">Decline</button>`
+    : stage==="approve" ? `<button type="button" class="btn solid" data-ib="approve">✓ Approve – send to Ready to release</button><a class="btn" href="#review-${esc(s.id)}">Edit</a><button type="button" class="btn" data-ib="back">Back to proofread</button><button type="button" class="btn" data-ib="ask-reject">Decline</button>`
     : `<button type="button" class="btn solid" data-ib="pub">🌐 Release to the public</button><button type="button" class="btn" data-ib="priv">🔒 Release for the team only</button><a class="btn" href="#review-${esc(s.id)}">Edit</a>`;
   app.innerHTML = `<section class="wrap admin inbox">
     <div class="section-head" style="margin-top:28px"><h2>${title}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}</p></div>
@@ -5361,6 +5371,22 @@ const TEXT_SIZES = [["1","Normal"],["1.12","Large"],["1.25","Extra large"]];
 const myTextSize = () => store("gk-textsize") || "1";
 function applyTextSize(){ const z=myTextSize(); app.style.zoom = z==="1" ? "" : z; }
 const LOOK_SET = () => appBuild ? "App settings" : "Website settings";
+function inboxSettings(){
+  const team=members.filter(m=>m.status==="approved" && ["owner","admin","employee"].includes(roleOf(m))).sort((a,b)=>({owner:0,admin:1,employee:2}[roleOf(a)]-{owner:0,admin:1,employee:2}[roleOf(b)]) || byName(a.name,b.name));
+  app.innerHTML=`<section class="wrap admin">
+    <div class="section-head" style="margin-top:28px"><h2>Inbox settings</h2><p>Who may work in each inbox</p></div>
+    <div class="panel-a"><p class="hint">Every recipe goes through all three: <b>1 Need to proofread</b> → <b>2 For approval</b> → <b>3 Ready to release</b>. The same person can never do two steps for one recipe. Anyone on the team can ask for a recipe to move on; those ticked here get the notice.</p>
+      <div class="ibs-wrap"><table class="ibs"><thead><tr><th>Who</th>${INBOXES.map(([,l],i)=>`<th>${i+1}. ${l}</th>`).join("")}</tr></thead>
+      <tbody>${team.map(m=>`<tr><th><b>${esc(m.name)}</b><small>${ROLE_LABEL[roleOf(m)]}${m.no?" · no. "+m.no:""}</small></th>${INBOXES.map(([st,,p])=>roleOf(m)==="employee"
+        ? `<td><label class="ibs-c"><input type="checkbox" data-ibs="${p}" data-ibu="${esc(m.uid)}" ${permOf(m,p)?"checked":""}><span class="sr">${esc(m.name)}: ${INBOX_NAME[st]}</span></label></td>`
+        : `<td><span class="ibs-all" title="Admins can always">✓</span></td>`).join("")}</tr>`).join("")}</tbody></table></div>
+      <p class="hint" style="margin-top:8px">Admins can always work in every inbox. To make someone an admin or an employee, use <a class="link" href="#admin">Members</a>.</p></div>
+  </section>`;
+  app.querySelectorAll("[data-ibs]").forEach(c=>c.onchange=async()=>{ const m=members.find(x=>x.uid===c.dataset.ibu); if(!m) return;
+    const k=c.dataset.ibs, perms=Object.assign({}, m.perms||{}); if(c.checked===empDefault(k)) delete perms[k]; else perms[k]=c.checked;
+    try{ await db.collection("users").doc(m.uid).update({perms}); m.perms=perms; toast(`${m.name}: ${c.checked?"can":"can't"} work in ${INBOX_NAME[INBOXES.find(x=>x[2]===k)[0]]}`); syncTeamList(); }
+    catch(e){ c.checked=!c.checked; toast("Couldn't save. Check your connection."); } });
+}
 function settingsPage(){
   const seg = (name, opts, cur) => `<div class="seg" role="radiogroup" aria-label="${name}">${opts.map(([k,l])=>`<button type="button" role="radio" data-${name}="${k}" aria-checked="${cur===k}">${l}</button>`).join("")}</div>`;
   app.innerHTML = `<section class="wrap admin settings">
@@ -5814,6 +5840,7 @@ function routePage(){
   if(!offline && h.startsWith("edit-")){ const er=RECIPES.find(x=>x.id===h.slice(5)); if(er){ q.value=""; editor(er); window.scrollTo(0,0); return; } }
   if(h==="profile"){ q.value=""; profilePage(); window.scrollTo(0,0); return; }
   if(h==="settings"){ q.value=""; settingsPage(); window.scrollTo(0,0); return; }
+  if(h==="inbox-settings" && isAdmin()){ q.value=""; inboxSettings(); window.scrollTo(0,0); return; }
   if(h==="settings-look"){ q.value=""; settingsPage(); window.scrollTo(0,0); return; }
   if(h==="account"){ q.value=""; profilePage("account"); window.scrollTo(0,0); return; }
   if(h==="inbox" && may("inbox")){ q.value=""; inboxPage(); window.scrollTo(0,0); return; }

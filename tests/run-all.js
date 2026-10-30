@@ -38,6 +38,14 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       await P.evaluate(async t => { for (const s of subs.filter(x => x.t.includes(t) || (x.n || '').includes(t))) { const u = {uids: [], proofUid: '', approvedUid: ''}; { await db.collection('submissions').doc(s.id).update(u); Object.assign(s, u); } } }, title);
     }
   };
+  // A recipe already in the cookbook goes through the three steps (pretending three different people did them)
+  const rvThrough = async (P, rid, priv) => {
+    for (const k of ['ok', 'approve', priv ? 'priv' : 'pub']) {
+      await P.goto(F + '#' + rid); await P.waitForTimeout(500); await P.reload(); await P.waitForTimeout(900);
+      await P.locator(`.rv-bar [data-rv=${k}]`).click(); await P.waitForTimeout(700);
+      await P.evaluate(async id => { await db.collection('recipes').doc(id).update({rvUids: []}); }, rid);
+    }
+  };
   const join = async (p, name, pw, noConfirm) => { await p.click('[data-mode=create]'); await p.fill('#nm', name); await p.fill('#em', mailOf(name)); await p.fill('#pw', pw); await p.fill('#pw2', pw); await p.click('#fake-robot').catch(() => {}); await p.click('.primary'); await p.waitForTimeout(600);
     if (!noConfirm && await p.locator('#ev-check').count()) { await p.evaluate(() => __fakeVerify()); await p.click('#ev-check'); await p.waitForTimeout(600); } };
 
@@ -477,24 +485,21 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('switched-off tool is gone for public members', (await PP.locator('.cats.tools a[href="#requests"]').count()) === 0 && (await V.locator('.cats.tools a[href="#requests"]').count()) === 1);
     await PP.goto(F + '#requests'); await PP.waitForTimeout(400);
     ok("public member can't open it by address", (await PP.locator('#rqform').count()) === 0);
-    await A.goto(F + '#r-challah'); await A.waitForTimeout(300); await A.click('#pubtog'); await A.waitForTimeout(500);
+    await A.goto(F + '#public'); await A.waitForTimeout(400); await A.fill('#pub-q', 'challah'); await A.waitForTimeout(200); await A.locator('#pub-hits [data-pr="r-challah"]').uncheck(); await A.waitForTimeout(600);
     ok('admin can hide one recipe', await PP.evaluate(() => !RECIPES.some(r => r.id === 'r-challah')) && await V.evaluate(() => RECIPES.some(r => r.id === 'r-challah')));
     // Employees ask for a hidden recipe to go live
     await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
-    ok('employees see "Request to go live" on a hidden recipe', (await V.locator('#gl-btn').count()) === 1);
+    ok('a hidden recipe says Team only, and can be sent through the 3 steps to go public', /Team only/.test(await V.locator('.rhead .aud').innerText()) && (await V.locator('#go3-btn').count()) === 1);
     await V.goto(F + '#r-croissants'); await V.waitForTimeout(300);
-    ok('…and "Live ✓" on a visible one', /Live ✓/.test(await V.locator('.rhead').innerText()) && (await V.locator('#gl-btn').count()) === 0);
+    ok('…a public one says Public', /Public/.test(await V.locator('.rhead .aud').innerText()) && (await V.locator('#go3-btn').count()) === 0);
+    await A.goto(F + '#r-challah'); await A.waitForTimeout(400);
+    ok('there is no Go live button any more', (await A.locator('#pubtog').count()) === 0 && (await A.locator('#gl-btn').count()) === 0);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(400);
-    await V.click('#gl-btn'); await V.waitForTimeout(600);
-    ok('…and it shows as asked', /Asked to go live/.test(await V.locator('.rhead').innerText()) && notes.some(n => /show a recipe to the public/.test(n)));
-    await A.goto(F + '#public'); await A.waitForTimeout(600);
-    ok('the request waits in Public portal settings', /Asked to go public/.test(await A.locator('main').innerText()));
-    await A.locator('[data-gl][data-glok="1"]').first().click(); await A.waitForTimeout(800);
-    ok('approving it shows the recipe to the public', await PP.evaluate(() => RECIPES.some(r => r.id === 'r-challah')));
-    await A.goto(F + '#r-challah'); await A.waitForTimeout(300);
-    ok('admins see "Live ✓" on a live recipe', (await A.locator('#pubtog').innerText()).trim() === 'Live ✓');
-    await A.click('#pubtog'); await A.waitForTimeout(400);
-    ok('…and "Go live" once it is taken off', (await A.locator('#pubtog').innerText()).trim() === 'Go live');
+    await V.click('#go3-btn'); await V.waitForTimeout(700);
+    ok('…it goes into Need to proofread, not straight to the public', /In Need to proofread/.test(await V.locator('.rv-bar').innerText()) && await PP.evaluate(() => !RECIPES.some(r => r.id === 'r-challah')) && notes.some(n => /wants a recipe to go public/.test(n)));
+    await rvThrough(A, 'r-challah');
+    ok('after the three steps it is public', await PP.evaluate(() => RECIPES.some(r => r.id === 'r-challah')));
+    await A.goto(F + '#public'); await A.waitForTimeout(400); await A.fill('#pub-q', 'challah'); await A.waitForTimeout(200); await A.locator('#pub-hits [data-pr="r-challah"]').uncheck(); await A.waitForTimeout(600);
     await A.goto(F + '#public'); await A.waitForTimeout(400);
     await A.locator('[data-pd="Bread"] summary').click(); await A.waitForTimeout(200);
     const br = await A.locator('[data-pd="Bread"] [data-pr]').count();
@@ -502,8 +507,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('recipe-by-recipe: untick hides just that one', br >= 5 && await PP.evaluate(() => !RECIPES.some(r => r.id === 'r-croissants') && RECIPES.some(r => r.c === 'Bread')), br);
     ok('category shows how many are visible', /of \d+ visible/.test(await A.locator('[data-pcat="Bread"] [data-psum]').innerText()));
     await A.fill('#pub-q', 'croissant'); await A.waitForTimeout(200);
-    await A.locator('#pub-hits [data-pr="r-croissants"]').check(); await A.waitForTimeout(500);
-    ok('search box finds and shows a recipe again', await PP.evaluate(() => RECIPES.some(r => r.id === 'r-croissants')) && await A.locator('[data-pd="Bread"] [data-pr="r-croissants"]').isChecked());
+    await A.locator('#pub-hits [data-pr="r-croissants"]').click(); await A.waitForTimeout(600);
+    ok('ticking a hidden recipe sends it through the 3 steps instead of showing it', await PP.evaluate(() => !RECIPES.some(r => r.id === 'r-croissants')) && await A.evaluate(() => RECIPES.find(r => r.id === 'r-croissants').rv === 'proof'));
+    await rvThrough(A, 'r-croissants');
+    ok('…then it shows again', await PP.evaluate(() => RECIPES.some(r => r.id === 'r-croissants')));
     await V.goto(F + '#public'); await V.waitForTimeout(300);
     ok("employees don't get admin pages", (await V.locator('.pub-cats').count()) === 0);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(300);
@@ -528,7 +535,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('owner can make an admin', await PP.evaluate(() => isAdmin()) && (await A.locator('.mrow', {hasText: 'Public Pat'}).locator('.tag').innerText()) === 'ADMIN');
     await PP.goto(F + '#admin'); await PP.waitForTimeout(500);
     ok("an admin can't change the owner", (await PP.locator('.mrow', {hasText: 'Shulem'}).locator('[data-role]').count()) === 0 && (await PP.locator('.mrow', {hasText: 'Test Member'}).first().locator('[data-role]').count()) === 1);
-    await A.goto(F + '#public'); await A.waitForTimeout(300); await A.locator('[data-pc="Cakes"][data-pv="1"]').click(); await A.waitForTimeout(500); await A.check('[data-pa=requests]'); await A.waitForTimeout(300);
+    await A.goto(F + '#public'); await A.waitForTimeout(300); await A.locator('[data-pc="Cakes"][data-pv="1"]').click(); await A.waitForTimeout(700);
+    ok('“Send hidden ones to go public” puts them in Need to proofread', await A.evaluate(() => RECIPES.filter(r => r.c === 'Cakes').every(r => r.rv === 'proof' && r.pub === false)));
+    await A.evaluate(async () => { for (const r of RECIPES.filter(r => r.c === 'Cakes')) { await db.collection('recipes').doc(r.id).update({pub: true, rv: ''}); r.pub = true; r.rv = ''; } });   // (as if released)
+    await A.goto(F + '#public'); await A.waitForTimeout(300); await A.check('[data-pa=requests]'); await A.waitForTimeout(300);
 
     // Per-person employee permissions
     const vn = await V.evaluate(() => myName());
@@ -673,7 +683,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#r-croissants'); await A.waitForTimeout(300); await A.click('#mv-btn'); await A.selectOption('#mv1-cat', 'Bread'); await A.click('#mv1-go'); await A.waitForTimeout(800);
 
     // See it as… (owner)
-    await A.goto(F + '#r-challah'); await A.waitForTimeout(300); if ((await A.locator('#pubtog').innerText()).includes('Live')) { await A.click('#pubtog'); await A.waitForTimeout(400); }
+    await A.evaluate(async () => { await db.collection('recipes').doc('r-challah').update({pub: false}); });
     await A.goto(F + '#viewas'); await A.waitForTimeout(300);
     ok('the owner can log in as admin, employee or customer', (await A.locator('[data-va]').count()) === 3);
     await A.click('[data-va=public]'); await A.waitForTimeout(1500);
@@ -827,6 +837,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await V.goto(F + '#profile'); await V.waitForTimeout(500);
     ok('…and asking counts as moving it up, on their profile', /[1-9]\s*moved up/.test(await V.locator('.pstats').innerText()));
     ok('…then on to approval and release, still in the cookbook the whole time', await A.evaluate(() => { const r = RECIPES.find(x => x.id === 'r-croissants'); return !r.rv && r.pub === true; }));
+    await A.goto(F + '#inbox-settings'); await A.waitForTimeout(500);
+    ok('Inbox settings shows who may work in each inbox', (await A.locator('.ibs thead th').count()) === 4 && (await A.locator(`[data-ibs=proofread][data-ibu="${vuid}"]`).count()) === 1);
+    await A.locator(`[data-ibs=proofread][data-ibu="${vuid}"]`).check(); await A.waitForTimeout(800);
+    ok('…and gives an employee access to an inbox', await V.evaluate(() => may('proofread')));
+    await A.locator(`[data-ibs=proofread][data-ibu="${vuid}"]`).uncheck(); await A.waitForTimeout(600);
     await A.click('#avbtn'); await A.waitForTimeout(200);
     ok('the menu has Inboxes, and the old items are still there', /Need to proofread/.test(await A.locator('.menu').innerText()) && /Approve recipes/.test(await A.locator('.menu').innerText())); await A.click('#avbtn');
 
