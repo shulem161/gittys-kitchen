@@ -202,6 +202,12 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.waitForTimeout(5000);
     ok('member list has no duplicate after reset', (await A.locator('.mwho b').allInnerTexts()).filter(x => /Test Member Two/.test(x)).length === 1, [await A.locator('.mwho b').allInnerTexts(), await A.evaluate(() => members.map(m => [m.uid, m.name, m.from, m.moved, m.status].join(':')))]);
     ok("member's messages follow them", await A.evaluate(o => Object.values(JSON.parse(localStorage.__fakedb).feedback).every(x => x.uid !== o), R0));
+    await W.goto(F); await W.waitForTimeout(500);
+    ok('members from before emails are invited (not made) to add one', (await W.locator('#enudge').count()) === 1 && (await B.evaluate(() => document.querySelectorAll('#enudge').length)) === 0);
+    await W.click('#en-add'); await W.waitForTimeout(600);
+    ok('“Add email” opens the email box in My profile', /#profile/.test(await W.evaluate(() => location.hash)) && await W.evaluate(() => document.activeElement && document.activeElement.id === 'em-new'));
+    await W.goto(F); await W.waitForTimeout(400); await W.click('#en-no'); await W.waitForTimeout(200); await W.reload(); await W.waitForTimeout(600);
+    ok('“Not now” hides the invitation', (await W.locator('#enudge').count()) === 0);
     await W.goto(F + '#profile'); await W.waitForTimeout(500);
     ok('a profile without an email can add one', /Add your email/.test(await W.locator('.admin').innerText()));
     await W.fill('#em-new', 'tm.two@example.com'); await W.fill('#em-pw', 'member3'); await W.click('#emform .primary'); await W.waitForTimeout(500);

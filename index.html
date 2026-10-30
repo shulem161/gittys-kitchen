@@ -575,6 +575,7 @@ body.guiding{overflow:hidden}
 .gd-back{flex:1;border:2px solid #3a5070;background:none;color:#fff}.gd-back:disabled{opacity:.35;cursor:default}
 .gd-next{flex:2;border:0;background:#5aa2ff;color:#0b1a30;font-weight:800 !important}
 .robot{margin:4px 0 12px;min-height:78px}
+.enudge{margin-top:14px}.enudge p{margin:0 0 10px;font-size:15px}
 .fg-mail{padding:12px;border:1px solid var(--line);border-radius:12px;margin:4px 0 14px}.fg-mail .field{margin-bottom:8px}.fg-mail .hint{margin:8px 0 0}
 .fg-or{font-size:14px;color:var(--muted);margin:0 0 10px}
 .va-opts{display:grid;gap:8px}
@@ -1127,7 +1128,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.77";
+const WEB_VERSION = "3.78";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1528,6 +1529,12 @@ function categoriesPage(){
   </section>`;
   const db0=document.getElementById("dl-book"); if(db0) db0.onclick=()=>downloadBook(CATS.filter(c=>RECIPES.some(r=>r.c===c)), db0);
 }
+// Members from before emails: an optional, dismissable invitation to add one
+function emailNudge(){
+  if(offline || viewingAs() || !auth || !auth.currentUser || realEmail(auth.currentUser.email) || store("gk-emailnudge-"+me)) return "";
+  return `<div class="panel-a enudge" id="enudge"><p><b>Add your email?</b> Then you can sign in with it and reset your password yourself. It's up to you.</p>
+    <div class="row"><a class="btn solid" href="#profile" id="en-add">Add email</a><button type="button" class="btn" id="en-no">Not now</button></div></div>`;
+}
 function home(){
   const f = favs().map(id=>RECIPES.find(r=>r.id===id)).filter(Boolean);
   const nw = recentList(7*864e5), hr = new Date().getHours();
@@ -1538,6 +1545,7 @@ function home(){
     <div class="hello"><div><div class="eyebrow">${hi}, ${esc(myName())}</div><h1>Gitty's Kitchen</h1></div></div>
     ${tabs("")}
     ${homeTodoBox()}
+    ${emailNudge()}
   </section>
   ${adminBanner()}
   ${dupBanner()}
@@ -1564,6 +1572,8 @@ function home(){
   const ib=document.getElementById("importbtn"); if(ib) ib.onclick=()=>importBundled(ib);
   const db0=document.getElementById("dl-book"); if(db0) db0.onclick=()=>downloadBook(CATS.filter(c=>RECIPES.some(r=>r.c===c)), db0);
   wireToday();
+  const ena=document.getElementById("en-add"); if(ena) ena.onclick=()=>sessionStorage.setItem("gk-goemail","1");
+  const enn=document.getElementById("en-no"); if(enn) enn.onclick=()=>{ store("gk-emailnudge-"+me, 1); document.getElementById("enudge").remove(); toast("You can add it any time in My profile"); };
 }
 
 function tabs(active){
@@ -4850,7 +4860,7 @@ async function profilePage(){
         <div><button class="primary" type="submit">Save name</button></div>
       </form></div>`}
     ${offline||!auth||!auth.currentUser?"":(()=>{ const ce=auth.currentUser.email, has=realEmail(ce);
-      return `<div class="panel-a"><h3>Email</h3>
+      return `<div class="panel-a" id="email-panel"><h3>Email${has?"":` <span class="hint" style="font-weight:400">optional</span>`}</h3>
       ${has?`<p>Your email: <b>${esc(ce)}</b></p><p class="hint">You sign in with it, and can reset your password by email. Only you and the admins see it.</p>`
         :`<p class="hint">Add your email so you can sign in with it and reset your password yourself, without a code.</p>`}
       <form id="emform" class="pw-form" novalidate>
@@ -4927,6 +4937,7 @@ async function profilePage(){
   };
   // add or change email: they confirm it by tapping a link, then sign in with it
   const EF=document.getElementById("emform");
+  if(EF && sessionStorage.getItem("gk-goemail")){ sessionStorage.removeItem("gk-goemail"); setTimeout(()=>{ document.getElementById("email-panel").scrollIntoView({block:"center"}); EF.querySelector("#em-new").focus({preventScroll:true}); }, 50); }
   if(EF) EF.onsubmit=async e=>{
     e.preventDefault();
     const err=EF.querySelector("#em-err"), okm=EF.querySelector("#em-ok"), fail=m=>{ err.textContent=m; err.hidden=false; };
