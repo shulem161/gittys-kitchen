@@ -1,6 +1,6 @@
 {
-  "web": "3.99",
+  "web": "4.00",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Recipe inboxes: Need to proofread, For approval, Ready to release (public or team only)."
+  "notes": "Shorter Public / Team only tag on recipes."
 }
