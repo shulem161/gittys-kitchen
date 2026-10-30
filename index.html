@@ -195,7 +195,7 @@ button{font:inherit;color:inherit}
 .wr-list{margin:4px 0 8px;padding-left:20px}.wr-list li{margin:3px 0}.wr-list b{color:var(--accent);font-variant-numeric:tabular-nums}
 .cv-guide{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px 18px;padding-left:18px;margin:0}
 .g-recs{list-style:none;margin:0;padding:0;display:grid;gap:8px}
-.g-rec{display:flex;align-items:center;gap:8px}.g-rec a{flex:1;color:var(--ink);font-weight:600;text-decoration:none}
+.g-rec{display:flex;align-items:center;gap:8px}.g-rec a,.g-rec > span{flex:1;color:var(--ink);font-weight:600;text-decoration:none}
 .g-rec select{width:auto}
 .g-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px}
 .g-tools{display:flex;flex-wrap:wrap;gap:6px}
@@ -1157,7 +1157,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.88";
+const WEB_VERSION = "3.90";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1605,9 +1605,15 @@ function home(){
       <a class="cat" href="#convert"><div class="ic">${TOOL_IC.calc}</div><div class="tool-txt"><h3>Calculator</h3><span>Double, halve, convert</span></div></a>
       ${offline||!can("ai")?"":`<a class="cat" href="#menu"><div class="ic">${TOOL_IC.menu}</div><div class="tool-txt"><h3>Menu ideas</h3><span>A full menu from the cookbook</span></div></a>`}
       ${offline||(may("edit")&&!recipesOnline)||!can("ai")||!can("suggest")?"":`<a class="cat" href="#scan"><div class="ic">${TOOL_IC.scan}</div><div class="tool-txt"><h3>Scan a recipe</h3><span>Photo, PDF or Word</span></div></a>`}
-      ${offline||!can("requests")?"":`<a class="cat" href="#requests"><div class="ic">${TOOL_IC.ask}</div><div class="tool-txt"><h3>${may("answer")?"Recipe requests":"Request a recipe"}</h3><span>${may("answer")?(openRequests()?`${openRequests()} waiting`:"What the family asks for"):"Ask for any recipe"}</span></div></a>`}
+      ${offline||!can("requests")||isPublic()?"":`<a class="cat" href="#requests"><div class="ic">${TOOL_IC.ask}</div><div class="tool-txt"><h3>${may("answer")?"Recipe requests":"Request a recipe"}</h3><span>${may("answer")?(openRequests()?`${openRequests()} waiting`:"What the family asks for"):"Ask for any recipe"}</span></div></a>`}
     </div>
   </section>
+  ${offline||!isPublic()||!can("requests")?"":`<section class="wrap"><div class="panel-a fb-card rq-card" style="margin-top:14px">
+    <div class="ic">${TOOL_IC.ask.replace('<svg','<svg width="26" height="26"')}</div>
+    <div class="fb-card-txt"><h3>Looking for a recipe?</h3>
+      <p>${openMine()?`You asked for ${openMine()} ${openMine()===1?"recipe":"recipes"}. We'll let you know.`:"Ask for any recipe and we'll try to find it for you."}</p></div>
+    <a class="btn solid" href="#requests">Request a recipe</a>
+  </div></section>`}
   ${offline||!can("feedback")?"":`<section class="wrap"><div class="panel-a fb-card" style="margin-top:14px">
     <div class="ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/><path d="M8.5 11h7M8.5 14h4"/></svg></div>
     <div class="fb-card-txt"><h3>${may("inbox")?"Suggestions &amp; comments":"Have a suggestion or a comment?"}</h3>
@@ -3141,8 +3147,6 @@ function openMenu(confirming){
     item("#favorites","My favorites", favs().length||""),
     !offline ? item("#menus","My menus", Object.values(MENUS).filter(m=>m.uid===me).length||"") : "",
     isAdmin()&&recipesOnline ? item("#dupes","Duplicate recipes", findDupes(0.9).length?findDupes(0.9).length+" pairs":"", findDupes(0.9).length) : "",
-    !offline&&can("requests")&&!may("answer") ? item("#requests","Request a recipe") : "",
-    !may("inbox")&&can("feedback") ? item("#feedback","Suggestions &amp; comments") : "",
   ].filter(Boolean);
   const group = (key,title,items,n) => items.length ? `<details class="mgroup" data-mg="${key}" ${menuOpen.has(key)?"open":""}><summary>${title}<span class="n${n?" hot":""}">${n?n+" waiting":""}</span></summary>${items.join("")}</details>` : "";
   const teamItem = isTeam()&&!offline ? `<a href="#team" role="menuitem" class="m-team">Team messages <span class="n${unreadThreads()?" hot":""}">${unreadThreads()?unreadThreads()+" new":""}</span></a>` : "";
@@ -3151,6 +3155,13 @@ function openMenu(confirming){
     ${teamItem}
     ${group("manage","Manage", manage, manageN)}
     ${group("recipes","Recipes", recipes, 0)}
+    ${group("tools","Kitchen tools", [
+      item("#grocery","Grocery list"), item("#timers","Timers", timersRunning()?timersRunning()+" running":""), item("#plan","Calendar &amp; menus"), item("#convert","Calculator"),
+      offline||!can("ai") ? "" : item("#menu","Menu ideas"),
+      offline||(may("edit")&&!recipesOnline)||!can("ai")||!can("suggest") ? "" : item("#scan","Scan a recipe"),
+      offline||!can("requests") ? "" : item("#requests", may("answer")?"Recipe requests":"Request a recipe", may("answer")&&openRequests()?openRequests()+" waiting":"", may("answer")&&openRequests()),
+      offline||!can("feedback")||may("inbox") ? "" : item("#feedback","Suggestions &amp; comments"),
+    ].filter(Boolean), 0)}
     ${group("settings","Settings", [item("#account","Account settings"), item("#settings-look", LOOK_SET())], 0)}
     ${group("app","App", [
       isAdmin()?`<button type="button" role="menuitem" id="m-ntfy">Send test notification <span class="n"></span></button>`:"",
@@ -4506,6 +4517,13 @@ function groceryName(name){
 function groceryKey(name){
   return groceryName(name).toLowerCase().replace(/[’']/g,"'").replace(/(oes|ies|s)\b/g,(m)=>m==="ies"?"y":m==="oes"?"o":"").replace(/[^a-z0-9' ]/g,"").trim();
 }
+// Everyday groceries, and every ingredient in the cookbook, for "Add any item"
+const COMMON_GROCERIES = "milk,eggs,bread,challah,butter,margarine,cream cheese,yogurt,cottage cheese,shredded cheese,orange juice,apples,bananas,oranges,grapes,lemons,potatoes,onions,carrots,celery,tomatoes,cucumbers,lettuce,peppers,garlic,parsley,dill,chicken,ground beef,salmon,flour,sugar,brown sugar,oil,olive oil,salt,pepper,paprika,rice,pasta,noodles,cereal,oatmeal,coffee,tea,water,seltzer,grape juice,wine,paper towels,napkins,aluminum pans,foil,plastic wrap,parchment paper,ziploc bags,garbage bags,dish soap,toilet paper,tissues".split(",");
+let _gItems=null;
+function groceryItems(){ if(_gItems) return _gItems;
+  const s=new Set(COMMON_GROCERIES);
+  for(const r of RECIPES) for(const x of (r.s||[]).filter(x=>x[0]).flatMap(x=>x[2])){ const n=groceryName(parseIng(x).name); if(n && n.length<=30 && !/[,;()]/.test(n)) s.add(n.toLowerCase()); }
+  return _gItems=[...s].sort((a,b)=>a.length-b.length || a.localeCompare(b)); }
 const gStore = () => store(uk("grocery")) || {items:[],have:[]};
 const gSave = v => store(uk("grocery"), v);
 function groceryToggle(r,x){
@@ -4515,9 +4533,11 @@ function groceryToggle(r,x){
 }
 function groceryLines(){
   const g=gStore(), map=new Map();
-  for(const it of g.items){
-    const r=RECIPES.find(x=>x.id===it.id); if(!r) continue;
-    for(const t of (r.s||[]).filter(x=>x[0]).flatMap(x=>x[2])){
+  const srcs = g.items.map(it=>{ const r=RECIPES.find(x=>x.id===it.id); return r ? {t:r.t, x:it.x, lines:(r.s||[]).filter(x=>x[0]).flatMap(x=>x[2])} : null; }).filter(Boolean);
+  if((g.extra||[]).length) srcs.push({t:"Your own items", x:1, lines:g.extra.map(e=>e.t)});
+  for(const it of srcs){
+    const r=it;
+    for(const t of it.lines){
       const p=parseIng(t); if(/^#|^makes\b|^serves\b/i.test(t.trim())) continue;
       const nm=groceryName(p.name); if(!nm || nm.length>60) continue;
       const grp = p.n===null ? "none" : p.unit ? (UNIT[p.unit].group==="n" ? "n:"+p.unit : UNIT[p.unit].group) : "count";
@@ -4561,6 +4581,7 @@ function groceryQty(L){
 }
 function groceryText(lines, have){
   const g=gStore(), names=g.items.map(it=>{ const r=RECIPES.find(x=>x.id===it.id); return r ? r.t+(it.x!==1?` (${fmtNum(it.x)}×)`:"") : ""; }).filter(Boolean);
+  if((g.extra||[]).length) names.push("other items");
   let out=`Grocery list – Gitty's Kitchen\nFor: ${names.join(", ")}\n`;
   for(const a of AISLE_ORDER){ const ls=lines.filter(l=>l.aisle===a && !have.includes(l.key) && !l.enough); if(!ls.length) continue;
     out+=`\n${a}\n`+ls.map(l=>{ const q=l.buy||l.qty; return `☐ ${q?q+" ":""}${l.name}${l.buy?` (have ${l.haveTxt})`:""}`; }).join("\n")+"\n"; }
@@ -4574,10 +4595,17 @@ function groceryPage(){
       <button type="button" class="btn sm" data-grm="${esc(r.id)}" aria-label="Remove ${esc(r.t)}">✕</button></li>`; }).join("");
   const haveN=lines.filter(l=>g.have.includes(l.key)||l.enough).length;
   app.innerHTML = `<section class="wrap admin tools-page">
-    <div class="section-head" style="margin-top:28px"><h2>Grocery list</h2><p>${g.items.length} ${g.items.length===1?"recipe":"recipes"}</p></div>
+    <div class="section-head" style="margin-top:28px"><h2>Grocery list</h2><p>${g.items.length} ${g.items.length===1?"recipe":"recipes"}${(g.extra||[]).length?` · ${g.extra.length} other ${g.extra.length===1?"item":"items"}`:""}</p></div>
     <div class="panel-a"><h3>What you're making</h3>
       ${g.items.length?`<ul class="g-recs">${rows}</ul>`:`<p class="hint">Nothing yet. Add recipes here, or open a recipe and tap “Add to grocery list”.</p>`}
       <div class="field" style="margin-top:12px"><label for="g-add">Add a recipe</label><input id="g-add" type="text" autocomplete="off" placeholder="Type a recipe name…"><div class="pre-sugg" id="g-sugg"></div></div>
+    </div>
+    <div class="panel-a"><h3>Anything else to buy</h3>
+      ${(g.extra||[]).length?`<ul class="g-recs">${g.extra.map((e,i)=>`<li class="g-rec"><span>${esc(e.t)}</span><button type="button" class="btn sm" data-gxrm="${i}" aria-label="Remove ${esc(e.t)}">✕</button></li>`).join("")}</ul>`:""}
+      <div class="field" style="margin-top:8px"><label for="g-item">Add any item</label>
+        <div class="td-add"><input id="g-item" type="text" autocomplete="off" maxlength="80" placeholder="e.g. 2 lb apples, paper towels, milk"><button type="button" class="btn solid" id="g-iadd">Add</button></div>
+        <div class="pre-sugg" id="g-isugg"></div></div>
+      <p class="hint">It goes on the shopping list with everything else, in the right aisle. If a recipe needs it too, they're added together.</p>
     </div>
     ${lines.length?`<div class="panel-a"><div class="g-head"><h3>Shopping list</h3>
         <div class="g-tools"><button type="button" class="btn sm" id="g-hide" aria-pressed="${hideHave}">${hideHave?"Show all":"Hide what I have"}</button>
@@ -4598,6 +4626,16 @@ function groceryPage(){
     v.have = c.checked ? [...new Set([...v.have,k])] : v.have.filter(x=>x!==k);
     if(!c.checked && v.part && v.part[k]){ const L=lines.find(x=>x.key===k); if(L && L.enough) delete v.part[k]; }   // un-ticking a "have enough" line
     gSave(v); const y=window.scrollY; groceryPage(); window.scrollTo(0,y); });
+  app.querySelectorAll("[data-gxrm]").forEach(b=>b.onclick=()=>{ const v=gStore(); v.extra=(v.extra||[]).filter((e,i)=>i!==+b.dataset.gxrm); gSave(v); renderAcct(); const y=window.scrollY; groceryPage(); window.scrollTo(0,y); });
+  const xa=$("g-item"), xs=$("g-isugg");
+  const addItem = txt => { txt=String(txt||"").trim().replace(/\s+/g," "); if(!txt) return; const v=gStore(); v.extra=[...(v.extra||[]), {t:txt.slice(0,80)}]; gSave(v); renderAcct(); groceryPage(); const a2=$("g-item"); if(a2) a2.focus(); toast("Added: "+txt); };
+  xa.oninput=()=>{ const q=xa.value.trim().toLowerCase(); if(q.length<2){ xs.innerHTML=""; return; }
+    const word=q.replace(/^[\d½¼¾⅓⅔⅛\s./-]+(cups?|tbsp|tsp|oz|lbs?|pounds?|kg|g|liters?|packages?|pk\.?|cans?|bags?|boxes?|jars?|bottles?|dozen)?\.?\s*/i,"");
+    const hits=groceryItems().filter(n=>n.toLowerCase().includes(word||q)).slice(0,6);
+    xs.innerHTML = hits.map(n=>`<button type="button" class="pre-opt" data-gi="${esc(n)}">${esc(q!==word&&word?xa.value.trim().slice(0, xa.value.trim().toLowerCase().indexOf(word))+n:n)}</button>`).join("");
+    xs.querySelectorAll("[data-gi]").forEach(b=>b.onclick=()=>addItem(b.textContent)); };
+  xa.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); addItem(xa.value); } };
+  $("g-iadd").onclick=()=>addItem(xa.value);
   app.querySelectorAll("[data-ghv]").forEach(b=>b.onclick=()=>{
     const li=b.closest("li"), old=li.querySelector(".g-hvbox"); if(old){ old.remove(); return; }
     const k=b.dataset.ghv, L=lines.find(x=>x.key===k), cur=(gStore().part||{})[k], us=haveUnits(L), u0=cur?cur.u:haveDefaultUnit(L);
@@ -4622,7 +4660,7 @@ function groceryPage(){
   const cp=$("g-copy"); if(cp) cp.onclick=()=>copyText(groceryText(lines, gStore().have));
   const sh=$("g-share"); if(sh) sh.onclick=()=>navigator.share({title:"Grocery list", text:groceryText(lines, gStore().have)}).catch(()=>{});
   const cl=$("g-clear"); if(cl) cl.onclick=()=>{ setTimeout(()=>$("g-confirm").scrollIntoView({block:"nearest"}),0); $("g-confirm").innerHTML=`<div class="confirm">Clear the whole grocery list? <div class="row"><button type="button" class="btn warn" id="g-yes">Clear</button><button type="button" class="btn" id="g-no">Cancel</button></div></div>`;
-    $("g-no").onclick=()=>{ $("g-confirm").innerHTML=""; }; $("g-yes").onclick=()=>{ gSave({items:[],have:[],part:{}}); renderAcct(); groceryPage(); window.scrollTo(0,0); toast("Grocery list cleared"); }; };
+    $("g-no").onclick=()=>{ $("g-confirm").innerHTML=""; }; $("g-yes").onclick=()=>{ gSave({items:[],have:[],part:{},extra:[]}); renderAcct(); groceryPage(); window.scrollTo(0,0); toast("Grocery list cleared"); }; };
 }
 
 /* ---------- menu ideas ---------- */
@@ -4745,6 +4783,7 @@ function showMenu(menu, opts, via){
    The cookbook is searched first (and the AI looks at the photo); anything not found goes to the admin. */
 let requests = [];            // admin: everyone's; member: their own
 let unsubRequests = null;
+const openMine = () => requests.filter(r=>r.uid===who() && r.status==="open").length;
 const openRequests = () => may("answer") ? requests.filter(r=>r.status==="open").length : 0;
 function watchRequests(){
   if(unsubRequests || !db || !me) return;

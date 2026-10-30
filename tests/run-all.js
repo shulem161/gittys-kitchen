@@ -524,7 +524,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('…and take it away again', await V.evaluate(() => !may('answer')));
     await A.goto(F); await A.waitForTimeout(400); await A.click('#avbtn'); await A.waitForTimeout(200);
     const menuTxt = await A.locator('.menu').innerText();
-    ok('account menu is grouped and short', (await A.locator('.menu .mgroup').count()) === 4 && !/Grocery list|Kitchen calculator|Menu ideas/.test(menuTxt) && /Employee settings/.test(menuTxt), menuTxt.slice(0, 300));
+    ok('account menu is grouped and short', (await A.locator('.menu .mgroup').count()) === 5 && /Employee settings/.test(menuTxt), menuTxt.slice(0, 300));
+    await A.click('.menu details[data-mg=tools] summary'); await A.waitForTimeout(200);
+    const toolsTxt = await A.locator('.menu details[data-mg=tools]').innerText();
+    ok('the menu has a Kitchen tools drop-down with all the tools', ['Grocery list', 'Timers', 'Calendar', 'Calculator', 'Menu ideas', 'Scan a recipe', 'Recipe requests'].every(x => toolsTxt.includes(x)), toolsTxt);
     await A.click('#avbtn');
     ok('home has no shortcuts that are already in the bottom bar', (await A.locator('.cats.tools a[href="#timers"], .cats.tools a[href="#grocery"]').count()) === 0);
     // Who added / changed: admins only, plus the Activity page
@@ -713,8 +716,22 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await PU.goto(F + '#account'); await PU.waitForTimeout(500);
     ok("customers don't get the phone notices setting", (await PU.locator('#ntfypanel').count()) === 0);
 
+    await PU.goto(F); await PU.waitForTimeout(500);
+    ok('customers have “Request a recipe” on the home page, by Suggestions & comments', (await PU.locator('.rq-card a[href="#requests"]').count()) === 1 && (await PU.locator('.fb-card').count()) === 2);
+    // Grocery list: any item
+    await PU.goto(F + '#grocery'); await PU.waitForTimeout(400);
+    await PU.fill('#g-item', 'paper tow'); await PU.waitForTimeout(150);
+    ok('“Add any item” suggests everyday groceries', /paper towels/.test(await PU.locator('#g-isugg').innerText()));
+    await PU.fill('#g-item', '2 lb apples'); await PU.press('#g-item', 'Enter'); await PU.waitForTimeout(300);
+    await PU.fill('#g-item', 'paper towels'); await PU.click('#g-iadd'); await PU.waitForTimeout(300);
+    const gl = await PU.locator('.glist').allInnerTexts();
+    ok('any item can go on the grocery list, in its aisle', /apples/.test(gl.join(' ')) && /paper towels/.test(gl.join(' ')) && /2 lb/.test(gl.join(' ')), gl);
+    await PU.locator('[data-gxrm="1"]').click(); await PU.waitForTimeout(300);
+    ok('…and taken off again', !/paper towels/.test((await PU.locator('.glist').allInnerTexts()).join(' ')));
+
     // Member numbers
     ok('every approved member has their own member number', await A.evaluate(() => { const n = members.filter(m => m.status === 'approved').map(m => m.no); return n.every(x => x > 1000) && new Set(n).size === n.length; }));
+    await PU.goto(F + '#account'); await PU.waitForTimeout(500);
     ok('…shown in Account settings', /^\d{4,}$/.test((await PU.locator('.acc-no b').innerText()).trim()));
     const puNo = String(await PU.evaluate(() => profile.no));
 

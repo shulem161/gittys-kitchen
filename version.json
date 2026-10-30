@@ -1,6 +1,6 @@
 {
-  "web": "3.88",
+  "web": "3.90",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Log in as a particular customer or employee (search by name, email or number). Member numbers for everyone."
+  "notes": "Request a recipe on the home page for customers; add any item to the grocery list; Kitchen tools in the menu."
 }
