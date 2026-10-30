@@ -271,6 +271,9 @@ await check("…nor can the person who asked", assertFails(updateDoc(doc(EMP, 'r
 await check('someone else approves it', assertSucceeds(updateDoc(doc(PR2, 'recipes', 'r-ib'), { rv: 'release', rvUids: ['pr1', 'emp', 'pr2'] })));
 await check("…and can't release it too", assertFails(updateDoc(doc(PR2, 'recipes', 'r-ib'), { rv: '', pub: true })));
 await check('a third person releases it', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-ib'), { rv: '', pub: false })));
+await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'recipes', 'r-hid2'), { c: 'Cakes', t: 'Hidden two', pub: false, rv: '', s: [] }); });
+await check('anyone on the team can send a hidden recipe through the 3 steps', assertSucceeds(updateDoc(doc(EMP, 'recipes', 'r-hid2'), { rv: 'proof', rvUids: [], rvAsk: [], rvLog: [] })));
+await check("…but nobody can make it public directly, not even with that", assertFails(updateDoc(doc(EMP, 'recipes', 'r-hid2'), { pub: true })));
 // Team messages: employees and admins only, and only the people in the conversation
 const th = (by, members) => ({ by, lastBy: by, members, names: {}, to: 'admins', rid: 'r-pub', rtitle: 'X', subject: '', msgs: [{ by, name: 'X', text: 'Can you look at this?', at: 1 }], updated: 1, readAt: {}, done: false, created: 1 });
 await check('an employee can write to the admins about a recipe', assertSucceeds(setDoc(doc(EMP, 'threads', 't1'), th('emp', ['emp', 'adm']))));
