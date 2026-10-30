@@ -636,13 +636,14 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.locator('[data-mv="r-croissants"]').check(); await A.selectOption('#mv-cat', 'Bread'); await A.click('#mv-go'); await A.waitForTimeout(1000);
     ok('…or several at once', await A.evaluate(() => RECIPES.find(x => x.id === 'r-croissants').c) === 'Bread');
     await V.goto(F + '#r-croissants'); await V.waitForTimeout(400);
-    ok("employees can't move recipes unless allowed", (await V.locator('#mv-btn').count()) === 0);
-    const vn3 = await V.evaluate(() => myName());
-    await A.goto(F + '#admin'); await A.waitForTimeout(400); await A.locator('.mrow', {hasText: vn3}).locator('[data-act=perms]').click(); await A.waitForTimeout(200);
-    await A.locator('[data-pk=move]').check(); await A.waitForTimeout(1500);
-    await V.goto(F + '#r-croissants'); await V.waitForTimeout(500);
-    ok('…and can once you allow it', (await V.locator('#mv-btn').count()) === 1);
-    await A.locator('[data-pk=move]').uncheck(); await A.waitForTimeout(800);
+    ok("employees can't move recipes; they can ask to", /Ask to move/.test(await V.locator('#mv-btn').innerText()) && (await V.locator('.cat-tools a[href^="#move-"]').count()) === 0);
+    await V.click('#mv-btn'); await V.selectOption('#mv1-cat', 'Cakes'); await V.click('#mv1-go'); await V.waitForTimeout(800);
+    ok('…which goes to the admins', /Asked to move to Cakes/.test(await V.locator('.rhead').innerText()) && notes.some(n => /asks to move a recipe/.test(n)) && await V.evaluate(() => RECIPES.find(x => x.id === 'r-croissants').c) === 'Bread');
+    await A.goto(F + '#review'); await A.waitForTimeout(600);
+    ok('admins see the request in Approve recipes', /Requests to move/.test(await A.locator('.admin').innerText()));
+    await A.locator('[data-mvq][data-mvok="1"]').first().click(); await A.waitForTimeout(1200);
+    ok('…and moving it moves the recipe', await V.evaluate(() => RECIPES.find(x => x.id === 'r-croissants').c) === 'Cakes');
+    await A.goto(F + '#r-croissants'); await A.waitForTimeout(300); await A.click('#mv-btn'); await A.selectOption('#mv1-cat', 'Bread'); await A.click('#mv1-go'); await A.waitForTimeout(800);
 
     // See it as… (owner)
     await A.goto(F + '#r-challah'); await A.waitForTimeout(300); if ((await A.locator('#pubtog').innerText()).includes('Live')) { await A.click('#pubtog'); await A.waitForTimeout(400); }

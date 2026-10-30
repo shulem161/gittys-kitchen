@@ -118,7 +118,7 @@ service cloud.firestore {
     }
     match /meta/codes {
       allow get: if signedIn();
-      allow write: if isAdmin() || extra('edit') || extra('review') || extra('move');
+      allow write: if isAdmin() || extra('edit') || extra('review');
     }
 
     // Who the owner is and the name shown for them. Only the owner can change it, and only to themselves.
@@ -181,10 +181,8 @@ service cloud.firestore {
     match /recipes/{id} {
       allow read: if isAdmin()
         || (approvedMember() && (myRole() != 'public' || resource.data.get('pub', false) == true));
-      allow write: if publishOk()
-        // employees allowed to move recipes: only the category, section, code and history change
-        || (extra('move') && resource != null
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['c', 'sec', 'code', 'history', 'updated']));
+      // Only admins move recipes to another category; employees ask (golive, kind "move").
+      allow write: if publishOk();
     }
 
     // Employees asking for a recipe to be shown to public members. Admins decide.
@@ -192,7 +190,7 @@ service cloud.firestore {
       allow create: if approvedMember() && myRole() == 'employee'
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.status == 'open'
-        && request.resource.data.keys().hasOnly(['uid', 'byName', 'rid', 'title', 'status', 'created']);
+        && request.resource.data.keys().hasOnly(['uid', 'byName', 'rid', 'title', 'status', 'created', 'kind', 'to', 'sec', 'from']);
       allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
       allow update: if isAdmin();
       allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);

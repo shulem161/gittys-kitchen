@@ -1,6 +1,6 @@
 {
-  "web": "3.92",
+  "web": "3.93",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "The App items moved into Website/App settings."
+  "notes": "Employees ask an admin to move a recipe to another category."
 }
