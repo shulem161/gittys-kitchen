@@ -158,8 +158,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('profile shows my activity', /1\s+favorite\b/.test(pst) && /photos? shared/.test(pst) && !/…/.test(pst), pst);
     ok('profile links to Account settings and Website settings', (await B.locator('.set-links a[href="#account"]').count()) === 1 && (await B.locator('.set-links a[href="#settings-look"]').count()) === 1);
     await B.click('#avbtn'); await B.waitForTimeout(200);
-    const mt = await B.locator('.menu').innerText();
-    ok('the menu has Account settings and Website settings as two separate items', /Account settings/.test(mt) && /Website settings/.test(mt) && (await B.locator('.menu a[href="#settings"]').count()) === 0);
+    ok('the menu has a Settings drop-down, closed at first', (await B.locator('.menu details[data-mg=settings]:not([open])').count()) === 1);
+    await B.click('.menu details[data-mg=settings] summary'); await B.waitForTimeout(200);
+    const mt2 = await B.locator('.menu details[data-mg=settings]').innerText();
+    ok('…with Account settings and Website settings inside', /Account settings/.test(mt2) && /Website settings/.test(mt2));
     await B.click('.menu a[href="#account"]'); await B.waitForTimeout(500);
     ok('Account settings has name, email, password and recovery code', (await B.locator('#nameform').count()) === 1 && (await B.locator('#emform').count()) === 1 && (await B.locator('#pwform').count()) === 1 && (await B.locator('#rcpanel').count()) === 1 && (await B.locator('.pstat').count()) === 0);
     await B.fill('#pw-old', 'nope99'); await B.fill('#pw-new', 'member2'); await B.fill('#pw-new2', 'member2'); await B.click('#pwform .primary'); await B.waitForTimeout(400);
@@ -522,7 +524,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('…and take it away again', await V.evaluate(() => !may('answer')));
     await A.goto(F); await A.waitForTimeout(400); await A.click('#avbtn'); await A.waitForTimeout(200);
     const menuTxt = await A.locator('.menu').innerText();
-    ok('account menu is grouped and short', (await A.locator('.menu .mgroup').count()) === 3 && !/Grocery list|Kitchen calculator|Menu ideas/.test(menuTxt) && /Employee settings/.test(menuTxt), menuTxt.slice(0, 300));
+    ok('account menu is grouped and short', (await A.locator('.menu .mgroup').count()) === 4 && !/Grocery list|Kitchen calculator|Menu ideas/.test(menuTxt) && /Employee settings/.test(menuTxt), menuTxt.slice(0, 300));
     await A.click('#avbtn');
     ok('home has no shortcuts that are already in the bottom bar', (await A.locator('.cats.tools a[href="#timers"], .cats.tools a[href="#grocery"]').count()) === 0);
     // Who added / changed: admins only, plus the Activity page

@@ -1139,7 +1139,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.84";
+const WEB_VERSION = "3.85";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -3057,8 +3057,7 @@ function openMenu(confirming){
     ${teamItem}
     ${group("manage","Manage", manage, manageN)}
     ${group("recipes","Recipes", recipes, 0)}
-    <a href="#account" role="menuitem" class="m-team">Account settings <span class="n">name · email · password</span></a>
-    <a href="#settings-look" role="menuitem" class="m-team">${LOOK_SET()} <span class="n">screen · design · text</span></a>
+    ${group("settings","Settings", [item("#account","Account settings","name · email · password"), item("#settings-look", LOOK_SET(), "screen · design · text")], 0)}
     ${group("app","App", [
       isAdmin()?`<button type="button" role="menuitem" id="m-ntfy">Send test notification <span class="n"></span></button>`:"",
       `<button type="button" role="menuitem" id="m-upd">Check for updates <span class="n">v${WEB_VERSION}</span></button>`,
