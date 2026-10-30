@@ -25,7 +25,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
   await ctx.route(/version\.json/, r => r.fulfill({contentType: 'application/json', body: '{"web":"0","apk":0}'}));
   const notes = []; await ctx.route(/ntfy\.sh/, r => { notes.push(new URL(r.request().url()).searchParams.get('title')); r.fulfill({status: 200, body: '{}', headers: {'access-control-allow-origin': '*'}}); });
   const page = async () => { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(e.message + ' @ ' + (e.stack||'').split('\n').slice(1,3).join(' | '))); await p.goto(F); await p.waitForTimeout(400); return p; };
-  const join = async (p, name, pw) => { await p.click('[data-mode=create]'); await p.fill('#nm', name); await p.fill('#pw', pw); await p.fill('#pw2', pw); await p.click('.primary'); await p.waitForTimeout(600); };
+  const mailOf = name => name.toLowerCase().replace(/\s+/g, '.') + '@example.com';
+  // Sign up with name, email and password, then tap the link in the (stand-in) email
+  const join = async (p, name, pw, noConfirm) => { await p.click('[data-mode=create]'); await p.fill('#nm', name); await p.fill('#em', mailOf(name)); await p.fill('#pw', pw); await p.fill('#pw2', pw); await p.click('.primary'); await p.waitForTimeout(600);
+    if (!noConfirm && await p.locator('#ev-check').count()) { await p.evaluate(() => __fakeVerify()); await p.click('#ev-check'); await p.waitForTimeout(600); } };
 
   try {
     // Members and approval
@@ -36,9 +39,19 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#categories'); await A.waitForTimeout(300);
     const total = parseInt(await A.locator('.section-head p').first().innerText());
     ok('recipes go online', total > 100, total);
-    const B = await page(); await join(B, 'Test Member', 'member1');
-    ok('new member waits for approval', (await B.locator('h2').innerText()) === 'Waiting for approval');
+    const B0 = await page(); await B0.click('[data-mode=create]'); await B0.fill('#nm', 'Test Member'); await B0.fill('#pw', 'member1'); await B0.fill('#pw2', 'member1'); await B0.click('.primary'); await B0.waitForTimeout(300);
+    ok('signing up needs an email', /email address/.test(await B0.locator('.err').innerText()) && (await B0.locator('#nm').inputValue()) === 'Test Member');
+    await B0.close();
+    const B = await page(); await join(B, 'Test Member', 'member1', true);
+    ok('a new member is asked to confirm their email first', (await B.locator('h2').innerText()) === 'Confirm your email' && await B.evaluate(() => __fakeMails().some(m => m.to === 'test.member@example.com' && m.kind === 'verify')));
+    await A.goto(F + '#admin'); await A.waitForTimeout(500);
+    ok("…and the admin isn't asked yet", !notes.some(n => /asked to join/.test(n)) && (await A.locator('[data-act=approve]').count()) === 0 && /Haven't confirmed/.test(await A.locator('.admin').innerText()));
+    await B.click('#ev-check'); await B.waitForTimeout(500);
+    ok("tapping “I tapped the link” too early says so", (await B.locator('h2').innerText()) === 'Confirm your email');
+    await B.evaluate(() => __fakeVerify()); await B.click('#ev-check'); await B.waitForTimeout(700);
+    ok('once confirmed, the member waits for approval', (await B.locator('h2').innerText()) === 'Waiting for approval');
     ok('admin is notified of join request', notes.some(n => /asked to join/.test(n)), notes);
+    ok('admins see the email on the member list', /test\.member@example\.com/.test(await A.locator('.admin').innerText()));
     await A.goto(F + '#admin'); await A.waitForTimeout(400); await A.click('[data-act=approve]'); await A.waitForTimeout(700);
     ok('a newly approved member starts as public', await B.evaluate(() => myRole()) === 'public');
     await A.locator('.mrow', {hasText: 'Test Member'}).locator('[data-role]').selectOption('employee'); await A.waitForTimeout(1500);
@@ -46,8 +59,13 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('approved member gets in by themselves', (await B.locator('.eyebrow').innerText().catch(() => '')).includes('TEST MEMBER'));
     const C = await page();
     await C.fill('#nm', 'Test Member'); await C.fill('#pw', 'wrong1'); await C.click('.primary'); await C.waitForTimeout(400);
+    ok('a new profile signing in by name is told to use the email', /Type your email/.test(await C.locator('.err').innerText()));
+    await C.fill('#nm', 'test.member@example.com'); await C.fill('#pw', 'wrong1'); await C.click('.primary'); await C.waitForTimeout(400);
     ok('wrong password refused', /isn't right/.test(await C.locator('.err').innerText()));
-    await C.click('[data-mode=create]'); await C.fill('#nm', 'test  member'); await C.fill('#pw', 'abcdef'); await C.fill('#pw2', 'abcdef'); await C.click('.primary'); await C.waitForTimeout(400);
+    await C.click('[data-mode=create]'); await C.fill('#nm', 'Someone Else'); await C.fill('#em', 'test.member@example.com'); await C.fill('#pw', 'abcdef'); await C.fill('#pw2', 'abcdef'); await C.click('.primary'); await C.waitForTimeout(400);
+    ok('an email can only be on one profile', /already has a profile/.test(await C.locator('.err').innerText()));
+    await C.goto(F); await C.waitForTimeout(300);
+    await C.click('[data-mode=create]'); await C.fill('#nm', 'test  member'); await C.fill('#em', 'tm2@example.com'); await C.fill('#pw', 'abcdef'); await C.fill('#pw2', 'abcdef'); await C.click('.primary'); await C.waitForTimeout(400);
     ok('duplicate name refused', /already taken/.test(await C.locator('.err').innerText()));
 
     // Admin recipe editing
@@ -138,7 +156,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('profile refuses wrong current password', /isn't right/.test(await B.locator('#pw-err').innerText()));
     await B.fill('#pw-old', 'member1'); await B.click('#pwform .primary'); await B.waitForTimeout(500);
     ok('member can change password', /Password changed/.test(await B.locator('#toast').innerText()));
-    const P = await page(); await P.fill('#nm', 'Test Member'); await P.fill('#pw', 'member2'); await P.click('.primary'); await P.waitForTimeout(500);
+    const P = await page(); await P.fill('#nm', 'test.member@example.com'); await P.fill('#pw', 'member2'); await P.click('.primary'); await P.waitForTimeout(500);
     ok('new password works', (await P.locator('.eyebrow').innerText().catch(() => '')).includes('TEST MEMBER'));
 
     // Change name
@@ -151,7 +169,9 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     const R = await page(); await R.fill('#nm', 'Test Member'); await R.fill('#pw', 'member2'); await R.click('.primary'); await R.waitForTimeout(400);
     ok('old name no longer signs in', /no member/i.test(await R.locator('.err').innerText()));
     await R.fill('#nm', 'test member two'); await R.fill('#pw', 'member2'); await R.click('.primary'); await R.waitForTimeout(500);
-    ok('new name signs in', (await R.locator('.eyebrow').innerText().catch(() => '')).includes('TEST MEMBER TWO'));
+    ok('the new name points to the profile (which signs in with its email)', /Type your email/.test(await R.locator('.err').innerText()));
+    await R.fill('#nm', 'test.member@example.com'); await R.fill('#pw', 'member2'); await R.click('.primary'); await R.waitForTimeout(500);
+    ok('new name shows after signing in', (await R.locator('.eyebrow').innerText().catch(() => '')).includes('TEST MEMBER TWO'));
     // Admin renames themselves and stays admin
     await A.goto(F + '#profile'); await A.waitForTimeout(500);
     await A.fill('#nm-new', 'Shulem'); await A.click('#nameform .primary'); await A.waitForTimeout(800);
@@ -162,7 +182,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await R.goto(F + '#profile'); await R.waitForTimeout(400); await R.fill('#nm-new', 'Shulem'); await R.click('#nameform .primary'); await R.waitForTimeout(500);
     ok("member can't take the admin's new name", /already taken/.test(await R.locator('#nm-err').innerText()));
     const Q = await page(); await Q.evaluate(() => localStorage.removeItem('gk-admin')); await Q.reload(); await Q.waitForTimeout(400);
-    await Q.fill('#nm', 'shulem'); await Q.fill('#pw', 'admin123'); await Q.click('.primary'); await Q.waitForTimeout(800);
+    await Q.fill('#nm', 'shulem.schlesinger@example.com'); await Q.fill('#pw', 'admin123'); await Q.click('.primary'); await Q.waitForTimeout(800);
     ok('admin signs in with the new name on a new device and is still admin', await Q.evaluate(() => isAdmin()));
 
     // Reset codes and recovery codes
@@ -182,7 +202,14 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.waitForTimeout(5000);
     ok('member list has no duplicate after reset', (await A.locator('.mwho b').allInnerTexts()).filter(x => /Test Member Two/.test(x)).length === 1, [await A.locator('.mwho b').allInnerTexts(), await A.evaluate(() => members.map(m => [m.uid, m.name, m.from, m.moved, m.status].join(':')))]);
     ok("member's messages follow them", await A.evaluate(o => Object.values(JSON.parse(localStorage.__fakedb).feedback).every(x => x.uid !== o), R0));
-    await W.goto(F + '#profile'); await W.waitForTimeout(500); await W.click('#rc-make'); await W.waitForTimeout(600);
+    await W.goto(F + '#profile'); await W.waitForTimeout(500);
+    ok('a profile without an email can add one', /Add your email/.test(await W.locator('.admin').innerText()));
+    await W.fill('#em-new', 'tm.two@example.com'); await W.fill('#em-pw', 'member3'); await W.click('#emform .primary'); await W.waitForTimeout(500);
+    ok('…by tapping a link sent to it', /We sent a link/.test(await W.locator('#em-ok').innerText()) && await W.evaluate(() => __fakeMails().some(m => m.to === 'tm.two@example.com' && m.kind === 'change')));
+    const FE = await page(); await FE.click('[data-mode=forgot]'); await FE.waitForTimeout(200); await FE.fill('#fe', 'test.member@example.com'); await FE.click('#fe-send'); await FE.waitForTimeout(400);
+    ok('Forgot password emails a link', /on its way/.test(await FE.locator('#fe-msg').innerText()));
+    await FE.close();
+    await W.click('#rc-make'); await W.waitForTimeout(600);
     const own = await W.locator('.codebox.big b').innerText();
     ok('member can make a recovery code', /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(own), own);
     const V = await page(); await V.click('[data-mode=forgot]'); await V.waitForTimeout(200);

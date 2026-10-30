@@ -574,6 +574,9 @@ body.guiding{overflow:hidden}
 .gd-nav button{min-height:68px;border-radius:18px;font:700 20px/1 inherit;cursor:pointer}
 .gd-back{flex:1;border:2px solid #3a5070;background:none;color:#fff}.gd-back:disabled{opacity:.35;cursor:default}
 .gd-next{flex:2;border:0;background:#5aa2ff;color:#0b1a30;font-weight:800 !important}
+.robot{margin:4px 0 12px;min-height:78px}
+.fg-mail{padding:12px;border:1px solid var(--line);border-radius:12px;margin:4px 0 14px}.fg-mail .field{margin-bottom:8px}.fg-mail .hint{margin:8px 0 0}
+.fg-or{font-size:14px;color:var(--muted);margin:0 0 10px}
 .va-opts{display:grid;gap:8px}
 .va-opt{display:grid;gap:2px;text-align:left;padding:14px 16px;border:2px solid var(--line);border-radius:14px;background:var(--paper);color:var(--ink);cursor:pointer;font:inherit}
 .va-opt b{font-size:17px}.va-opt span{font-size:13.5px;color:var(--muted)}
@@ -1077,7 +1080,7 @@ const isAdminMember = m => adminUid ? m.uid===adminUid : nameKey(m.name)===ADMIN
 let auth=null, db=null;
 let me=null;            // signed-in user id
 let profile=null;       // {name, status, favs, created}
-let state="loading";    // loading | setup | offline-first | signedout | pending | denied | removed | error | approved
+let state="loading";    // loading | setup | offline-first | signedout | unverified | pending | denied | removed | error | approved
 let offline=false, pendingCreate=false;
 let unsubMe=null, unsubAll=null, members=[], adminReady=Promise.resolve();
 // Roles: the owner (meta/admin), admins the owner chooses, employees (what members could always do) and public members.
@@ -1124,7 +1127,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.76";
+const WEB_VERSION = "3.77";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1221,8 +1224,9 @@ function boot(){
       profile=s.data(); offline=false;
       if(wasRole && profile.status==="approved" && (wasRole!==myRole() || wasPerms!==JSON.stringify(profile.perms||{}))){ store("gk-recipes", null); store("gk-recipes-pub", null); return location.reload(); }
       if(profile.status==="approved" && isPublic() && !recipesOnline) setRecipes(store("gk-recipes-pub")||[]);
-      state = profile.status==="approved" ? "approved" : profile.status==="denied" ? "denied" : "pending";
+      state = profile.status==="approved" ? "approved" : profile.status==="denied" ? "denied" : profile.status==="unverified" ? "unverified" : "pending";
       cacheProfile(); renderAcct();
+      if(state==="approved" && !wasRole) syncMyEmail();
       if(isAdmin() && !unsubAll) watchMembers();
       if(isAdmin()) watchDupes();
       if(profile.status==="approved"){ watchGolive(); watchTeam(); }
@@ -1251,25 +1255,62 @@ function watchMembers(){
     if(location.hash==="#admin") route();
   }, ()=>{});
 }
-async function signUp(name,pw){
+// Older profiles sign in with a made-up address; newer ones with their own email (kept private: only they and admins see it)
+const FAKE_MAIL = "@gittys-kitchen.app";
+const realEmail = e => !!e && !String(e).toLowerCase().endsWith(FAKE_MAIL);
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+async function signUp(name,email,pw){
   const key=nameKey(name);
   const taken = await db.collection("names").doc(key).get();
   if(taken.exists) throw {code:"gk/taken"};
   pendingCreate=true;
   try{
-    const cred = await auth.createUserWithEmailAndPassword("m"+newId()+"@gittys-kitchen.app", pw);
+    let cred;
+    try{ cred = await auth.createUserWithEmailAndPassword(email, pw); }
+    catch(e){ throw (e&&e.code==="auth/email-already-in-use") ? {code:"gk/emailtaken"} : e; }
     const uid = cred.user.uid;
-    try{ await db.collection("names").doc(key).set({uid, email:cred.user.email}); }
+    try{ await db.collection("names").doc(key).set({uid, email:""}); }
     catch(e){ try{ await cred.user.delete(); }catch(_){} throw {code:"gk/taken"}; }
-    profile = {name, status: key===ADMIN_KEY ? "approved" : "pending", created: Date.now(), favs: []};
+    profile = {name, status: key===ADMIN_KEY ? "approved" : "unverified", created: Date.now(), favs: [], email};
     await db.collection("users").doc(uid).set(profile);
-    if(key!==ADMIN_KEY) notifyAdmin(`${name} asked to join`, "Tap to open Approve members in Gitty's Kitchen.", "#admin", "wave");
+    if(key!==ADMIN_KEY) await sendConfirm();
   } finally { pendingCreate=false; }
 }
+let confirmSentAt=0;
+async function sendConfirm(){ const u=auth.currentUser; if(!u) return; confirmSentAt=Date.now(); try{ await u.sendEmailVerification(); }catch(e){} }
+// After they tap the link in the email: the join request goes to the admin
+let confirmBusy=false;
+async function checkConfirmed(quiet){
+  const u=auth.currentUser; if(!u || confirmBusy || !profile || profile.status!=="unverified") return false;
+  confirmBusy=true;
+  try{
+    await u.reload(); const v=auth.currentUser;
+    if(!v || !v.emailVerified){ if(!quiet) toast("Not confirmed yet. Tap the link in the email first."); return false; }
+    await v.getIdToken(true);
+    await db.collection("users").doc(v.uid).update({status:"pending"});
+    notifyAdmin(`${myName()} asked to join`, "Tap to open Approve members in Gitty's Kitchen.", "#admin", "wave");
+    return true;
+  }catch(e){ if(!quiet) toast("Couldn't check. Check your connection."); return false; }
+  finally{ confirmBusy=false; }
+}
+setInterval(()=>{ if(state==="unverified" && !document.hidden) checkConfirmed(true); }, 5000);
+document.addEventListener("visibilitychange", ()=>{ if(state==="unverified" && !document.hidden) checkConfirmed(true); });
 async function signIn(name,pw){
+  if(name.includes("@")){ await auth.signInWithEmailAndPassword(name.trim(), pw); return; }
   const n = await db.collection("names").doc(nameKey(name)).get();
   if(!n.exists) throw {code:"gk/noname"};
-  await auth.signInWithEmailAndPassword(n.data().email, pw);
+  if(!n.data().email) throw {code:"gk/useemail"};
+  try{ await auth.signInWithEmailAndPassword(n.data().email, pw); }
+  catch(e){ if(e && /invalid-credential|wrong-password|user-not-found/.test(e.code||"")) throw {code:"gk/nameorpw"}; throw e; }
+}
+// When someone added their email in My profile: once confirmed, keep their profile and sign-in name up to date
+async function syncMyEmail(){
+  const u=auth&&auth.currentUser; if(!u || !profile || profile.status!=="approved" || offline || !realEmail(u.email) || !u.emailVerified) return;
+  try{
+    if(profile.email!==u.email) await db.collection("users").doc(me).update({email:u.email});
+    const n=await db.collection("names").doc(nameKey(myName())).get();
+    if(n.exists && n.data().uid===me && n.data().email) await db.collection("names").doc(nameKey(myName())).set({uid:me, email:""});
+  }catch(e){}
 }
 async function signOut(){
   closeMenu(); store("gk-cache",null); location.hash="";
@@ -1312,7 +1353,7 @@ async function renameMe(newName){
   const taken = await db.collection("names").doc(key).get();
   if(taken.exists && taken.data().uid!==me) throw {code:"gk/taken"};
   const mine = await db.collection("names").doc(oldKey).get();
-  const email = (mine.exists && mine.data().email) || auth.currentUser.email;
+  const email = realEmail(auth.currentUser.email) ? "" : ((mine.exists && mine.data().email) || auth.currentUser.email);
   if(!taken.exists){ try{ await db.collection("names").doc(key).set({uid:me, email}); } catch(e){ throw {code:"gk/taken"}; } }
   if(isOwner()){ await db.collection("meta").doc("admin").set({uid:me, name}); setAdminInfo({uid:me, name}); }
   const was=[...new Set([...(profile.was||[]), old])].slice(-20);
@@ -1384,6 +1425,10 @@ function errText(e){
   const c=(e&&e.code)||"";
   if(c==="gk/badcode") return "That code doesn't match this name. Check both and try again.";
   if(c==="gk/oldcode") return "That code has expired. Ask "+ADMIN_NAME+" for a new one.";
+  if(c==="gk/emailtaken") return "That email already has a profile. Sign in with it, or tap “Forgot your password?”.";
+  if(c==="gk/useemail") return "This profile signs in with its email. Type your email instead of your name.";
+  if(c==="gk/nameorpw") return "That password isn't right. If you added an email to your profile, sign in with the email.";
+  if(c==="auth/invalid-email") return "That email doesn't look right. Check it and try again.";
   if(c==="gk/taken"||c==="auth/email-already-in-use") return "That name is already taken. Sign in, or add a last name or initial to make it different.";
   if(c==="gk/noname") return "There's no member with that name. Check the spelling, or create a profile.";
   if(c==="auth/wrong-password"||c==="auth/invalid-credential"||c==="auth/invalid-login-credentials") return "That password isn't right. Try again.";
@@ -1778,7 +1823,18 @@ function recipe(r){
 
 /* ---------- sign-in and waiting screens ---------- */
 const CHEF = '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14a5 5 0 1 1 3.5-8.6A5 5 0 0 1 22 7a4.5 4.5 0 1 1 1 8.9V25H9z"/><path d="M9 21h14"/></svg>';
-let authMode = "signin";
+let authMode = "signin", authDraft = {};
+// "I'm not a robot" (Google reCAPTCHA). Turned on once the owner adds a site key here.
+const RECAPTCHA_KEY = "";
+let robotId=null, robotTok="";
+function robotBox(el){
+  robotTok="";
+  const draw=()=>{ try{ robotId=grecaptcha.render(el, {sitekey:RECAPTCHA_KEY, callback:t=>{robotTok=t}, "expired-callback":()=>{robotTok=""}}); }catch(e){} };
+  if(window.grecaptcha && grecaptcha.render) return draw();
+  window.gkRobot=draw;
+  if(!document.getElementById("rc-js")){ const s=document.createElement("script"); s.id="rc-js"; s.async=true; s.src="https://www.google.com/recaptcha/api.js?onload=gkRobot&render=explicit"; document.head.appendChild(s); }
+}
+const robotOk = () => !!robotTok;
 function shell(inner){
   app.innerHTML = `<section class="auth wrap">
     <div class="auth-card">
@@ -1796,6 +1852,17 @@ function gate(msg){
   if(state==="setup"){ shell(`<h2>Almost ready</h2><p class="sub">This copy of Gitty's Kitchen isn't connected to its online member list yet.</p><p class="hint">Once the Firebase setup is done and the app is rebuilt with its settings, members can sign up here.</p>`); return; }
   if(state==="offline-first"){ shell(`<h2>You're offline</h2><p class="sub">Connect to the internet to sign in. After your first sign-in, the recipes also open without internet.</p><button class="primary" type="button" onclick="location.reload()">Try again</button>`); return; }
   if(state==="error"){ shell(`<h2>Can't reach the member list</h2><p class="sub">Check your internet connection and try again.</p><button class="primary" type="button" onclick="location.reload()">Try again</button><p class="switch"><button type="button" class="link" data-signout>Sign out</button></p>`); return; }
+  if(state==="unverified"){ const em=(auth&&auth.currentUser&&auth.currentUser.email)||(profile&&profile.email)||"your email";
+    const F=shell(`<div class="wait"><span class="avatar lg">${esc(initial(myName()))}</span>
+      <h2>Confirm your email</h2>
+      <p class="sub">We sent a link to <b>${esc(em)}</b>. Tap it to confirm it's really you. Then your request goes to ${A}.</p></div>
+      <p class="hint">Can't find it? Look in your spam or junk folder.</p>
+      <button class="primary" type="button" id="ev-check">I tapped the link</button>
+      <p class="switch"><button type="button" class="link" id="ev-again">Send the email again</button></p>
+      <p class="switch"><button type="button" class="link" data-signout>Sign out</button></p>`);
+    F.querySelector("#ev-check").onclick=async e=>{ e.target.disabled=true; await checkConfirmed(false); e.target.disabled=false; };
+    F.querySelector("#ev-again").onclick=async e=>{ if(Date.now()-confirmSentAt<30000){ toast("Just sent. Give it a minute."); return; } await sendConfirm(); toast("Sent again"); };
+    return; }
   if(state==="pending"){ shell(`<div class="wait"><span class="avatar lg">${esc(initial(myName()))}</span>
       <h2>Waiting for approval</h2>
       <p class="sub">Thanks, ${esc(myName())}. Your request to join was sent to ${A}. This page opens the cookbook by itself as soon as you're approved.</p></div>
@@ -1810,15 +1877,21 @@ function authScreen(msg){
   if(authMode==="create"){
     inner = `<h2>Ask to join</h2>
       <p class="sub">Create a profile. ${esc(ADMIN_NAME)} approves every new member.</p>
-      <div class="field"><label for="nm">Your full name</label><input id="nm" type="text" autocomplete="name" maxlength="40" placeholder="e.g. Gitty Schlesinger"></div>
+      <div class="field"><label for="nm">Your full name</label><input id="nm" type="text" autocomplete="name" maxlength="40" placeholder="e.g. Gitty Schlesinger" value="${esc(authDraft.nm||"")}"></div>
+      <div class="field"><label for="em">Email</label><input id="em" type="email" autocomplete="email" inputmode="email" maxlength="100" placeholder="you@example.com" value="${esc(authDraft.em||"")}"></div>
       <div class="field"><label for="pw">Password</label><input id="pw" type="password" autocomplete="new-password" placeholder="At least 6 characters"></div>
       <div class="field"><label for="pw2">Confirm password</label><input id="pw2" type="password" autocomplete="new-password"></div>
+      ${RECAPTCHA_KEY?`<div id="robot" class="robot"></div>`:""}
       ${msg?`<p class="err" role="alert">${esc(msg)}</p>`:""}
       <button class="primary" type="submit">Send request</button>
+      <p class="hint" style="margin-top:8px">We'll email you a link to confirm. Only ${esc(ADMIN_NAME)} and the admins see your email.</p>
       <p class="switch">Already a member? <button type="button" class="link" data-mode="signin">Sign in</button></p>`;
   } else if(authMode==="forgot"){
     inner = `<h2>Forgot your password?</h2>
-      <p class="sub">Use a reset code from ${esc(ADMIN_NAME)}, or your own recovery code, to choose a new password. Your favorites and everything else stay.</p>
+      <p class="sub">Your favorites and everything else stay.</p>
+      <div class="fg-mail"><div class="field"><label for="fe">Your email</label><input id="fe" type="email" autocomplete="email" inputmode="email" maxlength="100" placeholder="you@example.com"></div>
+        <button type="button" class="btn solid" id="fe-send">Email me a link</button><p class="hint" id="fe-msg" role="status"></p></div>
+      <p class="fg-or">No email on your profile? Use a reset code from ${esc(ADMIN_NAME)}, or your own recovery code.</p>
       <div class="field"><label for="nm">Your name</label><input id="nm" type="text" autocomplete="username" maxlength="40" value="${esc(store("gk-lastname")||"")}"></div>
       <div class="field"><label for="code">Code</label><input id="code" type="text" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="20" placeholder="e.g. 7KQ2-M9XD"></div>
       <div class="field"><label for="pw">New password</label><input id="pw" type="password" autocomplete="new-password" placeholder="At least 6 characters"></div>
@@ -1829,8 +1902,8 @@ function authScreen(msg){
       <p class="switch"><button type="button" class="link" data-mode="signin">Back to sign in</button></p>`;
   } else {
     inner = `<h2>Sign in</h2>
-      <p class="sub">Members only. Enter the name you joined with.</p>
-      <div class="field"><label for="nm">Your name</label><input id="nm" type="text" autocomplete="username" maxlength="40" value="${esc(store("gk-lastname")||"")}"></div>
+      <p class="sub">Members only. Enter your email, or the name you joined with.</p>
+      <div class="field"><label for="nm">Your email or name</label><input id="nm" type="text" autocomplete="username" maxlength="100" value="${esc(store("gk-lastname")||"")}"></div>
       <div class="field"><label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password"></div>
       ${msg?`<p class="err" role="alert">${esc(msg)}</p>`:""}
       <button class="primary" type="submit">Sign in</button>
@@ -1840,6 +1913,14 @@ function authScreen(msg){
   const F = shell(inner);
   const nm=F.querySelector("#nm"), pw=F.querySelector("#pw");
   if(nm){ (nm.value ? (F.querySelector("#code")||pw) : nm).focus(); }
+  const fe=F.querySelector("#fe-send");
+  if(fe) fe.onclick=async()=>{ const em=F.querySelector("#fe").value.trim(), out=F.querySelector("#fe-msg");
+    if(!EMAIL_RE.test(em)){ out.textContent="Type the email on your profile."; F.querySelector("#fe").focus(); return; }
+    fe.disabled=true;
+    try{ await auth.sendPasswordResetEmail(em); out.textContent="If that email is on a profile, a link to choose a new password is on its way. Look in spam too."; }
+    catch(e){ out.textContent = (e&&e.code==="auth/invalid-email") ? "That email doesn't look right." : "If that email is on a profile, a link to choose a new password is on its way. Look in spam too."; }
+    fe.disabled=false; };
+  if(F.querySelector("#robot")) robotBox(F.querySelector("#robot"));
   const ask=F.querySelector("#askcode");
   if(ask) ask.onclick=()=>{
     const name=nm.value.trim().replace(/\s+/g," ");
@@ -1863,17 +1944,22 @@ function authScreen(msg){
       catch(err){ gate(errText(err)); }
       return;
     }
+    let email="";
     if(authMode==="create"){
+      email=F.querySelector("#em").value.trim(); authDraft={nm:name, em:email};
       if(name.length<2) return gate("Enter your full name.");
+      if(name.includes("@")) return gate("Type your name here, and your email in the Email box.");
+      if(!EMAIL_RE.test(email)) return gate("Enter your email address, like you@example.com.");
       if(/[\/]/.test(name)) return gate("Names can't include a slash (/).");
       if(p.length<6) return gate("Choose a password with at least 6 characters.");
       if(p!==F.querySelector("#pw2").value) return gate("The two passwords don't match. Type them again.");
+      if(RECAPTCHA_KEY && !robotOk()) return gate("Tick “I'm not a robot”.");
     } else if(!p) return gate("Enter your password.");
     btn.disabled=true; btn.textContent = authMode==="create" ? "Sending…" : "Signing in…";
     try{
-      store("gk-lastname", name);
-      authMode==="create" ? await signUp(name,p) : await signIn(name,p);
-      authMode="signin";
+      store("gk-lastname", authMode==="create" ? email : name);
+      authMode==="create" ? await signUp(name,email,p) : await signIn(name,p);
+      authMode="signin"; authDraft={};
     }catch(err){ gate(errText(err)); }
   };
 }
@@ -1883,9 +1969,9 @@ const fmtDate = t => t ? new Date(t).toLocaleDateString(undefined,{month:"short"
 const shownCodes={};
 const openPerms = new Set();   // employees whose permissions are showing on the Members page
 function adminPage(){
-  const pend=members.filter(m=>m.status==="pending"), appr=members.filter(m=>m.status==="approved"), den=members.filter(m=>m.status==="denied");
+  const unv=members.filter(m=>m.status==="unverified"), pend=members.filter(m=>m.status==="pending"), appr=members.filter(m=>m.status==="approved"), den=members.filter(m=>m.status==="denied");
   const row = (m,acts) => `<li class="mrow"><span class="avatar">${esc(initial(m.name))}</span>
-      <div class="mwho"><b>${esc(m.name)}${m.status==="approved"?` <span class="tag role-${roleOf(m)}">${ROLE_LABEL[roleOf(m)]}</span>`:""}</b><span>${m.status==="pending"?"Asked to join":"Joined"} ${fmtDate(m.created)}</span></div>
+      <div class="mwho"><b>${esc(m.name)}${m.status==="approved"?` <span class="tag role-${roleOf(m)}">${ROLE_LABEL[roleOf(m)]}</span>`:""}</b><span>${m.status==="pending"?"Asked to join":m.status==="unverified"?"Signed up":"Joined"} ${fmtDate(m.created)}${m.email?` · ${esc(m.email)}`:""}</span></div>
       <div class="macts">${acts}</div>${shownCodes[m.uid]?`<div class="codebox"><div>Reset code for ${esc(m.name)}: <b>${fmtCode(shownCodes[m.uid])}</b> <button type="button" class="btn" data-copy="${shownCodes[m.uid]}">Copy</button></div><p class="hint">Works once, for 2 days. On the sign-in page they tap “Forgot your password?” and enter their name, this code and a new password. Their favorites and everything else stay.</p></div>`:""}</li>`;
   const btn = (act,m,label,cls) => `<button type="button" class="btn ${cls||""}" data-act="${act}" data-uid="${esc(m.uid)}">${label}</button>`;
   const list = (arr,f,empty) => arr.length ? `<ul class="mlist">${arr.map(f).join("")}</ul>` : `<p class="hint mempty">${empty}</p>`;
@@ -1906,6 +1992,7 @@ function adminPage(){
     <div class="panel-a"><h3>Members</h3>
       <p class="hint" style="margin-bottom:6px"><b>Employee</b>: what you set in <a class="link" href="#employees">Employee settings</a>, plus anything you change for one person with Permissions. <b>Public</b>: only what you allow in <a class="link" href="#public">Public portal settings</a>. <b>Admin</b>: everything you can do, except changing you or other admins${isOwner()?" (only you make admins)":""}.</p>
       ${list(appr.slice().sort((a,b)=>order[roleOf(a)]-order[roleOf(b)]), m=>row(m, manage(m) ? roleSel(m)+(roleOf(m)==="employee"?btn("perms",m,"Permissions"+(Object.keys(m.perms||{}).length?" ✓":"")):"")+btn("reset",m,"Reset password")+btn("ask-remove",m,"Remove") : "")+(openPerms.has(m.uid)&&roleOf(m)==="employee"&&manage(m)?permsBox(m):""), "No members yet.")}</div>
+    ${unv.length?`<div class="panel-a"><h3>Haven't confirmed their email</h3><p class="hint">They signed up but haven't tapped the link in their email yet. They'll move to Waiting for approval once they do.</p>${list(unv, m=>row(m, btn("ask-remove",m,"Remove")), "")}</div>`:""}
     ${den.length?`<div class="panel-a"><h3>Not approved</h3>${list(den, m=>row(m, btn("approve",m,"Approve","solid")+btn("ask-remove",m,"Remove")), "")}</div>`:""}
   </section>`;
   app.querySelectorAll("[data-preset]").forEach(b=>b.onclick=async()=>{ const m=members.find(x=>x.uid===b.dataset.preset); if(!m) return;
@@ -4762,6 +4849,16 @@ async function profilePage(){
         <p class="err" id="nm-err" role="alert" hidden></p>
         <div><button class="primary" type="submit">Save name</button></div>
       </form></div>`}
+    ${offline||!auth||!auth.currentUser?"":(()=>{ const ce=auth.currentUser.email, has=realEmail(ce);
+      return `<div class="panel-a"><h3>Email</h3>
+      ${has?`<p>Your email: <b>${esc(ce)}</b></p><p class="hint">You sign in with it, and can reset your password by email. Only you and the admins see it.</p>`
+        :`<p class="hint">Add your email so you can sign in with it and reset your password yourself, without a code.</p>`}
+      <form id="emform" class="pw-form" novalidate>
+        <div class="field"><label for="em-new">${has?"New email":"Your email"}</label><input id="em-new" type="email" inputmode="email" autocomplete="email" maxlength="100" placeholder="you@example.com"></div>
+        <div class="field"><label for="em-pw">Your password</label><input id="em-pw" type="password" autocomplete="current-password"></div>
+        <p class="err" id="em-err" role="alert" hidden></p><p class="hint" id="em-ok" role="status" hidden></p>
+        <div><button class="primary" type="submit">${has?"Change email":"Add email"}</button></div>
+      </form></div>`; })()}
     <div class="panel-a"><h3>Home page</h3>
       <div class="field"><label for="pref-todo">Show my to-do list on the home page when there's something to do in…</label>
         <select id="pref-todo">${TODO_CHOICES.map(([v,l])=>`<option value="${v}" ${v===todoDays()?"selected":""}>${l}</option>`).join("")}</select></div>
@@ -4827,6 +4924,23 @@ async function profilePage(){
     try{ await renameMe(nn); profile.name=nn; cacheProfile(); renderAcct(); toast("Name changed"); profilePage(); return; }
     catch(x){ fail(x&&x.code==="gk/taken" ? "That name is already taken. Add a last name or initial to make it different." : errText(x)); }
     btn.disabled=false; btn.textContent="Save name";
+  };
+  // add or change email: they confirm it by tapping a link, then sign in with it
+  const EF=document.getElementById("emform");
+  if(EF) EF.onsubmit=async e=>{
+    e.preventDefault();
+    const err=EF.querySelector("#em-err"), okm=EF.querySelector("#em-ok"), fail=m=>{ err.textContent=m; err.hidden=false; };
+    const em=EF.querySelector("#em-new").value.trim(), pw=EF.querySelector("#em-pw").value; err.hidden=true; okm.hidden=true;
+    if(!EMAIL_RE.test(em)) return fail("Type your email address, like you@example.com.");
+    if(!pw) return fail("Type your password, to show it's you.");
+    const btn=EF.querySelector(".primary"); btn.disabled=true;
+    try{
+      const u=auth.currentUser;
+      await u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email, pw));
+      await u.verifyBeforeUpdateEmail(em);
+      EF.reset(); okm.innerHTML=`We sent a link to <b>${esc(em)}</b>. Tap it to finish. After that, sign in with your email and password.`; okm.hidden=false;
+    }catch(x){ const c=(x&&x.code)||""; fail(/wrong-password|invalid-credential|invalid-login/.test(c) ? "Your password isn't right." : c==="auth/email-already-in-use" ? "That email is already on another profile." : errText(x)); }
+    btn.disabled=false;
   };
   // change password
   const F=document.getElementById("pwform");

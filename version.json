@@ -1,6 +1,6 @@
 {
-  "web": "3.76",
+  "web": "3.77",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Team messages about a recipe for employees and admins. Start cooking now walks you through the recipe one step at a time."
+  "notes": "Signing up now asks for your email and a confirmation link. Forgot password can email you a link."
 }
