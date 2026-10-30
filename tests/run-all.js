@@ -332,12 +332,12 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#plan'); await A.waitForTimeout(400);
     ok("today's to-do list is always on the Calendar", (await A.locator('#pl-day ~ #today, .pl-todo').count()) === 1);
     await A.goto(F + '#convert'); await A.waitForTimeout(400);
-    ok('calculator converts a cup', /16\s*tablespoons/.test(await A.locator('#cv-out').innerText()) && /237\s*ml/.test(await A.locator('#cv-out').innerText()));
+    ok('calculator converts a cup', /16\s*tbsp/.test(await A.locator('#cv-out').innerText()) && /237\s*ml/.test(await A.locator('#cv-out').innerText()));
     await A.fill('#cv-n', '350'); await A.selectOption('#cv-u', '°F'); await A.waitForTimeout(100);
     await A.fill('#wr-q', 'apple kugel'); await A.waitForTimeout(200); await A.locator('[data-wr]').first().click(); await A.waitForTimeout(300);
     ok('calculator doubles a whole recipe', /^6 cups flour/.test(await A.locator('.wr-list li').first().innerText()), await A.locator('.wr-list li').first().innerText());
     await A.click('[data-wx="0.5"]'); await A.waitForTimeout(200);
-    ok('calculator halves a whole recipe', /^1½ cups flour/.test(await A.locator('.wr-list li').first().innerText()) && /6 tablespoons sugar/.test(await A.locator('.wr-list').first().innerText()));
+    ok('calculator halves a whole recipe', /^1½ cups flour/.test(await A.locator('.wr-list li').first().innerText()) && /6 tbsp sugar/.test(await A.locator('.wr-list').first().innerText()));
     await A.click('#wr-open'); await A.waitForTimeout(400);
     ok('open recipe at the chosen size', /^1½ cups flour/.test(await A.locator('.col.ing li').first().innerText()));
     await A.goto(F + '#convert'); await A.waitForTimeout(300); await A.fill('#cv-n', '350'); await A.selectOption('#cv-u', '°F'); await A.waitForTimeout(100);
@@ -733,8 +733,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
 
     // Tablespoon and teaspoon spelled out everywhere
     await PU.goto(F + '#r-challah'); await PU.waitForTimeout(400);
-    const chTxt = await A.evaluate(async () => { location.hash = '#' + RECIPES.find(r => (r.s || []).some(s => s[2].some(i => /\btb?sp\b/i.test(i)))).id; await new Promise(r => setTimeout(r, 400)); return document.querySelector('.parts').innerText; });
-    ok('recipes say tablespoon and teaspoon, never tbsp or tsp', /tablespoon|teaspoon/.test(chTxt) && !/\b(tbsp|tsp)\b/i.test(chTxt), chTxt.slice(0, 300));
+    const chTxt = await A.evaluate(async () => { location.hash = '#' + RECIPES.find(r => (r.s || []).some(s => s[2].some(i => /\b(tb?sp|tablespoons?|teaspoons?)\b/i.test(i)))).id; await new Promise(r => setTimeout(r, 400)); return document.querySelector('.parts').innerText; });
+    ok('recipes write tbsp and tsp in lowercase, never spelled out', /\b(tbsp|tsp)\b/.test(chTxt) && !/tablespoon|teaspoon|\bTbsp|\bTsp|TBSP|TSP/.test(chTxt), chTxt.slice(0, 300));
     // Make a recipe better with AI
     await A.goto(F + '#new'); await A.waitForTimeout(400); await A.fill('#ed-t', 'Quick Cake');
     await A.locator('.sec-items').nth(0).fill('flour 2 cups'); await A.locator('.sec-items').nth(1).fill('mix and bake');
