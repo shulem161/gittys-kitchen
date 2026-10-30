@@ -409,7 +409,7 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/names/$(request.resource.data.name.lower())).data.uid == request.auth.uid)
         // an admin gives an approved member their number (once)
         || (isAdmin() && !('no' in resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['no'])
-            && request.resource.data.no is int && request.resource.data.no > 1000));
+            && request.resource.data.no is int && request.resource.data.no > 0));
       allow delete: if (isAdmin() && canManage(uid)) || (signedIn() && request.auth.uid == uid)
         || (signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.from == uid);
     }

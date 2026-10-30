@@ -729,6 +729,12 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await V.goto(F + '#team'); await V.waitForTimeout(800);
     ok('the employee sees the reply as new', (await V.locator('.tm-row.unread', {hasText: '375°F'}).count()) === 1);
     await V.locator('.tm-row', {hasText: '375°F'}).click(); await V.waitForTimeout(600);
+    ok('newest messages are on top', /375°F/.test(await V.locator('.tm-msgs li').first().innerText()));
+    await V.locator('.tm-msgs [data-fw]').last().click(); await V.waitForTimeout(200);
+    const fwSel = V.locator('.tm-fwform select'); await fwSel.selectOption({index: 0});
+    await V.locator('.tm-fwform textarea').fill('FYI'); await V.locator('.tm-fwform .btn.solid').click(); await V.waitForTimeout(900);
+    ok('a message can be forwarded to someone else on the team', /Forwarded from/.test(await V.locator('.tm-msgs').innerText()) && /oven time/.test(await V.locator('.tm-msgs').innerText()));
+    await V.goBack(); await V.waitForTimeout(600);
     await V.click('#tm-done'); await V.waitForTimeout(600);
     await V.goto(F + '#team'); await V.waitForTimeout(500);
     ok('marking done moves it to Done', (await V.locator('details .tm-row', {hasText: '375°F'}).count()) === 1);
@@ -856,9 +862,9 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('…and can be undone', (await A.locator('.sec-items').evaluateAll(els => els.map(e => e.value))).join('|') === 'flour 2 cups|mix and bake');
 
     // Member numbers
-    ok('every approved member has their own member number', await A.evaluate(() => { const n = members.filter(m => m.status === 'approved').map(m => m.no); return n.every(x => x > 1000) && new Set(n).size === n.length; }));
+    ok('every approved member has their own member number, starting from 1', await A.evaluate(() => { const n = members.filter(m => m.status === 'approved').map(m => m.no); return n.every(x => x > 0) && n.includes(1) && new Set(n).size === n.length; }));
     await PU.goto(F + '#account'); await PU.waitForTimeout(500);
-    ok('…shown in Account settings', /^\d{4,}$/.test((await PU.locator('.acc-no b').innerText()).trim()));
+    ok('…shown in Account settings', /^\d+$/.test((await PU.locator('.acc-no b').innerText()).trim()));
     const puNo = String(await PU.evaluate(() => profile.no));
 
     // Log in as one particular customer, found by email or number

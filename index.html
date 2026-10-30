@@ -556,6 +556,8 @@ body.viewing-as .bar{top:calc(env(safe-area-inset-top,0px) + 42px)}
 .tm-msgs{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:10px}
 .tm-msgs li{display:grid;justify-items:start;gap:2px}.tm-msgs li.me{justify-items:end}
 .tm-bub{max-width:85%;padding:9px 12px;border-radius:14px 14px 14px 4px;background:var(--bg);border:1px solid var(--line);font-size:15px;overflow-wrap:anywhere}
+.tm-fw{font-size:12.5px}.tm-fwform{display:grid;gap:6px;margin-top:6px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--bg);width:min(100%,420px)}
+.tm-fwform textarea{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:var(--paper);color:var(--ink)}
 .tm-msgs li.me .tm-bub{border-radius:14px 14px 4px 14px;background:var(--accent);border-color:var(--accent);color:var(--paper)}
 #tm-reply,#tn-text,#at-text{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;font-size:15px;box-sizing:border-box}
 #guide{position:fixed;inset:0;z-index:50;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
@@ -1216,7 +1218,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.01";
+const WEB_VERSION = "4.02";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -3078,7 +3080,7 @@ function watchTeam(){
   if(!unsubThreads) unsubThreads = db.collection("threads").where("members","array-contains",who()).onSnapshot(s=>{
     THREADS = s.docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(b.updated||0)-(a.updated||0)); renderAcct();
     const h=location.hash;
-    if((h==="#team" || h.startsWith("#team-")) && !document.querySelector("#tm-reply:focus, #tn-text:focus")){ const y=window.scrollY; route(); window.scrollTo(0, h.startsWith("#team-") ? document.body.scrollHeight : y); }
+    if((h==="#team" || h.startsWith("#team-")) && !document.querySelector("#tm-reply:focus, #tn-text:focus")){ const y=window.scrollY; route(); window.scrollTo(0, h.startsWith("#team-") ? 0 : y); }
   }, ()=>{});
 }
 function stopTeam(){ if(unsubThreads){unsubThreads();unsubThreads=null} if(unsubTeam){unsubTeam();unsubTeam=null} THREADS=[]; TEAM=[]; }
@@ -3113,8 +3115,8 @@ async function assignNumbers(){
         const cref=db.collection("meta").doc("counter"), uref=db.collection("users").doc(m.uid);
         const c=await tx.get(cref), u=await tx.get(uref);
         if(!u.exists || u.data().no) return;
-        const used = Math.max(1000, ...members.map(x=>+x.no||0));
-        const next = Math.max(c.exists ? (c.data().next||1001) : 1001, used+1);
+        const used = Math.max(0, ...members.map(x=>+x.no||0));
+        const next = Math.max(c.exists ? (c.data().next||1) : 1, used+1);
         tx.update(uref, {no:next}); tx.set(cref, {next:next+1});
       });
     }
@@ -3225,19 +3227,29 @@ function threadPage(id){
           <ul class="proof-who">${ps.map(u=>`<li><span>${esc((t.names||{})[u]||"Someone")}</span>${c[u]?(c[u].ok?'<span class="proof-ok">✓ Looks good</span>':'<span class="proof-no">✗ Needs changes</span>'):'<span class="hint">Not yet</span>'}</li>`).join("")}</ul>
           ${ps.includes(me)?`<div class="row mn-actions"><button type="button" class="btn${mineC&&mineC.ok?" solid":""}" id="pf-ok">✓ Looks good</button><button type="button" class="btn${mineC&&!mineC.ok?" solid":""}" id="pf-no">✗ Needs changes</button></div>
             <form id="pf-form" hidden class="td-add" style="margin-top:8px"><textarea id="pf-note" rows="2" maxlength="800" placeholder="What needs to change?" style="flex:1"></textarea><button class="btn solid" type="submit">Send</button></form>`:""}</div>`; })():""}
-      <ul class="tm-msgs">${(t.msgs||[]).map(m=>`<li class="${m.by===me?"me":""}"><div class="tm-bub">${esc(m.text).replace(/\n/g,"<br>")}</div><span class="hint">${esc(m.by===me?"You":m.name)} · ${fmtWhen(m.at)}</span></li>`).join("")}</ul>
-      <form class="td-add" id="tm-form" style="margin-top:10px"><textarea id="tm-reply" rows="2" maxlength="1500" placeholder="Reply…" style="flex:1"></textarea><button class="btn solid" type="submit">Send</button></form>
+      <form class="td-add" id="tm-form" style="margin:10px 0 6px"><textarea id="tm-reply" rows="2" maxlength="1500" placeholder="Reply…" style="flex:1"></textarea><button class="btn solid" type="submit">Send</button></form>
+      <p class="hint" style="margin:0 0 4px">Newest first</p>
+      <ul class="tm-msgs">${(t.msgs||[]).map((m,i)=>[m,i]).reverse().map(([m,i])=>`<li class="${m.by===me?"me":""}"><div class="tm-bub">${esc(m.text).replace(/\n/g,"<br>")}</div><span class="hint">${esc(m.by===me?"You":m.name)} · ${fmtWhen(m.at)} · <button type="button" class="link tm-fw" data-fw="${i}">Forward</button></span><div class="tm-fwbox" data-fwbox="${i}"></div></li>`).join("")}</ul>
       <div class="row mn-actions" style="margin-top:10px"><button type="button" class="btn" id="tm-done">${t.done?"Open it again":"Mark done"}</button></div>
     </div></section>`;
   // read
   const now=Date.now(); if(!pv() && ((t.readAt||{})[me]||0) < (t.updated||0)){ t.readAt=Object.assign({}, t.readAt||{}, {[me]:now}); db.collection("threads").doc(t.id).update({readAt:t.readAt}).catch(()=>{}); renderAcct(); }
   document.getElementById("tm-form").onsubmit=async e=>{ e.preventDefault(); const ta=document.getElementById("tm-reply"), text=ta.value.trim(); if(!text) return;
-    try{ await replyThread(t, text); ta.value=""; threadPage(id); window.scrollTo(0, document.body.scrollHeight); }catch(err){ toast("Couldn't send. Check your connection."); } };
+    try{ await replyThread(t, text); ta.value=""; threadPage(id); window.scrollTo(0,0); }catch(err){ toast("Couldn't send. Check your connection."); } };
   const pok=document.getElementById("pf-ok"), pno=document.getElementById("pf-no"), pff=document.getElementById("pf-form");
   if(pok) pok.onclick=async()=>{ try{ await markProof(t, true, ""); toast("Marked: looks good"); threadPage(id); }catch(e){ toast("Couldn't save. Check your connection."); } };
   if(pno) pno.onclick=()=>{ pff.hidden=false; pff.querySelector("#pf-note").focus(); };
   if(pff) pff.onsubmit=async e=>{ e.preventDefault(); const note=pff.querySelector("#pf-note").value.trim(); if(!note){ pff.querySelector("#pf-note").focus(); toast("Write what needs to change."); return; }
     try{ await markProof(t, false, note); toast("Sent"); threadPage(id); }catch(x){ toast("Couldn't save. Check your connection."); } };
+  // forward one message to someone else on the team
+  app.querySelectorAll("[data-fw]").forEach(b=>b.onclick=()=>{ const i=+b.dataset.fw, m=t.msgs[i], box=app.querySelector(`[data-fwbox="${i}"]`);
+    if(box.innerHTML){ box.innerHTML=""; return; }
+    box.innerHTML=`<div class="tm-fwform"><label>Forward to ${toSelect("fw-to-"+i, "")}</label><textarea id="fw-note-${i}" rows="2" maxlength="600" placeholder="Add a note (optional)"></textarea><div class="row"><button type="button" class="btn sm solid" id="fw-go-${i}">Forward</button><button type="button" class="btn sm" id="fw-no-${i}">Cancel</button></div></div>`;
+    document.getElementById("fw-no-"+i).onclick=()=>{ box.innerHTML=""; };
+    document.getElementById("fw-go-"+i).onclick=async e=>{ e.target.disabled=true;
+      const note=document.getElementById("fw-note-"+i).value.trim(), to=document.getElementById("fw-to-"+i).value, r=t.rid&&RECIPES.find(x=>x.id===t.rid);
+      const text=(note?note+"\n\n":"")+`Forwarded from ${m.name} (${threadTitle(t)}):\n“${m.text}”`;
+      try{ const nid=await startThread(to, text, r||null); toast("Forwarded"); location.hash="team-"+nid; }catch(x){ e.target.disabled=false; toast("Couldn't forward. Check your connection."); } }; });
   document.getElementById("tm-done").onclick=async()=>{ const v=!t.done; try{ await db.collection("threads").doc(t.id).update({done:v}); t.done=v; toast(v?"Marked done":"Opened again"); threadPage(id); }catch(e){ toast("Couldn't save. Check your connection."); } };
 }
 
@@ -5861,7 +5873,7 @@ function routePage(){
   if(h.startsWith("move-") && isAdmin()){ const mc=CATS.find(x=>slug(x)==="c-"+h.slice(5)); if(mc){ q.value=""; movePage(mc); window.scrollTo(0,0); return; } }
   if(h==="ratings" && may("ratings")){ q.value=""; ratingsPage(); window.scrollTo(0,0); return; }
   if(h==="team" && isTeam()){ q.value=""; teamPage(); window.scrollTo(0,0); return; }
-  if(h.startsWith("team-") && isTeam()){ q.value=""; threadPage(h.slice(5)); window.scrollTo(0, document.body.scrollHeight); return; }
+  if(h.startsWith("team-") && isTeam()){ q.value=""; threadPage(h.slice(5)); window.scrollTo(0,0); return; }
   if(h==="plan" || h.startsWith("plan-")){ q.value=""; planPage(h.slice(5)||null); window.scrollTo(0,0); return; }
   if(!h.startsWith("menu-")) menuBack=null;
   if(h==="menus"){ q.value=""; menusPage(); window.scrollTo(0,0); return; }

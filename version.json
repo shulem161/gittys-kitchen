@@ -1,6 +1,6 @@
 {
-  "web": "4.01",
+  "web": "4.02",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Inbox settings; every recipe goes public only through the three steps."
+  "notes": "Newest team messages on top; forward a message; member numbers from 1."
 }
