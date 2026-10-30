@@ -1072,7 +1072,29 @@ const linkify = html => html.replace(/\[\[([^\]]+)\]\]/g, (m, name) => {
   const r = RECIPES.find(x => x.t.replace(/^Untitled: /,"").toLowerCase() === key);
   return r ? `<a class="rlink" href="#${r.id}">${name}</a>` : name;
 });
-const hiTemps = s => esc(s).replace(/(\d{3}°F)/g,'<span class="temp">$1</span>');
+// Spell out tbsp/tsp ("2 tbsp" → "2 tablespoons", "½ tsp" → "½ teaspoon")
+const SU_FRAC = {"½":.5,"¼":.25,"¾":.75,"⅓":1/3,"⅔":2/3,"⅛":.125,"⅜":.375,"⅝":.625,"⅞":.875};
+function suVal(s){ s=String(s).trim(); let m;
+  if((m=s.match(/^(\d+)\s(\d+)\/(\d+)$/))) return +m[1] + m[2]/m[3];
+  if((m=s.match(/^(\d+)\/(\d+)$/))) return m[1]/m[2];
+  if((m=s.match(/^(\d+(?:\.\d+)?)\s?([½¼¾⅓⅔⅛⅜⅝⅞])$/))) return +m[1] + SU_FRAC[m[2]];
+  if(SU_FRAC[s]!==undefined) return SU_FRAC[s];
+  return parseFloat(s); }
+function spellUnits(text){
+  return String(text).replace(/\b(tbsps?|tbls?|tblsp|tbs|tsps?|tspn)\b/gi, (tok, w, off, all)=>{
+    const tea=/^ts/i.test(w), before=all.slice(Math.max(0,off-30), off);
+    const N="(?:\\d+(?:\\.\\d+)?\\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\\d+\\s\\d+/\\d+|\\d+/\\d+|\\d+(?:\\.\\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])";
+    const m=before.match(new RegExp("("+N+")(?:\\s*(?:-|–|to|or)\\s*("+N+"))?\\s*(?:heaping|heaped|level|scant|rounded|generous|good|large|small|full|big)?\\s*$","i"));
+    let plural=false;
+    if(m){ plural = !!m[2] || suVal(m[1])>1; }
+    else if(/\b(a|an|one|per|each|the|1)\s+(heaping |level |scant |rounded |generous |good |large |small |full |big )?$/i.test(before)) plural=false;
+    else if(/\b(two|three|four|five|six|several|few|some|more|extra)\s+(heaping |level |scant |rounded |generous |good |large |small |full |big )?$/i.test(before)) plural=true;
+    let word=(tea?"teaspoon":"tablespoon")+(plural?"s":"");
+    if(/^[A-Z]/.test(tok) && !m && (off===0 || /[.\n:]\s*$/.test(before))) word=word[0].toUpperCase()+word.slice(1);
+    return word;
+  }).replace(/\b([Tt]ablespoons?|[Tt]easpoons?)\.(?=\s*[a-z0-9(,;)])/g, "$1");
+}
+const hiTemps = s => esc(spellUnits(s)).replace(/(\d{3}°F)/g,'<span class="temp">$1</span>');
 function splitQty(t){
   const m = t.match(/^((?:\d+[½¼¾⅓⅔⅛]?|[½¼¾⅓⅔⅛])(?:\s?[–-]\s?\d+[½¼¾⅓⅔⅛]?)?(?:\s?(?:lb|oz|cups?|tbsp|tsp|sticks?|cans?|packs?|pk\.|lg\.|glass|squares?|bunch|cloves?|heads?|quart)\b\.?)?)\s+(.*)$/i);
   return m ? [m[1],m[2]] : ["",t];
@@ -1159,7 +1181,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.93";
+const WEB_VERSION = "3.94";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -3292,7 +3314,7 @@ What the cook wrote (in their own words; it may be short, messy or incomplete):
 ${written}
 
 Rewrite it as a clear, complete recipe that anyone can follow:
-- Ingredients: one per line, amount first ("2 cups flour", "3 large eggs", "1 tsp salt"). Keep every ingredient and amount the cook gave. Only fill in an amount when it's obviously missing, and then use a sensible amount. Don't add new ingredients except basics clearly needed by the steps (like oil for greasing), and never mix meat and dairy.
+- Ingredients: one per line, amount first ("2 cups flour", "3 large eggs", "1 teaspoon salt"); always spell out "tablespoon" and "teaspoon", never tbsp or tsp. Keep every ingredient and amount the cook gave. Only fill in an amount when it's obviously missing, and then use a sensible amount. Don't add new ingredients except basics clearly needed by the steps (like oil for greasing), and never mix meat and dairy.
 - Steps: one action per line, in order, starting with a verb. Say exactly what to do with each ingredient, the pan or pot and its size when it matters, the oven temperature in °F, the heat on the stove, how long, and how to tell when it's done. Short, plain sentences. No numbering.
 - Keep parts the cook used (like Dough, Filling, Topping) as separate parts with headings. Put "Preheat the oven" first when it bakes.
 - If the cook gave a time or number of servings, keep them; if not, estimate.
@@ -3495,7 +3517,7 @@ async function approveSub(sub){
 }
 function previewHTML(sub){
   return (sub.s||[]).map(x=>`<div class="pv-part">${x.h?`<div class="group">${esc(x.h)}</div>`:`<div class="group">${x.k==="ing"?"Ingredients":"Method"}</div>`}
-    ${x.k==="ing"?`<ul>${x.items.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>`:`<ol>${x.items.map(i=>`<li>${hiTemps(i)}</li>`).join("")}</ol>`}</div>`).join("");
+    ${x.k==="ing"?`<ul>${x.items.map(i=>`<li>${esc(spellUnits(i))}</li>`).join("")}</ul>`:`<ol>${x.items.map(i=>`<li>${hiTemps(i)}</li>`).join("")}</ol>`}</div>`).join("");
 }
 function reviewPage(){
   const pend=pendingSubs(), done=subs.filter(s=>s.status!=="pending").slice(0,10);
@@ -3819,8 +3841,8 @@ async function drawRecipe(doc, r, opts){
     if(S.twoCol && p.ing.length && p.steps.length){
       const iw=176, gap=22, sx=M+iw+gap, sw=CW-iw-gap;
       const ingRows=[], stepRows=[]; let n0=stepNo;
-      p.ing.forEach(g=>{ if(g.title) ingRows.push(["g",g.title.toUpperCase()]); g.items.forEach(it=>{ wrap(unbracket(it), B, iw-30).forEach((l,i)=>ingRows.push(["i",l,i===0])); ingRows.push(["s"]); }); });
-      p.steps.forEach(g=>{ if(g.title) stepRows.push(["g",g.title.toUpperCase()]); g.items.forEach(it=>{ n0++; wrap(unbracket(it), B, sw-24).forEach((l,i)=>stepRows.push(["i",l,i===0?n0:0])); stepRows.push(["s"]); }); });
+      p.ing.forEach(g=>{ if(g.title) ingRows.push(["g",g.title.toUpperCase()]); g.items.forEach(it=>{ wrap(spellUnits(unbracket(it)), B, iw-30).forEach((l,i)=>ingRows.push(["i",l,i===0])); ingRows.push(["s"]); }); });
+      p.steps.forEach(g=>{ if(g.title) stepRows.push(["g",g.title.toUpperCase()]); g.items.forEach(it=>{ n0++; wrap(spellUnits(unbracket(it)), B, sw-24).forEach((l,i)=>stepRows.push(["i",l,i===0?n0:0])); stepRows.push(["s"]); }); });
       const hOf = rows => rows.reduce((h,x)=>h+(x[0]==="g"?LH:x[0]==="s"?3:LH),0)+B+14;
       const need=Math.max(hOf(ingRows),hOf(stepRows))+16, room=doc.H-doc.M-24;
       if(need < room-doc.M){
@@ -3837,7 +3859,7 @@ async function drawRecipe(doc, r, opts){
       doc.need(40,footer); head("Ingredients", M); doc.y+=LH+5;
       p.ing.forEach(g=>{
         if(g.title){ doc.need(30,footer); doc.text(g.title.toUpperCase(), M, doc.y, 9, "F2", C.wheat); doc.y+=LH; }
-        g.items.forEach(it=>{ const ls=wrap(unbracket(it), B, CW-16); doc.need(ls.length*LH+2,footer);
+        g.items.forEach(it=>{ const ls=wrap(spellUnits(unbracket(it)), B, CW-16); doc.need(ls.length*LH+2,footer);
           doc.text("•", M+2, doc.y, B, "F1", C.accent); ls.forEach(l=>{ doc.text(l, M+16, doc.y, B, "F1", C.ink); doc.y+=LH; }); doc.y+=2; });
       });
       doc.y+=10;
@@ -3846,7 +3868,7 @@ async function drawRecipe(doc, r, opts){
       doc.need(40,footer); head("Method", M); doc.y+=LH+5;
       p.steps.forEach(g=>{
         if(g.title){ doc.need(30,footer); doc.text(g.title.toUpperCase(), M, doc.y, 9, "F2", C.wheat); doc.y+=LH; }
-        g.items.forEach(it=>{ stepNo++; const ls=wrap(unbracket(it), B, CW-28); doc.need(ls.length*LH+6,footer);
+        g.items.forEach(it=>{ stepNo++; const ls=wrap(spellUnits(unbracket(it)), B, CW-28); doc.need(ls.length*LH+6,footer);
           doc.text(stepNo+".", M, doc.y, B, "F2", C.accent); ls.forEach(l=>{ doc.text(l, M+28, doc.y, B, "F1", C.ink); doc.y+=LH; }); doc.y+=6; });
       });
       doc.y+=10;
@@ -4084,7 +4106,7 @@ function scanPrompt(){
 Rules:
 - Include every complete recipe you find, in the order they appear (at most 60). Skip tables of contents, page numbers and cover pages.
 - Keep the family's own wording and terms (Yiddish/Hebrew words like lukshen, bekele, kugel, challah stay as written). Only fix obvious spelling mistakes.
-- One ingredient per item, quantity first, e.g. "2 cups flour", "1½ tsp salt", "3 eggs, separated". Use ½ ¼ ¾ ⅓ ⅔ ⅛ for fractions, "tbsp" and "tsp", and °F for temperatures.
+- One ingredient per item, quantity first, e.g. "2 cups flour", "1½ tsp salt", "3 eggs, separated". Use ½ ¼ ¾ ⅓ ⅔ ⅛ for fractions, spell out "tablespoon" and "teaspoon" (never tbsp or tsp), and °F for temperatures.
 - Method: one clear step per item, in order, as short sentences. Split long paragraphs into steps.
 - If a recipe has separate parts (dough, filling, topping, glaze, sauce), make a separate ingredients part for each with that heading, and method parts with headings when the steps are grouped.
 - "category": choose the best fit from: ${CATS.join(", ")}. If none fits, suggest a short new category name.
@@ -4385,7 +4407,7 @@ const UNITS = [
 ];
 const UNIT = Object.fromEntries(UNITS.map(u=>[u[0],{group:u[2],size:u[3]}]));
 const PLURAL = {cup:"cups",pint:"pints",quart:"quarts",gallon:"gallons",stick:"sticks",can:"cans",pack:"packs",box:"boxes",bag:"bags",jar:"jars",container:"containers",bunch:"bunches",clove:"cloves",head:"heads",square:"squares",glass:"glasses",slice:"slices",pinch:"pinches",dash:"dashes",envelope:"envelopes",bottle:"bottles",bar:"bars",liter:"liters"};
-const unitLabel = (u,n) => u ? (n>1 && PLURAL[u] ? PLURAL[u] : u) : "";
+const unitLabel = (u,n) => u==="tbsp"||u==="tsp" ? (u==="tbsp"?"tablespoon":"teaspoon")+(n>1?"s":"") : u ? (n>1 && PLURAL[u] ? PLURAL[u] : u) : "";
 // "1½ cups flour" → {n:1.5, unit:"cup", name:"flour"}; "Salt" → {n:null, name:"Salt"}
 function parseIng(t){
   const s=String(t).trim();
@@ -4419,9 +4441,10 @@ function tidyUnit(n,unit){
   if(unit==="cup" && !isClean(n)){ const tb=(n-Math.floor(n))*16; if(Math.abs(tb*2-Math.round(tb*2))<0.05) return n<1 ? [tb,"tbsp"] : [n,"cup+tbsp"]; }
   return [n,unit];
 }
-const qtyText = (n,unit) => unit==="cup+tbsp" ? `${Math.floor(n)} ${unitLabel("cup",Math.floor(n))} + ${fmtNum((n-Math.floor(n))*16)} tbsp` : fmtNum(n)+(unit?" "+unitLabel(unit,n):"");
+const qtyText = (n,unit) => unit==="cup+tbsp" ? `${Math.floor(n)} ${unitLabel("cup",Math.floor(n))} + ${fmtNum((n-Math.floor(n))*16)} ${unitLabel("tbsp",(n-Math.floor(n))*16)}` : fmtNum(n)+(unit?" "+unitLabel(unit,n):"");
 // Returns [amount, rest] for showing an ingredient at x times the recipe
-function scaledQty(t,x){
+function scaledQty(t,x){ const [q,n]=scaledQty0(t,x); return [spellUnits(q), spellUnits(n)]; }
+function scaledQty0(t,x){
   if(x===1) return splitQty(t);
   const p=parseIng(t); if(p.n===null) return ["",t];
   let n=p.n*x, n2=p.n2!==null?p.n2*x:null, unit=p.unit;
@@ -4491,7 +4514,7 @@ function calcPage(preId){
       <div class="calc-row">
         <div class="field"><label for="cv-n">Amount</label><input id="cv-n" type="text" inputmode="decimal" value="1" autocomplete="off"></div>
         <div class="field"><label for="cv-u">Unit</label><select id="cv-u">
-          <optgroup label="Volume">${vol.map(u=>`<option ${u==="cup"?"selected":""}>${u}</option>`).join("")}</optgroup>
+          <optgroup label="Volume">${vol.map(u=>`<option value="${u}" ${u==="cup"?"selected":""}>${u==="tbsp"?"tablespoon":u==="tsp"?"teaspoon":u}</option>`).join("")}</optgroup>
           <optgroup label="Weight">${wt.map(u=>`<option>${u}</option>`).join("")}</optgroup>
           <optgroup label="Oven"><option>°F</option><option>°C</option></optgroup></select></div>
       </div>
@@ -4525,9 +4548,9 @@ function calcPage(preId){
     const list=UNITS.filter(x=>x[2]===g && x[0]!==u).map(x=>`<span><b>${show(base/x[3],x[0])}</b> ${unitLabel(x[0],base/x[3])}</span>`);
     if(gpc){
       if(g==="vol"){ const grams=base/236.59*gpc; list.push(`<span class="x"><b>${Math.round(grams)}</b> g</span>`,`<span class="x"><b>${fmtNum(grams/28.35)}</b> oz</span>`); }
-      else { const cups=base/gpc; list.push(`<span class="x"><b>${fmtNum(cups)}</b> ${unitLabel("cup",cups)}</span>`,`<span class="x"><b>${fmtNum(cups*16)}</b> tbsp</span>`); }
+      else { const cups=base/gpc; list.push(`<span class="x"><b>${fmtNum(cups)}</b> ${unitLabel("cup",cups)}</span>`,`<span class="x"><b>${fmtNum(cups*16)}</b> ${unitLabel("tbsp",cups*16)}</span>`); }
     }
-    out.innerHTML=`<p class="hint">${esc($("cv-n").value)} ${esc(u)} is</p><div class="cv-chips">${list.join("")}</div>`;
+    out.innerHTML=`<p class="hint">${esc($("cv-n").value)} ${esc(unitLabel(u, n))} is</p><div class="cv-chips">${list.join("")}</div>`;
   };
   const mult=()=>{ const a=$("mx-a").value.trim(), x=+$("mx-x").value; const [q,rest]=scaledQty(a,x);
     $("mx-out").innerHTML = a ? (q ? `<b>${esc(q)}</b> ${esc(rest)}` : `<span class="hint">Start with a number, like “2 cups sugar”.</span>`) : ""; };
@@ -4638,8 +4661,8 @@ function groceryQty(L){
   if(L.grp.startsWith("n:")){ const u=L.grp.slice(2); return fmtNum(L.amt)+" "+unitLabel(u,L.amt); }
   if(L.grp==="vol"){
     if(L.metric) return L.amt>=1000 ? +(L.amt/1000).toFixed(2)+" liters" : Math.round(L.amt)+" ml";
-    if(L.amt<14) return fmtNum(L.amt/4.929)+" tsp";
-    if(L.amt<59) return fmtNum(L.amt/14.787)+" tbsp";
+    if(L.amt<14) return fmtNum(L.amt/4.929)+" "+unitLabel("tsp",L.amt/4.929);
+    if(L.amt<59) return fmtNum(L.amt/14.787)+" "+unitLabel("tbsp",L.amt/14.787);
     const c=L.amt/236.59; return fmtNum(c)+" "+unitLabel("cup",c);
   }
   if(L.metric) return L.amt>=1000 ? +(L.amt/1000).toFixed(2)+" kg" : Math.round(L.amt)+" g";
