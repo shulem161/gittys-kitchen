@@ -590,6 +590,22 @@ body.guiding{overflow:hidden}
 .va-go{flex:none;padding:8px 14px;border-radius:999px;background:var(--accent);color:var(--paper);font-weight:700;font-size:14px}
 .ai-box{display:grid;gap:10px;margin:14px 0 6px;padding:14px;border-radius:14px;border:1px dashed var(--accent);background:var(--accent-soft)}
 .ai-box b{display:block;font-size:16px}.ai-box span{display:block;font-size:14px;color:var(--muted);margin-top:2px}.ai-box .hint:empty{display:none}
+.cmp{margin-top:10px}
+.cmp-sum{font-size:14.5px;margin:0 0 10px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline}
+.cmp-key{margin-left:auto;display:inline-flex;gap:6px;font-size:12.5px}.cmp-key span{padding:1px 8px;border-radius:6px}
+.cmp .del{background:#FBE3E1;color:#8A2A20}.cmp .add{background:#DDF3E3;color:#1E6B37}
+.cmp-l.del{text-decoration:line-through;text-decoration-color:rgba(138,42,32,.5)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cmp .del{background:#4A2420;color:#F6C7C1}:root:not([data-theme="light"]) .cmp .add{background:#1E3D28;color:#BDEBCB}}
+:root[data-theme="dark"] .cmp .del{background:#4A2420;color:#F6C7C1}:root[data-theme="dark"] .cmp .add{background:#1E3D28;color:#BDEBCB}
+.cmp-f{width:100%;border-collapse:collapse;margin:0 0 12px;font-size:14.5px}.cmp-f th,.cmp-f td{padding:6px 8px;border:1px solid var(--line);text-align:left;vertical-align:top;overflow-wrap:anywhere}.cmp-f thead th{font-size:12.5px;color:var(--muted)}
+.cmp-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}.cmp-cols[hidden],.cmp-one[hidden]{display:none}
+.cmp-view{display:inline-flex;flex-wrap:wrap;gap:4px;padding:4px;border-radius:12px;background:var(--bg);border:1px solid var(--line);margin:0 0 10px}
+.cmp-view button{min-height:38px;padding:0 12px;border-radius:9px;border:0;background:none;color:var(--ink);font:600 14px/1 inherit;cursor:pointer}.cmp-view button[aria-checked="true"]{background:var(--accent);color:var(--paper)}
+@media (max-width:640px){.cmp-cols{grid-template-columns:1fr}}
+.cmp-col{border:1px solid var(--line);border-radius:12px;padding:10px;min-width:0}
+.cmp-t{font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.cmp-h{font-weight:700;font-size:13.5px;color:var(--accent);margin:10px 0 4px;padding:2px 6px;border-radius:6px}.cmp-h:first-of-type{margin-top:0}
+.cmp-l{font-size:14.5px;line-height:1.45;padding:3px 6px;border-radius:6px;overflow-wrap:anywhere}
 .set-links{display:grid;gap:12px}.set-links .panel-a{margin:0}
 .set-ic{flex:none;width:44px;height:44px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}.set-ic svg{width:24px;height:24px}
 .set-link > span:nth-child(2){flex:1}
@@ -1166,7 +1182,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.95";
+const WEB_VERSION = "3.96";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -3504,6 +3520,47 @@ function previewHTML(sub){
   return (sub.s||[]).map(x=>`<div class="pv-part">${x.h?`<div class="group">${esc(x.h)}</div>`:`<div class="group">${x.k==="ing"?"Ingredients":"Method"}</div>`}
     ${x.k==="ing"?`<ul>${x.items.map(i=>`<li>${esc(spellUnits(i))}</li>`).join("")}</ul>`:`<ol>${x.items.map(i=>`<li>${hiTemps(i)}</li>`).join("")}</ol>`}</div>`).join("");
 }
+// Suggested changes: the recipe now and the suggestion, side by side (top and bottom on a phone), with the differences marked
+function diffLines(a, b){
+  const n=a.length, m=b.length, L=Array.from({length:n+1},()=>new Array(m+1).fill(0)), key=s=>s.k+"|"+s.t.trim().toLowerCase().replace(/\s+/g," ");
+  for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--) L[i][j] = key(a[i])===key(b[j]) ? L[i+1][j+1]+1 : Math.max(L[i+1][j], L[i][j+1]);
+  const left=[], right=[], one=[]; let i=0, j=0;
+  while(i<n || j<m){
+    if(i<n && j<m && key(a[i])===key(b[j])){ left.push([a[i],""]); right.push([b[j],""]); one.push([b[j],""]); i++; j++; }
+    else if(i<n && (j>=m || L[i+1][j]>=L[i][j+1])){ left.push([a[i],"del"]); one.push([a[i],"del"]); i++; }
+    else { right.push([b[j],"add"]); one.push([b[j],"add"]); j++; }
+  }
+  return {left, right, one};
+}
+function recipeLines(parts){   // parts: [[isIng, heading, items]]
+  const out=[];
+  parts.forEach(([ing,h,items])=>{ out.push({k:"h", t:(h?h+" · ":"")+(ing?"Ingredients":"Method")}); (items||[]).forEach(x=>out.push({k:ing?"i":"s", t:spellUnits(unbracket(x))})); });
+  return out;
+}
+function compareHTML(r, sub){
+  const now=r, sug=fromDoc(sub.id, sub);
+  const kindName = k => ({meat:"Meat",dairy:"Dairy",fish:"Fish",other:"None of these"})[k] || "Automatic";
+  const fields=[["Name", now.t, sug.t], ["Category", now.c+(now.sec?" · "+now.sec:""), sug.c+(sug.sec?" · "+sug.sec:"")], ["From", now.by||"", sug.by||""],
+    ["Serves", now.serves||"", sug.serves||""], ["Time to make", now.time||"", sug.time||""], ["Meat or dairy", kindName(now.kind), kindName(sug.kind)], ["Note", now.n||"", sug.n||""]]
+    .filter(([,a,b])=>String(a).trim()!==String(b).trim());
+  const {left, right, one}=diffLines(recipeLines(now.s||[]), recipeLines(sug.s||[]));
+  const nDel=left.filter(x=>x[1]).length, nAdd=right.filter(x=>x[1]).length;
+  const col=(rows)=>rows.map(([x,c])=>x.k==="h" ? `<div class="cmp-h${c?" "+c:""}">${esc(x.t)}</div>` : `<div class="cmp-l${c?" "+c:""}">${c==="del"?'<span class="sr">Removed: </span>':c==="add"?'<span class="sr">Added: </span>':""}${esc(x.t)}</div>`).join("");
+  return `<div class="cmp">
+    <p class="cmp-sum">${fields.length||nDel||nAdd ? `<b>What changes:</b> ${[fields.length?fields.map(f=>f[0].toLowerCase()).join(", "):"", nDel?`${nDel} ${nDel===1?"line":"lines"} taken out`:"", nAdd?`${nAdd} ${nAdd===1?"line":"lines"} added or changed`:""].filter(Boolean).join(" · ")}` : "No differences."}
+      <span class="cmp-key"><span class="del">taken out</span> <span class="add">new</span></span></p>
+    ${fields.length?`<table class="cmp-f"><thead><tr><th></th><th>Now</th><th>Suggested</th></tr></thead><tbody>${fields.map(([l,a,b])=>`<tr><th>${l}</th><td class="del">${esc(a)||'<i>empty</i>'}</td><td class="add">${esc(b)||'<i>empty</i>'}</td></tr>`).join("")}</tbody></table>`:""}
+    <div class="cmp-view" role="radiogroup" aria-label="How to show the changes"><button type="button" role="radio" data-cmpv="one" aria-checked="${cmpView()==="one"}">One recipe, changes marked</button><button type="button" role="radio" data-cmpv="two" aria-checked="${cmpView()==="two"}">Side by side</button></div>
+    <div class="cmp-one" ${cmpView()==="one"?"":"hidden"}><div class="cmp-col">${col(one)}</div></div>
+    <div class="cmp-cols" ${cmpView()==="two"?"":"hidden"}><div class="cmp-col"><div class="cmp-t">Now</div>${col(left)}</div><div class="cmp-col"><div class="cmp-t">Suggested</div>${col(right)}</div></div>
+  </div>`;
+}
+const cmpView = () => store("gk-cmpview") || "one";
+function wireCompare(){
+  app.querySelectorAll("[data-cmpv]").forEach(b=>b.onclick=()=>{ store("gk-cmpview", b.dataset.cmpv);
+    app.querySelectorAll(".cmp").forEach(c=>{ c.querySelector(".cmp-one").hidden = b.dataset.cmpv!=="one"; c.querySelector(".cmp-cols").hidden = b.dataset.cmpv!=="two";
+      c.querySelectorAll("[data-cmpv]").forEach(x=>x.setAttribute("aria-checked", x.dataset.cmpv===b.dataset.cmpv)); }); });
+}
 function reviewPage(){
   const pend=pendingSubs(), done=subs.filter(s=>s.status!=="pending").slice(0,10);
   app.innerHTML = `<section class="wrap admin">
@@ -3515,7 +3572,7 @@ function reviewPage(){
         ${s.editOf?`<p class="edit-of">Suggested changes to <a class="link" href="#${esc(s.editOf)}">${esc((RECIPES.find(x=>x.id===s.editOf)||{t:s.t}).t)}</a> (opens the current version)</p>`:""}
         <h3>${esc(s.t)}</h3>${s.by&&s.by!==s.byName?`<div class="credit">Recipe from ${esc(s.by)}</div>`:""}
         ${s.n?`<div class="note"><b>Note:</b> ${esc(s.n)}</div>`:""}
-        <div class="pv">${previewHTML(s)}</div>
+        ${s.editOf&&RECIPES.find(x=>x.id===s.editOf)?compareHTML(RECIPES.find(x=>x.id===s.editOf), s):`<div class="pv">${previewHTML(s)}</div>`}
         <div class="macts sub-acts">
           <button type="button" class="btn solid" data-sact="approve">Approve</button>
           <a class="btn" href="#review-${esc(s.id)}">Edit &amp; approve</a>
@@ -3525,7 +3582,7 @@ function reviewPage(){
     ${done.length?`<div class="panel-a"><h3>Recently reviewed</h3><ul class="mlist">${done.map(s=>`<li class="mrow"><div class="mwho"><b>${esc(s.t)}</b><span>From ${esc(s.byName||"a member")} · ${s.status==="approved"?"Approved":"Not approved"} ${fmtDate(s.decided)}</span></div>
       <div class="macts">${s.status==="approved"&&s.recipeId&&RECIPES.some(r=>r.id===s.recipeId)?`<a class="btn" href="#${esc(s.recipeId)}">Open</a>`:""}</div></li>`).join("")}</ul></div>`:""}
   </section>`;
-  bindPhotoReview(); wireMoves();
+  bindPhotoReview(); wireMoves(); wireCompare();
   app.querySelectorAll(".sub-card").forEach(card=>{
     const s=subs.find(x=>x.id===card.dataset.id); if(!s) return;
     const acts=card.querySelector(".sub-acts");

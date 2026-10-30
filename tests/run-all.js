@@ -493,6 +493,18 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok("employees don't get admin pages", (await V.locator('.pub-cats').count()) === 0);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(300);
     ok('employees suggest changes, not edit', /Suggest changes/.test(await V.locator('.rhead').innerText()) && (await V.locator('#pubtog').count()) === 0);
+    // Suggested changes: the admin sees what changed
+    await V.click('.rhead a[href^="#edit-"]'); await V.waitForTimeout(400);
+    const firstIng = await V.locator('.sec-items').nth(0).inputValue();
+    await V.locator('.sec-items').nth(0).fill(firstIng.split('\n').slice(1).join('\n') + '\n3 tbsp honey');
+    await V.click('#edform .primary'); await V.waitForTimeout(900);
+    await A.goto(F + '#review'); await A.waitForTimeout(600);
+    const cmpCard = A.locator('.sub-card', {has: A.locator('.cmp')}).first();
+    ok('suggested changes show the recipe once, with the changes marked', (await cmpCard.locator('.cmp-one .cmp-l.del').count()) === 1 && /3 tbsp honey/.test(await cmpCard.locator('.cmp-one .cmp-l.add').innerText()) && !(await cmpCard.locator('.cmp-cols').isVisible()));
+    await cmpCard.locator('[data-cmpv=two]').click(); await A.waitForTimeout(100);
+    ok('…or side by side, now and suggested', await cmpCard.locator('.cmp-cols').isVisible() && (await cmpCard.locator('.cmp-cols .cmp-col').nth(0).locator('.del').count()) === 1 && (await cmpCard.locator('.cmp-cols .cmp-col').nth(1).locator('.add').count()) === 1);
+    await cmpCard.locator('[data-cmpv=one]').click();
+    await cmpCard.locator('[data-sact="ask-reject"]').click(); await A.locator('[data-sact="reject"]').click(); await A.waitForTimeout(600);
     await A.goto(F + '#admin'); await A.waitForTimeout(400);
     await A.locator('.mrow', {hasText: 'Public Pat'}).locator('[data-role]').selectOption('employee'); await A.waitForTimeout(1500);
     ok('making them an employee opens everything', await PP.evaluate(() => myRole()) === 'employee' && await PP.evaluate(() => RECIPES.some(r => r.c === 'Cakes')));
