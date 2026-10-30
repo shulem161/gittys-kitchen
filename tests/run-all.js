@@ -213,6 +213,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await W.goto(F); await W.waitForTimeout(400); await W.click('#en-no'); await W.waitForTimeout(200); await W.reload(); await W.waitForTimeout(600);
     ok('“Not now” hides the invitation', (await W.locator('#enudge').count()) === 0);
     await W.goto(F + '#profile'); await W.waitForTimeout(500);
+    await W.click('[data-theme-pick=dark]'); await W.waitForTimeout(200);
+    const darkBg = await W.evaluate(() => [document.documentElement.dataset.theme, getComputedStyle(document.body).backgroundColor]);
+    await W.click('[data-theme-pick=light]'); await W.waitForTimeout(200);
+    ok('My profile can switch to a dark or light screen', darkBg[0] === 'dark' && darkBg[1] !== await W.evaluate(() => getComputedStyle(document.body).backgroundColor) && await W.evaluate(() => document.documentElement.dataset.theme === 'light'), darkBg);
+    await W.click('[data-theme-pick=auto]'); await W.waitForTimeout(200);
     ok('a profile without an email can add one', /Add your email/.test(await W.locator('.admin').innerText()));
     await W.fill('#em-new', 'tm.two@example.com'); await W.fill('#em-pw', 'member3'); await W.click('#emform .primary'); await W.waitForTimeout(500);
     ok('…by tapping a link sent to it', /We sent a link/.test(await W.locator('#em-ok').innerText()) && await W.evaluate(() => __fakeMails().some(m => m.to === 'tm.two@example.com' && m.kind === 'change')));
@@ -369,6 +374,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Next step goes to step 2 and ticks off step 1', /STEP 2 OF/.test(await A.locator('.gd-count').innerText()) && (await A.locator('.step[data-k="0"].done').count()) === 1);
     await A.click('#gd-back'); await A.waitForTimeout(200);
     ok('Back goes to step 1 again', /STEP 1 OF/.test(await A.locator('.gd-count').innerText()) && (await A.locator('.step[data-k="0"].done').count()) === 0);
+    ok('the guide is light on a light screen', await A.evaluate(() => { const c = getComputedStyle(document.getElementById('guide')).backgroundColor.match(/\d+/g).map(Number); return c[0] + c[1] + c[2] > 600; }));
     await A.click('#gd-close'); await A.waitForTimeout(300);
     ok('Close ends cooking: Start cooking turns into Stop cooking, and back', cookOn === 'Stop cooking' && !(await A.locator('#guide').isVisible()) && (await A.locator('#cook').innerText()).trim() === 'Start cooking', cookOn);
     ok('steps with a time get a timer button', (await A.locator('.tbtn').count()) >= 1);

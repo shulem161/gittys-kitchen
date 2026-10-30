@@ -54,6 +54,11 @@
   :root[data-look="modern"]:not([data-theme="light"]){ --bg:#111111;--tile:#111111;--paper:#1B1B1B;--ink:#F2F2F2;--muted:#A8A8A8;--line:#2C2C2C;--accent:#F2F2F2;--accent-soft:#262626;--wheat:#E59A6E;--wheat-soft:#2E231C; }
 }
 
+/* "Dark" chosen in My profile */
+:root[data-theme="dark"][data-look="warm"]{ --bg:#1C1612;--tile:#261E18;--paper:#261E18;--ink:#F1E7DB;--muted:#BFAE9C;--line:#3A2E25;--accent:#E7926C;--accent-soft:#3A251B;--wheat:#E2B36B;--wheat-soft:#33281A; }
+:root[data-theme="dark"][data-look="garden"]{ --bg:#121A14;--tile:#1A241C;--paper:#1A241C;--ink:#E4EEE5;--muted:#A3B5A6;--line:#2A382D;--accent:#8CCB9B;--accent-soft:#1E3324;--wheat:#D8BE73;--wheat-soft:#2C2A19; }
+:root[data-theme="dark"][data-look="shabbos"]{ --bg:#0F1326;--tile:#161B33;--paper:#161B33;--ink:#EDE8DA;--muted:#ABAFC2;--line:#262C48;--accent:#D9B865;--accent-soft:#262A42;--wheat:#D9B865;--wheat-soft:#2B2717; }
+:root[data-theme="dark"][data-look="modern"]{ --bg:#111111;--tile:#111111;--paper:#1B1B1B;--ink:#F2F2F2;--muted:#A8A8A8;--line:#2C2C2C;--accent:#F2F2F2;--accent-soft:#262626;--wheat:#E59A6E;--wheat-soft:#2E231C; }
 *{box-sizing:border-box}
 body{
   background-color:var(--bg);
@@ -553,31 +558,30 @@ body.viewing-as .bar{top:calc(env(safe-area-inset-top,0px) + 42px)}
 .tm-bub{max-width:85%;padding:9px 12px;border-radius:14px 14px 14px 4px;background:var(--bg);border:1px solid var(--line);font-size:15px;overflow-wrap:anywhere}
 .tm-msgs li.me .tm-bub{border-radius:14px 14px 4px 14px;background:var(--accent);border-color:var(--accent);color:var(--paper)}
 #tm-reply,#tn-text,#at-text{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;font-size:15px;box-sizing:border-box}
-#guide{position:fixed;inset:0;z-index:50;background:#10213a;color:#fff;display:flex;flex-direction:column;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+#guide{position:fixed;inset:0;z-index:50;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
 #guide[hidden]{display:none}
 body.guiding{overflow:hidden}
 .gd-top{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px 20px 0}
-.gd-close{min-height:44px;padding:0 16px;border-radius:12px;border:1px solid #3a5070;background:none;color:#fff;font:600 15px/1 inherit;cursor:pointer}
-.gd-name{font-size:14.5px;font-weight:600;color:#b9c9de;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gd-bar{margin:16px 20px 0;height:8px;border-radius:4px;background:#2a3d5a}.gd-bar div{height:8px;border-radius:4px;background:#5aa2ff;transition:width .25s}
+.gd-close{min-height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font:600 15px/1 inherit;cursor:pointer}
+.gd-name{font-size:14.5px;font-weight:600;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gd-bar{margin:16px 20px 0;height:8px;border-radius:4px;background:var(--line)}.gd-bar div{height:8px;border-radius:4px;background:var(--accent);transition:width .25s}
 .gd-body{flex:1;overflow-y:auto;padding:0 20px 20px;max-width:760px;width:100%;margin:0 auto;box-sizing:border-box}
-.gd-count{margin:24px 0 0;font-size:15px;font-weight:700;letter-spacing:.05em;color:#8fb7ea}
+.gd-count{margin:24px 0 0;font-size:15px;font-weight:700;letter-spacing:.05em;color:var(--accent)}
 .gd-text{margin:12px 0 0;font-size:clamp(24px,6.4vw,36px);line-height:1.3;font-weight:650;overflow-wrap:anywhere}
-.gd-text a{color:#9cc8ff}.gd-text .temp{color:#ffb57d;font-weight:800}
-.gd-timer{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:58px;margin-top:22px;border-radius:16px;border:2px solid #5aa2ff;background:none;color:#fff;font:700 18px/1.2 inherit;cursor:pointer}
+.gd-text a{color:var(--accent)}.gd-text .temp{color:#C2581A;font-weight:800}
+.gd-timer{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:58px;margin-top:22px;border-radius:16px;border:2px solid var(--accent);background:var(--paper);color:var(--accent);font:700 18px/1.2 inherit;cursor:pointer}
 .gd-timer svg{width:24px;height:24px}
-.gd-run{display:grid;gap:6px;margin:14px 0 0}.gd-run span{display:flex;align-items:center;gap:8px;color:#ffd2ad;font-size:15px}.gd-run svg{width:18px;height:18px}.gd-run b{font-variant-numeric:tabular-nums;font-size:18px;color:#fff}
-.gd-ings{margin-top:22px;padding:16px;border-radius:16px;background:#1a2f4f}
-.gd-ings p{margin:0;font-size:13px;font-weight:700;letter-spacing:.05em;color:#8fb7ea}
-.gd-ings ul{margin:8px 0 0;padding:0;list-style:none;font-size:18px;line-height:1.5}.gd-ings b{color:#ffd2ad}
+.gd-run{display:grid;gap:6px;margin:14px 0 0}.gd-run span{display:flex;align-items:center;gap:8px;color:#C2581A;font-size:15px}.gd-run svg{width:18px;height:18px}.gd-run b{font-variant-numeric:tabular-nums;font-size:18px;color:var(--ink)}
+.gd-ings{margin-top:22px;padding:16px;border-radius:16px;background:var(--paper);border:1px solid var(--line)}
+.gd-ings p{margin:0;font-size:13px;font-weight:700;letter-spacing:.05em;color:var(--accent)}
+.gd-ings ul{margin:8px 0 0;padding:0;list-style:none;font-size:18px;line-height:1.5}.gd-ings b{color:var(--accent)}
 .gd-nav{display:flex;gap:12px;padding:14px 20px 22px;max-width:760px;width:100%;margin:0 auto;box-sizing:border-box}
 .gd-nav button{min-height:68px;border-radius:18px;font:700 20px/1 inherit;cursor:pointer}
-.gd-back{flex:1;border:2px solid #3a5070;background:none;color:#fff}.gd-back:disabled{opacity:.35;cursor:default}
-.gd-next{flex:2;border:0;background:#5aa2ff;color:#0b1a30;font-weight:800 !important}
-.robot{margin:4px 0 12px;min-height:78px}
-.enudge{margin-top:14px}.enudge p{margin:0 0 10px;font-size:15px}
-.fg-mail{padding:12px;border:1px solid var(--line);border-radius:12px;margin:4px 0 14px}.fg-mail .field{margin-bottom:8px}.fg-mail .hint{margin:8px 0 0}
-.fg-or{font-size:14px;color:var(--muted);margin:0 0 10px}
+.gd-back{flex:1;border:2px solid var(--line);background:var(--paper);color:var(--ink)}.gd-back:disabled{opacity:.4;cursor:default}
+.gd-next{flex:2;border:0;background:var(--accent);color:var(--paper);font-weight:800 !important}
+.seg{display:inline-flex;flex-wrap:wrap;gap:4px;padding:4px;border-radius:14px;background:var(--bg);border:1px solid var(--line);margin-top:8px}
+.seg button{min-height:42px;padding:0 16px;border-radius:10px;border:0;background:none;color:var(--ink);font:600 15px/1 inherit;cursor:pointer}
+.seg button[aria-checked="true"]{background:var(--accent);color:var(--paper)}
 .va-opts{display:grid;gap:8px}
 .va-opt{display:grid;gap:2px;text-align:left;padding:14px 16px;border:2px solid var(--line);border-radius:14px;background:var(--paper);color:var(--ink);cursor:pointer;font:inherit}
 .va-opt b{font-size:17px}.va-opt span{font-size:13.5px;color:var(--muted)}
@@ -1128,7 +1132,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.79";
+const WEB_VERSION = "3.80";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -4813,11 +4817,17 @@ const LOOKS = [
 ];
 let siteLook = "classic";       // the admin's choice for everyone (meta/look)
 const myLook = () => { const q=(location.search.match(/[?&]look=(\w+)/)||[])[1]; return LOOKS.some(l=>l[0]===q) ? q : (store("gk-look") || siteLook); };
+// Light or dark screen: "auto" follows the phone's setting
+const myTheme = () => store("gk-theme") || "auto";
+function applyTheme(){ const th=myTheme(), d=document.documentElement; if(th==="auto") delete d.dataset.theme; else d.dataset.theme=th; }
+applyTheme();
 function applyLook(){ const l=myLook(); if(l==="classic") delete document.documentElement.dataset.look; else document.documentElement.dataset.look=l;
   const m=document.querySelector('meta[name="theme-color"]'); const L=LOOKS.find(x=>x[0]===l); if(m&&L) m.content=L[3]; }
 function lookPanel(){
   const cur=myLook(), mine=store("gk-look");
-  return `<div class="panel-a" id="lookpanel"><h3>Design</h3>
+  return `<div class="panel-a" id="lookpanel"><h3>Screen</h3>
+    <div class="seg" role="radiogroup" aria-label="Light or dark screen">${[["light","Light"],["dark","Dark"],["auto","Same as my phone"]].map(([k,l])=>`<button type="button" role="radio" data-theme-pick="${k}" aria-checked="${myTheme()===k}">${l}</button>`).join("")}</div>
+    <h3 style="margin-top:18px">Design</h3>
     <p class="hint">Choose how the cookbook looks on this device.${isAdmin()?" You can also make it the design for everyone.":""}</p>
     <div class="looks">${LOOKS.map(([k,n,d,acc,bg,font])=>`<button type="button" class="look${k===cur?" on":""}" data-look="${k}" aria-pressed="${k===cur}">
       <span class="look-sw" style="background:${bg}"><i style="background:${acc}"></i><b style="font-family:'${font}',serif;color:${acc}">Aa</b></span>
@@ -4827,6 +4837,7 @@ function lookPanel(){
 function wireLooks(){
   const P=document.getElementById("lookpanel"); if(!P) return;
   const redraw=()=>{ P.outerHTML=lookPanel(); wireLooks(); };
+  P.querySelectorAll("[data-theme-pick]").forEach(b=>b.onclick=()=>{ store("gk-theme", b.dataset.themePick==="auto"?null:b.dataset.themePick); applyTheme(); redraw(); });
   P.querySelectorAll("[data-look]").forEach(b=>b.onclick=()=>{ store("gk-look", b.dataset.look===siteLook?null:b.dataset.look); applyLook(); redraw(); });
   const r=document.getElementById("look-reset"); if(r) r.onclick=()=>{ store("gk-look", null); applyLook(); redraw(); };
   const a=document.getElementById("look-all"); if(a) a.onclick=async()=>{ const l=myLook(); a.disabled=true;
