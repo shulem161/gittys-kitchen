@@ -198,6 +198,23 @@ await check("…or list all menus", assertFails(fs.getDocs(fs.collection(as('rev
 await check('the owner can change it', assertSucceeds(updateDoc(doc(EMP, 'menus', 'm1'), { name: 'Shabbos night' })));
 await check("the owner can't hand it to someone else", assertFails(updateDoc(doc(EMP, 'menus', 'm1'), { uid: 'pub' })));
 await check('the owner can delete it', assertSucceeds(deleteDoc(doc(EMP, 'menus', 'm1'))));
+// Team messages: employees and admins only, and only the people in the conversation
+const th = (by, members) => ({ by, lastBy: by, members, names: {}, to: 'admins', rid: 'r-pub', rtitle: 'X', subject: '', msgs: [{ by, name: 'X', text: 'Can you look at this?', at: 1 }], updated: 1, readAt: {}, done: false, created: 1 });
+await check('an employee can write to the admins about a recipe', assertSucceeds(setDoc(doc(EMP, 'threads', 't1'), th('emp', ['emp', 'adm']))));
+await check("…not in someone else's name", assertFails(setDoc(doc(EMP, 'threads', 't2'), th('adm', ['emp', 'adm']))));
+await check("public members can't write team messages", assertFails(setDoc(doc(PUB, 'threads', 't3'), th('pub', ['pub', 'adm']))));
+await check('the admin in it can read it', assertSucceeds(getDoc(doc(ADM, 'threads', 't1'))));
+await check('…and find it in their list', assertSucceeds(fs.getDocs(fs.query(fs.collection(ADM, 'threads'), fs.where('members', 'array-contains', 'adm')))));
+await check("an employee who isn't in it can't read it", assertFails(getDoc(doc(as('rev'), 'threads', 't1'))));
+await check("public members can't read it", assertFails(getDoc(doc(PUB, 'threads', 't1'))));
+await check('the admin can reply', assertSucceeds(updateDoc(doc(ADM, 'threads', 't1'), { msgs: [{ by: 'emp', text: 'a' }, { by: 'adm', text: 'b' }], lastBy: 'adm', updated: 2 })));
+await check("…but can't reply in someone else's name", assertFails(updateDoc(doc(ADM, 'threads', 't1'), { lastBy: 'emp', updated: 3 })));
+await check("nobody can add people or change the recipe", assertFails(updateDoc(doc(EMP, 'threads', 't1'), { members: ['emp', 'adm', 'pub'] })));
+await check('the employee can mark it done', assertSucceeds(updateDoc(doc(EMP, 'threads', 't1'), { done: true })));
+await check('employees can read the team list', assertSucceeds(getDoc(doc(EMP, 'meta', 'team'))));
+await check("public members can't", assertFails(getDoc(doc(PUB, 'meta', 'team'))));
+await check("employees can't change it", assertFails(setDoc(doc(EMP, 'meta', 'team'), { list: [] })));
+await check('admins keep it up to date', assertSucceeds(setDoc(doc(ADM, 'meta', 'team'), { list: [{ uid: 'adm', name: 'A', role: 'admin' }] })));
 // Employee settings for all employees
 await check("employees can't change Employee settings", assertFails(setDoc(doc(EMP, 'meta', 'employees'), { allow: { edit: true } })));
 await check('admin can change Employee settings', assertSucceeds(setDoc(doc(ADM, 'meta', 'employees'), { allow: { answer: true, photos: false } })));
