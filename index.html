@@ -579,6 +579,8 @@ body.guiding{overflow:hidden}
 .gd-nav button{min-height:68px;border-radius:18px;font:700 20px/1 inherit;cursor:pointer}
 .gd-back{flex:1;border:2px solid var(--line);background:var(--paper);color:var(--ink)}.gd-back:disabled{opacity:.4;cursor:default}
 .gd-next{flex:2;border:0;background:var(--accent);color:var(--paper);font-weight:800 !important}
+.set-app h4{margin:18px 0 4px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.set-url{margin:0 0 8px;overflow-wrap:anywhere}
 .set-link{display:flex;justify-content:space-between;align-items:center;gap:12px;text-decoration:none;color:var(--ink);font-size:22px}
 .set-link small{display:block;font-size:14px;color:var(--muted);margin-top:2px}.set-link b{font-size:17px}
 .seg{display:grid;grid-auto-columns:minmax(0,1fr);grid-auto-flow:column;max-width:420px;gap:4px;padding:4px;border-radius:14px;background:var(--bg);border:1px solid var(--line);margin-top:8px}
@@ -1134,7 +1136,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.81";
+const WEB_VERSION = "3.82";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -4864,14 +4866,23 @@ function settingsPage(){
       <div class="field"><label for="pref-todo">Show my to-do list on the home page when there's something to do in…</label>
         <select id="pref-todo">${TODO_CHOICES.map(([v,l])=>`<option value="${v}" ${v===todoDays()?"selected":""}>${l}</option>`).join("")}</select></div>
       <p class="hint">Otherwise it stays out of the way. Today's to-do list is always on the Calendar, on today's date.</p></div>`:""}
-    <div class="panel-a"><h3>App</h3>
+    <div class="panel-a set-app"><h3>App</h3>
       <p>Version ${WEB_VERSION}${appBuild?` · Android app ${appBuild}`:""}</p>
-      <div class="row mn-actions"><button type="button" class="btn" id="set-upd">Check for updates</button></div></div>
+      <div class="row mn-actions"><button type="button" class="btn" id="set-upd">Check for updates</button></div>
+      <h4>Website</h4>
+      <p class="set-url"><a class="link" href="${SITE}" target="_blank" rel="noopener">${SITE.replace(/^https:\/\//,"").replace(/\/$/,"")}</a></p>
+      <div class="row mn-actions"><button type="button" class="btn" id="set-copy">Copy link</button>${navigator.share?`<button type="button" class="btn" id="set-share">Share</button>`:""}</div>
+      <h4>Android app</h4>
+      <p class="hint">${appBuild?"You're using the app now. Download it again to install it on another phone, or to reinstall.":"Install Gitty's Kitchen on an Android phone. After downloading, open the file and allow installing from this source if the phone asks."}</p>
+      <div class="row mn-actions"><a class="btn solid" id="set-apk" href="${SITE}Gittys-Kitchen.apk" download>Download the Android app</a><button type="button" class="btn" id="set-apkcopy">Copy download link</button></div></div>
   </section>`;
   app.querySelectorAll("[data-theme]").forEach(b=>b.onclick=()=>{ store("gk-theme", b.dataset.theme==="auto"?null:b.dataset.theme); applyTheme(); settingsPage(); });
   app.querySelectorAll("[data-tsize]").forEach(b=>b.onclick=()=>{ store("gk-textsize", b.dataset.tsize==="1"?null:b.dataset.tsize); applyTextSize(); settingsPage(); });
   const pt=document.getElementById("pref-todo"); if(pt) pt.onchange=()=>{ setPref("todoDays", +pt.value); toast("Saved"); };
   document.getElementById("set-upd").onclick=()=>checkUpdates(true);
+  document.getElementById("set-copy").onclick=()=>copyText(SITE);
+  document.getElementById("set-apkcopy").onclick=()=>copyText(SITE+"Gittys-Kitchen.apk");
+  const ssh=document.getElementById("set-share"); if(ssh) ssh.onclick=()=>navigator.share({title:"Gitty's Kitchen", text:"Our family cookbook", url:SITE}).catch(()=>{});
   wireLooks();
 }
 applyTextSize();

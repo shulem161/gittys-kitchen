@@ -1,6 +1,6 @@
 {
-  "web": "3.81",
+  "web": "3.82",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New Settings page: light or dark screen, design, text size and home page."
+  "notes": "Settings now has the website link and a download for the Android app."
 }

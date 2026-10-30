@@ -223,6 +223,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await W.setViewportSize({width: 390, height: 844}); await W.goto(F + '#r-croissants'); await W.waitForTimeout(400);
     ok('…without sideways scrolling on a phone', await W.evaluate(() => document.documentElement.scrollWidth) <= 392);
     await W.goto(F + '#settings'); await W.waitForTimeout(300); await W.click('#app [data-tsize="1"]'); await W.waitForTimeout(200); await W.setViewportSize({width: 1100, height: 900});
+    ok('Settings shows the website link and a full Android app download', await W.evaluate(() => /github\.io\/gittys-kitchen/.test(document.querySelector('.set-url a').href) && /Gittys-Kitchen\.apk$/.test(document.getElementById('set-apk').href)));
     ok('the account menu has Settings', await W.evaluate(() => !!document.querySelector('#acct a[href="#settings"]') || /href="#settings"/.test(document.body.innerHTML)));
     await W.goto(F + '#profile'); await W.waitForTimeout(500);
     ok('a profile without an email can add one', /Add your email/.test(await W.locator('.admin').innerText()));
