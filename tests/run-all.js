@@ -692,6 +692,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('employees see "Ask the team about this" on a recipe; public members do not', (await V.locator('#askteam-btn').count()) === 1 && (await PU.locator('#askteam-btn').count()) === 0);
     await V.click('#askteam-btn'); await V.waitForTimeout(200);
     ok('the team list lets an employee pick the admins or one person', await V.locator('#at-to option').count() >= 3);
+    ok('…including the owner alone, privately', /Shulem only \(private\)/.test(await V.locator('#at-to option').first().innerText()) && /All the admins/.test((await V.locator('#at-to option').allInnerTexts()).join('|')));
     await V.selectOption('#at-to', 'admins'); await V.fill('#at-text', 'Can you check the oven time on this one?'); await V.click('#at-send'); await V.waitForTimeout(800);
     ok('sending opens the conversation with the recipe attached', /^#team-/.test(await V.evaluate(() => location.hash)) && (await V.locator('.tm-recipe[href="#r-croissants"]').count()) === 1);
     ok('the owner gets a phone notice', notes.some(n => /: about /.test(n)), notes.slice(-2));
@@ -747,6 +748,46 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await PU.goto(F + '#r-challah'); await PU.waitForTimeout(400);
     const chTxt = await A.evaluate(async () => { location.hash = '#' + RECIPES.find(r => (r.s || []).some(s => s[2].some(i => /\b(tb?sp|tablespoons?|teaspoons?)\b/i.test(i)))).id; await new Promise(r => setTimeout(r, 400)); return document.querySelector('.parts').innerText; });
     ok('recipes write tbsp and tsp in lowercase, never spelled out', /\b(tbsp|tsp)\b/.test(chTxt) && !/tablespoon|teaspoon|\bTbsp|\bTsp|TBSP|TSP/.test(chTxt), chTxt.slice(0, 300));
+    // Like / dislike
+    await PU.goto(F + '#r-croissants'); await PU.waitForTimeout(700);
+    ok('every recipe asks “Did you like this recipe?”', /Did you like this recipe/.test(await PU.locator('#rate').innerText()));
+    await PU.click('#rt-up'); await PU.waitForTimeout(500);
+    ok('a like is just a tap', /You liked this recipe/.test(await PU.locator('#rate').innerText()));
+    await PU.click('#rt-down'); await PU.waitForTimeout(200);
+    const rsOpts = await PU.locator('#rt-reason option').allInnerTexts();
+    ok('a dislike asks why, from a list', ['instructions aren', 'Not a good recipe', "picture doesn't look", 'amounts look wrong', 'oven heat', 'ingredient is missing', 'step is missing', 'Too hard', 'Something else'].every(x => rsOpts.join('|').includes(x)), rsOpts);
+    await PU.click('#rt-form button[type=submit]'); await PU.waitForTimeout(200);
+    ok('…and a reason is needed', /Choose a reason/.test(await PU.locator('#rt-err').innerText()));
+    await PU.selectOption('#rt-reason', 'other'); await PU.click('#rt-form button[type=submit]'); await PU.waitForTimeout(200);
+    ok('…“Something else” needs it written', /Write the reason/.test(await PU.locator('#rt-err').innerText()));
+    await PU.fill('#rt-text', 'Too sweet for us'); await PU.click('#rt-form button[type=submit]'); await PU.waitForTimeout(600);
+    ok('…then it is saved, and the admin hears about it', /You didn't like this recipe/.test(await PU.locator('#rate').innerText()) && notes.some(n => /didn't like a recipe/.test(n)));
+    await A.goto(F + '#r-croissants'); await A.waitForTimeout(800); await A.reload(); await A.waitForTimeout(1200);
+    ok('admins see the likes, dislikes and reasons on the recipe', /0 👍 · 1 👎/.test(await A.locator('.rate-admin').innerText()) && /Too sweet for us/.test(await A.locator('.rate-admin').innerText()));
+    await A.goto(F + '#ratings'); await A.waitForTimeout(800);
+    ok('…and all of them on Likes & dislikes', /Croissants/.test(await A.locator('.rate-list').innerText()) && /Something else/.test(await A.locator('.rate-reasons').innerText()));
+    // Chosen employees see likes and dislikes, and get a notice for each
+    await A.goto(F + '#admin'); await A.waitForTimeout(500);
+    if (!(await A.locator(`[data-pk=ratings][data-pu="${vuid}"]`).count())) { await A.locator('.mrow', {hasText: vname}).locator('[data-act=perms]').click(); await A.waitForTimeout(300); }
+    await A.locator(`[data-pk=ratings][data-pu="${vuid}"]`).check(); await A.waitForTimeout(4500);
+    ok('choosing an employee for likes and dislikes', await A.evaluate(u => ((__fakeDB().meta.ratewatch || {}).uids || []).includes(u), vuid));
+    const nb2 = ntfyPaths.length; const likeId = await PU.evaluate(() => RECIPES.find(r => r.id !== 'r-croissants').id); await PU.goto(F + '#' + likeId); await PU.waitForTimeout(700); await PU.click('#rt-up'); await PU.waitForTimeout(1200);
+    ok('…they get a notice for a like', ntfyPaths.slice(nb2).includes('/' + vtopic) && notes.slice(-3).some(n => /liked a recipe/.test(n)), ntfyPaths.slice(nb2));
+    await V.goto(F + '#r-croissants'); await V.waitForTimeout(500); await V.reload(); await V.waitForTimeout(1200);
+    ok('…and see the likes and dislikes on each recipe', /1 👎/.test(await V.locator('.rate-admin').innerText().catch(() => '')));
+    await A.locator(`[data-pk=ratings][data-pu="${vuid}"]`).uncheck(); await A.waitForTimeout(800);
+    // Send to proofread
+    await V.goto(F + '#r-croissants'); await V.waitForTimeout(500); await V.click('#proof-btn'); await V.waitForTimeout(200);
+    await V.selectOption('#at-to', 'admins'); await V.click('#at-send'); await V.waitForTimeout(900);
+    ok('the team can send a recipe to proofread', /Proofread: /.test(await V.locator('.thread').innerText()) && /Not yet/.test(await V.locator('.proof-box').innerText()));
+    await A.goto(F + '#team'); await A.waitForTimeout(700); await A.locator('.tm-row', {hasText: 'Proofread'}).first().click(); await A.waitForTimeout(600);
+    await A.click('#pf-no'); await A.click('#pf-form button[type=submit]'); await A.waitForTimeout(200);
+    ok('“Needs changes” asks what to change', /Write what needs to change/.test(await A.locator('#toast').innerText()));
+    await A.fill('#pf-note', 'Step 3 needs the oven heat'); await A.click('#pf-form button[type=submit]'); await A.waitForTimeout(700);
+    ok('…and it is marked for everyone to see', /✗ Needs changes/.test(await A.locator('.proof-box').innerText()) && /Step 3 needs the oven heat/.test(await A.locator('.tm-msgs').innerText()));
+    await V.goto(F + '#r-croissants'); await V.waitForTimeout(800);
+    ok('the recipe shows how proofreading is going', /Proofreading: .*1 ✗/.test(await V.locator('.rhead').innerText()));
+
     // Make a recipe better with AI
     await A.goto(F + '#new'); await A.waitForTimeout(400); await A.fill('#ed-t', 'Quick Cake');
     await A.locator('.sec-items').nth(0).fill('flour 2 cups'); await A.locator('.sec-items').nth(1).fill('mix and bake');

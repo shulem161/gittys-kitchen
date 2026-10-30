@@ -606,6 +606,20 @@ body.guiding{overflow:hidden}
 .cmp-t{font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 .cmp-h{font-weight:700;font-size:13.5px;color:var(--accent);margin:10px 0 4px;padding:2px 6px;border-radius:6px}.cmp-h:first-of-type{margin-top:0}
 .cmp-l{font-size:14.5px;line-height:1.45;padding:3px 6px;border-radius:6px;overflow-wrap:anywhere}
+.rate{margin:18px 0 6px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--paper)}
+.rate:empty{display:none}
+.rate-q{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.rate-btns{display:flex;gap:8px}
+.rate-b{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:600 15px/1 inherit;cursor:pointer}
+.rate-b.up[aria-pressed="true"]{background:#DDF3E3;border-color:#3D9A5B;color:#1E6B37}.rate-b.down[aria-pressed="true"]{background:#FBE3E1;border-color:#C2581A;color:#8A2A20}
+.rate-form{display:grid;gap:8px;margin-top:12px}.rate-form select,.rate-form textarea{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;font-size:15px}
+.rate-admin{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);font-size:14.5px}.rate-admin ul,.rate-list ul{margin:6px 0 0;padding-left:18px}
+.rate-list{list-style:none;margin:0;padding:0;display:grid}.rate-list > li{padding:10px 0;border-bottom:1px solid var(--line)}.rate-top{display:flex;justify-content:space-between;gap:10px}
+.rate-reasons{list-style:none;margin:0;padding:0}.rate-reasons li{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)}
+.proof-box{margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.proof-who{list-style:none;margin:6px 0 4px;padding:0}.proof-who li{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--line)}
+.proof-ok{color:#1E6B37;font-weight:700}.proof-no{color:#8A2A20;font-weight:700}
+:root[data-theme="dark"] .proof-ok{color:#8FD6A6}:root[data-theme="dark"] .proof-no{color:#F2A49A}
 .set-links{display:grid;gap:12px}.set-links .panel-a{margin:0}
 .set-ic{flex:none;width:44px;height:44px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}.set-ic svg{width:24px;height:24px}
 .set-link > span:nth-child(2){flex:1}
@@ -1160,7 +1174,7 @@ const PUB_ALLOW = [["suggest","Suggest changes and send new recipes"],["photos",
 let PUB = {allow:{}, cats:{}};
 // Employees: each person has their own permissions (users/{uid}.perms). The everyday ones are on unless switched off;
 // the extras are off unless granted. Public members all share the Public portal settings. Admins can do everything.
-const EXTRA_PERMS = [["edit","Add and edit recipes directly, without approval"],["review","Approve suggested recipes and photos"],["answer","Recipe requests: see them, answer them, and get a notice for new ones"],["inbox","Read and answer suggestions & comments"],["viewas","Log in as a customer, to see exactly what they see"]];
+const EXTRA_PERMS = [["edit","Add and edit recipes directly, without approval"],["review","Approve suggested recipes and photos"],["answer","Recipe requests: see them, answer them, and get a notice for new ones"],["inbox","Read and answer suggestions & comments"],["viewas","Log in as a customer, to see exactly what they see"],["ratings","Likes and dislikes: see them, and get a notice for each one"]];
 const isExtra = k => EXTRA_PERMS.some(x=>x[0]===k);
 // Employee settings (meta/employees) apply to every employee; a person's own Permissions override them.
 let EMP = {allow:{}};
@@ -1182,7 +1196,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "3.96";
+const WEB_VERSION = "3.98";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1198,6 +1212,11 @@ async function notifyPeople(uids, title, message, hash, tags){
   if(!db || offline) return;
   const list=[...new Set(uids)].filter(u=>u && u!==me && u!==adminUid);   // the owner already hears through the main topic
   await Promise.all(list.map(async u=>{ try{ const s=await db.collection("notify").doc(u).get(); if(s.exists && s.data().topic) await notifyTopic(s.data().topic, title, message, hash, tags); }catch(e){} }));
+}
+// The owner, plus whoever is on a watch list (meta/reqwatch, meta/ratewatch)
+async function notifyWatchers(list, title, message, hash, tags){
+  if(!isOwner()) notifyAdmin(title, message, hash, tags);
+  try{ const s=await db.collection("meta").doc(list).get(); if(s.exists) await notifyPeople(s.data().uids||[], title, message, hash, tags); }catch(e){}
 }
 // A new recipe request: the owner, the other admins, and the employees allowed to answer requests
 async function notifyRequest(title, message){
@@ -1804,6 +1823,7 @@ function recipe(r){
       ${sx!==1?`<p class="hint scale-note">Amounts are for ${fmtNum(sx)}× the recipe. Pan size and baking time may need adjusting.</p>`:""}
       <div class="tools">
         ${recipesOnline&&!offline&&(can("suggest")||may("edit"))?`<a class="btn solid" href="#edit-${r.id}">${may("edit")?"Edit recipe":"Suggest changes"}</a>`:""}
+        ${isTeam()&&!offline?`<button class="btn" id="proof-btn" type="button">✓ Send to proofread</button>`:""}
         ${isTeam()&&!offline?`<button class="btn" id="askteam-btn" type="button">${TOOL_IC.ask.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Ask the team about this</button>`:""}
         ${isAdmin()&&recipesOnline&&!offline?`<button class="btn" id="mv-btn" type="button">Move to another category</button>`:""}
         ${myRole()==="employee"&&recipesOnline&&!offline?(myMoveAsk(r.id)?`<span class="btn pub-state" aria-disabled="true">Asked to move to ${esc(myMoveAsk(r.id).to)} ✓</span>`:`<button class="btn" id="mv-btn" type="button">Ask to move to another category</button>`):""}
@@ -1830,6 +1850,7 @@ function recipe(r){
         ${usedIn(r).length?`<div><b>Use it in:</b> ${usedIn(r).map(x=>`<a href="#${x.id}">${esc(x.t)}</a>`).join(", ")}</div>`:""}</div>`:""}
       ${r.n?`<div class="note"><b>Note:</b> ${linkify(esc(r.n))}</div>`:""}
       ${partHTML}
+      ${offline?"":`<div class="rate vnotes" id="rate"></div>`}
       ${offline||!can("feedback")?"":`<p class="fb-link vnotes"><a class="link" href="#feedback-${r.id}">Comment on this recipe</a></p>`}
       ${isAdmin()&&historyLines(r).length?`<div class="byline vnotes">${historyLines(r).map(l=>`<span>${esc(l)}</span>`).join("")}</div>`:""}
       <nav class="pager">
@@ -1893,7 +1914,10 @@ function recipe(r){
     toast(on ? "Screen stays on while you cook. Tap a step when it's done." : "Tap a step when it's done.");
   };
   const mvb=document.getElementById("mv-btn"); if(mvb) mvb.onclick=e=>moveBox(r, e.currentTarget);
+  rateBox(r);
   const atb=document.getElementById("askteam-btn"); if(atb) atb.onclick=e=>askTeamBox(r, e.currentTarget);
+  const pfb=document.getElementById("proof-btn"); if(pfb) pfb.onclick=e=>askTeamBox(r, e.currentTarget, "proof");
+  const pst=proofStatus(r.id); if(pst && pfb) pfb.insertAdjacentHTML("afterend", pst);
   const glb=document.getElementById("gl-btn"); if(glb) glb.onclick=async()=>{ glb.disabled=true;
     try{ await requestGolive(r); glb.outerHTML='<span class="btn pub-state" aria-disabled="true">Asked to go live ✓</span>'; toast("Sent to the admins"); }catch(e){ glb.disabled=false; toast("Couldn't send. Check your connection."); } };
   const pt=document.getElementById("pubtog");
@@ -2960,6 +2984,63 @@ function wireGolive(){
     catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); } });
 }
 
+/* ---------- like / dislike: ratings/{rid}_{uid} {rid, uid, name, v:1|-1, reason, text, at} ---------- */
+const DISLIKE_REASONS = [["unclear","The instructions aren't clear"],["notgood","Not a good recipe"],["photo","The picture doesn't look like the real dish"],
+  ["amounts","The amounts look wrong"],["timeheat","The time or oven heat is off"],["noing","An ingredient is missing"],["nostep","A step is missing"],["hard","Too hard to make"],["other","Something else (write it)"]];
+const reasonText = k => (DISLIKE_REASONS.find(x=>x[0]===k)||[,"Other"])[1].replace(" (write it)","");
+async function rateBox(r){
+  let box=document.getElementById("rate"); if(!box || !db || offline) return;
+  const id=r.id+"_"+who(); let mine=null, all=null;
+  try{ const s=await db.collection("ratings").doc(id).get(); if(s.exists) mine=s.data(); }catch(e){}
+  if(may("ratings")){ try{ const s=await db.collection("ratings").where("rid","==",r.id).get(); all=s.docs.map(d=>d.data()); }catch(e){} }
+  const draw=(open)=>{
+    if(!box.isConnected){ box=document.getElementById("rate"); if(!box) return; }
+    const $=s=>box.querySelector(s);
+    const ups=all?all.filter(x=>x.v===1).length:0, downs=all?all.filter(x=>x.v===-1):[];
+    box.innerHTML=`<div class="rate-q"><b>${mine?(mine.v===1?"You liked this recipe":"You didn't like this recipe"):"Did you like this recipe?"}</b>
+      <div class="rate-btns"><button type="button" class="rate-b up" id="rt-up" aria-pressed="${!!mine&&mine.v===1}">👍 Like</button><button type="button" class="rate-b down" id="rt-down" aria-pressed="${!!mine&&mine.v===-1}">👎 Dislike</button></div></div>
+      ${mine&&mine.v===-1&&!open?`<p class="hint">Your reason: ${esc(reasonText(mine.reason))}${mine.text?" · "+esc(mine.text):""} <button type="button" class="link" id="rt-edit">Change</button></p>`:""}
+      ${open?`<form class="rate-form" id="rt-form"><label for="rt-reason">Why not? <span class="hint">(needed)</span></label>
+        <select id="rt-reason"><option value="">Choose a reason…</option>${DISLIKE_REASONS.map(([k,l])=>`<option value="${k}" ${mine&&mine.reason===k?"selected":""}>${l}</option>`).join("")}</select>
+        <textarea id="rt-text" rows="2" maxlength="400" placeholder="Tell us more (optional)">${esc(mine&&mine.text||"")}</textarea>
+        <p class="err" id="rt-err" role="alert" hidden></p>
+        <div class="row"><button type="submit" class="btn solid">Send</button><button type="button" class="btn" id="rt-cancel">Cancel</button></div></form>`:""}
+      ${all?`<div class="rate-admin"><b>${ups} 👍 · ${downs.length} 👎</b>${downs.length?`<ul>${downs.map(x=>`<li><b>${esc(reasonText(x.reason))}</b>${x.text?`: ${esc(x.text)}`:""} <span class="hint">– ${esc(x.name||"")}, ${fmtDate(x.at)}</span></li>`).join("")}</ul>`:""}</div>`:""}`;
+    const save=async(v, reason, text)=>{ if(previewBlocked()) return false;
+      const d={rid:r.id, uid:me, name:myName(), v, reason:reason||"", text:(text||"").trim().slice(0,400), at:Date.now()};
+      try{ await db.collection("ratings").doc(r.id+"_"+me).set(d); mine=d; if(all){ all=all.filter(x=>x.uid!==me); all.push(d); }
+        const ttl = v===1 ? `${myName()} liked a recipe` : `${myName()} didn't like a recipe`, body = v===1 ? `“${r.t}”` : `“${r.t}”: ${reasonText(reason)}${d.text?" – "+d.text:""}`;
+        notifyWatchers("ratewatch", ttl, body, "#"+r.id, v===1?"thumbsup":"thumbsdown");
+        return true; }catch(e){ toast("Couldn't save. Check your connection."); return false; } };
+    $("#rt-up").onclick=async()=>{ if(mine&&mine.v===1){ if(previewBlocked()) return; try{ await db.collection("ratings").doc(r.id+"_"+me).delete(); mine=null; if(all) all=all.filter(x=>x.uid!==me); draw(); }catch(e){} return; }
+      if(await save(1)){ toast("Thanks!"); draw(); } };
+    $("#rt-down").onclick=()=>draw(true);
+    const ed=$("#rt-edit"); if(ed) ed.onclick=()=>draw(true);
+    const F=$("#rt-form");
+    if(F){ F.querySelector("#rt-reason").focus(); F.querySelector("#rt-cancel").onclick=()=>draw();
+      F.onsubmit=async e=>{ e.preventDefault(); const reason=F.querySelector("#rt-reason").value, text=F.querySelector("#rt-text").value, err=F.querySelector("#rt-err");
+        if(!reason){ err.textContent="Choose a reason."; err.hidden=false; return; }
+        if(reason==="other" && !text.trim()){ err.textContent="Write the reason."; err.hidden=false; F.querySelector("#rt-text").focus(); return; }
+        if(await save(-1, reason, text)){ toast("Thanks. We'll look at it."); draw(); } }; }
+  };
+  draw();
+}
+// Admins: every recipe's likes and dislikes, with the reasons
+async function ratingsPage(){
+  app.innerHTML=`<section class="wrap tools-page"><div class="section-head" style="margin-top:28px"><h2>Likes &amp; dislikes</h2><p>Loading…</p></div></section>`;
+  let all=[]; try{ const s=await db.collection("ratings").get(); all=s.docs.map(d=>d.data()); }catch(e){}
+  if(location.hash!=="#ratings") return;
+  const by=new Map(); all.forEach(x=>{ if(!by.has(x.rid)) by.set(x.rid,[]); by.get(x.rid).push(x); });
+  const rows=[...by.entries()].map(([rid,l])=>({r:RECIPES.find(x=>x.id===rid), up:l.filter(x=>x.v===1).length, down:l.filter(x=>x.v===-1)})).filter(x=>x.r).sort((a,b)=>b.down.length-a.down.length || b.up-a.up);
+  const reasons=DISLIKE_REASONS.map(([k])=>[k, all.filter(x=>x.v===-1&&x.reason===k).length]).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]);
+  app.innerHTML=`<section class="wrap tools-page">
+    <div class="section-head" style="margin-top:28px"><h2>Likes &amp; dislikes</h2><p>${all.filter(x=>x.v===1).length} 👍 · ${all.filter(x=>x.v===-1).length} 👎 on ${rows.length} ${rows.length===1?"recipe":"recipes"}</p></div>
+    ${reasons.length?`<div class="panel-a"><h3>Why people didn't like a recipe</h3><ul class="rate-reasons">${reasons.map(([k,n])=>`<li><span>${esc(reasonText(k))}</span><b>${n}</b></li>`).join("")}</ul></div>`:""}
+    <div class="panel-a"><h3>By recipe</h3>${rows.length?`<ul class="rate-list">${rows.map(x=>`<li><div class="rate-top"><a class="link" href="#${esc(x.r.id)}">${esc(x.r.t.replace(/^Untitled: /,""))}</a><span>${x.up} 👍 · ${x.down.length} 👎</span></div>
+      ${x.down.length?`<ul>${x.down.map(d=>`<li><b>${esc(reasonText(d.reason))}</b>${d.text?`: ${esc(d.text)}`:""} <span class="hint">– ${esc(d.name||"")}, ${fmtDate(d.at)}</span></li>`).join("")}</ul>`:""}</li>`).join("")}</ul>`:`<p class="hint">No likes or dislikes yet.</p>`}</div>
+  </section>`;
+}
+
 /* ---------- team messages (employees and admins only) ----------
    threads/{id}: {by, members:[uid…], names:{uid:name}, to ("team"|"admins"|uid), rid, rtitle, subject, msgs:[{by,name,text,at}],
                   updated, lastBy, readAt:{uid:ms}, done}
@@ -2986,6 +3067,8 @@ function syncTeamNow(){
   // who hears about new recipe requests: every admin, and employees allowed to answer them
   const uids = members.filter(m=>m.status==="approved" && (["owner","admin"].includes(roleOf(m)) || (roleOf(m)==="employee" && permOf(m,"answer")))).map(m=>m.uid).sort();
   if(uids.join()!==lastReqWatch){ lastReqWatch=uids.join(); db.collection("meta").doc("reqwatch").set({uids}).catch(()=>{}); }
+  const rw = members.filter(m=>m.status==="approved" && (["owner","admin"].includes(roleOf(m)) || (roleOf(m)==="employee" && permOf(m,"ratings")))).map(m=>m.uid).sort();
+  if(rw.join()!==lastRateWatch){ lastRateWatch=rw.join(); db.collection("meta").doc("ratewatch").set({uids:rw}).catch(()=>{}); }
   // customers, for employees allowed to log in as one
   const cust = members.filter(m=>m.status==="approved" && roleOf(m)==="public").map(m=>({uid:m.uid, name:m.name, email:m.email||"", no:m.no||""})).sort((a,b)=>byName(a.name,b.name));
   if(JSON.stringify(cust)!==lastCustomers){ lastCustomers=JSON.stringify(cust); db.collection("meta").doc("customers").set({list:cust}).catch(()=>{}); }
@@ -3010,9 +3093,27 @@ async function assignNumbers(){
     }
   }catch(e){} finally{ numbering=false; }
 }
-let lastReqWatch=null;
+let lastReqWatch=null, lastRateWatch=null;
 const unreadThreads = () => { const u=who(); return THREADS.filter(t=>t.lastBy && t.lastBy!==u && (t.updated||0) > ((t.readAt||{})[u]||0) && !t.done).length; };
-function threadTitle(t){ return t.subject || (t.rtitle ? `About ${t.rtitle}` : "Message"); }
+// Proofreading: everyone it was sent to marks it
+const proofers = t => (t.members||[]).filter(u=>u!==t.by);
+function proofCounts(t){ const c=t.checks||{}, ps=proofers(t); return {ok:ps.filter(u=>c[u]&&c[u].ok).length, no:ps.filter(u=>c[u]&&!c[u].ok).length, wait:ps.filter(u=>!c[u]).length, n:ps.length}; }
+function proofStatus(rid){
+  const ts=THREADS.filter(t=>t.kind==="proof" && t.rid===rid && !t.done); if(!ts.length) return "";
+  const c=ts.map(proofCounts).reduce((a,b)=>({ok:a.ok+b.ok, no:a.no+b.no, wait:a.wait+b.wait}), {ok:0,no:0,wait:0});
+  return `<a class="btn pub-state proof-st" href="#team-${esc(ts[0].id)}">Proofreading: ${c.ok?`${c.ok} ✓ `:""}${c.no?`${c.no} ✗ `:""}${c.wait?`${c.wait} waiting`:""}</a>`;
+}
+async function markProof(t, ok, note){
+  if(previewBlocked()) return;
+  const now=Date.now(), checks=Object.assign({}, t.checks||{}, {[me]:{ok, at:now, name:myName()}});
+  const upd={checks, updated:now, lastBy:me, readAt:Object.assign({}, t.readAt||{}, {[me]:now})};
+  const text = (ok ? "✓ Looks good" : "✗ Needs changes") + (note ? ": "+note : "");
+  upd.msgs=[...(t.msgs||[]), {by:me, name:myName(), text, at:now}].slice(-200);
+  await db.collection("threads").doc(t.id).update(upd); Object.assign(t, upd);
+  if(adminUid && t.members.includes(adminUid) && adminUid!==me) notifyAdmin(`${myName()} proofread ${t.rtitle}`, text, "#team-"+t.id, ok?"white_check_mark":"pencil2");
+  notifyPeople(t.members, `${myName()} proofread ${t.rtitle}`, text, "#team-"+t.id, ok?"white_check_mark":"pencil2");
+}
+function threadTitle(t){ return t.kind==="proof" ? `Proofread: ${t.rtitle}` : t.subject || (t.rtitle ? `About ${t.rtitle}` : "Message"); }
 function threadWho(t){ const others=Object.entries(t.names||{}).filter(([u])=>u!==me).map(([,n])=>n);
   return t.to==="team" ? "Whole team" : t.to==="admins" ? "Admins" : others.join(", ") || "Just you"; }
 // Who a new message goes to
@@ -3022,16 +3123,17 @@ function recipientsFor(to){
   if(to==="admins") return team.filter(x=>x.role==="owner"||x.role==="admin");
   return team.filter(x=>x.uid===to);
 }
-async function startThread(to, text, r){
+async function startThread(to, text, r, kind){
   if(previewBlocked()) throw {code:"preview"};
   const rec=recipientsFor(to), names={[me]:myName()}; rec.forEach(x=>names[x.uid]=x.name);
   const membersList=[...new Set([me, ...rec.map(x=>x.uid)])], now=Date.now();
   const ref=db.collection("threads").doc();
   const t={by:me, members:membersList, names, to, rid:r?r.id:"", rtitle:r?r.t.replace(/^Untitled: /,""):"", subject:r?"":text.slice(0,60),
-    msgs:[{by:me, name:myName(), text, at:now}], updated:now, lastBy:me, readAt:{[me]:now}, done:false, created:now};
+    msgs:[{by:me, name:myName(), text, at:now}], updated:now, lastBy:me, readAt:{[me]:now}, done:false, created:now, ...(kind==="proof"?{kind:"proof", checks:{}}:{})};
   await ref.set(t); THREADS.unshift(Object.assign({id:ref.id}, t));
-  if(adminUid && membersList.includes(adminUid) && adminUid!==me) notifyAdmin(`${myName()}: ${r?"about "+t.rtitle:"team message"}`, text.slice(0,180), "#team-"+ref.id, "speech_balloon");
-  notifyPeople(membersList, `${myName()}: ${r?"about "+t.rtitle:"team message"}`, text.slice(0,180), "#team-"+ref.id, "speech_balloon");
+  const ttl = kind==="proof" ? `${myName()} asks you to proofread ${t.rtitle}` : `${myName()}: ${r?"about "+t.rtitle:"team message"}`;
+  if(adminUid && membersList.includes(adminUid) && adminUid!==me) notifyAdmin(ttl, text.slice(0,180), "#team-"+ref.id, kind==="proof"?"pencil2":"speech_balloon");
+  notifyPeople(membersList, ttl, text.slice(0,180), "#team-"+ref.id, kind==="proof"?"pencil2":"speech_balloon");
   return ref.id;
 }
 async function replyThread(t, text){
@@ -3043,23 +3145,25 @@ async function replyThread(t, text){
   notifyPeople(t.members, `${myName()} replied`, text.slice(0,180), "#team-"+t.id, "speech_balloon");
 }
 function toSelect(id, dflt){
-  const others=(TEAM.length?TEAM:[]).filter(x=>x.uid!==me);
-  return `<select id="${id}" aria-label="Send to"><option value="team" ${dflt==="team"?"selected":""}>Everyone on the team</option><option value="admins" ${dflt==="admins"?"selected":""}>The admins</option>${others.length?`<optgroup label="One person">${others.map(x=>`<option value="${esc(x.uid)}">${esc(x.name)}${x.role==="employee"?"":" ("+ROLE_LABEL[x.role].toLowerCase()+")"}</option>`).join("")}</optgroup>`:""}</select>`;
+  const others=(TEAM.length?TEAM:[]).filter(x=>x.uid!==me), owner=others.find(x=>x.role==="owner");
+  return `<select id="${id}" aria-label="Send to">${owner?`<option value="${esc(owner.uid)}" ${dflt===owner.uid?"selected":""}>${esc(owner.name)} only (private)</option>`:""}<option value="team" ${dflt==="team"?"selected":""}>Everyone on the team</option><option value="admins" ${dflt==="admins"?"selected":""}>All the admins</option>${others.filter(x=>x.role!=="owner").length?`<optgroup label="One person">${others.filter(x=>x.role!=="owner").map(x=>`<option value="${esc(x.uid)}">${esc(x.name)}${x.role==="employee"?"":" ("+ROLE_LABEL[x.role].toLowerCase()+")"}</option>`).join("")}</optgroup>`:""}</select>`;
 }
 // On a recipe page
-function askTeamBox(r, btn){
-  const old=document.getElementById("askteam"); if(old){ old.remove(); return; }
-  const box=document.createElement("div"); box.id="askteam"; box.className="dlpick";
-  const open=THREADS.filter(t=>t.rid===r.id && !t.done);
-  box.innerHTML=`<b>Ask the team about “${esc(r.t.replace(/^Untitled: /,""))}”</b>
+function askTeamBox(r, btn, kind){
+  const old=document.getElementById("askteam"); if(old){ const was=old.dataset.kind; old.remove(); if(was===(kind||"")) return; }
+  const box=document.createElement("div"); box.id="askteam"; box.className="dlpick"; box.dataset.kind=kind||"";
+  const open=THREADS.filter(t=>t.rid===r.id && !t.done && (kind==="proof") === (t.kind==="proof"));
+  const proof = kind==="proof";
+  box.innerHTML=`<b>${proof?"Send":"Ask the team about"} “${esc(r.t.replace(/^Untitled: /,""))}”${proof?" to proofread":""}</b>
+    ${proof?`<p class="hint" style="margin-top:4px">They read it over and mark it “Looks good” or “Needs changes”.</p>`:""}
     ${open.length?`<p class="hint" style="margin-top:6px">Already talking about it: ${open.map(t=>`<a class="link" href="#team-${esc(t.id)}">${esc(threadWho(t))}</a>`).join(", ")}</p>`:""}
     <div class="pl-add-row" style="margin-top:8px"><label>To ${toSelect("at-to", isAdmin()?"team":"admins")}</label></div>
-    <textarea id="at-text" rows="3" maxlength="1500" placeholder="e.g. Can you check the oven time? It burnt at 400°F." style="width:100%;margin-top:8px"></textarea>
+    <textarea id="at-text" rows="3" maxlength="1500" placeholder="${proof?"e.g. Please check the amounts and that every step is clear.":"e.g. Can you check the oven time? It burnt at 400°F."}" style="width:100%;margin-top:8px">${proof?"Please proofread this recipe.":""}</textarea>
     <div class="row" style="margin-top:8px"><button type="button" class="btn solid" id="at-send">Send</button><button type="button" class="btn" id="at-no">Cancel</button></div>`;
   btn.closest(".tools").after(box); document.getElementById("at-text").focus();
   document.getElementById("at-no").onclick=()=>box.remove();
   document.getElementById("at-send").onclick=async e=>{ const text=document.getElementById("at-text").value.trim(); if(!text){ document.getElementById("at-text").focus(); return; }
-    e.target.disabled=true; try{ const id=await startThread(document.getElementById("at-to").value, text, r); box.remove(); toast("Sent"); location.hash="team-"+id; }
+    e.target.disabled=true; try{ const id=await startThread(document.getElementById("at-to").value, text, r, kind); box.remove(); toast("Sent"); location.hash="team-"+id; }
     catch(err){ e.target.disabled=false; toast("Couldn't send. Check your connection."); } };
 }
 function teamPage(){
@@ -3089,6 +3193,11 @@ function threadPage(id){
     <a class="back" href="#team">← Team messages</a>
     <div class="panel-a"><div class="tm-top"><h3 style="margin:0">${esc(threadTitle(t))}</h3><span class="hint">${esc(threadWho(t))}</span></div>
       ${t.rid?`<a class="tm-recipe" href="#${esc(t.rid)}">${r?`<span class="rc-th">${r.cover?`<span style="background-image:url('${r.cover}')"></span>`:icon(r.c)}</span><span><b>${esc(r.t.replace(/^Untitled: /,""))}</b><small>${esc(codeOf(r)||r.c)} · Open the recipe</small></span>`:`<span><b>${esc(t.rtitle)}</b><small>This recipe isn't in the cookbook any more</small></span>`}</a>`:""}
+      ${t.kind==="proof"?(()=>{ const c=t.checks||{}, ps=proofers(t), mineC=c[me];
+        return `<div class="proof-box"><b>Proofreading</b>
+          <ul class="proof-who">${ps.map(u=>`<li><span>${esc((t.names||{})[u]||"Someone")}</span>${c[u]?(c[u].ok?'<span class="proof-ok">✓ Looks good</span>':'<span class="proof-no">✗ Needs changes</span>'):'<span class="hint">Not yet</span>'}</li>`).join("")}</ul>
+          ${ps.includes(me)?`<div class="row mn-actions"><button type="button" class="btn${mineC&&mineC.ok?" solid":""}" id="pf-ok">✓ Looks good</button><button type="button" class="btn${mineC&&!mineC.ok?" solid":""}" id="pf-no">✗ Needs changes</button></div>
+            <form id="pf-form" hidden class="td-add" style="margin-top:8px"><textarea id="pf-note" rows="2" maxlength="800" placeholder="What needs to change?" style="flex:1"></textarea><button class="btn solid" type="submit">Send</button></form>`:""}</div>`; })():""}
       <ul class="tm-msgs">${(t.msgs||[]).map(m=>`<li class="${m.by===me?"me":""}"><div class="tm-bub">${esc(m.text).replace(/\n/g,"<br>")}</div><span class="hint">${esc(m.by===me?"You":m.name)} · ${fmtWhen(m.at)}</span></li>`).join("")}</ul>
       <form class="td-add" id="tm-form" style="margin-top:10px"><textarea id="tm-reply" rows="2" maxlength="1500" placeholder="Reply…" style="flex:1"></textarea><button class="btn solid" type="submit">Send</button></form>
       <div class="row mn-actions" style="margin-top:10px"><button type="button" class="btn" id="tm-done">${t.done?"Open it again":"Mark done"}</button></div>
@@ -3097,6 +3206,11 @@ function threadPage(id){
   const now=Date.now(); if(!pv() && ((t.readAt||{})[me]||0) < (t.updated||0)){ t.readAt=Object.assign({}, t.readAt||{}, {[me]:now}); db.collection("threads").doc(t.id).update({readAt:t.readAt}).catch(()=>{}); renderAcct(); }
   document.getElementById("tm-form").onsubmit=async e=>{ e.preventDefault(); const ta=document.getElementById("tm-reply"), text=ta.value.trim(); if(!text) return;
     try{ await replyThread(t, text); ta.value=""; threadPage(id); window.scrollTo(0, document.body.scrollHeight); }catch(err){ toast("Couldn't send. Check your connection."); } };
+  const pok=document.getElementById("pf-ok"), pno=document.getElementById("pf-no"), pff=document.getElementById("pf-form");
+  if(pok) pok.onclick=async()=>{ try{ await markProof(t, true, ""); toast("Marked: looks good"); threadPage(id); }catch(e){ toast("Couldn't save. Check your connection."); } };
+  if(pno) pno.onclick=()=>{ pff.hidden=false; pff.querySelector("#pf-note").focus(); };
+  if(pff) pff.onsubmit=async e=>{ e.preventDefault(); const note=pff.querySelector("#pf-note").value.trim(); if(!note){ pff.querySelector("#pf-note").focus(); toast("Write what needs to change."); return; }
+    try{ await markProof(t, false, note); toast("Sent"); threadPage(id); }catch(x){ toast("Couldn't save. Check your connection."); } };
   document.getElementById("tm-done").onclick=async()=>{ const v=!t.done; try{ await db.collection("threads").doc(t.id).update({done:v}); t.done=v; toast(v?"Marked done":"Opened again"); threadPage(id); }catch(e){ toast("Couldn't save. Check your connection."); } };
 }
 
@@ -3192,6 +3306,8 @@ function openMenu(confirming){
     !offline&&may("answer") ? item("#requests","Recipe requests", openRequests()?openRequests()+" waiting":"", openRequests()) : "",
     may("inbox") ? item("#inbox","Suggestions &amp; comments", newFeedback()?newFeedback()+" new":"", newFeedback()) : "",
     isAdmin()&&recipesOnline ? item("#activity","Activity") : "",
+    may("ratings") ? item("#ratings","Likes &amp; dislikes") : "",
+
     isAdmin() ? item("#employees","Employee settings") : "",
     isAdmin() ? item("#public","Public portal settings", openGolive()?openGolive()+" waiting":"", openGolive()) : "",
   ].filter(Boolean);
@@ -5160,7 +5276,7 @@ applyTextSize();
 async function ntfyPanel(){
   const P=document.getElementById("ntfypanel"); if(!P) return;
   let topic=""; try{ const s=await db.collection("notify").doc(me).get(); if(s.exists) topic=s.data().topic||""; }catch(e){}
-  const what = may("answer") ? "when someone asks for a recipe, and when the team writes to you" : "when the team writes to you";
+  const what = "when "+[may("answer")?"someone asks for a recipe":"", may("ratings")?"someone likes or dislikes a recipe":"", "the team writes to you"].filter(Boolean).join(", ").replace(/, ([^,]*)$/," and $1");
   if(!topic){
     P.innerHTML=`<h3>Phone notices <span class="hint" style="font-weight:400">optional</span></h3>
       <p class="hint">Get a notice on your phone ${what}. It uses the free ntfy app.</p>
@@ -5584,6 +5700,7 @@ function routePage(){
   if(h==="grocery"){ q.value=""; groceryPage(); window.scrollTo(0,0); return; }
   if(h==="categories"){ q.value=""; categoriesPage(); window.scrollTo(0,0); return; }
   if(h.startsWith("move-") && isAdmin()){ const mc=CATS.find(x=>slug(x)==="c-"+h.slice(5)); if(mc){ q.value=""; movePage(mc); window.scrollTo(0,0); return; } }
+  if(h==="ratings" && may("ratings")){ q.value=""; ratingsPage(); window.scrollTo(0,0); return; }
   if(h==="team" && isTeam()){ q.value=""; teamPage(); window.scrollTo(0,0); return; }
   if(h.startsWith("team-") && isTeam()){ q.value=""; threadPage(h.slice(5)); window.scrollTo(0, document.body.scrollHeight); return; }
   if(h==="plan" || h.startsWith("plan-")){ q.value=""; planPage(h.slice(5)||null); window.scrollTo(0,0); return; }

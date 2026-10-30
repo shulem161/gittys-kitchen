@@ -1,6 +1,6 @@
 (function(){
 // Each document is its own localStorage key, so pages writing at the same time don't overwrite each other's changes.
-const PFX="__fk|", COLS=["users","names","accounts","recipes","submissions","photos","feedback","meta","resets","requests","plans","menus","golive","threads","notify"];
+const PFX="__fk|", COLS=["users","names","accounts","recipes","submissions","photos","feedback","meta","resets","requests","plans","menus","golive","threads","notify","ratings"];
 const L=()=>{const d={},snap={};COLS.forEach(c=>d[c]={});
  for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k||!k.startsWith(PFX))continue;const raw=localStorage.getItem(k);snap[k]=raw;const r=k.slice(PFX.length),j=r.indexOf("|"),c=r.slice(0,j),id=r.slice(j+1);
   if(c==="__mails")d.mails=JSON.parse(raw);else{(d[c]=d[c]||{})[id]=JSON.parse(raw)}}

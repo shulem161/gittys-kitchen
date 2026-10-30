@@ -243,6 +243,19 @@ await check('an admin gives a member their number', assertSucceeds(updateDoc(doc
 await check("…which nobody can change, not even the owner", assertFails(updateDoc(doc(OWN, 'users', 'pub'), { no: 1006 })));
 await check("…or take away", assertFails(setDoc(doc(OWN, 'users', 'pub'), { name: 'Pub', status: 'approved', created: 1, favs: [] })));
 await check("the member can't give themselves one", assertFails(updateDoc(doc(EMP, 'users', 'emp'), { no: 1001 })));
+// Likes and dislikes
+const rt = (uid, v, reason) => ({ rid: 'r-pub', uid, name: 'X', v, reason: reason || '', text: '', at: 1 });
+await check('a customer can like a recipe', assertSucceeds(setDoc(doc(PUB, 'ratings', 'r-pub_pub'), rt('pub', 1))));
+await check("…not in someone else's name", assertFails(setDoc(doc(PUB, 'ratings', 'r-pub_emp'), rt('emp', 1))));
+await check('a dislike needs a reason from the list', assertFails(setDoc(doc(PUB, 'ratings', 'r-pub_pub'), rt('pub', -1, 'meh'))));
+await check('…and is saved with one', assertSucceeds(setDoc(doc(PUB, 'ratings', 'r-pub_pub'), rt('pub', -1, 'unclear'))));
+await check('admins see all of them', assertSucceeds(fs.getDocs(fs.query(fs.collection(ADM, 'ratings'), fs.where('rid', '==', 'r-pub')))));
+await check("employees can't unless allowed", assertFails(fs.getDocs(fs.query(fs.collection(EMP, 'ratings'), fs.where('rid', '==', 'r-pub')))));
+await check("…or read someone's rating", assertFails(getDoc(doc(EMP, 'ratings', 'r-pub_pub'))));
+// Proofreading: each person marks only their own check
+await setDoc(doc(EMP, 'threads', 'pf1'), { by: 'emp', lastBy: 'emp', members: ['emp', 'adm'], names: {}, to: 'admins', rid: 'r-pub', rtitle: 'X', subject: '', msgs: [{ by: 'emp', name: 'X', text: 'Please proofread', at: 1 }], updated: 1, readAt: {}, done: false, created: 1, kind: 'proof', checks: {} });
+await check('the admin can mark it', assertSucceeds(updateDoc(doc(ADM, 'threads', 'pf1'), { checks: { adm: { ok: true, at: 2 } }, lastBy: 'adm', updated: 2 })));
+await check("…but not mark it for someone else", assertFails(updateDoc(doc(ADM, 'threads', 'pf1'), { checks: { adm: { ok: true, at: 2 }, emp: { ok: true, at: 2 } }, lastBy: 'adm' })));
 // Team messages: employees and admins only, and only the people in the conversation
 const th = (by, members) => ({ by, lastBy: by, members, names: {}, to: 'admins', rid: 'r-pub', rtitle: 'X', subject: '', msgs: [{ by, name: 'X', text: 'Can you look at this?', at: 1 }], updated: 1, readAt: {}, done: false, created: 1 });
 await check('an employee can write to the admins about a recipe', assertSucceeds(setDoc(doc(EMP, 'threads', 't1'), th('emp', ['emp', 'adm']))));
