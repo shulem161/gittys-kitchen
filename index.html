@@ -79,6 +79,8 @@ button{font:inherit;color:inherit}
 /* top bar */
 .bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--line)}
 .bar .wrap{display:flex;align-items:center;gap:16px;padding-block:12px}
+.navback{flex:none;width:40px;height:40px;margin-right:-4px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);display:grid;place-items:center;cursor:pointer;padding:0}
+.navback[hidden]{display:none}.navback svg{width:22px;height:22px}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);flex-shrink:0}
 .brand svg{width:30px;height:30px;color:var(--accent)}
 .brand span{font-family:var(--display);font-size:20px}
@@ -983,6 +985,7 @@ body.out .tpill,body.out .talarm{display:none}
 </head><body class="out">
 <header class="bar">
   <div class="wrap">
+    <button class="navback" id="navback" type="button" aria-label="Go back" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
     <a class="brand" href="#" aria-label="Gitty's Kitchen home">
       <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14a5 5 0 1 1 3.5-8.6A5 5 0 0 1 22 7a4.5 4.5 0 1 1 1 8.9V25H9z"/><path d="M9 21h14"/></svg>
       <span>Gitty's Kitchen</span>
@@ -1218,7 +1221,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.02";
+const WEB_VERSION = "4.03";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -5834,7 +5837,17 @@ function setNav(){
   const k = !h ? (q.value.trim() ? "" : "home") : (h==="categories"||h==="recent"||h.startsWith("recent-")||/^c-/.test(h)) ? "cats" : h==="grocery" ? "grocery" : /^timers/.test(h) ? "timers" : h==="profile" ? "me" : /^(plan|menus$|menu-)/.test(h) ? "plan" : "";
   document.querySelectorAll("#tabbar [data-nav]").forEach(a=>{ if(a.dataset.nav===k) a.setAttribute("aria-current","page"); else a.removeAttribute("aria-current"); });
 }
-function route(){ if(guideOn && location.hash.slice(1)!==guideOn.r.id) closeGuide(true); document.body.classList.remove("on-recipe"); routePage(); setNav(); tickTimers(); }
+// Go back one screen: to the page you came from in the app, or home if there is none
+const navStack=[location.hash]; let navGoingBack=false;
+window.addEventListener("hashchange", ()=>{ const h=location.hash;
+  if(navGoingBack){ navGoingBack=false; navStack.pop(); if(navStack[navStack.length-1]!==h) navStack.push(h); }
+  else if(navStack.length>1 && navStack[navStack.length-2]===h) navStack.pop();   // the phone's own back button
+  else navStack.push(h);
+  if(navStack.length>60) navStack.splice(0, navStack.length-60); });
+function navBack(){ if(navStack.length>1){ navGoingBack=true; history.back(); } else location.hash=""; }
+function setBack(){ const b=document.getElementById("navback"); if(b) b.hidden = !location.hash || location.hash==="#" || state!=="approved"; }
+document.getElementById("navback").onclick=navBack;
+function route(){ setBack(); if(guideOn && location.hash.slice(1)!==guideOn.r.id) closeGuide(true); document.body.classList.remove("on-recipe"); routePage(); setNav(); tickTimers(); }
 
 function routePage(){
   closeMenu(); stopRecipePhotos();

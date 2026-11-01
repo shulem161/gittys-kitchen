@@ -1,6 +1,6 @@
 {
-  "web": "4.02",
+  "web": "4.03",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Newest team messages on top; forward a message; member numbers from 1."
+  "notes": "A back button at the top goes back one screen."
 }

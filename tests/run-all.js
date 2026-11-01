@@ -895,6 +895,19 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await V.click('#va-back'); await V.waitForTimeout(1500);
     await A.locator(`[data-pk=viewas][data-pu="${vuid}"]`).uncheck(); await A.waitForTimeout(800);
 
+    // Go back one screen
+    await A.goto(F); await A.waitForTimeout(400);
+    ok('no back button on the home page', !(await A.locator('#navback').isVisible()));
+    await A.evaluate(() => { location.hash = 'categories'; }); await A.waitForTimeout(300);
+    await A.evaluate(() => { location.hash = 'c-bread'; }); await A.waitForTimeout(300);
+    await A.evaluate(() => { location.hash = 'r-croissants'; }); await A.waitForTimeout(400);
+    await A.click('#navback'); await A.waitForTimeout(400);
+    const b1 = await A.evaluate(() => location.hash);
+    await A.click('#navback'); await A.waitForTimeout(400);
+    ok('the back button goes back one screen at a time', b1 === '#c-bread' && await A.evaluate(() => location.hash) === '#categories', b1);
+    await A.setViewportSize({width: 390, height: 844}); await A.goto(F + '#r-croissants'); await A.waitForTimeout(700);
+    ok('…and fits on a phone', await A.locator('#navback').isVisible() && await A.evaluate(() => document.documentElement.scrollWidth) <= 390); await A.setViewportSize({width: 1100, height: 900});
+
     // Search
     await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);
     ok('search finds recipes', await V.locator('.rc').count() >= 3);
