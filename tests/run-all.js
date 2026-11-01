@@ -47,7 +47,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     }
   };
   // Set one employee's permission in Settings → Employee settings
-  const perm = async (P, uid, k, on, wait) => { if (!/#employees$/.test(await P.evaluate(() => location.hash))) { await P.goto(F + '#employees'); await P.waitForTimeout(500); }
+  const perm = async (P, uid, k, on, wait) => { const pg = ['proofread', 'review', 'release', 'answer', 'inbox', 'ratings'].includes(k) ? '#inbox-settings' : '#employees';
+    if ((await P.evaluate(() => location.hash)) !== pg) { await P.goto(F + pg); await P.waitForTimeout(500); }
     await P.locator(`.perms-t [data-ibs=${k}][data-ibu="${uid}"]`).setChecked(on); await P.waitForTimeout(wait || 800); };
   const join = async (p, name, pw, noConfirm) => { await p.click('[data-mode=create]'); await p.fill('#nm', name); await p.fill('#em', mailOf(name)); await p.fill('#pw', pw); await p.fill('#pw2', pw); await p.click('#fake-robot').catch(() => {}); await p.click('.primary'); await p.waitForTimeout(600);
     if (!noConfirm && await p.locator('#ev-check').count()) { await p.evaluate(() => __fakeVerify()); await p.click('#ev-check'); await p.waitForTimeout(600); } };
@@ -556,7 +557,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await perm(A, vu0, 'photos', true, 400); await perm(A, vu0, 'edit', false, 1500);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
     ok('taking a permission away works', /Suggest changes/.test(await V.locator('.rhead').innerText()) && (await V.locator('.ph-add').count()) > 0);
-    await A.goto(F + '#employees'); await A.waitForTimeout(400);
+    await A.goto(F + '#inbox-settings'); await A.waitForTimeout(400);
     await A.locator('[data-ea=answer]').check(); await A.waitForTimeout(1500);
     await V.goto(F); await V.waitForTimeout(500);
     ok('Employee settings give every employee a permission', await V.evaluate(() => may('answer')) && /Recipe requests/.test(await V.evaluate(() => { openMenu(); const t = document.querySelector('.menu').innerText; closeMenu(); return t; })));
@@ -845,16 +846,18 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#activity'); await A.waitForTimeout(600);
     ok('Activity shows who moved recipes from one inbox to the next', /Inbox moves/.test(await A.locator('main').innerText()) && /moved Croissants.* from Need to proofread to For approval/s.test(await A.locator('.act-moves').innerText()));
     await A.goto(F + '#inbox-settings'); await A.waitForTimeout(500);
-    ok('Inbox settings shows who may work in each inbox', (await A.locator('.ibs thead th').count()) === 4 && (await A.locator(`[data-ibs=proofread][data-ibu="${vuid}"]`).count()) === 1);
+    ok('Inbox settings shows who may use each inbox: the three steps, requests, comments and likes', (await A.locator('.perms-t tbody tr').count()) === 6 && (await A.locator(`[data-ibs=proofread][data-ibu="${vuid}"]`).count()) === 1);
     await A.locator(`[data-ibs=proofread][data-ibu="${vuid}"]`).check(); await A.waitForTimeout(800);
     ok('…and gives an employee access to an inbox', await V.evaluate(() => may('proofread')));
     await A.locator(`[data-ibs=proofread][data-ibu="${vuid}"]`).uncheck(); await A.waitForTimeout(600);
     await A.goto(F + '#employees'); await A.waitForTimeout(500);
-    ok('Employee settings has a table of every employee and every permission', (await A.locator('.perms-t tbody tr:not(.perm-grp)').count()) >= 13 && (await A.locator(`.perms-t [data-ibs=ratings][data-ibu="${vuid}"]`).count()) === 1);
-    await A.locator(`.perms-t [data-ibs=ratings][data-ibu="${vuid}"]`).check(); await A.waitForTimeout(800);
-    ok('…ticking one gives just that person the permission', await V.evaluate(() => may('ratings')) && await A.evaluate(u => !!document.querySelector(`.perms-t [data-ibs=ratings][data-ibu="${u}"]`).closest('td').querySelector('.perm-dot'), vuid));
-    await A.locator(`.perms-t [data-ibs=ratings][data-ibu="${vuid}"]`).uncheck(); await A.waitForTimeout(600);
+    ok('Employee settings has a table of every employee and every permission', (await A.locator('.perms-t tbody tr:not(.perm-grp)').count()) >= 7 && (await A.locator(`.perms-t [data-ibs=viewas][data-ibu="${vuid}"]`).count()) === 1 && (await A.locator('.perms-t [data-ibs=ratings]').count()) === 0);
+    await A.locator(`.perms-t [data-ibs=viewas][data-ibu="${vuid}"]`).check(); await A.waitForTimeout(800);
+    ok('…ticking one gives just that person the permission', await V.evaluate(() => canViewAs()) && await A.evaluate(u => !!document.querySelector(`.perms-t [data-ibs=viewas][data-ibu="${u}"]`).closest('td').querySelector('.perm-dot'), vuid));
+    await A.locator(`.perms-t [data-ibs=viewas][data-ibu="${vuid}"]`).uncheck(); await A.waitForTimeout(600);
     await A.click('#avbtn'); await A.waitForTimeout(200);
+    const t0 = await A.locator('.menu details[data-mg=inboxes]').textContent(), m0 = await A.locator('.menu details[data-mg=manage]').textContent();
+    ok('Recipe requests, comments and likes are in Inboxes, not Manage', ['Recipe requests', 'Suggestions', 'Likes'].every(x => t0.includes(x)) && !/Recipe requests|Suggestions|Likes/.test(m0), [t0, m0]);
     ok('Employee and Customer portal settings are under Settings, not Manage', /Employee settings/.test(await A.locator('.menu details[data-mg=settings]').textContent()) && /Customer portal settings/.test(await A.locator('.menu details[data-mg=settings]').textContent()) && !/Employee settings|Customer portal/.test(await A.locator('.menu details[data-mg=manage]').textContent()));
     ok('the menu has Inboxes, and no separate “Approve recipes & photos”', /Need to proofread/.test(await A.locator('.menu').innerText()) && !/Approve recipes/.test(await A.locator('.menu').textContent())); await A.click('#avbtn');
 

@@ -635,10 +635,14 @@ body.guiding{overflow:hidden}
 .ibs th,.ibs td{padding:8px;border-bottom:1px solid var(--line);text-align:center;vertical-align:middle}.ibs thead th{font-size:13px;color:var(--muted)}
 .ibs tbody th{text-align:left}.ibs tbody th small{display:block;color:var(--muted);font-weight:400;font-size:12.5px}
 .ibs-c input{width:22px;height:22px}.perm-reset th,.perm-reset td{font-size:13px}.perm-dot{color:#C2581A;font-size:10px;margin-left:2px;vertical-align:top}
-.perms-wrap{overflow:visible}
-.perms-t{table-layout:fixed}.perms-t col.pc{width:38%}
-.perms-t thead th{font-size:12.5px;color:var(--ink);position:sticky;top:var(--barh,64px);background:var(--paper);z-index:2;box-shadow:0 1px 0 var(--line);overflow-wrap:anywhere}.perms-t thead th small{display:block;color:var(--muted);font-weight:400}
-.perms-t tbody th{font-weight:600;font-size:14px;overflow-wrap:anywhere}
+/* the table fits the screen exactly; inside it you scroll up and down and side to side, names and permissions stay in view */
+.perms-wrap{overflow:auto;-webkit-overflow-scrolling:touch;max-height:calc(100dvh - var(--barh,64px) - var(--tabh,0px) - 24px);border:1px solid var(--line);border-radius:12px;overscroll-behavior:contain}
+.perms-t{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0}
+.perms-t th,.perms-t td{border-bottom:1px solid var(--line)}
+.perms-t thead th{font-size:13px;color:var(--ink);position:sticky;top:0;background:var(--paper);z-index:2;min-width:84px;max-width:120px;white-space:normal;word-break:normal;overflow-wrap:normal;line-height:1.25;vertical-align:bottom}
+.perms-t thead th:first-child,.perms-t tbody th{position:sticky;left:0;z-index:3;background:var(--paper);text-align:left;min-width:120px;max-width:150px;box-shadow:1px 0 0 var(--line)}
+.perms-t thead th:first-child{z-index:4}.perms-t thead th small{display:block;color:var(--muted);font-weight:400}
+.perms-t tbody th{font-weight:600;font-size:14px;z-index:1}
 .perms-t .perm-grp th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:14px}.ibs-all{color:var(--accent);font-weight:800}
 .rv-bar{margin:8px 0 2px;padding:10px 12px;border:1px dashed var(--accent);border-radius:12px;background:var(--accent-soft);display:grid;gap:6px;font-size:14.5px}
 .rv-bar .row:empty{display:none}
@@ -1228,7 +1232,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.07";
+const WEB_VERSION = "4.08";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -2176,7 +2180,12 @@ function adminPage(){
     catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); }
   });
 }
-const ALL_PERMS = () => [...PUB_ALLOW, ...EXTRA_PERMS];
+const INBOX_PERMS = [["proofread","1. Need to proofread"],["review","2. For approval"],["release","3. Ready to release"],["answer","Recipe requests"],["inbox","Suggestions & comments"],["ratings","Likes & dislikes"]];
+const isInboxPerm = k => INBOX_PERMS.some(x=>x[0]===k);
+function fitPermBox(){ const d=document.documentElement.style, bar=document.querySelector("header.bar"), tab=document.getElementById("tabbar");
+  if(bar) d.setProperty("--barh", bar.offsetHeight+"px"); d.setProperty("--tabh", (tab && getComputedStyle(tab).display!=="none" ? tab.offsetHeight : 0)+"px"); }
+addEventListener("resize", ()=>{ if(document.querySelector(".perms-wrap")) fitPermBox(); });
+const ALL_PERMS = () => [...PUB_ALLOW, ...EXTRA_PERMS.filter(([k])=>!isInboxPerm(k))];
 const PERM_SHORT = {suggest:"Suggest", photos:"Photos", requests:"Ask for recipes", ai:"AI tools", feedback:"Comments", edit:"Edit directly", proofread:"1. Proofread", review:"2. Approve", release:"3. Release", answer:"Answer requests", inbox:"Comments inbox", viewas:"Log in as customer", ratings:"Likes"};
 // One tick per person and permission (Employee settings, Inbox settings)
 function wirePermTable(redraw){
@@ -2193,18 +2202,19 @@ function employeesPage(){
     <div class="panel-a"><h3>What every employee may do</h3>
       <p class="hint">These apply to all employees. To change something for one person only, use Permissions next to their name in Members.</p>
       <div class="perm-h">Everyday</div><div class="pub-allow">${PUB_ALLOW.map(row).join("")}</div>
-      <div class="perm-h">Extra</div><div class="pub-allow">${EXTRA_PERMS.map(row).join("")}</div>
+      <div class="perm-h">Extra</div><div class="pub-allow">${EXTRA_PERMS.filter(([k])=>!isInboxPerm(k)).map(row).join("")}</div>
+      <p class="hint" style="margin-top:8px">Who may use each inbox is in <a class="link" href="#inbox-settings">Inbox settings</a>.</p>
     </div>
     ${emps.length?`<div class="panel-a"><h3>Each employee</h3>
       <p class="hint">Tick or untick for one person. A <span class="perm-dot">●</span> means it's set for that person and differs from the list above.</p>
-      <div class="ibs-wrap perms-wrap"><table class="ibs perms-t"><colgroup><col class="pc">${emps.map(()=>"<col>").join("")}</colgroup><thead><tr><th>Permission</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
-      <tbody>${[["Everyday",PUB_ALLOW],["Extra",EXTRA_PERMS]].map(([g,L])=>`<tr class="perm-grp"><th colspan="${emps.length+1}">${g}</th></tr>`+L.map(([k,l])=>`<tr><th>${PERM_SHORT[k]||esc(l)}</th>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")).join("")}
+      <div class="ibs-wrap perms-wrap"><table class="ibs perms-t"><thead><tr><th>Permission</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
+      <tbody>${[["Everyday",PUB_ALLOW],["Extra",EXTRA_PERMS.filter(([k])=>!isInboxPerm(k))]].map(([g,L])=>`<tr class="perm-grp"><th>${g}</th>${emps.map(()=>"<td></td>").join("")}</tr>`+L.map(([k,l])=>`<tr><th>${PERM_SHORT[k]||esc(l)}</th>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")).join("")}
       <tr class="perm-reset"><th>Back to the list above</th>${emps.map(m=>`<td>${Object.keys(m.perms||{}).length?`<button type="button" class="link" data-preset="${esc(m.uid)}" title="Use Employee settings for everything">Reset</button>`:""}</td>`).join("")}</tr></tbody></table></div>
       ${own.length?`<p class="hint" style="margin-top:8px">${own.length} ${own.length===1?"employee has":"employees have"} their own settings. “Reset” at the bottom puts that person back on the list above.</p>`:""}</div>`:""}
   </section>`;
   // the names stay at the top of the screen, just under the search bar
-  const bar=document.querySelector("header.bar"); if(bar) document.documentElement.style.setProperty("--barh", bar.offsetHeight+"px");
-  wirePermTable(()=>{ const y=window.scrollY; employeesPage(); window.scrollTo(0,y); });
+  fitPermBox();
+  wirePermTable(()=>{ const y=window.scrollY, w=app.querySelector(".perms-wrap"), wy=w?w.scrollTop:0, wx=w?w.scrollLeft:0; employeesPage(); window.scrollTo(0,y); const w2=app.querySelector(".perms-wrap"); if(w2){ w2.scrollTop=wy; w2.scrollLeft=wx; } });
   app.querySelectorAll("[data-preset]").forEach(b=>b.onclick=async()=>{ const m=members.find(x=>x.uid===b.dataset.preset); if(!m) return;
     try{ await db.collection("users").doc(m.uid).update({perms:{}}); m.perms={}; toast(`${m.name} now follows Employee settings`); syncTeamList(); const y=window.scrollY; employeesPage(); window.scrollTo(0,y); }catch(e){ toast("Couldn't save. Check your connection."); } });
   app.querySelectorAll("[data-ea]").forEach(c=>c.onchange=async()=>{ const d={allow:Object.assign({},EMP.allow,{[c.dataset.ea]:c.checked})};
@@ -3378,14 +3388,15 @@ function openMenu(confirming){
   const waitSubs = pendingSubs().length+pendingPhotos.length+openMoves(), mp = members.filter(x=>x.status==="pending").length;
   const manage = [
     isAdmin() ? item("#admin","Members", mp?mp+" waiting":"", mp) : "",
-    !offline&&may("answer") ? item("#requests","Recipe requests", openRequests()?openRequests()+" waiting":"", openRequests()) : "",
-    may("inbox") ? item("#inbox","Suggestions &amp; comments", newFeedback()?newFeedback()+" new":"", newFeedback()) : "",
     isAdmin()&&recipesOnline ? item("#activity","Activity") : "",
-    may("ratings") ? item("#ratings","Likes &amp; dislikes") : "",
 
   ].filter(Boolean);
-  const manageN = (isAdmin()?mp:0)+(may("answer")?openRequests():0)+(may("inbox")?newFeedback():0);
-  const inboxes = INBOXES.filter(([,,p])=>may(p)).map(([st,l])=>item("#"+st, l, inboxCount(st)?inboxCount(st)+" waiting":"", inboxCount(st)));
+  const manageN = (isAdmin()?mp:0);
+  const inboxes = [...INBOXES.filter(([,,p])=>may(p)).map(([st,l])=>item("#"+st, l, inboxCount(st)?inboxCount(st)+" waiting":"", inboxCount(st))),
+    !offline&&may("answer") ? item("#requests","Recipe requests", openRequests()?openRequests()+" waiting":"", openRequests()) : "",
+    may("inbox") ? item("#inbox","Suggestions &amp; comments", newFeedback()?newFeedback()+" new":"", newFeedback()) : "",
+    may("ratings") ? item("#ratings","Likes &amp; dislikes") : ""].filter(Boolean);
+  const inboxN = inboxTotal() + (may("answer")?openRequests():0) + (may("inbox")?newFeedback():0);
   const recipes = [
     !offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit")) ? item("#new","Add a recipe")+(can("ai")?item("#scan","Add from photo or file"):"") : "",
     may("edit")||(!can("suggest")&&!subs.length) ? "" : item("#mine","My recipes", subs.length||""),
@@ -3398,7 +3409,7 @@ function openMenu(confirming){
   m.innerHTML = `<a class="who" href="#profile" role="menuitem"><b>${esc(shownName())}</b><span>${ROLE_LABEL[myRole()]}${offline?" · offline":""} · My profile</span></a>
     ${canViewAs()||viewingAs()?`<a href="#viewas" role="menuitem" class="m-viewas">Log in as… <span class="n">${pv()?esc(VIEW_WHO.name):viewingAs()?ROLE_LABEL[viewingAs()].replace("Public","Customer"):realAdmin()?(realOwner()?"admin · employee · customer":"employee · customer"):"customer"}</span></a>`:""}
     ${teamItem}
-    ${group("inboxes","Inboxes", inboxes, inboxTotal())}
+    ${group("inboxes","Inboxes", inboxes, inboxN)}
     ${group("manage","Manage", manage, manageN)}
     ${group("recipes","Recipes", recipes, 0)}
     ${group("tools","Kitchen tools", [
@@ -5419,16 +5430,22 @@ function applyTextSize(){ const z=myTextSize(); app.style.zoom = z==="1" ? "" : 
 const LOOK_SET = () => appBuild ? "App settings" : "Website settings";
 function inboxSettings(){
   const team=members.filter(m=>m.status==="approved" && ["owner","admin","employee"].includes(roleOf(m))).sort((a,b)=>({owner:0,admin:1,employee:2}[roleOf(a)]-{owner:0,admin:1,employee:2}[roleOf(b)]) || byName(a.name,b.name));
+  const emps=team.filter(m=>roleOf(m)==="employee"), admins=team.filter(m=>roleOf(m)!=="employee");
   app.innerHTML=`<section class="wrap admin">
-    <div class="section-head" style="margin-top:28px"><h2>Inbox settings</h2><p>Who may work in each inbox</p></div>
-    <div class="panel-a"><p class="hint">Every recipe goes through all three: <b>1 Need to proofread</b> → <b>2 For approval</b> → <b>3 Ready to release</b>. The same person can never do two steps for one recipe. Anyone on the team can ask for a recipe to move on; those ticked here get the notice.</p>
-      <div class="ibs-wrap"><table class="ibs"><thead><tr><th>Who</th>${INBOXES.map(([,l],i)=>`<th>${i+1}. ${l}</th>`).join("")}</tr></thead>
-      <tbody>${team.map(m=>`<tr><th><b>${esc(m.name)}</b><small>${ROLE_LABEL[roleOf(m)]}${m.no?" · no. "+m.no:""}</small></th>${INBOXES.map(([st,,p])=>roleOf(m)==="employee"
-        ? `<td><label class="ibs-c"><input type="checkbox" data-ibs="${p}" data-ibu="${esc(m.uid)}" ${permOf(m,p)?"checked":""}><span class="sr">${esc(m.name)}: ${INBOX_NAME[st]}</span></label></td>`
-        : `<td><span class="ibs-all" title="Admins can always">✓</span></td>`).join("")}</tr>`).join("")}</tbody></table></div>
-      <p class="hint" style="margin-top:8px">Admins can always work in every inbox. To make someone an admin or an employee, use <a class="link" href="#admin">Members</a>.</p></div>
+    <div class="section-head" style="margin-top:28px"><h2>Inbox settings</h2><p>Who may use each inbox</p></div>
+    <div class="panel-a"><p class="hint">Recipes go through <b>1 Need to proofread</b> → <b>2 For approval</b> → <b>3 Ready to release</b>, and the same person can never do two steps for one recipe. Whoever has an inbox also gets its notices.</p>
+      ${emps.length?`<div class="ibs-wrap perms-wrap"><table class="ibs perms-t">
+      <thead><tr><th>Inbox</th><th>All employees</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
+      <tbody>${INBOX_PERMS.map(([k,l])=>`<tr><th>${esc(l)}</th><td><label class="ibs-c"><input type="checkbox" data-ea="${k}" ${empDefault(k)?"checked":""}><span class="sr">All employees: ${esc(l)}</span></label></td>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`
+      :`<p class="hint">No employees yet.</p>`}
+      <p class="hint" style="margin-top:8px">“All employees” is for everyone who has nothing of their own set; a <span class="perm-dot">●</span> marks a person's own setting. Admins${admins.length?` (${admins.map(m=>esc(m.name)).join(", ")})`:""} can always use every inbox. To make someone an admin or an employee, use <a class="link" href="#admin">Members</a>.</p></div>
   </section>`;
-  wirePermTable();
+  fitPermBox();
+  const redraw=()=>{ const y=window.scrollY, w=app.querySelector(".perms-wrap"), wy=w?w.scrollTop:0, wx=w?w.scrollLeft:0; inboxSettings(); window.scrollTo(0,y); const w2=app.querySelector(".perms-wrap"); if(w2){ w2.scrollTop=wy; w2.scrollLeft=wx; } };
+  wirePermTable(redraw);
+  app.querySelectorAll("[data-ea]").forEach(c=>c.onchange=async()=>{ const d={allow:Object.assign({},EMP.allow,{[c.dataset.ea]:c.checked})};
+    try{ await db.collection("meta").doc("employees").set(d); EMP=d; toast(c.checked?"All employees can use it now":"Employees can't use it now"); syncTeamList(); redraw(); }
+    catch(e){ c.checked=!c.checked; toast("Couldn't save. Check your connection."); } });
 }
 function settingsPage(){
   const seg = (name, opts, cur) => `<div class="seg" role="radiogroup" aria-label="${name}">${opts.map(([k,l])=>`<button type="button" role="radio" data-${name}="${k}" aria-checked="${cur===k}">${l}</button>`).join("")}</div>`;

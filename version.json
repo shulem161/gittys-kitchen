@@ -1,6 +1,6 @@
 {
-  "web": "4.07",
+  "web": "4.08",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Employee settings table fits the screen; names stay at the top."
+  "notes": "Recipe requests, comments and likes are inboxes; who may use them is in Inbox settings."
 }
