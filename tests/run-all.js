@@ -46,6 +46,9 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       await P.evaluate(async id => { await db.collection('recipes').doc(id).update({rvUids: []}); }, rid);
     }
   };
+  // Set one employee's permission in Settings → Employee settings
+  const perm = async (P, uid, k, on, wait) => { if (!/#employees$/.test(await P.evaluate(() => location.hash))) { await P.goto(F + '#employees'); await P.waitForTimeout(500); }
+    await P.locator(`.perms-t [data-ibs=${k}][data-ibu="${uid}"]`).setChecked(on); await P.waitForTimeout(wait || 800); };
   const join = async (p, name, pw, noConfirm) => { await p.click('[data-mode=create]'); await p.fill('#nm', name); await p.fill('#em', mailOf(name)); await p.fill('#pw', pw); await p.fill('#pw2', pw); await p.click('#fake-robot').catch(() => {}); await p.click('.primary'); await p.waitForTimeout(600);
     if (!noConfirm && await p.locator('#ev-check').count()) { await p.evaluate(() => __fakeVerify()); await p.click('#ev-check'); await p.waitForTimeout(600); } };
 
@@ -541,16 +544,16 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#public'); await A.waitForTimeout(300); await A.check('[data-pa=requests]'); await A.waitForTimeout(300);
 
     // Per-person employee permissions
-    const vn = await V.evaluate(() => myName());
+    const vn = await V.evaluate(() => myName()), vu0 = await V.evaluate(() => me);
     await A.goto(F + '#admin'); await A.waitForTimeout(400);
-    await A.locator('.mrow', {hasText: vn}).locator('[data-act=perms]').click(); await A.waitForTimeout(200);
-    await A.locator('[data-pk=edit]').check(); await A.waitForTimeout(1500);
+    ok('Members has no Permissions button any more', (await A.locator('[data-act=perms]').count()) === 0);
+    await perm(A, vu0, 'edit', true, 1500);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
     ok('one employee can be allowed to edit recipes', /Edit recipe/.test(await V.locator('.rhead').innerText()) && await V.evaluate(() => may('edit') && !may('review')));
-    await A.locator('[data-pk=photos]').uncheck(); await A.waitForTimeout(1500);
+    await perm(A, vu0, 'photos', false, 1500);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
     ok('an everyday permission can be switched off for one employee', (await V.locator('.ph-add').count()) === 0);
-    await A.locator('[data-pk=photos]').check(); await A.waitForTimeout(400); await A.locator('[data-pk=edit]').uncheck(); await A.waitForTimeout(1500);
+    await perm(A, vu0, 'photos', true, 400); await perm(A, vu0, 'edit', false, 1500);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
     ok('taking a permission away works', /Suggest changes/.test(await V.locator('.rhead').innerText()) && (await V.locator('.ph-add').count()) > 0);
     await A.goto(F + '#employees'); await A.waitForTimeout(400);
@@ -562,7 +565,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('…and take it away again', await V.evaluate(() => !may('answer')));
     await A.goto(F); await A.waitForTimeout(400); await A.click('#avbtn'); await A.waitForTimeout(200);
     const menuTxt = await A.locator('.menu').innerText();
-    ok('account menu is grouped and short', (await A.locator('.menu .mgroup').count()) === 5 && !/Check for updates/.test(menuTxt) && /Employee settings/.test(menuTxt), menuTxt.slice(0, 300));
+    ok('account menu is grouped and short', (await A.locator('.menu .mgroup').count()) === 5 && !/Check for updates/.test(menuTxt) && /Employee settings/.test(await A.locator('.menu details[data-mg=settings]').textContent()), menuTxt.slice(0, 300));
     await A.click('.menu details[data-mg=tools] summary'); await A.waitForTimeout(200);
     const toolsTxt = await A.locator('.menu details[data-mg=tools]').innerText();
     ok('the menu has a Kitchen tools drop-down with all the tools', ['Grocery list', 'Timers', 'Calendar', 'Calculator', 'Menu ideas', 'Scan a recipe', 'Recipe requests'].every(x => toolsTxt.includes(x)), toolsTxt);
@@ -576,7 +579,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Activity page lists changes by person, with charts', (await A.locator('.act-feed li').count()) > 0 && (await A.locator('.act-bar').count()) > 0 && (await A.locator('.act-col').count()) > 0);
     await A.locator('.act-bar').first().click(); await A.waitForTimeout(200);
     const who = await A.locator('#act-who').inputValue();
-    ok('tapping a person shows only their changes', who !== '' && (await A.locator('.act-feed li b').allInnerTexts()).every(x => x === who), who);
+    ok('tapping a person shows only their changes', who !== '' && (await A.locator('.act-feed:not(.act-moves) li b').allInnerTexts()).every(x => x === who), who);
     await V.goto(F + '#activity'); await V.waitForTimeout(300);
     ok("employees don't get the Activity page", (await V.locator('.act-feed, .act-bars').count()) === 0);
     // Duplicate recipes (admins)
@@ -701,13 +704,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // one particular employee, with their own permissions
     const vn4 = await V.evaluate(() => myName());
     await A.click('#va-back'); await A.waitForTimeout(1500);
-    await A.goto(F + '#admin'); await A.waitForTimeout(400); await A.locator('.mrow', {hasText: vn4}).locator('[data-act=perms]').click(); await A.waitForTimeout(200);
-    await A.locator('[data-pk=edit]').check(); await A.waitForTimeout(800);
+    await A.goto(F); await A.waitForTimeout(300); await perm(A, await V.evaluate(() => me), 'edit', true);
     await A.goto(F + '#viewas'); await A.waitForTimeout(400); await A.fill('#va-q', vn4.slice(0, 6)); await A.waitForTimeout(100); await A.locator('.va-person', {hasText: vn4}).click(); await A.waitForTimeout(1500);
     ok('the owner can log in as one particular employee, with their own permissions', new RegExp(vn4).test(await A.locator('#viewas-bar').innerText().catch(() => '')) && await A.evaluate(() => may('edit') && myRole() === 'employee'));
     await A.click('#va-back'); await A.waitForTimeout(1500);
-    await A.goto(F + '#admin'); await A.waitForTimeout(400); await A.locator('.mrow', {hasText: vn4}).locator('[data-act=perms]').click(); await A.waitForTimeout(200);
-    await A.locator('[data-pk=edit]').uncheck(); await A.waitForTimeout(800);
+    await A.goto(F); await A.waitForTimeout(300); await perm(A, await V.evaluate(() => me), 'edit', false);
     ok('Back to my view brings everything back', (await A.locator('#viewas-bar').count()) === 0 && await A.evaluate(() => isOwner() && isAdmin()));
 
     // Team messages about a recipe
@@ -749,15 +750,14 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('…which gives them their own private topic, with a test button', /^gk-[0-9a-f]{24}$/.test(vtopic) && (await V.locator('#nt-test').count()) === 1, vtopic);
     const vuid = await V.evaluate(() => me), vname = await V.evaluate(() => myName());
     await A.goto(F + '#admin'); await A.waitForTimeout(500);
-    if (!(await A.locator(`[data-pk=answer][data-pu="${vuid}"]`).count())) { await A.locator('.mrow', {hasText: vname}).locator('[data-act=perms]').click(); await A.waitForTimeout(300); }
-    await A.locator(`[data-pk=answer][data-pu="${vuid}"]`).check(); await A.waitForTimeout(4500);
+    await A.goto(F); await A.waitForTimeout(300); await perm(A, vuid, 'answer', true, 4500);
     ok('choosing an employee for recipe requests means they hear about new ones', await A.evaluate(u => ((__fakeDB().meta.reqwatch || {}).uids || []).includes(u), vuid));
     await PU.goto(F + '#requests'); await PU.waitForTimeout(500);
     const nBefore = ntfyPaths.length;
     await PU.fill('#rq-text', 'Quince jelly from Bubby'); await PU.click('#rqform .primary'); await PU.waitForTimeout(2000);
     ok('customers can ask for a recipe, and the admin hears about it', notes.slice(-4).some(n => /asking for a recipe/.test(n)));
     ok('…and so does the chosen employee, on their own phone', ntfyPaths.slice(nBefore).includes('/' + vtopic), ntfyPaths.slice(nBefore));
-    await A.locator(`[data-pk=answer][data-pu="${vuid}"]`).uncheck(); await A.waitForTimeout(4500);
+    await perm(A, vuid, 'answer', false, 4500);
     ok('taking it away stops the notices', await A.evaluate(u => !((__fakeDB().meta.reqwatch || {}).uids || []).includes(u), vuid));
     await PU.goto(F + '#account'); await PU.waitForTimeout(500);
     ok("customers don't get the phone notices setting", (await PU.locator('#ntfypanel').count()) === 0);
@@ -799,14 +799,13 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('…and all of them on Likes & dislikes', /Croissants/.test(await A.locator('.rate-list').innerText()) && /Something else/.test(await A.locator('.rate-reasons').innerText()));
     // Chosen employees see likes and dislikes, and get a notice for each
     await A.goto(F + '#admin'); await A.waitForTimeout(500);
-    if (!(await A.locator(`[data-pk=ratings][data-pu="${vuid}"]`).count())) { await A.locator('.mrow', {hasText: vname}).locator('[data-act=perms]').click(); await A.waitForTimeout(300); }
-    await A.locator(`[data-pk=ratings][data-pu="${vuid}"]`).check(); await A.waitForTimeout(4500);
+    await A.goto(F); await A.waitForTimeout(300); await perm(A, vuid, 'ratings', true, 4500);
     ok('choosing an employee for likes and dislikes', await A.evaluate(u => ((__fakeDB().meta.ratewatch || {}).uids || []).includes(u), vuid));
     const nb2 = ntfyPaths.length; const likeId = await PU.evaluate(() => RECIPES.find(r => r.id !== 'r-croissants').id); await PU.goto(F + '#' + likeId); await PU.waitForTimeout(700); await PU.click('#rt-up'); await PU.waitForTimeout(1200);
     ok('…they get a notice for a like', ntfyPaths.slice(nb2).includes('/' + vtopic) && notes.slice(-3).some(n => /liked a recipe/.test(n)), ntfyPaths.slice(nb2));
     await V.goto(F + '#r-croissants'); await V.waitForTimeout(500); await V.reload(); await V.waitForTimeout(1200);
     ok('…and see the likes and dislikes on each recipe', /1 👎/.test(await V.locator('.rate-admin').innerText().catch(() => '')));
-    await A.locator(`[data-pk=ratings][data-pu="${vuid}"]`).uncheck(); await A.waitForTimeout(800);
+    await perm(A, vuid, 'ratings', false, 800);
     // Send to proofread
     await V.goto(F + '#r-croissants'); await V.waitForTimeout(500); await V.click('#proof-btn'); await V.waitForTimeout(200);
     await V.selectOption('#at-to', 'admins'); await V.click('#at-send'); await V.waitForTimeout(900);
@@ -843,6 +842,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await V.goto(F + '#profile'); await V.waitForTimeout(500);
     ok('…and asking counts as moving it up, on their profile', /[1-9]\s*moved up/.test(await V.locator('.pstats').innerText()));
     ok('…then on to approval and release, still in the cookbook the whole time', await A.evaluate(() => { const r = RECIPES.find(x => x.id === 'r-croissants'); return !r.rv && r.pub === true; }));
+    await A.goto(F + '#activity'); await A.waitForTimeout(600);
+    ok('Activity shows who moved recipes from one inbox to the next', /Inbox moves/.test(await A.locator('main').innerText()) && /moved Croissants.* from Need to proofread to For approval/s.test(await A.locator('.act-moves').innerText()));
     await A.goto(F + '#inbox-settings'); await A.waitForTimeout(500);
     ok('Inbox settings shows who may work in each inbox', (await A.locator('.ibs thead th').count()) === 4 && (await A.locator(`[data-ibs=proofread][data-ibu="${vuid}"]`).count()) === 1);
     await A.locator(`[data-ibs=proofread][data-ibu="${vuid}"]`).check(); await A.waitForTimeout(800);
@@ -851,10 +852,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#employees'); await A.waitForTimeout(500);
     ok('Employee settings has a table of every employee and every permission', (await A.locator('.perms-t tbody tr:not(.perm-grp)').count()) >= 13 && (await A.locator(`.perms-t [data-ibs=ratings][data-ibu="${vuid}"]`).count()) === 1);
     await A.locator(`.perms-t [data-ibs=ratings][data-ibu="${vuid}"]`).check(); await A.waitForTimeout(800);
-    ok('…ticking one gives just that person the permission', await V.evaluate(() => may('ratings')) && (await A.locator(`.perms-t [data-ibu="${vuid}"]`).first().locator('xpath=ancestor::tr').locator('.perm-dot').count()) >= 1);
+    ok('…ticking one gives just that person the permission', await V.evaluate(() => may('ratings')) && await A.evaluate(u => !!document.querySelector(`.perms-t [data-ibs=ratings][data-ibu="${u}"]`).closest('td').querySelector('.perm-dot'), vuid));
     await A.locator(`.perms-t [data-ibs=ratings][data-ibu="${vuid}"]`).uncheck(); await A.waitForTimeout(600);
     await A.click('#avbtn'); await A.waitForTimeout(200);
-    ok('the menu has Inboxes, and the old items are still there', /Need to proofread/.test(await A.locator('.menu').innerText()) && /Approve recipes/.test(await A.locator('.menu').innerText())); await A.click('#avbtn');
+    ok('Employee and Public portal settings are under Settings, not Manage', /Employee settings/.test(await A.locator('.menu details[data-mg=settings]').textContent()) && /Public portal settings/.test(await A.locator('.menu details[data-mg=settings]').textContent()) && !/Employee settings|Public portal/.test(await A.locator('.menu details[data-mg=manage]').textContent()));
+    ok('the menu has Inboxes, and no separate “Approve recipes & photos”', /Need to proofread/.test(await A.locator('.menu').innerText()) && !/Approve recipes/.test(await A.locator('.menu').textContent())); await A.click('#avbtn');
 
     // Make a recipe better with AI
     await A.goto(F + '#new'); await A.waitForTimeout(400); await A.fill('#ed-t', 'Quick Cake');
@@ -890,15 +892,14 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok("employees can't log in as anyone unless allowed", (await V.locator('.menu a[href="#viewas"]').count()) === 0);
     await V.click('#avbtn');
     await A.goto(F + '#admin'); await A.waitForTimeout(500);
-    if (!(await A.locator(`[data-pk=viewas][data-pu="${vuid}"]`).count())) { await A.locator('.mrow', {hasText: vname}).locator('[data-act=perms]').click(); await A.waitForTimeout(300); }
-    await A.locator(`[data-pk=viewas][data-pu="${vuid}"]`).check(); await A.waitForTimeout(4500);
+    await A.goto(F); await A.waitForTimeout(300); await perm(A, vuid, 'viewas', true, 4500);
     await V.goto(F + '#viewas'); await V.waitForTimeout(900);
     const vaTxt = await V.locator('#va-people').innerText();
     ok('an allowed employee can log in as customers only', (await V.locator('[data-va]').count()) === 1 && (await V.locator('[data-va=public]').count()) === 1 && /Public Paula/.test(vaTxt) && !/Shulem/.test(vaTxt), vaTxt);
     await V.locator('.va-person', {hasText: 'Public Paula'}).click(); await V.waitForTimeout(1800);
     ok('…and sees what that customer sees', /Public Paula/.test(await V.locator('#viewas-bar').innerText().catch(() => '')) && await V.evaluate(() => isPublic() && favs().includes('r-croissants')));
     await V.click('#va-back'); await V.waitForTimeout(1500);
-    await A.locator(`[data-pk=viewas][data-pu="${vuid}"]`).uncheck(); await A.waitForTimeout(800);
+    await perm(A, vuid, 'viewas', false, 800);
 
     // Go back one screen
     await A.goto(F); await A.waitForTimeout(400);

@@ -1,6 +1,6 @@
 {
-  "web": "4.04",
+  "web": "4.05",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Employee permissions as one table: every employee and every permission."
+  "notes": "Employee and Public portal settings are under Settings; permissions table keeps its headings; inbox moves on Activity."
 }

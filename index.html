@@ -629,11 +629,15 @@ body.guiding{overflow:hidden}
 :root[data-theme="dark"] .aud.pub{background:#1E3D28;color:#BDEBCB}:root[data-theme="dark"] .aud.priv{background:#3A2E15;color:#F0D49A}
 .rv-log{margin:6px 0 0;font-size:14px}.rv-log summary{cursor:pointer;color:var(--accent);font-weight:600}.rv-log ul{margin:6px 0 0;padding-left:18px}
 .lock{display:inline-block;padding:6px 10px;border-radius:10px;background:var(--bg);border:1px solid var(--line);font-size:13.5px}
-.ibs-wrap{overflow-x:auto;margin-top:10px}.ibs{width:100%;border-collapse:collapse;font-size:14.5px}
+.ibs-wrap{overflow-x:auto;margin-top:10px}
+.act-movers{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}.act-movers span{padding:4px 10px;border-radius:999px;background:var(--accent-soft);font-size:13.5px}
+.act-moves li{align-items:baseline}.ibs{width:100%;border-collapse:collapse;font-size:14.5px}
 .ibs th,.ibs td{padding:8px;border-bottom:1px solid var(--line);text-align:center;vertical-align:middle}.ibs thead th{font-size:13px;color:var(--muted)}
 .ibs tbody th{text-align:left}.ibs tbody th small{display:block;color:var(--muted);font-weight:400;font-size:12.5px}
-.ibs-c input{width:22px;height:22px}.perm-dot{color:#C2581A;font-size:10px;margin-left:2px;vertical-align:top}
-.perms-t thead th{font-size:12.5px;min-width:70px;color:var(--ink)}.perms-t thead th small{display:block;color:var(--muted);font-weight:400}
+.ibs-c input{width:22px;height:22px}.perm-reset th,.perm-reset td{font-size:13px}.perm-dot{color:#C2581A;font-size:10px;margin-left:2px;vertical-align:top}
+.perms-wrap{max-height:calc(100vh - 190px);overflow:auto;border:1px solid var(--line);border-radius:12px}
+.perms-t thead th{font-size:12.5px;min-width:70px;color:var(--ink);position:sticky;top:0;background:var(--paper);z-index:2;box-shadow:0 1px 0 var(--line)}
+.perms-t thead th:first-child{left:0;z-index:3}.perms-t thead th small{display:block;color:var(--muted);font-weight:400}
 .perms-t tbody th{position:sticky;left:0;background:var(--paper);z-index:1;min-width:120px;font-weight:600;font-size:14px}
 .perms-t .perm-grp th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:14px}.ibs-all{color:var(--accent);font-weight:800}
 .rv-bar{margin:8px 0 2px;padding:10px 12px;border:1px dashed var(--accent);border-radius:12px;background:var(--accent-soft);display:grid;gap:6px;font-size:14.5px}
@@ -1224,7 +1228,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.04";
+const WEB_VERSION = "4.05";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -2129,11 +2133,11 @@ function adminPage(){
   app.innerHTML = `<section class="wrap admin">
     <div class="section-head" style="margin-top:28px"><h2>Approve members</h2><p>${members.length} ${members.length===1?"profile":"profiles"}</p></div>
     <div class="panel-a"><h3>Waiting for approval ${pend.length?`<span class="count">${pend.length}</span>`:""}</h3>
-      <p class="hint">New members join as public. To give someone more, change their role under Members, or use Permissions for an employee.</p>
+      <p class="hint">New members join as public. To give someone more, change their role under Members; set what employees may do in Settings → Employee settings.</p>
       ${list(pend, m=>row(m, btn("approve",m,"Approve","solid")+btn("deny",m,"Deny")), "No one is waiting. New requests appear here right away.")}</div>
     <div class="panel-a"><h3>Members</h3>
-      <p class="hint" style="margin-bottom:6px"><b>Employee</b>: what you set in <a class="link" href="#employees">Employee settings</a>, plus anything you change for one person with Permissions. <b>Public</b>: only what you allow in <a class="link" href="#public">Public portal settings</a>. <b>Admin</b>: everything you can do, except changing you or other admins${isOwner()?" (only you make admins)":""}.</p>
-      ${list(appr.slice().sort((a,b)=>order[roleOf(a)]-order[roleOf(b)]), m=>row(m, manage(m) ? roleSel(m)+(roleOf(m)==="employee"?btn("perms",m,"Permissions"+(Object.keys(m.perms||{}).length?" ✓":"")):"")+btn("reset",m,"Reset password")+btn("ask-remove",m,"Remove") : "")+(openPerms.has(m.uid)&&roleOf(m)==="employee"&&manage(m)?permsBox(m):""), "No members yet.")}</div>
+      <p class="hint" style="margin-bottom:6px"><b>Employee</b>: what you set in <a class="link" href="#employees">Employee settings</a>, plus anything you change for one person there. <b>Public</b>: only what you allow in <a class="link" href="#public">Public portal settings</a>. <b>Admin</b>: everything you can do, except changing you or other admins${isOwner()?" (only you make admins)":""}.</p>
+      ${list(appr.slice().sort((a,b)=>order[roleOf(a)]-order[roleOf(b)]), m=>row(m, manage(m) ? roleSel(m)+btn("reset",m,"Reset password")+btn("ask-remove",m,"Remove") : "")+(openPerms.has(m.uid)&&roleOf(m)==="employee"&&manage(m)?permsBox(m):""), "No members yet.")}</div>
     ${unv.length?`<div class="panel-a"><h3>Haven't confirmed their email</h3><p class="hint">They signed up but haven't tapped the link in their email yet. They'll move to Waiting for approval once they do.</p>${list(unv, m=>row(m, btn("ask-remove",m,"Remove")), "")}</div>`:""}
     ${den.length?`<div class="panel-a"><h3>Not approved</h3>${list(den, m=>row(m, btn("approve",m,"Approve","solid")+btn("ask-remove",m,"Remove")), "")}</div>`:""}
   </section>`;
@@ -2193,11 +2197,14 @@ function employeesPage(){
     </div>
     ${emps.length?`<div class="panel-a"><h3>Each employee</h3>
       <p class="hint">Tick or untick for one person. A <span class="perm-dot">●</span> means it's set for that person and differs from the list above.</p>
-      <div class="ibs-wrap"><table class="ibs perms-t"><thead><tr><th>Permission</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
-      <tbody>${[["Everyday",PUB_ALLOW],["Extra",EXTRA_PERMS]].map(([g,L])=>`<tr class="perm-grp"><th colspan="${emps.length+1}">${g}</th></tr>`+L.map(([k,l])=>`<tr><th>${PERM_SHORT[k]||esc(l)}</th>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")).join("")}</tbody></table></div>
-      ${own.length?`<p class="hint" style="margin-top:8px">${own.length} ${own.length===1?"employee has":"employees have"} their own settings. To go back to the list above for someone, use “Use Employee settings for everything” in their Permissions on <a class="link" href="#admin">Members</a>.</p>`:""}</div>`:""}
+      <div class="ibs-wrap perms-wrap"><table class="ibs perms-t"><thead><tr><th>Permission</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
+      <tbody>${[["Everyday",PUB_ALLOW],["Extra",EXTRA_PERMS]].map(([g,L])=>`<tr class="perm-grp"><th colspan="${emps.length+1}">${g}</th></tr>`+L.map(([k,l])=>`<tr><th>${PERM_SHORT[k]||esc(l)}</th>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")).join("")}
+      <tr class="perm-reset"><th>Back to the list above</th>${emps.map(m=>`<td>${Object.keys(m.perms||{}).length?`<button type="button" class="link" data-preset="${esc(m.uid)}" title="Use Employee settings for everything">Reset</button>`:""}</td>`).join("")}</tr></tbody></table></div>
+      ${own.length?`<p class="hint" style="margin-top:8px">${own.length} ${own.length===1?"employee has":"employees have"} their own settings. “Reset” at the bottom puts that person back on the list above.</p>`:""}</div>`:""}
   </section>`;
-  wirePermTable(()=>{ const y=window.scrollY; employeesPage(); window.scrollTo(0,y); });
+  wirePermTable(()=>{ const y=window.scrollY, w=app.querySelector(".perms-wrap"), wy=w?w.scrollTop:0, wx=w?w.scrollLeft:0; employeesPage(); window.scrollTo(0,y); const w2=app.querySelector(".perms-wrap"); if(w2){ w2.scrollTop=wy; w2.scrollLeft=wx; } });
+  app.querySelectorAll("[data-preset]").forEach(b=>b.onclick=async()=>{ const m=members.find(x=>x.uid===b.dataset.preset); if(!m) return;
+    try{ await db.collection("users").doc(m.uid).update({perms:{}}); m.perms={}; toast(`${m.name} now follows Employee settings`); syncTeamList(); const y=window.scrollY; employeesPage(); window.scrollTo(0,y); }catch(e){ toast("Couldn't save. Check your connection."); } });
   app.querySelectorAll("[data-ea]").forEach(c=>c.onchange=async()=>{ const d={allow:Object.assign({},EMP.allow,{[c.dataset.ea]:c.checked})};
     try{ await db.collection("meta").doc("employees").set(d); EMP=d; toast(c.checked?"All employees can do this now":"Employees can't do this now"); const y=window.scrollY; employeesPage(); window.scrollTo(0,y); }
     catch(e){ c.checked=!c.checked; toast("Couldn't save. Check your connection."); } });
@@ -2491,6 +2498,14 @@ function activityPage(){
         <div class="act-cols" role="img" aria-label="${list.length} changes over time">${bins.map(b=>`<div class="act-col" title="${fmtD(b.start)}${step>1?" week":""}: ${b.added} added, ${b.changed} changed"><span class="changed" style="height:${b.changed/maxB*100}%"></span><span class="added" style="height:${b.added/maxB*100}%"></span></div>`).join("")}</div>
         <div class="act-axis"><span>${fmtD(bins[0].start)}</span><span>Today</span></div></div>
     </div>
+    ${(()=>{ const mv=[]; RECIPES.forEach(r=>(r.rvLog||[]).forEach(e=>mv.push({t:r.t.replace(/^Untitled: /,""), rid:r.id, e})));
+      subs.forEach(s=>(s.log||[]).forEach(e=>mv.push({t:s.t, rid:s.recipeId||"", e})));
+      const L=mv.filter(m=>m.e.at>=since && (!actFilter.who||m.e.by===actFilter.who||(m.e.asked||[]).some(a=>a.name===actFilter.who))).sort((a,b)=>b.e.at-a.e.at);
+      const per={}; L.forEach(m=>{ per[m.e.by]=(per[m.e.by]||0)+1; (m.e.asked||[]).forEach(a=>{ per[a.name]=(per[a.name]||0)+1; }); });
+      const STEP={proof:"Need to proofread", approve:"For approval", release:"Ready to release", done:"Released", "":"the cookbook"};
+      return `<div class="panel-a"><h3>Inbox moves <span class="count">${L.length}</span></h3>
+        ${Object.keys(per).length?`<p class="act-movers">${Object.entries(per).sort((a,b)=>b[1]-a[1]).map(([n,c])=>`<span><b>${esc(n)}</b> ${c}</span>`).join("")}</p>`:""}
+        ${L.length?`<ul class="act-feed act-moves">${L.slice(0,200).map(m=>`<li><span class="act-time">${new Date(m.e.at).toLocaleDateString(undefined,{month:"short",day:"numeric"})}</span><span><b>${esc(m.e.by)}</b>${(m.e.asked||[]).length?` (asked by ${m.e.asked.map(a=>esc(a.name)).join(", ")})`:""} moved ${m.rid?`<a class="link" href="#${esc(m.rid)}">${esc(m.t)}</a>`:esc(m.t)} from <i>${STEP[m.e.from||""]||m.e.from}</i> to <b>${m.e.to==="done"?(m.e.pub===false?"Released, team only":"Released to the public"):STEP[m.e.to]||m.e.to}</b></span></li>`).join("")}</ul>`:`<p class="hint">No inbox moves in this time.</p>`}</div>`; })()}
     <div class="panel-a"><h3>Every change</h3>${feed||`<p class="hint">No changes in this time.</p>`}${list.length>300?`<p class="hint">Showing the newest 300.</p>`:""}
       <p class="hint" style="margin-top:12px">The cookbook keeps the last 12 changes for each recipe.</p></div>
   </section>`;
@@ -3360,15 +3375,12 @@ function openMenu(confirming){
   const item = (href,label,n,hot) => `<a href="${href}" role="menuitem">${label} <span class="n${hot?" hot":""}">${n||""}</span></a>`;
   const waitSubs = pendingSubs().length+pendingPhotos.length+openMoves(), mp = members.filter(x=>x.status==="pending").length;
   const manage = [
-    may("review") ? item("#review","Approve recipes &amp; photos", inboxCount("approve")?inboxCount("approve")+" waiting":"", inboxCount("approve")) : "",
     isAdmin() ? item("#admin","Members", mp?mp+" waiting":"", mp) : "",
     !offline&&may("answer") ? item("#requests","Recipe requests", openRequests()?openRequests()+" waiting":"", openRequests()) : "",
     may("inbox") ? item("#inbox","Suggestions &amp; comments", newFeedback()?newFeedback()+" new":"", newFeedback()) : "",
     isAdmin()&&recipesOnline ? item("#activity","Activity") : "",
     may("ratings") ? item("#ratings","Likes &amp; dislikes") : "",
 
-    isAdmin() ? item("#employees","Employee settings") : "",
-    isAdmin() ? item("#public","Public portal settings", openGolive()?openGolive()+" waiting":"", openGolive()) : "",
   ].filter(Boolean);
   const manageN = (isAdmin()?mp:0)+(may("answer")?openRequests():0)+(may("inbox")?newFeedback():0);
   const inboxes = INBOXES.filter(([,,p])=>may(p)).map(([st,l])=>item("#"+st, l, inboxCount(st)?inboxCount(st)+" waiting":"", inboxCount(st)));
@@ -3394,7 +3406,7 @@ function openMenu(confirming){
       offline||!can("requests") ? "" : item("#requests", may("answer")?"Recipe requests":"Request a recipe", may("answer")&&openRequests()?openRequests()+" waiting":"", may("answer")&&openRequests()),
       offline||!can("feedback")||may("inbox") ? "" : item("#feedback","Suggestions &amp; comments"),
     ].filter(Boolean), 0)}
-    ${group("settings","Settings", [item("#account","Account settings"), item("#settings-look", LOOK_SET()), isAdmin()?item("#inbox-settings","Inbox settings"):"", isAdmin()?item("#employees","Employee permissions"):""].filter(Boolean), 0)}
+    ${group("settings","Settings", [item("#account","Account settings"), item("#settings-look", LOOK_SET()), isAdmin()?item("#inbox-settings","Inbox settings"):"", isAdmin()?item("#employees","Employee settings"):"", isAdmin()?item("#public","Public portal settings", openGolive()?openGolive()+" waiting":"", openGolive()):""].filter(Boolean), isAdmin()?openGolive():0)}
     <button type="button" role="menuitem" id="m-out" class="m-out">Sign out</button>`;
   m.querySelectorAll(".mgroup").forEach(d=>d.addEventListener("toggle",()=>{ d.open ? menuOpen.add(d.dataset.mg) : menuOpen.delete(d.dataset.mg); }));
   m.onclick=e=>e.stopPropagation();
