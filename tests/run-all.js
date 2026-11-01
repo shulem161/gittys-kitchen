@@ -850,6 +850,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.locator(`[data-ibs=proofread][data-ibu="${vuid}"]`).check(); await A.waitForTimeout(800);
     ok('…and gives an employee access to an inbox', await V.evaluate(() => may('proofread')));
     await A.locator(`[data-ibs=proofread][data-ibu="${vuid}"]`).uncheck(); await A.waitForTimeout(600);
+    await A.setViewportSize({width: 390, height: 844});
+    for (const pg of ['#employees', '#inbox-settings']) { await A.goto(F + pg); await A.waitForTimeout(500);
+      await A.evaluate(() => { const tb = document.querySelector('.perms-t'); for (let i = 0; i < 6; i++) tb.querySelectorAll('tr').forEach(tr => tr.appendChild(tr.lastElementChild.cloneNode(true))); });
+      ok(`the ${pg.slice(1)} table never makes the page wider than the phone, it scrolls inside`, await A.evaluate(() => document.documentElement.scrollWidth <= 390 && document.querySelector('.perms-wrap').scrollWidth > document.querySelector('.perms-wrap').clientWidth)); }
+    await A.setViewportSize({width: 1100, height: 900});
     await A.goto(F + '#employees'); await A.waitForTimeout(500);
     ok('Employee settings has a table of every employee and every permission', (await A.locator('.perms-t tbody tr:not(.perm-grp)').count()) >= 7 && (await A.locator(`.perms-t [data-ibs=viewas][data-ibu="${vuid}"]`).count()) === 1 && (await A.locator('.perms-t [data-ibs=ratings]').count()) === 0);
     await A.locator(`.perms-t [data-ibs=viewas][data-ibu="${vuid}"]`).check(); await A.waitForTimeout(800);

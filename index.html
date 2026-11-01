@@ -629,14 +629,15 @@ body.guiding{overflow:hidden}
 :root[data-theme="dark"] .aud.pub{background:#1E3D28;color:#BDEBCB}:root[data-theme="dark"] .aud.priv{background:#3A2E15;color:#F0D49A}
 .rv-log{margin:6px 0 0;font-size:14px}.rv-log summary{cursor:pointer;color:var(--accent);font-weight:600}.rv-log ul{margin:6px 0 0;padding-left:18px}
 .lock{display:inline-block;padding:6px 10px;border-radius:10px;background:var(--bg);border:1px solid var(--line);font-size:13.5px}
-.ibs-wrap{overflow-x:auto;margin-top:10px}
+.ibs-wrap{overflow-x:auto;margin-top:10px;position:relative}
 .act-movers{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}.act-movers span{padding:4px 10px;border-radius:999px;background:var(--accent-soft);font-size:13.5px}
 .act-moves li{align-items:baseline}.ibs{width:100%;border-collapse:collapse;font-size:14.5px}
 .ibs th,.ibs td{padding:8px;border-bottom:1px solid var(--line);text-align:center;vertical-align:middle}.ibs thead th{font-size:13px;color:var(--muted)}
 .ibs tbody th{text-align:left}.ibs tbody th small{display:block;color:var(--muted);font-weight:400;font-size:12.5px}
 .ibs-c input{width:22px;height:22px}.perm-reset th,.perm-reset td{font-size:13px}.perm-dot{color:#C2581A;font-size:10px;margin-left:2px;vertical-align:top}
 /* the table fits the screen exactly; inside it you scroll up and down and side to side, names and permissions stay in view */
-.perms-wrap{overflow:auto;-webkit-overflow-scrolling:touch;max-height:calc(100dvh - var(--barh,64px) - var(--tabh,0px) - 24px);border:1px solid var(--line);border-radius:12px;overscroll-behavior:contain}
+.perms-wrap{position:relative;overflow:auto;-webkit-overflow-scrolling:touch;width:100%;max-width:100%;min-width:0;box-sizing:border-box;touch-action:pan-x pan-y;max-height:calc(100vh - var(--barh,64px) - var(--tabh,0px) - 24px);border:1px solid var(--line);border-radius:12px}
+.perms-hint{margin:6px 0 0;font-size:13px;color:var(--muted)}
 .perms-t{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0}
 .perms-t th,.perms-t td{border-bottom:1px solid var(--line)}
 .perms-t thead th{font-size:13px;color:var(--ink);position:sticky;top:0;background:var(--paper);z-index:2;min-width:84px;max-width:120px;white-space:normal;word-break:normal;overflow-wrap:normal;line-height:1.25;vertical-align:bottom}
@@ -1232,7 +1233,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.08";
+const WEB_VERSION = "4.09";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -2182,9 +2183,19 @@ function adminPage(){
 }
 const INBOX_PERMS = [["proofread","1. Need to proofread"],["review","2. For approval"],["release","3. Ready to release"],["answer","Recipe requests"],["inbox","Suggestions & comments"],["ratings","Likes & dislikes"]];
 const isInboxPerm = k => INBOX_PERMS.some(x=>x[0]===k);
-function fitPermBox(){ const d=document.documentElement.style, bar=document.querySelector("header.bar"), tab=document.getElementById("tabbar");
-  if(bar) d.setProperty("--barh", bar.offsetHeight+"px"); d.setProperty("--tabh", (tab && getComputedStyle(tab).display!=="none" ? tab.offsetHeight : 0)+"px"); }
+// The table box fills exactly the screen space left under it, so you scroll inside it (up/down and sideways)
+// without the page moving; if there isn't room, the page first brings the box up under the top bar.
+function fitPermBox(){
+  const bar=document.querySelector("header.bar"), tab=document.getElementById("tabbar"), w=app.querySelector(".perms-wrap"); if(!w) return;
+  const barH=bar?bar.offsetHeight:0, tabH=(tab && getComputedStyle(tab).display!=="none") ? tab.offsetHeight : 0, vh=window.innerHeight;
+  const top=w.getBoundingClientRect().top+window.scrollY, room=vh-tabH-12-top;
+  const full=vh-barH-tabH-20;
+  w.style.maxHeight = (room>=Math.min(360, full) ? room : full) + "px";
+  const hint=app.querySelector(".perms-hint");
+  if(hint) hint.hidden = !(w.scrollWidth>w.clientWidth+2 || w.scrollHeight>w.clientHeight+2);
+}
 addEventListener("resize", ()=>{ if(document.querySelector(".perms-wrap")) fitPermBox(); });
+addEventListener("load", ()=>{ if(document.querySelector(".perms-wrap")) fitPermBox(); });
 const ALL_PERMS = () => [...PUB_ALLOW, ...EXTRA_PERMS.filter(([k])=>!isInboxPerm(k))];
 const PERM_SHORT = {suggest:"Suggest", photos:"Photos", requests:"Ask for recipes", ai:"AI tools", feedback:"Comments", edit:"Edit directly", proofread:"1. Proofread", review:"2. Approve", release:"3. Release", answer:"Answer requests", inbox:"Comments inbox", viewas:"Log in as customer", ratings:"Likes"};
 // One tick per person and permission (Employee settings, Inbox settings)
@@ -2210,6 +2221,7 @@ function employeesPage(){
       <div class="ibs-wrap perms-wrap"><table class="ibs perms-t"><thead><tr><th>Permission</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
       <tbody>${[["Everyday",PUB_ALLOW],["Extra",EXTRA_PERMS.filter(([k])=>!isInboxPerm(k))]].map(([g,L])=>`<tr class="perm-grp"><th>${g}</th>${emps.map(()=>"<td></td>").join("")}</tr>`+L.map(([k,l])=>`<tr><th>${PERM_SHORT[k]||esc(l)}</th>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")).join("")}
       <tr class="perm-reset"><th>Back to the list above</th>${emps.map(m=>`<td>${Object.keys(m.perms||{}).length?`<button type="button" class="link" data-preset="${esc(m.uid)}" title="Use Employee settings for everything">Reset</button>`:""}</td>`).join("")}</tr></tbody></table></div>
+      <p class="perms-hint" hidden>Swipe inside the table to see everything: up and down, and side to side for more people.</p>
       ${own.length?`<p class="hint" style="margin-top:8px">${own.length} ${own.length===1?"employee has":"employees have"} their own settings. “Reset” at the bottom puts that person back on the list above.</p>`:""}</div>`:""}
   </section>`;
   // the names stay at the top of the screen, just under the search bar
@@ -5436,7 +5448,7 @@ function inboxSettings(){
     <div class="panel-a"><p class="hint">Recipes go through <b>1 Need to proofread</b> → <b>2 For approval</b> → <b>3 Ready to release</b>, and the same person can never do two steps for one recipe. Whoever has an inbox also gets its notices.</p>
       ${emps.length?`<div class="ibs-wrap perms-wrap"><table class="ibs perms-t">
       <thead><tr><th>Inbox</th><th>All employees</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
-      <tbody>${INBOX_PERMS.map(([k,l])=>`<tr><th>${esc(l)}</th><td><label class="ibs-c"><input type="checkbox" data-ea="${k}" ${empDefault(k)?"checked":""}><span class="sr">All employees: ${esc(l)}</span></label></td>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`
+      <tbody>${INBOX_PERMS.map(([k,l])=>`<tr><th>${esc(l)}</th><td><label class="ibs-c"><input type="checkbox" data-ea="${k}" ${empDefault(k)?"checked":""}><span class="sr">All employees: ${esc(l)}</span></label></td>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="perms-hint" hidden>Swipe inside the table to see everything: up and down, and side to side for more people.</p>`
       :`<p class="hint">No employees yet.</p>`}
       <p class="hint" style="margin-top:8px">“All employees” is for everyone who has nothing of their own set; a <span class="perm-dot">●</span> marks a person's own setting. Admins${admins.length?` (${admins.map(m=>esc(m.name)).join(", ")})`:""} can always use every inbox. To make someone an admin or an employee, use <a class="link" href="#admin">Members</a>.</p></div>
   </section>`;

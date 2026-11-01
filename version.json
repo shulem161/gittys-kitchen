@@ -1,6 +1,6 @@
 {
-  "web": "4.08",
+  "web": "4.09",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Recipe requests, comments and likes are inboxes; who may use them is in Inbox settings."
+  "notes": "Fixed: permission tables no longer make the page wider than the phone."
 }
