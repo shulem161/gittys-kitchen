@@ -635,10 +635,10 @@ body.guiding{overflow:hidden}
 .ibs th,.ibs td{padding:8px;border-bottom:1px solid var(--line);text-align:center;vertical-align:middle}.ibs thead th{font-size:13px;color:var(--muted)}
 .ibs tbody th{text-align:left}.ibs tbody th small{display:block;color:var(--muted);font-weight:400;font-size:12.5px}
 .ibs-c input{width:22px;height:22px}.perm-reset th,.perm-reset td{font-size:13px}.perm-dot{color:#C2581A;font-size:10px;margin-left:2px;vertical-align:top}
-.perms-wrap{max-height:calc(100vh - 190px);overflow:auto;border:1px solid var(--line);border-radius:12px}
-.perms-t thead th{font-size:12.5px;min-width:70px;color:var(--ink);position:sticky;top:0;background:var(--paper);z-index:2;box-shadow:0 1px 0 var(--line)}
-.perms-t thead th:first-child{left:0;z-index:3}.perms-t thead th small{display:block;color:var(--muted);font-weight:400}
-.perms-t tbody th{position:sticky;left:0;background:var(--paper);z-index:1;min-width:120px;font-weight:600;font-size:14px}
+.perms-wrap{overflow:visible}
+.perms-t{table-layout:fixed}.perms-t col.pc{width:38%}
+.perms-t thead th{font-size:12.5px;color:var(--ink);position:sticky;top:var(--barh,64px);background:var(--paper);z-index:2;box-shadow:0 1px 0 var(--line);overflow-wrap:anywhere}.perms-t thead th small{display:block;color:var(--muted);font-weight:400}
+.perms-t tbody th{font-weight:600;font-size:14px;overflow-wrap:anywhere}
 .perms-t .perm-grp th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:14px}.ibs-all{color:var(--accent);font-weight:800}
 .rv-bar{margin:8px 0 2px;padding:10px 12px;border:1px dashed var(--accent);border-radius:12px;background:var(--accent-soft);display:grid;gap:6px;font-size:14.5px}
 .rv-bar .row:empty{display:none}
@@ -1228,7 +1228,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.06";
+const WEB_VERSION = "4.07";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -2197,12 +2197,14 @@ function employeesPage(){
     </div>
     ${emps.length?`<div class="panel-a"><h3>Each employee</h3>
       <p class="hint">Tick or untick for one person. A <span class="perm-dot">●</span> means it's set for that person and differs from the list above.</p>
-      <div class="ibs-wrap perms-wrap"><table class="ibs perms-t"><thead><tr><th>Permission</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
+      <div class="ibs-wrap perms-wrap"><table class="ibs perms-t"><colgroup><col class="pc">${emps.map(()=>"<col>").join("")}</colgroup><thead><tr><th>Permission</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
       <tbody>${[["Everyday",PUB_ALLOW],["Extra",EXTRA_PERMS]].map(([g,L])=>`<tr class="perm-grp"><th colspan="${emps.length+1}">${g}</th></tr>`+L.map(([k,l])=>`<tr><th>${PERM_SHORT[k]||esc(l)}</th>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")).join("")}
       <tr class="perm-reset"><th>Back to the list above</th>${emps.map(m=>`<td>${Object.keys(m.perms||{}).length?`<button type="button" class="link" data-preset="${esc(m.uid)}" title="Use Employee settings for everything">Reset</button>`:""}</td>`).join("")}</tr></tbody></table></div>
       ${own.length?`<p class="hint" style="margin-top:8px">${own.length} ${own.length===1?"employee has":"employees have"} their own settings. “Reset” at the bottom puts that person back on the list above.</p>`:""}</div>`:""}
   </section>`;
-  wirePermTable(()=>{ const y=window.scrollY, w=app.querySelector(".perms-wrap"), wy=w?w.scrollTop:0, wx=w?w.scrollLeft:0; employeesPage(); window.scrollTo(0,y); const w2=app.querySelector(".perms-wrap"); if(w2){ w2.scrollTop=wy; w2.scrollLeft=wx; } });
+  // the names stay at the top of the screen, just under the search bar
+  const bar=document.querySelector("header.bar"); if(bar) document.documentElement.style.setProperty("--barh", bar.offsetHeight+"px");
+  wirePermTable(()=>{ const y=window.scrollY; employeesPage(); window.scrollTo(0,y); });
   app.querySelectorAll("[data-preset]").forEach(b=>b.onclick=async()=>{ const m=members.find(x=>x.uid===b.dataset.preset); if(!m) return;
     try{ await db.collection("users").doc(m.uid).update({perms:{}}); m.perms={}; toast(`${m.name} now follows Employee settings`); syncTeamList(); const y=window.scrollY; employeesPage(); window.scrollTo(0,y); }catch(e){ toast("Couldn't save. Check your connection."); } });
   app.querySelectorAll("[data-ea]").forEach(c=>c.onchange=async()=>{ const d={allow:Object.assign({},EMP.allow,{[c.dataset.ea]:c.checked})};

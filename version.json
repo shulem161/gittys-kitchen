@@ -1,6 +1,6 @@
 {
-  "web": "4.06",
+  "web": "4.07",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Public portal is now called Customer portal."
+  "notes": "Employee settings table fits the screen; names stay at the top."
 }
