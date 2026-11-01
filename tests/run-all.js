@@ -855,7 +855,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('…ticking one gives just that person the permission', await V.evaluate(() => may('ratings')) && await A.evaluate(u => !!document.querySelector(`.perms-t [data-ibs=ratings][data-ibu="${u}"]`).closest('td').querySelector('.perm-dot'), vuid));
     await A.locator(`.perms-t [data-ibs=ratings][data-ibu="${vuid}"]`).uncheck(); await A.waitForTimeout(600);
     await A.click('#avbtn'); await A.waitForTimeout(200);
-    ok('Employee and Public portal settings are under Settings, not Manage', /Employee settings/.test(await A.locator('.menu details[data-mg=settings]').textContent()) && /Public portal settings/.test(await A.locator('.menu details[data-mg=settings]').textContent()) && !/Employee settings|Public portal/.test(await A.locator('.menu details[data-mg=manage]').textContent()));
+    ok('Employee and Customer portal settings are under Settings, not Manage', /Employee settings/.test(await A.locator('.menu details[data-mg=settings]').textContent()) && /Customer portal settings/.test(await A.locator('.menu details[data-mg=settings]').textContent()) && !/Employee settings|Customer portal/.test(await A.locator('.menu details[data-mg=manage]').textContent()));
     ok('the menu has Inboxes, and no separate “Approve recipes & photos”', /Need to proofread/.test(await A.locator('.menu').innerText()) && !/Approve recipes/.test(await A.locator('.menu').textContent())); await A.click('#avbtn');
 
     // Make a recipe better with AI

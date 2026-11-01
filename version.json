@@ -1,6 +1,6 @@
 {
-  "web": "4.05",
+  "web": "4.06",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Employee and Public portal settings are under Settings; permissions table keeps its headings; inbox moves on Activity."
+  "notes": "Public portal is now called Customer portal."
 }
