@@ -632,7 +632,10 @@ body.guiding{overflow:hidden}
 .ibs-wrap{overflow-x:auto;margin-top:10px}.ibs{width:100%;border-collapse:collapse;font-size:14.5px}
 .ibs th,.ibs td{padding:8px;border-bottom:1px solid var(--line);text-align:center;vertical-align:middle}.ibs thead th{font-size:13px;color:var(--muted)}
 .ibs tbody th{text-align:left}.ibs tbody th small{display:block;color:var(--muted);font-weight:400;font-size:12.5px}
-.ibs-c input{width:22px;height:22px}.ibs-all{color:var(--accent);font-weight:800}
+.ibs-c input{width:22px;height:22px}.perm-dot{color:#C2581A;font-size:10px;margin-left:2px;vertical-align:top}
+.perms-t thead th{font-size:12.5px;min-width:70px;color:var(--ink)}.perms-t thead th small{display:block;color:var(--muted);font-weight:400}
+.perms-t tbody th{position:sticky;left:0;background:var(--paper);z-index:1;min-width:120px;font-weight:600;font-size:14px}
+.perms-t .perm-grp th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:14px}.ibs-all{color:var(--accent);font-weight:800}
 .rv-bar{margin:8px 0 2px;padding:10px 12px;border:1px dashed var(--accent);border-radius:12px;background:var(--accent-soft);display:grid;gap:6px;font-size:14.5px}
 .rv-bar .row:empty{display:none}
 .rv-list{list-style:none;margin:0;padding:0}.rv-list > li{padding:10px 0;border-bottom:1px solid var(--line)}.rv-list > li[hidden]{display:none}
@@ -1221,7 +1224,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.03";
+const WEB_VERSION = "4.04";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -2169,8 +2172,17 @@ function adminPage(){
     catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); }
   });
 }
+const ALL_PERMS = () => [...PUB_ALLOW, ...EXTRA_PERMS];
+const PERM_SHORT = {suggest:"Suggest", photos:"Photos", requests:"Ask for recipes", ai:"AI tools", feedback:"Comments", edit:"Edit directly", proofread:"1. Proofread", review:"2. Approve", release:"3. Release", answer:"Answer requests", inbox:"Comments inbox", viewas:"Log in as customer", ratings:"Likes"};
+// One tick per person and permission (Employee settings, Inbox settings)
+function wirePermTable(redraw){
+  app.querySelectorAll("[data-ibs]").forEach(c=>c.onchange=async()=>{ const m=members.find(x=>x.uid===c.dataset.ibu); if(!m) return;
+    const k=c.dataset.ibs, perms=Object.assign({}, m.perms||{}); if(c.checked===empDefault(k)) delete perms[k]; else perms[k]=c.checked;
+    try{ await db.collection("users").doc(m.uid).update({perms}); m.perms=perms; toast(`${m.name}: ${c.checked?"allowed":"not allowed"}`); syncTeamList(); if(redraw) redraw(); }
+    catch(e){ c.checked=!c.checked; toast("Couldn't save. Check your connection."); } });
+}
 function employeesPage(){
-  const emps = members.filter(m=>m.status==="approved" && roleOf(m)==="employee"), own = emps.filter(m=>Object.keys(m.perms||{}).length);
+  const emps = members.filter(m=>m.status==="approved" && roleOf(m)==="employee").sort((a,b)=>byName(a.name,b.name)), own = emps.filter(m=>Object.keys(m.perms||{}).length);
   const row = ([k,l]) => `<label class="pub-row"><input type="checkbox" data-ea="${k}" ${empDefault(k)?"checked":""}><span>${esc(l)}</span></label>`;
   app.innerHTML = `<section class="wrap admin tools-page">
     <div class="section-head" style="margin-top:28px"><h2>Employee settings</h2><p>${emps.length} ${emps.length===1?"employee":"employees"} · <a class="link" href="#admin">Members</a></p></div>
@@ -2179,10 +2191,15 @@ function employeesPage(){
       <div class="perm-h">Everyday</div><div class="pub-allow">${PUB_ALLOW.map(row).join("")}</div>
       <div class="perm-h">Extra</div><div class="pub-allow">${EXTRA_PERMS.map(row).join("")}</div>
     </div>
-    ${own.length?`<div class="panel-a"><h3>Employees with their own permissions</h3><p class="hint">${own.map(m=>esc(m.name)).join(", ")}. What's set for them personally stays as it is.</p></div>`:""}
+    ${emps.length?`<div class="panel-a"><h3>Each employee</h3>
+      <p class="hint">Tick or untick for one person. A <span class="perm-dot">●</span> means it's set for that person and differs from the list above.</p>
+      <div class="ibs-wrap"><table class="ibs perms-t"><thead><tr><th>Permission</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
+      <tbody>${[["Everyday",PUB_ALLOW],["Extra",EXTRA_PERMS]].map(([g,L])=>`<tr class="perm-grp"><th colspan="${emps.length+1}">${g}</th></tr>`+L.map(([k,l])=>`<tr><th>${PERM_SHORT[k]||esc(l)}</th>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")).join("")}</tbody></table></div>
+      ${own.length?`<p class="hint" style="margin-top:8px">${own.length} ${own.length===1?"employee has":"employees have"} their own settings. To go back to the list above for someone, use “Use Employee settings for everything” in their Permissions on <a class="link" href="#admin">Members</a>.</p>`:""}</div>`:""}
   </section>`;
+  wirePermTable(()=>{ const y=window.scrollY; employeesPage(); window.scrollTo(0,y); });
   app.querySelectorAll("[data-ea]").forEach(c=>c.onchange=async()=>{ const d={allow:Object.assign({},EMP.allow,{[c.dataset.ea]:c.checked})};
-    try{ await db.collection("meta").doc("employees").set(d); EMP=d; toast(c.checked?"All employees can do this now":"Employees can't do this now"); }
+    try{ await db.collection("meta").doc("employees").set(d); EMP=d; toast(c.checked?"All employees can do this now":"Employees can't do this now"); const y=window.scrollY; employeesPage(); window.scrollTo(0,y); }
     catch(e){ c.checked=!c.checked; toast("Couldn't save. Check your connection."); } });
 }
 const pubOpen = new Set();   // categories left open in Public portal settings
@@ -3377,7 +3394,7 @@ function openMenu(confirming){
       offline||!can("requests") ? "" : item("#requests", may("answer")?"Recipe requests":"Request a recipe", may("answer")&&openRequests()?openRequests()+" waiting":"", may("answer")&&openRequests()),
       offline||!can("feedback")||may("inbox") ? "" : item("#feedback","Suggestions &amp; comments"),
     ].filter(Boolean), 0)}
-    ${group("settings","Settings", [item("#account","Account settings"), item("#settings-look", LOOK_SET()), isAdmin()?item("#inbox-settings","Inbox settings"):""].filter(Boolean), 0)}
+    ${group("settings","Settings", [item("#account","Account settings"), item("#settings-look", LOOK_SET()), isAdmin()?item("#inbox-settings","Inbox settings"):"", isAdmin()?item("#employees","Employee permissions"):""].filter(Boolean), 0)}
     <button type="button" role="menuitem" id="m-out" class="m-out">Sign out</button>`;
   m.querySelectorAll(".mgroup").forEach(d=>d.addEventListener("toggle",()=>{ d.open ? menuOpen.add(d.dataset.mg) : menuOpen.delete(d.dataset.mg); }));
   m.onclick=e=>e.stopPropagation();
@@ -5397,10 +5414,7 @@ function inboxSettings(){
         : `<td><span class="ibs-all" title="Admins can always">✓</span></td>`).join("")}</tr>`).join("")}</tbody></table></div>
       <p class="hint" style="margin-top:8px">Admins can always work in every inbox. To make someone an admin or an employee, use <a class="link" href="#admin">Members</a>.</p></div>
   </section>`;
-  app.querySelectorAll("[data-ibs]").forEach(c=>c.onchange=async()=>{ const m=members.find(x=>x.uid===c.dataset.ibu); if(!m) return;
-    const k=c.dataset.ibs, perms=Object.assign({}, m.perms||{}); if(c.checked===empDefault(k)) delete perms[k]; else perms[k]=c.checked;
-    try{ await db.collection("users").doc(m.uid).update({perms}); m.perms=perms; toast(`${m.name}: ${c.checked?"can":"can't"} work in ${INBOX_NAME[INBOXES.find(x=>x[2]===k)[0]]}`); syncTeamList(); }
-    catch(e){ c.checked=!c.checked; toast("Couldn't save. Check your connection."); } });
+  wirePermTable();
 }
 function settingsPage(){
   const seg = (name, opts, cur) => `<div class="seg" role="radiogroup" aria-label="${name}">${opts.map(([k,l])=>`<button type="button" role="radio" data-${name}="${k}" aria-checked="${cur===k}">${l}</button>`).join("")}</div>`;

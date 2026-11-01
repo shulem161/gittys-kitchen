@@ -848,6 +848,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.locator(`[data-ibs=proofread][data-ibu="${vuid}"]`).check(); await A.waitForTimeout(800);
     ok('…and gives an employee access to an inbox', await V.evaluate(() => may('proofread')));
     await A.locator(`[data-ibs=proofread][data-ibu="${vuid}"]`).uncheck(); await A.waitForTimeout(600);
+    await A.goto(F + '#employees'); await A.waitForTimeout(500);
+    ok('Employee settings has a table of every employee and every permission', (await A.locator('.perms-t tbody tr:not(.perm-grp)').count()) >= 13 && (await A.locator(`.perms-t [data-ibs=ratings][data-ibu="${vuid}"]`).count()) === 1);
+    await A.locator(`.perms-t [data-ibs=ratings][data-ibu="${vuid}"]`).check(); await A.waitForTimeout(800);
+    ok('…ticking one gives just that person the permission', await V.evaluate(() => may('ratings')) && (await A.locator(`.perms-t [data-ibu="${vuid}"]`).first().locator('xpath=ancestor::tr').locator('.perm-dot').count()) >= 1);
+    await A.locator(`.perms-t [data-ibs=ratings][data-ibu="${vuid}"]`).uncheck(); await A.waitForTimeout(600);
     await A.click('#avbtn'); await A.waitForTimeout(200);
     ok('the menu has Inboxes, and the old items are still there', /Need to proofread/.test(await A.locator('.menu').innerText()) && /Approve recipes/.test(await A.locator('.menu').innerText())); await A.click('#avbtn');
 

@@ -1,6 +1,6 @@
 {
-  "web": "4.03",
+  "web": "4.04",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "A back button at the top goes back one screen."
+  "notes": "Employee permissions as one table: every employee and every permission."
 }
