@@ -78,7 +78,7 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/users/$(uid)).data.get('role', 'public') != 'admin');
     }
 
-    // Recipe code letters per category, and number blocks per section. Members read, only the admin writes.
+    // Recipe code numbers per category and per Pesach section. Members read, only the admin writes.
     // The design everyone gets (chosen by an admin).
     match /meta/look {
       allow get: if signedIn();

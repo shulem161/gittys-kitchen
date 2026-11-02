@@ -1110,32 +1110,39 @@ const kindOf = r => (r && (r.kind==="meat"||r.kind==="dairy"||r.kind==="fish"||r
 const KIND_LABEL = {meat:"Meat", dairy:"Dairy", fish:"Fish", other:""};
 const PAREVE = k => k==="other" || k==="fish";   // fish is pareve: it can go with meat or dairy meals
 const kindChip = r => { const k=kindOf(r); return (KIND_LABEL[k]?`<span class="kchip ${k}">${KIND_LABEL[k]}</span>`:"") + (r && /^pesach$/i.test(r.c||"") ? `<span class="kchip pesach">Pesach</span>` : ""); };
-// Recipe codes: a letter per category, then a number from 001 (A001, A002…). In a category with sections each
-// section gets a second letter and numbers from 001 (Pesach: LA001 Family recipes, LB001 Cakes…). Kept in meta/codes.
+// Recipe codes are numbers only. Pesach recipes start with 2, every other recipe with 1. Then two digits for the
+// category (Pesach: for its section) and the recipe's number from 001: 101001 is the first recipe of category 01,
+// 203001 the first of Pesach section 03. Category and section numbers are kept in meta/codes.
 let CODEMAP = {cats:{}, secs:{}};   // loaded from storage in boot()
 let usedCodes = new Set();       // every code used online, including deleted recipes
-const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";   // no I or O, so they aren't mistaken for 1 and 0
+const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";   // the old letters, in order: A → 01, B → 02 …
+const num2 = v => /^\d+$/.test(String(v||"")) ? String(+v).padStart(2,"0") : String((CODE_LETTERS.indexOf(v)+1)||99).padStart(2,"0");
+const isPesach = c => /^pesach$/i.test(c||"");
 const codeOf = r => r && r.code ? r.code : "";
 const noText = r => codeOf(r);
 const noChip = r => codeOf(r) ? `<span class="nochip" title="Recipe code">${esc(codeOf(r))}</span>` : "";
+const freeNum = vals => { const used=new Set(Object.values(vals).map(num2)); for(let i=1;i<100;i++){ const k=String(i).padStart(2,"0"); if(!used.has(k)) return k; } return "99"; };
 function codeLetter(c, map){
   map = map || CODEMAP;
-  if(map.cats[c]) return map.cats[c];
-  const used = new Set(Object.values(map.cats)); const L = [...CODE_LETTERS].find(x=>!used.has(x)) || "Z";
-  map.cats[c] = L; return L;
+  if(map.cats[c]) return num2(map.cats[c]);
+  return map.cats[c] = freeNum(map.cats);
 }
 function secLetter(c, s, map){
   map = map || CODEMAP; const m = map.secs[c] = map.secs[c] || {};
-  if(m[s]) return m[s];
-  const used = new Set(Object.values(m)); m[s] = [...CODE_LETTERS].find(x=>!used.has(x)) || "Z"; return m[s];
+  if(m[s]) return num2(m[s]);
+  return m[s] = freeNum(m);
 }
 const hasSections = c => !!(CODEMAP.secs[c] && Object.keys(CODEMAP.secs[c]).length) || RECIPES.some(r=>r.c===c && r.sec);
-// Next free code for a recipe in category c (and section s). Saves new letters/blocks to meta/codes.
+// What a category's (or a section's) codes start with, as shown on its tile
+const catPrefix = c => isPesach(c) ? "2" : CODEMAP.cats[c] ? "1"+num2(CODEMAP.cats[c]) : "";
+const secPrefix = (c, s) => { const sl=CODEMAP.secs[c]&&CODEMAP.secs[c][s]; if(!sl) return ""; return isPesach(c) ? "2"+num2(sl) : CODEMAP.cats[c] ? "1"+num2(CODEMAP.cats[c])+num2(sl) : ""; };
+// Next free code for a recipe in category c (and section s). Saves new numbers to meta/codes.
 function nextCode(c, s){
   const before = JSON.stringify(CODEMAP);
-  const L = codeLetter(c);
-  let pre = L, n = 1; const fmt = x => String(x).padStart(3,"0");
-  if(hasSections(c) || s) pre = L + secLetter(c, s || "Family recipes");
+  let pre;
+  if(isPesach(c)) pre = "2" + secLetter(c, s || "Family recipes");
+  else { pre = "1" + codeLetter(c); if(hasSections(c) || s) pre += secLetter(c, s || "Family recipes"); }
+  let n = 1; const fmt = x => String(x).padStart(3,"0");
   while(n<999 && usedCodes.has(pre+fmt(n))) n++;
   const code = pre + fmt(n);
   usedCodes.add(code);
@@ -1244,7 +1251,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.14";
+const WEB_VERSION = "4.15";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1656,7 +1663,7 @@ function wireToday(){
 function catTiles(){
   const d=recentList(864e5).length, w=recentList(7*864e5).length;
   return `<a class="cat cat-new" href="#recent"><span class="catcode">${w?`${w} new`:"New"}</span><div class="ic">${TOOL_IC.spark}</div><h3>New recipes</h3><span>${d?`${d} added today`:w?`${w} added this week`:"See what's been added"}</span></a>${CATS.map(c=>{const n=RECIPES.filter(r=>r.c===c).length;
-    return `<a class="cat" href="#${slug(c)}">${CODEMAP.cats[c]?`<span class="catcode" title="Recipe codes start with ${CODEMAP.cats[c]}">${CODEMAP.cats[c]}</span>`:""}<div class="ic">${icon(c)}</div><h3>${esc(c)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`}).join("")}`;
+    return `<a class="cat" href="#${slug(c)}">${catPrefix(c)?`<span class="catcode" title="Recipe codes start with ${catPrefix(c)}">${catPrefix(c)}</span>`:""}<div class="ic">${icon(c)}</div><h3>${esc(c)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`}).join("")}`;
 }
 const DL_IC = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>';
 function categoriesPage(){
@@ -1788,8 +1795,8 @@ function category(c){
     <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}${!offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit"))?` · <a class="link" href="#new-${slug(c).slice(2)}">+ Add a recipe</a>${can("ai")?` · <a class="link" href="#scan-${slug(c).slice(2)}">Add from photo or file</a>`:""}`:""}</p></div>
     ${list.length?`<div class="cat-tools">${isAdmin()&&recipesOnline&&!offline?`<a class="btn" href="#move-${slug(c).slice(2)}">Move recipes…</a>`:""}<button class="btn" id="dl-cat" type="button"${isPublic()?" hidden":""}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download ${esc(c)}</button></div>`:""}
     ${secs?`<div class="cats rows">${secs.map(s=>{ const n=list.filter(r=>secOf(r)===s).length;
-      const L=CODEMAP.cats[c], sl=CODEMAP.secs[c]&&CODEMAP.secs[c][s];
-      return `<a class="cat" href="#${slug(c)}--${secSlug(s)}">${L&&sl?`<span class="catcode" title="Recipe codes start with ${L}${sl}">${L}${sl}</span>`:""}<div class="ic">${icon(SEC_ICON[s]||s)}</div><h3>${esc(s)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`; }).join("")}</div>` : ""}
+      const sp=secPrefix(c, s);
+      return `<a class="cat" href="#${slug(c)}--${secSlug(s)}">${sp?`<span class="catcode" title="Recipe codes start with ${sp}">${sp}</span>`:""}<div class="ic">${icon(SEC_ICON[s]||s)}</div><h3>${esc(s)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`; }).join("")}</div>` : ""}
     ${!secs && list.length>1 ? sortBar("cat", SO_CAT, so) : ""}
     <div class="grid"${secs?" hidden":""}>${list.length && !secs ? sortList(list, so).map(card).join("") : `<div class="empty">No ${esc(c)} recipes yet.${offline?"":` <a class="link" href="#new-${slug(c).slice(2)}">Add the first one</a>`}</div>`}</div></section>`;
   const dc=document.getElementById("dl-cat"); if(dc) dc.onclick=()=>downloadBook([c], dc);
@@ -1810,7 +1817,7 @@ function favorites(){
 function results(term){
   const t = term.toLowerCase();
   const num = (t.match(/^(?:#|no\.?\s*|number\s*)?(\d{1,4})$/)||[])[1];
-  const code = (term.trim().toUpperCase().match(/^#?([A-Z]{1,2}\s?\d{3})$/)||[])[1];
+  const code = (term.trim().match(/^#?([12](?:\s?\d\d){1,2}\s?\d{3})$/)||[])[1];
   const list = code ? RECIPES.filter(r=>codeOf(r)===code.replace(/\s/g,"")) : num ? RECIPES.filter(r=>String(r.no)===num) : RECIPES.filter(r=>[r.t,r.by,r.c,r.sec||"",allText(r)].join(" ").toLowerCase().includes(t));
   const titleHits = list.filter(r=>r.t.toLowerCase().includes(t)), so = sortChoice("search", ["best",...SO_ALL], "best");
   const rest = list.filter(r=>!r.t.toLowerCase().includes(t));
@@ -3473,7 +3480,7 @@ const toDoc = r => ({pub: r.pub===undefined ? pubDefault(r.c) : !!r.pub, c:r.c, 
   s:r.s.map(([ing,h,items])=>({k:ing?"ing":"step", h:h||"", items:items}))});
 const fromDoc = (id,d) => ({id, pub: d.pub===undefined ? undefined : !!d.pub, c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, pre:d.pre, kind:d.kind||"", time:d.time||"", serves:d.serves||"", sec:d.sec||"", no:d.no||0, code:d.code||"", ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[], rv:d.rv||"", rvNote:d.rvNote||"", rvNoteBy:d.rvNoteBy||"", rvBy:d.rvBy||"", rvUids:d.rvUids||[], rvAsk:d.rvAsk||[], rvLog:d.rvLog||[],
   s:(d.s||[]).map(x=>[x.k==="ing"?1:0, x.h||"", x.items||[]])});
-// Recipes are listed A to Z by category, then by recipe code (A001, A002…); any without a code go after, A to Z by name.
+// Recipes are listed A to Z by category, then by recipe code (101001, 101002…); any without a code go after, A to Z by name.
 const sortName = r => r.t.replace(/^Untitled:\s*/,"").replace(/^[^A-Za-z0-9]+/,"");
 function sortRecipes(list){
   return list.sort((a,b)=> byName(a.c,b.c) || (!a.code - !b.code) || (a.code&&b.code ? a.code.localeCompare(b.code, undefined, {numeric:true}) : 0)

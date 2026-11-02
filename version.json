@@ -1,6 +1,6 @@
 {
-  "web": "4.14",
+  "web": "4.15",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Scan a recipe and Request a recipe moved from Kitchen tools to Recipes."
+  "notes": "Recipe codes are numbers: Pesach recipes start with 2, all others with 1."
 }

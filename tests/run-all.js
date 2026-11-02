@@ -380,7 +380,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('a recipe an admin writes goes to Need to proofread too', /#proof$/.test(await A.evaluate(() => location.hash)) && (await A.locator('.sub-card', {hasText: 'Test Pesach Kugel'}).count()) === 1);
     await through(A, 'Test Pesach Kugel'); await A.goto(F + '#' + await A.evaluate(() => RECIPES.find(r => r.t === 'Test Pesach Kugel').id)); await A.waitForTimeout(500);
     const newNo = await A.locator('.rhead .nochip').innerText().catch(() => '');
-    ok('new Pesach recipe gets a section code like LA001', /^[A-Z]{2}\d{3}$/.test(newNo), newNo);
+    ok('new Pesach recipe gets a number code starting with 2, like 201001', /^2\d{5}$/.test(newNo) && newNo.slice(1, 3) === await A.evaluate(() => num2(CODEMAP.secs.Pesach.Kugel)), newNo);
     await A.goto(F + '#c-pesach'); await A.waitForTimeout(500);
     ok('Pesach shows section tiles', (await A.locator('.cats .cat h3').allInnerTexts()).some(x => /Kugel/.test(x)));
     await A.locator('.cats .cat', {hasText: 'Kugel'}).click(); await A.waitForTimeout(400);
@@ -394,7 +394,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#new-bread'); await A.waitForTimeout(300); await A.fill('#ed-t', 'Test Bread Code'); await A.locator('.sec-items').nth(0).fill('2 cups flour'); await A.click('#edform .primary'); await A.waitForTimeout(1000);
     await through(A, 'Test Bread Code', true); await A.goto(F + '#' + await A.evaluate(() => RECIPES.find(r => r.t === 'Test Bread Code').id)); await A.waitForTimeout(500);
     ok('“Release for the team only” keeps it from customers, and the recipe says so', /Team only/.test(await A.locator('.rhead .aud').innerText()) && await A.evaluate(() => RECIPES.find(r => r.t === 'Test Bread Code').pub === false));
-    ok('category codes start at 001', /^[A-Z]\d{3}$/.test(await A.locator('.rhead .nochip').innerText().catch(() => '')) && !/1\d\d$/.test(await A.locator('.rhead .nochip').innerText().catch(() => '')), await A.locator('.rhead .nochip').innerText().catch(() => ''));
+    ok('other recipes get a number code starting with 1, counting from 001', /^1\d{2}\d{3}$/.test(await A.locator('.rhead .nochip').innerText().catch(() => '')) && !/1\d\d$/.test(await A.locator('.rhead .nochip').innerText().catch(() => '')), await A.locator('.rhead .nochip').innerText().catch(() => ''));
     await A.goto(F + '#c-bread'); await A.waitForTimeout(400);
     const bc = await A.locator('.rc .nochip').allInnerTexts();
     ok('category lists recipes by code', bc.length >= 2 && bc.every((c, i) => !i || bc[i - 1].localeCompare(c, undefined, {numeric: true}) < 0) && (await A.locator('.rc').first().locator('.nochip').count()) === 1, bc);
@@ -676,7 +676,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // Moving recipes to another category
     await A.goto(F + '#r-croissants'); await A.waitForTimeout(300); await A.click('#mv-btn'); await A.selectOption('#mv1-cat', 'Cakes'); await A.click('#mv1-go'); await A.waitForTimeout(800);
     const mvd = await A.evaluate(() => { const r = RECIPES.find(x => x.id === 'r-croissants'); return [r.c, r.code, CODEMAP.cats.Cakes]; });
-    ok('admins can move a recipe to another category, with a new code', mvd[0] === 'Cakes' && mvd[1].startsWith(mvd[2]), mvd);
+    ok('admins can move a recipe to another category, with a new code', mvd[0] === 'Cakes' && mvd[1].startsWith('1' + mvd[2]) && /^\d{6}$/.test(mvd[1]), mvd);
     await A.goto(F + '#move-cakes'); await A.waitForTimeout(400);
     await A.locator('[data-mv="r-croissants"]').check(); await A.selectOption('#mv-cat', 'Bread'); await A.click('#mv-go'); await A.waitForTimeout(1000);
     ok('…or several at once', await A.evaluate(() => RECIPES.find(x => x.id === 'r-croissants').c) === 'Bread');
