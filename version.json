@@ -1,6 +1,6 @@
 {
-  "web": "4.13",
+  "web": "4.14",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Merge two recipes choosing what to keep from each. Only admins edit recipes; everyone else requests a change."
+  "notes": "Scan a recipe and Request a recipe moved from Kitchen tools to Recipes."
 }

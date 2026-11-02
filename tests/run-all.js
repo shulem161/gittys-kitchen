@@ -299,7 +299,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('admin can mark a recipe Dairy', /dairy/i.test(await A.locator('.rhead .kchip').innerText().catch(() => '')));
 
     await A.goto(F); await A.waitForTimeout(400);
-    await A.click('.cats.tools a[href="#scan"]'); await A.waitForTimeout(400);
+    await A.click('.recipe-tools a[href="#scan"]'); await A.waitForTimeout(400);
     ok('home page Scan a recipe opens the scanner', /Add from a photo or file/.test(await A.locator('main h2').first().innerText()));
     // Kitchen tools: scaling, time, grocery list, calculator, menu ideas
     await A.goto(F + '#r-bobbys-challah'); await A.waitForTimeout(500);
@@ -572,7 +572,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('account menu is grouped and short', (await A.locator('.menu .mgroup').count()) === 5 && !/Check for updates/.test(menuTxt) && /Employee settings/.test(await A.locator('.menu details[data-mg=settings]').textContent()), menuTxt.slice(0, 300));
     await A.click('.menu details[data-mg=tools] summary'); await A.waitForTimeout(200);
     const toolsTxt = await A.locator('.menu details[data-mg=tools]').innerText();
-    ok('the menu has a Kitchen tools drop-down with all the tools', ['Grocery list', 'Timers', 'Calendar', 'Calculator', 'Menu ideas', 'Scan a recipe', 'Recipe requests'].every(x => toolsTxt.includes(x)), toolsTxt);
+    ok('the menu has a Kitchen tools drop-down with all the tools', ['Grocery list', 'Timers', 'Calendar', 'Calculator', 'Menu ideas'].every(x => toolsTxt.includes(x)) && !/Scan a recipe|Request a recipe|Recipe requests/.test(toolsTxt), toolsTxt);
+    ok('Scan a recipe is under Recipes in the menu, and on the home page', await A.evaluate(() => { openMenu(); const ok = !!document.querySelector('.mgroup[data-mg=recipes] a[href="#scan"]'); closeMenu(); return ok; }) && (await A.locator('.recipe-tools a[href="#scan"]').count()) === 1 && (await A.locator('.cats.tools:not(.recipe-tools) a[href="#scan"], .cats.tools:not(.recipe-tools) a[href="#requests"]').count()) === 0);
     await A.click('#avbtn');
     ok('home has no shortcuts that are already in the bottom bar', (await A.locator('.cats.tools a[href="#timers"], .cats.tools a[href="#grocery"]').count()) === 0);
     // Who added / changed: admins only, plus the Activity page
@@ -799,6 +800,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok("customers don't get the phone notices setting", (await PU.locator('#ntfypanel').count()) === 0);
 
     await PU.goto(F); await PU.waitForTimeout(500);
+    ok('Request a recipe is under Recipes in the menu', await PU.evaluate(() => { openMenu(); const ok = !!document.querySelector('.mgroup[data-mg=recipes] a[href="#requests"]') && !document.querySelector('.mgroup[data-mg=tools] a[href="#requests"]'); closeMenu(); return ok; }));
     ok('customers have “Request a recipe” on the home page, by Suggestions & comments', (await PU.locator('.rq-card a[href="#requests"]').count()) === 1 && (await PU.locator('.fb-card').count()) === 2);
     // Grocery list: any item
     await PU.goto(F + '#grocery'); await PU.waitForTimeout(400);

@@ -1244,7 +1244,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.13";
+const WEB_VERSION = "4.14";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1692,12 +1692,14 @@ function home(){
     <div class="grid">${nw.slice(0,4).map(card).join("")}</div>`:""}
     ${f.length?`<div class="section-head"><h2>Your favorites</h2><p><a class="link" href="#favorites">See all ${f.length}</a></p></div>
     <div class="grid">${f.slice(0,4).map(card).join("")}</div>`:""}
-    <div class="section-head"><h2>Kitchen tools</h2><p>Measure, plan and ask</p></div>
+    ${(rt => rt.trim() ? `<div class="section-head"><h2>Recipes</h2><p>Scan one in or ask for one</p></div><div class="cats tools recipe-tools">${rt}</div>` : "")(`
+      ${offline||(may("edit")&&!recipesOnline)||!can("ai")||!can("suggest")?"":`<a class="cat" href="#scan"><div class="ic">${TOOL_IC.scan}</div><div class="tool-txt"><h3>Scan a recipe</h3><span>Photo, PDF or Word</span></div></a>`}
+      ${offline||!can("requests")||isPublic()?"":`<a class="cat" href="#requests"><div class="ic">${TOOL_IC.ask}</div><div class="tool-txt"><h3>${may("answer")?"Recipe requests":"Request a recipe"}</h3><span>${may("answer")?(openRequests()?`${openRequests()} waiting`:"What the family asks for"):"Ask for any recipe"}</span></div></a>`}
+    `)}
+    <div class="section-head"><h2>Kitchen tools</h2><p>Measure and plan</p></div>
     <div class="cats tools">
       <a class="cat" href="#convert"><div class="ic">${TOOL_IC.calc}</div><div class="tool-txt"><h3>Calculator</h3><span>Double, halve, convert</span></div></a>
       ${offline||!can("ai")?"":`<a class="cat" href="#menu"><div class="ic">${TOOL_IC.menu}</div><div class="tool-txt"><h3>Menu ideas</h3><span>A full menu from the cookbook</span></div></a>`}
-      ${offline||(may("edit")&&!recipesOnline)||!can("ai")||!can("suggest")?"":`<a class="cat" href="#scan"><div class="ic">${TOOL_IC.scan}</div><div class="tool-txt"><h3>Scan a recipe</h3><span>Photo, PDF or Word</span></div></a>`}
-      ${offline||!can("requests")||isPublic()?"":`<a class="cat" href="#requests"><div class="ic">${TOOL_IC.ask}</div><div class="tool-txt"><h3>${may("answer")?"Recipe requests":"Request a recipe"}</h3><span>${may("answer")?(openRequests()?`${openRequests()} waiting`:"What the family asks for"):"Ask for any recipe"}</span></div></a>`}
     </div>
   </section>
   ${offline||!isPublic()||!can("requests")?"":`<section class="wrap"><div class="panel-a fb-card rq-card" style="margin-top:14px">
@@ -3427,7 +3429,8 @@ function openMenu(confirming){
     may("ratings") ? item("#ratings","Likes &amp; dislikes") : ""].filter(Boolean);
   const inboxN = inboxTotal() + (may("answer")?openRequests():0) + (may("inbox")?newFeedback():0);
   const recipes = [
-    !offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit")) ? item("#new","Add a recipe")+(can("ai")?item("#scan","Add from photo or file"):"") : "",
+    !offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit")) ? item("#new","Add a recipe")+(can("ai")?item("#scan","Scan a recipe"):"") : "",
+    offline||!can("requests")||may("answer") ? "" : item("#requests","Request a recipe"),
     may("edit")||(!can("suggest")&&!subs.length) ? "" : item("#mine","My recipes", subs.length||""),
     item("#favorites","My favorites", favs().length||""),
     !offline ? item("#menus","My menus", Object.values(MENUS).filter(m=>m.uid===me).length||"") : "",
@@ -3445,8 +3448,6 @@ function openMenu(confirming){
       isTeam() ? item("#compare~~","Compare recipes") : "",
       item("#grocery","Grocery list"), item("#timers","Timers", timersRunning()?timersRunning()+" running":""), item("#plan","Calendar &amp; menus"), item("#convert","Calculator"),
       offline||!can("ai") ? "" : item("#menu","Menu ideas"),
-      offline||(may("edit")&&!recipesOnline)||!can("ai")||!can("suggest") ? "" : item("#scan","Scan a recipe"),
-      offline||!can("requests") ? "" : item("#requests", may("answer")?"Recipe requests":"Request a recipe", may("answer")&&openRequests()?openRequests()+" waiting":"", may("answer")&&openRequests()),
       offline||!can("feedback")||may("inbox") ? "" : item("#feedback","Suggestions &amp; comments"),
     ].filter(Boolean), 0)}
     ${group("settings","Settings", [item("#account","Account settings"), item("#settings-look", LOOK_SET()), isAdmin()?item("#inbox-settings","Inbox settings"):"", isAdmin()?item("#employees","Employee settings"):"", isAdmin()?item("#public","Customer portal settings", openGolive()?openGolive()+" waiting":"", openGolive()):""].filter(Boolean), isAdmin()?openGolive():0)}
