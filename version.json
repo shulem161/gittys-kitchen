@@ -1,6 +1,6 @@
 {
-  "web": "4.09",
+  "web": "4.10",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Fixed: permission tables no longer make the page wider than the phone."
+  "notes": "New inbox: Needs admin approval (moving recipes, photos, going public)."
 }

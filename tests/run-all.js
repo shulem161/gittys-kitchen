@@ -127,7 +127,9 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await B.goto(F + '#r-bobbys-challah'); await B.waitForTimeout(400); await B.setInputFiles('#ph-file', IMG); await B.waitForTimeout(1500);
     await B.click('#ph-send'); await B.waitForTimeout(700);
     ok('member photo waits', /Waiting for approval/.test(await B.locator('#ph-grid').innerText()));
-    await A.goto(F + '#review'); await A.waitForTimeout(500); await A.click('[data-pact=ok]'); await A.waitForTimeout(800);
+    await A.goto(F + '#admin-approval'); await A.waitForTimeout(500);
+    ok('a photo waits in Needs admin approval', (await A.locator('[data-pact=ok]').count()) >= 1 && /Needs admin approval/.test(await A.locator('h2').first().innerText()));
+    await A.click('[data-pact=ok]'); await A.waitForTimeout(800);
     await B.goto(F + '#c-bread'); await B.waitForTimeout(500);
     ok('approved photo shows on card', await B.locator('.rc.has-img').count() >= 1);
     await B.goto(F + '#r-challah'); await B.waitForTimeout(400);
@@ -680,8 +682,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok("employees can't move recipes; they can ask to", /Ask to move/.test(await V.locator('#mv-btn').innerText()) && (await V.locator('.cat-tools a[href^="#move-"]').count()) === 0);
     await V.click('#mv-btn'); await V.selectOption('#mv1-cat', 'Cakes'); await V.click('#mv1-go'); await V.waitForTimeout(800);
     ok('…which goes to the admins', /Asked to move to Cakes/.test(await V.locator('.rhead').innerText()) && notes.some(n => /asks to move a recipe/.test(n)) && await V.evaluate(() => RECIPES.find(x => x.id === 'r-croissants').c) === 'Bread');
-    await A.goto(F + '#review'); await A.waitForTimeout(600);
-    ok('admins see the request in Approve recipes', /Requests to move/.test(await A.locator('.admin').innerText()));
+    await A.goto(F + '#admin-approval'); await A.waitForTimeout(600);
+    ok('admins see the request in Needs admin approval', /Requests to move/.test(await A.locator('.admin').innerText()));
     await A.locator('[data-mvq][data-mvok="1"]').first().click(); await A.waitForTimeout(1200);
     ok('…and moving it moves the recipe', await V.evaluate(() => RECIPES.find(x => x.id === 'r-croissants').c) === 'Cakes');
     await A.goto(F + '#r-croissants'); await A.waitForTimeout(300); await A.click('#mv-btn'); await A.selectOption('#mv1-cat', 'Bread'); await A.click('#mv1-go'); await A.waitForTimeout(800);

@@ -1233,7 +1233,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.09";
+const WEB_VERSION = "4.10";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -3019,7 +3019,7 @@ function watchGolive(){
   unsubGolive = q.onSnapshot(s=>{ const before=GOLIVE.filter(g=>g.status==="open").map(g=>g.id).join();
     GOLIVE = s.docs.map(d=>Object.assign({id:d.id}, d.data())); renderAcct();
     const changed = before !== GOLIVE.filter(g=>g.status==="open").map(g=>g.id).join();
-    if(changed && ["#release","#approve","#review"].includes(location.hash) && !document.querySelector(".editor, textarea:focus")){ const y=window.scrollY; route(); window.scrollTo(0,y); } }, ()=>{});
+    if(changed && ["#release","#approve","#review","#admin-approval"].includes(location.hash) && !document.querySelector(".editor, textarea:focus")){ const y=window.scrollY; route(); window.scrollTo(0,y); } }, ()=>{});
 }
 const openGolive = () => may("release") ? GOLIVE.filter(g=>g.status==="open" && g.kind!=="move").length : 0;
 const openMoves = () => may("review") ? GOLIVE.filter(g=>g.status==="open" && g.kind==="move").length : 0;
@@ -3030,7 +3030,7 @@ async function requestMove(r, to, sec){
   if(viewingAs()){ toast("Preview: a real employee's request would go to the admins now"); return; }
   const ref=db.collection("golive").doc(), d={uid:me, byName:myName(), rid:r.id, title:r.t, status:"open", created:Date.now(), kind:"move", to, sec, from:r.c+(r.sec?" · "+r.sec:"")};
   await ref.set(d); GOLIVE.push(Object.assign({id:ref.id}, d)); renderAcct();
-  notifyAdmin(`${myName()} asks to move a recipe`, `Move “${r.t}” from ${d.from} to ${to}${sec?" · "+sec:""}. It's waiting in For approval.`, "#approve", "arrow_right");
+  notifyAdmin(`${myName()} asks to move a recipe`, `Move “${r.t}” from ${d.from} to ${to}${sec?" · "+sec:""}. It's waiting in Needs admin approval.`, "#admin-approval", "arrow_right");
 }
 function movesHTML(){
   const open=GOLIVE.filter(g=>g.status==="open" && g.kind==="move").sort((a,b)=>(a.created||0)-(b.created||0)); if(!open.length || !may("review")) return "";
@@ -3405,6 +3405,7 @@ function openMenu(confirming){
   ].filter(Boolean);
   const manageN = (isAdmin()?mp:0);
   const inboxes = [...INBOXES.filter(([,,p])=>may(p)).map(([st,l])=>item("#"+st, l, inboxCount(st)?inboxCount(st)+" waiting":"", inboxCount(st))),
+    isAdmin() ? item("#admin-approval","Needs admin approval", inboxCount("admin")?inboxCount("admin")+" waiting":"", inboxCount("admin")) : "",
     !offline&&may("answer") ? item("#requests","Recipe requests", openRequests()?openRequests()+" waiting":"", openRequests()) : "",
     may("inbox") ? item("#inbox","Suggestions &amp; comments", newFeedback()?newFeedback()+" new":"", newFeedback()) : "",
     may("ratings") ? item("#ratings","Likes &amp; dislikes") : ""].filter(Boolean);
@@ -3720,8 +3721,9 @@ const rvIn = st => recipesOnline ? RECIPES.filter(r=>r.rv===st) : [];
 const INBOXES = [["proof","Need to proofread","proofread"],["approve","For approval","review"],["release","Ready to release","release"]];
 const mayInboxes = () => may("proofread") || may("review") || may("release");
 const inboxCount = st => st==="proof" ? (may("proofread") ? inStage("proof").length + rvIn("proof").length : 0)
-  : st==="approve" ? (may("review") ? inStage("approve").length + rvIn("approve").length + pendingPhotos.length + openMoves() : 0)
-  : (may("release") ? inStage("release").length + rvIn("release").length + openGolive() : 0);
+  : st==="approve" ? (may("review") ? inStage("approve").length + rvIn("approve").length : 0)
+  : st==="admin" ? (isAdmin() ? pendingPhotos.length + openMoves() + openGolive() : 0)
+  : (may("release") ? inStage("release").length + rvIn("release").length : 0);
 const INBOX_NAME = {proof:"Need to proofread", approve:"For approval", release:"Ready to release"};
 // Move a cookbook recipe through the inboxes
 async function setRv(r, data, msg){
@@ -3780,7 +3782,7 @@ function wireRv(root, after){
       f.onsubmit=async e=>{ e.preventDefault(); const note=f.querySelector("textarea").value.trim(); if(!note){ toast("Write what needs to change."); return; } if(await rvActs.fix(r, note)) after(); }; return; }
     b.disabled=true; if(await rvActs[k](r)) after(); else b.disabled=false; });
 }
-const inboxTotal = () => INBOXES.reduce((n,[st])=>n+inboxCount(st), 0);
+const inboxTotal = () => INBOXES.reduce((n,[st])=>n+inboxCount(st), 0) + inboxCount("admin");
 function watchSubs(){
   if(unsubSubs || !db || !me) return;
   const q = mayInboxes() ? db.collection("submissions") : db.collection("submissions").where("uid","==",who());
@@ -3855,6 +3857,17 @@ function wireCompare(){
       c.querySelectorAll("[data-cmpv]").forEach(x=>x.setAttribute("aria-checked", x.dataset.cmpv===b.dataset.cmpv)); }); });
 }
 function reviewPage(){ recipeInbox("approve"); }
+// Needs admin approval: requests to move a recipe, photos, and requests to go public
+function adminApprovalPage(){
+  const n=inboxCount("admin");
+  app.innerHTML=`<section class="wrap admin inbox">
+    <div class="section-head" style="margin-top:28px"><h2>Needs admin approval</h2><p>${n} waiting</p></div>
+    <p class="hint" style="margin:-6px 0 12px">Everything that needs an admin's OK before it happens: moving a recipe to another category, photos people sent, and requests to go public.</p>
+    ${movesHTML()}${photoReviewHTML()}${goliveHTML()}
+    ${n?"":`<div class="panel-a"><p class="hint mempty">Nothing waiting for an admin.</p></div>`}
+  </section>`;
+  bindPhotoReview(); wireMoves(); wireGolive();
+}
 const mayFix = r => may("edit") || mayPublish();
 function recipeInbox(stage){
   const [,title]=INBOXES.find(x=>x[0]===stage), list=inStage(stage).sort((a,b)=>(a.created||0)-(b.created||0));
@@ -3868,8 +3881,7 @@ function recipeInbox(stage){
   app.innerHTML = `<section class="wrap admin inbox">
     <div class="section-head" style="margin-top:28px"><h2>${title}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}</p></div>
     ${steps}
-    ${stage==="approve"?movesHTML()+photoReviewHTML():""}
-    ${stage==="release"?goliveHTML():""}
+
     ${(()=>{ const rl=rvIn(stage).sort((a,b)=>byName(a.c,b.c)||(a.code||"").localeCompare(b.code||"",undefined,{numeric:true})); if(!rl.length) return "";
       return `<div class="panel-a rv-panel"><h3>Recipes in the cookbook <span class="count">${rl.length}</span></h3>
         <p class="hint">They stay in the cookbook as they are while they wait here. Open one to read it, then mark it here or on the recipe.</p>
@@ -3891,8 +3903,7 @@ function recipeInbox(stage){
     ${done.length?`<div class="panel-a"><h3>Recently released</h3><ul class="mlist">${done.map(s=>`<li class="mrow"><div class="mwho"><b>${esc(s.t)}</b><span>${s.releasedAs==="private"?"🔒 Team only":"🌐 Public"} · ${fmtDate(s.decided)}${s.releasedBy?" · "+esc(s.releasedBy):""}</span></div>
       <div class="macts">${s.recipeId&&RECIPES.some(r=>r.id===s.recipeId)?`<a class="btn" href="#${esc(s.recipeId)}">Open</a>`:""}</div></li>`).join("")}</ul></div>`:""}
   </section>`;
-  if(stage==="approve"){ bindPhotoReview(); wireMoves(); }
-  if(stage==="release") wireGolive();
+
   wireCompare();
   const keepY = () => { const y=window.scrollY; recipeInbox(stage); window.scrollTo(0,y); };
   wireRv(app, keepY);
@@ -3940,7 +3951,7 @@ function watchPendingPhotos(){
   unsubPendingPhotos = db.collection("photos").where("status","==","pending").onSnapshot(s=>{
     pendingPhotos = s.docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(a.created||0)-(b.created||0));
     renderAcct();
-    if(location.hash==="#review"||location.hash==="#approve") route();
+    if(["#review","#approve","#admin-approval"].includes(location.hash)) route();
   }, ()=>{});
 }
 function stopRecipePhotos(){ unsubRecipePhotos.forEach(u=>{ try{u()}catch(e){} }); unsubRecipePhotos=[]; }
@@ -4031,7 +4042,7 @@ function loadPhotos(r){
           if(may("review") && !r.cover){ await db.collection("recipes").doc(r.id).update({cover:shot.thumb, coverPhoto:id}).catch(()=>{}); r.cover=shot.thumb; r.coverPhoto=id; }
           sent++;
         }
-        if(!may("review")) notifyAdmin(`${sent>1?sent+" new photos":"New photo"} from ${myName()}`, `${sent>1?"Photos":"A photo"} of “${r.t}” ${sent>1?"are":"is"} waiting for your approval.`, "#review", "camera");
+        if(!may("review")) notifyAdmin(`${sent>1?sent+" new photos":"New photo"} from ${myName()}`, `${sent>1?"Photos":"A photo"} of “${r.t}” ${sent>1?"are":"is"} waiting for your approval.`, "#admin-approval", "camera");
         toast(may("review")?(sent>1?`${sent} photos added`:"Photo added"):`${sent>1?sent+" photos":"Photo"} sent to ${ADMIN_NAME} for approval`);
         shots=[]; pick.dataset.cap=""; drawPick();
       }catch(err){ shots=shots.slice(sent); drawPick(); toast(sent?`${sent} sent. The rest couldn't upload; check your connection and try again.`:"Couldn't upload. Check your internet connection and try again."); }
@@ -5445,7 +5456,7 @@ function inboxSettings(){
   const emps=team.filter(m=>roleOf(m)==="employee"), admins=team.filter(m=>roleOf(m)!=="employee");
   app.innerHTML=`<section class="wrap admin">
     <div class="section-head" style="margin-top:28px"><h2>Inbox settings</h2><p>Who may use each inbox</p></div>
-    <div class="panel-a"><p class="hint">Recipes go through <b>1 Need to proofread</b> → <b>2 For approval</b> → <b>3 Ready to release</b>, and the same person can never do two steps for one recipe. Whoever has an inbox also gets its notices.</p>
+    <div class="panel-a"><p class="hint">Recipes go through <b>1 Need to proofread</b> → <b>2 For approval</b> → <b>3 Ready to release</b>, and the same person can never do two steps for one recipe. Whoever has an inbox also gets its notices. <b>Needs admin approval</b> (moving a recipe, photos, going public) is for admins only.</p>
       ${emps.length?`<div class="ibs-wrap perms-wrap"><table class="ibs perms-t">
       <thead><tr><th>Inbox</th><th>All employees</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
       <tbody>${INBOX_PERMS.map(([k,l])=>`<tr><th>${esc(l)}</th><td><label class="ibs-c"><input type="checkbox" data-ea="${k}" ${empDefault(k)?"checked":""}><span class="sr">All employees: ${esc(l)}</span></label></td>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="perms-hint" hidden>Swipe inside the table to see everything: up and down, and side to side for more people.</p>`
@@ -5928,6 +5939,7 @@ function routePage(){
   if(h==="inbox" && may("inbox")){ q.value=""; inboxPage(); window.scrollTo(0,0); return; }
   if(h==="feedback" || h.startsWith("feedback-")){ q.value=""; feedbackPage(h.startsWith("feedback-")?h.slice(9):""); window.scrollTo(0,0); return; }
   if((h==="review"||h==="approve") && may("review")){ q.value=""; recipeInbox("approve"); window.scrollTo(0,0); return; }
+  if(h==="admin-approval" && isAdmin()){ q.value=""; adminApprovalPage(); window.scrollTo(0,0); return; }
   if(h==="proof" && may("proofread")){ q.value=""; recipeInbox("proof"); window.scrollTo(0,0); return; }
   if(h==="release" && may("release")){ q.value=""; recipeInbox("release"); window.scrollTo(0,0); return; }
   if(h.startsWith("review-") && mayInboxes()){ const sb=subs.find(x=>x.id===h.slice(7)&&x.status==="pending"); if(sb){ q.value=""; editor(null,null,sb); window.scrollTo(0,0); return; } }
