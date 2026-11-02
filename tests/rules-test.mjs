@@ -154,9 +154,9 @@ await check('employee can suggest a recipe', assertSucceeds(setDoc(doc(EMP, 'sub
 // Per-person employee permissions
 await check('employee can request', assertSucceeds(setDoc(doc(EMP, 'requests', 'q8'), rq('emp'))));
 const ED = as('ed'), REV = as('rev');
-await check('employee allowed to edit can edit a recipe', assertSucceeds(updateDoc(doc(ED, 'recipes', 'r-hid'), { t: 'Hidden, edited' })));
+await check("only admins edit: even an employee with the old edit permission can't", assertFails(updateDoc(doc(ED, 'recipes', 'r-hid'), { t: 'Hidden, edited' })));
 await check("…but can't show it to the public", assertFails(updateDoc(doc(ED, 'recipes', 'r-hid'), { pub: true })));
-await check('…and can add a recipe that follows its category', assertSucceeds(setDoc(doc(ED, 'recipes', 'r-new'), { t: 'New', c: 'Cakes', pub: true })));
+await check('…nor add a recipe directly', assertFails(setDoc(doc(ED, 'recipes', 'r-new'), { t: 'New', c: 'Cakes', pub: true })));
 await check("…but not one that breaks its category's setting", assertFails(setDoc(doc(ED, 'recipes', 'r-new2'), { t: 'New', c: 'Cakes', pub: false })));
 await check('an everyday permission can be switched off for one person', assertFails(setDoc(doc(ED, 'photos', 'p8'), { uid: 'ed', status: 'pending', img: 'x', thumb: 'x', recipeId: 'r-pub' })));
 await check('…while other employees keep it', assertSucceeds(setDoc(doc(EMP, 'photos', 'p7'), { uid: 'emp', status: 'pending', img: 'x', thumb: 'x', recipeId: 'r-pub' })));

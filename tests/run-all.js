@@ -114,7 +114,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('admin sees who added it', /Added by Test Member/.test(await A.locator('.byline').innerText().catch(() => '')));
 
     // Member suggests changes → admin approves
-    await B.goto(F + '#edit-r-challah'); await B.waitForTimeout(300); await B.fill('#ed-n', 'Test note'); await B.click('text=Send to be proofread'); await B.waitForTimeout(600);
+    await B.goto(F + '#edit-r-challah'); await B.waitForTimeout(300); await B.fill('#ed-n', 'Test note'); await B.click('text=Send the request'); await B.waitForTimeout(600);
     await B.goto(F + '#r-challah'); await B.waitForTimeout(300);
     ok('suggested change not live before approval', await B.locator('text=Test note').count() === 0);
     await through(A, 'Test note');
@@ -520,7 +520,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await V.goto(F + '#public'); await V.waitForTimeout(300);
     ok("employees don't get admin pages", (await V.locator('.pub-cats').count()) === 0);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(300);
-    ok('employees suggest changes, not edit', /Suggest changes/.test(await V.locator('.rhead').innerText()) && (await V.locator('#pubtog').count()) === 0);
+    ok('employees request a change, not edit', /Request a change/.test(await V.locator('.rhead').innerText()) && (await V.locator('#pubtog').count()) === 0);
     // Suggested changes: the admin sees what changed
     await V.click('.rhead a[href^="#edit-"]'); await V.waitForTimeout(400);
     const firstIng = await V.locator('.sec-items').nth(0).inputValue();
@@ -550,15 +550,16 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     const vn = await V.evaluate(() => myName()), vu0 = await V.evaluate(() => me);
     await A.goto(F + '#admin'); await A.waitForTimeout(400);
     ok('Members has no Permissions button any more', (await A.locator('[data-act=perms]').count()) === 0);
-    await perm(A, vu0, 'edit', true, 1500);
-    await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
-    ok('one employee can be allowed to edit recipes', /Edit recipe/.test(await V.locator('.rhead').innerText()) && await V.evaluate(() => may('edit') && !may('review')));
+    await A.goto(F + '#employees'); await A.waitForTimeout(400);
+    ok('only admins edit recipes: there is no edit permission to give', !/Edit directly|edit recipes directly/i.test(await A.locator('#app').innerText()) && await A.evaluate(() => !EXTRA_PERMS.some(x => x[0] === 'edit')));
+    await V.evaluate(() => { profile.perms = Object.assign({}, profile.perms, {edit: true}); });
+    ok('…even an employee marked with the old edit permission can only request a change', await V.evaluate(() => !may('edit')));
     await perm(A, vu0, 'photos', false, 1500);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
     ok('an everyday permission can be switched off for one employee', (await V.locator('.ph-add').count()) === 0);
-    await perm(A, vu0, 'photos', true, 400); await perm(A, vu0, 'edit', false, 1500);
+    await perm(A, vu0, 'photos', true, 1500);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
-    ok('taking a permission away works', /Suggest changes/.test(await V.locator('.rhead').innerText()) && (await V.locator('.ph-add').count()) > 0);
+    ok('taking a permission away works', /Request a change/.test(await V.locator('.rhead').innerText()) && (await V.locator('.ph-add').count()) > 0);
     await A.goto(F + '#inbox-settings'); await A.waitForTimeout(400);
     await A.locator('[data-ea=answer]').check(); await A.waitForTimeout(1500);
     await V.goto(F); await V.waitForTimeout(500);
@@ -707,11 +708,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // one particular employee, with their own permissions
     const vn4 = await V.evaluate(() => myName());
     await A.click('#va-back'); await A.waitForTimeout(1500);
-    await A.goto(F); await A.waitForTimeout(300); await perm(A, await V.evaluate(() => me), 'edit', true);
+    await A.goto(F); await A.waitForTimeout(300); await perm(A, await V.evaluate(() => me), 'review', true);
     await A.goto(F + '#viewas'); await A.waitForTimeout(400); await A.fill('#va-q', vn4.slice(0, 6)); await A.waitForTimeout(100); await A.locator('.va-person', {hasText: vn4}).click(); await A.waitForTimeout(1500);
-    ok('the owner can log in as one particular employee, with their own permissions', new RegExp(vn4).test(await A.locator('#viewas-bar').innerText().catch(() => '')) && await A.evaluate(() => may('edit') && myRole() === 'employee'));
+    ok('the owner can log in as one particular employee, with their own permissions', new RegExp(vn4).test(await A.locator('#viewas-bar').innerText().catch(() => '')) && await A.evaluate(() => may('review') && !may('edit') && myRole() === 'employee'));
     await A.click('#va-back'); await A.waitForTimeout(1500);
-    await A.goto(F); await A.waitForTimeout(300); await perm(A, await V.evaluate(() => me), 'edit', false);
+    await A.goto(F); await A.waitForTimeout(300); await perm(A, await V.evaluate(() => me), 'review', false);
     ok('Back to my view brings everything back', (await A.locator('#viewas-bar').count()) === 0 && await A.evaluate(() => isOwner() && isAdmin()));
 
     // Team messages about a recipe
@@ -748,6 +749,26 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await V.goto(F + '#r-croissants'); await V.waitForTimeout(500); await V.click('a[href="#compare~r-croissants~"]'); await V.waitForTimeout(400);
     await V.fill('#cp-b', 'challah'); await V.waitForTimeout(200); await V.locator('#cp-b-s [data-cp]').first().click(); await V.waitForTimeout(600);
     ok('the team can compare two recipes side by side or marked', /Compare recipes/.test(await V.locator('h2').first().innerText()) && (await V.locator('.cmp-one .cmp-l.del').count()) > 0 && (await V.locator('.cmp-one .cmp-l.add').count()) > 0);
+    await V.click('a[href="#merge~r-croissants~r-challah"]'); await V.waitForTimeout(500);
+    const nBox = await V.locator('[data-mg]').count(), n1 = await V.locator('[data-mg]:checked').count();
+    ok('merging shows every line with a tick, marked 1, 2 or Both', /Merge two recipes/.test(await V.locator('h2').first().innerText()) && nBox > 4 && (await V.locator('.mg-row.del').count()) > 0 && (await V.locator('.mg-row.add').count()) > 0);
+    { const vs = V.viewportSize(); await V.setViewportSize({width: 390, height: 1400}); await V.waitForTimeout(200);
+      if(process.env.SHOT) await V.screenshot({path: process.env.SHOT});
+      ok('the merge page fits a phone screen', await V.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)); await V.setViewportSize(vs); }
+    await V.click('[data-mgall=del]'); const only1 = await V.locator('[data-mg]:checked').count();
+    await V.click('[data-mgall=all]'); const all = await V.locator('[data-mg]:checked').count();
+    ok('…with quick ticks for everything from 1, from 2, or everything', only1 < all && all === nBox && n1 <= nBox);
+    const pickTxt = (await V.locator('.mg-row.add span:last-child').last().innerText()).trim();
+    await V.click('[data-mgall=del]'); await V.locator('.mg-row.add input').last().check(); await V.locator('.mg-row.del input').first().uncheck();
+    const dropTxt = (await V.locator('.mg-row.del span:last-child').first().innerText()).trim();
+    await V.click('#mg-go'); await V.waitForTimeout(500);
+    const mg = await V.locator('.sec-items').evaluateAll(els => els.map(e => e.value).join('\n'));
+    const plain = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    ok('two recipes can be merged, keeping just the lines you ticked from each', /Merged with/.test(await V.locator('#ed-n').inputValue()) && plain(mg).includes(plain(pickTxt).slice(0, 12)) && !plain(mg).includes(plain(dropTxt)) && /Send the request/.test(await V.locator('#edform .primary').innerText()));
+    await V.click('#edform .primary'); await V.waitForTimeout(800);
+    await A.goto(F + '#proof'); await A.waitForTimeout(600);
+    ok('…as a change to the first recipe', (await A.locator('.sub-card', {hasText: 'Merged with'}).count()) === 1);
+    await A.locator('.sub-card', {hasText: 'Merged with'}).locator('[data-ib="ask-reject"]').click(); await A.locator('[data-ib="reject"]').click(); await A.waitForTimeout(500);
     await PU.goto(F + '#compare~r-croissants~r-challah'); await PU.waitForTimeout(400);
     ok("…customers can't", (await PU.locator('.cmp').count()) === 0);
     await V.goto(F + '#team'); await V.waitForTimeout(500); await V.locator('.tm-row', {hasText: '375°F'}).click(); await V.waitForTimeout(600);
@@ -871,7 +892,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.setViewportSize({width: 1100, height: 900});
     await A.goto(F + '#employees'); await A.waitForTimeout(500);
     ok('Employee settings looks like Inbox settings, with an All employees column', /All employees/.test(await A.locator('.perms-t thead').innerText()) && (await A.locator('.perms-t [data-ea=suggest]').count()) === 1 && (await A.locator('.pub-allow').count()) === 0);
-    ok('Employee settings has a table of every employee and every permission', (await A.locator('.perms-t tbody tr:not(.perm-grp)').count()) >= 7 && (await A.locator(`.perms-t [data-ibs=viewas][data-ibu="${vuid}"]`).count()) === 1 && (await A.locator('.perms-t [data-ibs=ratings]').count()) === 0);
+    ok('Employee settings has a table of every employee and every permission', (await A.locator('.perms-t tbody tr:not(.perm-grp)').count()) >= 6 && (await A.locator(`.perms-t [data-ibs=viewas][data-ibu="${vuid}"]`).count()) === 1 && (await A.locator('.perms-t [data-ibs=ratings]').count()) === 0);
     await A.locator(`.perms-t [data-ibs=viewas][data-ibu="${vuid}"]`).check(); await A.waitForTimeout(800);
     ok('…ticking one gives just that person the permission', await V.evaluate(() => canViewAs()) && await A.evaluate(u => !!document.querySelector(`.perms-t [data-ibs=viewas][data-ibu="${u}"]`).closest('td').querySelector('.perm-dot'), vuid));
     await A.locator(`.perms-t [data-ibs=viewas][data-ibu="${vuid}"]`).uncheck(); await A.waitForTimeout(600);

@@ -1,6 +1,6 @@
 {
-  "web": "4.11",
+  "web": "4.13",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Employee settings look like Inbox settings; mark messages read/unread; compare two recipes."
+  "notes": "Merge two recipes choosing what to keep from each. Only admins edit recipes; everyone else requests a change."
 }

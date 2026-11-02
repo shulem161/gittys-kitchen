@@ -50,12 +50,12 @@ service cloud.firestore {
       return isAdmin()
         || (approvedMember() && me.get('role', 'public') == 'employee' && me.get('perms', {}).get(k, empAllow(k, false)) == true);
     }
-    // Who may write recipes: admins, and employees allowed to edit or to approve.
+    // Who may write recipes: admins, and employees allowed to approve (only admins edit; everyone else requests a change).
     // Those employees can't change whether the public sees a recipe; new recipes follow their category.
     function publishOk() {
       let p = /databases/$(database)/documents/meta/public;
       return isAdmin()
-        || ((extra('edit') || extra('review'))
+        || (extra('review')
             && (resource == null
                 ? request.resource.data.get('pub', true) == (!exists(p) || get(p).data.get('cats', {}).get(request.resource.data.c, true) != false)
                 : request.resource.data.get('pub', null) == resource.data.get('pub', null)));
@@ -147,7 +147,7 @@ service cloud.firestore {
     }
     match /meta/codes {
       allow get: if signedIn();
-      allow write: if isAdmin() || extra('edit') || extra('review');
+      allow write: if isAdmin() || extra('review');
     }
 
     // Who the owner is and the name shown for them. Only the owner can change it, and only to themselves.

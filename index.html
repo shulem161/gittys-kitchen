@@ -597,9 +597,15 @@ body.guiding{overflow:hidden}
 .ai-box{display:grid;gap:10px;margin:14px 0 6px;padding:14px;border-radius:14px;border:1px dashed var(--accent);background:var(--accent-soft)}
 .ai-box b{display:block;font-size:16px}.ai-box span{display:block;font-size:14px;color:var(--muted);margin-top:2px}.ai-box .hint:empty{display:none}
 .cmp{margin-top:10px}
+.cmp-merge{display:grid;gap:8px;border:1px dashed var(--accent);background:var(--accent-soft)}.mg-list{display:grid;gap:4px}.mg-row{display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border-radius:8px;cursor:pointer}.mg-row input{margin-top:3px;flex:none}
+.mg-row:has(input:not(:checked)) span:last-child{text-decoration:line-through;opacity:.55}.mg-row.del{background:rgba(200,60,60,.07)}.mg-row.add{background:rgba(40,150,80,.08)}
+.mg-both{font-size:11px;padding:1px 6px;border-radius:9px;background:var(--line);color:var(--muted);flex:none;margin-top:2px}.mg-row .cmp-tag{flex:none}
+.mg-pick{border:1px dashed var(--accent);border-radius:10px;padding:6px;display:grid;gap:4px}.mg-pick p{margin:0 4px;font-size:13px;color:var(--accent);font-weight:600}
+.mg-base{display:grid;gap:6px;margin-top:8px}.mg-quick{align-items:center;margin-bottom:10px}.mg-quick span{font-size:14px;color:var(--muted)}
+.cmp-merge span{font-size:14px;color:var(--muted)}
 .cmp-pickers{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media (max-width:640px){.cmp-pickers{grid-template-columns:1fr}}
 .cmp-names{display:flex;flex-wrap:wrap;gap:8px 16px;margin-bottom:6px;font-weight:600}
-.cmp-tag{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font-size:12px}
+.cmp-tag{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font-size:12px}.cmp-tag.del{background:rgba(200,60,60,.18)}.cmp-tag.add{background:rgba(40,150,80,.2)}
 .cmp-sum{font-size:14.5px;margin:0 0 10px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline}
 .cmp-key{margin-left:auto;display:inline-flex;gap:6px;font-size:12.5px}.cmp-key span{padding:1px 8px;border-radius:6px}
 .cmp .del{background:#FBE3E1;color:#8A2A20}.cmp .add{background:#DDF3E3;color:#1E6B37}
@@ -1216,13 +1222,13 @@ const PUB_ALLOW = [["suggest","Suggest changes and send new recipes"],["photos",
 let PUB = {allow:{}, cats:{}};
 // Employees: each person has their own permissions (users/{uid}.perms). The everyday ones are on unless switched off;
 // the extras are off unless granted. Public members all share the Customer portal settings. Admins can do everything.
-const EXTRA_PERMS = [["edit","Add and edit recipes directly, without approval"],["proofread","Proofread recipes (the Need to proofread inbox)"],["review","Approve recipes and photos (the For approval inbox)"],["release","Release approved recipes, to the public or for the team only (the Ready to release inbox)"],["answer","Recipe requests: see them, answer them, and get a notice for new ones"],["inbox","Read and answer suggestions & comments"],["viewas","Log in as a customer, to see exactly what they see"],["ratings","Likes and dislikes: see them, and get a notice for each one"]];
+const EXTRA_PERMS = [["proofread","Proofread recipes (the Need to proofread inbox)"],["review","Approve recipes and photos (the For approval inbox)"],["release","Release approved recipes, to the public or for the team only (the Ready to release inbox)"],["answer","Recipe requests: see them, answer them, and get a notice for new ones"],["inbox","Read and answer suggestions & comments"],["viewas","Log in as a customer, to see exactly what they see"],["ratings","Likes and dislikes: see them, and get a notice for each one"]];
 const isExtra = k => EXTRA_PERMS.some(x=>x[0]===k);
 // Employee settings (meta/employees) apply to every employee; a person's own Permissions override them.
 let EMP = {allow:{}};
 const empDefault = k => EMP.allow[k]!==undefined ? EMP.allow[k]===true : !isExtra(k);
 const permOf = (m,k) => { const p=(m&&m.perms)||{}; return p[k]!==undefined ? p[k]===true : empDefault(k); };
-const may = k => { if(isAdmin()) return true; if(!profile) return false;
+const may = k => { if(isAdmin()) return true; if(!profile || k==="edit") return false;   // only admins edit recipes
   if(isPublic()) return !isExtra(k) && PUB.allow[k]!==false;
   return viewingAs()==="employee" ? (VIEW_WHO ? permOf({perms:VIEW_WHO.perms||{}}, k) : empDefault(k)) : permOf(profile, k); };
 const can = may;
@@ -1238,7 +1244,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.11";
+const WEB_VERSION = "4.13";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1868,7 +1874,7 @@ function recipe(r){
       <div class="scale" role="group" aria-label="How much to make"><span>Make</span>${(SCALES.includes(sx)?SCALES:[...SCALES,sx].sort((a,b)=>a-b)).map(x=>`<button type="button" class="btn sm${x===sx?" on":""}" data-sx="${x}" aria-pressed="${x===sx}">${x===1?"1×":fmtNum(x)+"×"}</button>`).join("")}<a class="link" href="#convert-${r.id}">Calculator</a></div>
       ${sx!==1?`<p class="hint scale-note">Amounts are for ${fmtNum(sx)}× the recipe. Pan size and baking time may need adjusting.</p>`:""}
       <div class="tools">
-        ${recipesOnline&&!offline&&(can("suggest")||may("edit"))?`<a class="btn solid" href="#edit-${r.id}">${may("edit")?"Edit recipe":"Suggest changes"}</a>`:""}
+        ${recipesOnline&&!offline&&(can("suggest")||may("edit"))?`<a class="btn solid" href="#edit-${r.id}">${may("edit")?"Edit recipe":"Request a change"}</a>`:""}
         ${isTeam()&&!offline&&!r.rv?`<button class="btn" id="proof-btn" type="button">✓ Ask someone to proofread</button>`:""}
         ${isTeam()?`<a class="btn" href="#compare~${esc(r.id)}~">⇄ Compare with another recipe</a>`:""}
         ${isTeam()&&!offline?`<button class="btn" id="askteam-btn" type="button">${TOOL_IC.ask.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Ask the team about this</button>`:""}
@@ -3568,7 +3574,7 @@ function editor(r, cat, sub, draft){
     app.innerHTML = `<section class="wrap editor">
       <a class="back" href="${sub?"#"+stageOf(sub):r?"#"+r.id:"#"+(catNow&&CATS.includes(catNow)?slug(catNow):"")}">← Cancel</a>
       <form class="panel-a ed" id="edform" novalidate>
-        <h2>${sub?(sub.editOf?"Review changes":"Review recipe"):!isNew?(suggest?"Suggest changes":"Edit recipe"):"Add a recipe"}</h2>
+        <h2>${sub?(sub.editOf?"Review changes":"Review recipe"):!isNew?(suggest?"Request a change":"Edit recipe"):"Add a recipe"}</h2>
         ${sub?`<p class="sub">${sub.editOf?`Changes to “${esc(target?target.t:sub.t)}”`:"New recipe"} sent by ${esc(sub.byName||"a member")} on ${fmtDate(sub.created)}. Fix anything you like, then approve it.</p>`:suggest?`<p class="sub">${esc(ADMIN_NAME)} will look it over before it appears for everyone.</p>`:""}
         <div class="field"><label for="ed-t">Recipe name</label><input id="ed-t" type="text" maxlength="80" value="${esc(src?src.t:(rqDraft&&rqDraft.t)||"")}" placeholder="e.g. Potato Kugel"></div>
         <div class="row2">
@@ -3610,7 +3616,7 @@ function editor(r, cat, sub, draft){
           <div class="row"><button type="button" class="btn solid" id="ed-ai">Make it better</button>${edAiUndo?`<button type="button" class="btn" id="ed-ai-undo">Undo</button>`:""}</div><p class="hint" id="ed-ai-msg" role="status"></p></div>`}
         <p class="err" id="ed-err" role="alert" hidden></p>
         <div class="ed-actions">
-          <button class="primary" type="submit">${sub?"Save changes":suggest?"Send to be proofread":isNew?"Add recipe":"Save changes"}</button>
+          <button class="primary" type="submit">${sub?"Save changes":suggest?(editOf?"Send the request":"Send to be proofread"):isNew?"Add recipe":"Save changes"}</button>
           ${isNew||suggest?"":`<button type="button" class="btn danger-btn" id="ed-del">Delete recipe</button>`}
         </div>
         <div id="ed-confirm"></div>
@@ -3695,7 +3701,7 @@ function editor(r, cat, sub, draft){
         try{
           await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves||"",sec:d.sec,s:d.s, uid:me, byName:myName(), status:"pending", stage:"proof", created:Date.now(), editOf, ...(rqDraft&&rqDraft.id?{rq:rqDraft.id}:{})});
           if(draft && draft.fromSub) db.collection("submissions").doc(draft.fromSub).delete().catch(()=>{});
-          notifyWatchers("watch-proof", editOf ? `${myName()} suggested changes` : `New recipe from ${myName()}`, `“${editOf&&target?target.t:t}” needs to be proofread.`, "#proof", editOf?"pencil2":"cookie");
+          notifyWatchers("watch-proof", editOf ? `${myName()} requested a change` : `New recipe from ${myName()}`, `“${editOf&&target?target.t:t}” needs to be proofread.`, "#proof", editOf?"pencil2":"cookie");
           toast("Sent. It will be proofread, approved and released."); location.hash = may("proofread") ? "proof" : "mine";
         }catch(e){ btn0.disabled=false; btn0.textContent="Send for approval"; fail("Couldn't send. Check your internet connection and try again."); }
         return;
@@ -3840,7 +3846,7 @@ function diffLines(a, b){
 }
 function recipeLines(parts){   // parts: [[isIng, heading, items]]
   const out=[];
-  parts.forEach(([ing,h,items])=>{ out.push({k:"h", t:(h?h+" · ":"")+(ing?"Ingredients":"Method")}); (items||[]).forEach(x=>out.push({k:ing?"i":"s", t:spellUnits(unbracket(x))})); });
+  parts.forEach(([ing,h,items])=>{ out.push({k:"h", t:(h?h+" · ":"")+(ing?"Ingredients":"Method"), ing:!!ing, h:h||""}); (items||[]).forEach(x=>out.push({k:ing?"i":"s", t:spellUnits(unbracket(x)), ing:!!ing, h:h||"", raw:x})); });
   return out;
 }
 function compareHTML(r, sub, L){
@@ -3863,6 +3869,51 @@ function compareHTML(r, sub, L){
   </div>`;
 }
 const cmpView = () => store("gk-cmpview") || "one";
+// Merge two recipes, choosing line by line what to keep: #merge~<id>~<id>
+function mergePage(ida, idb){
+  const A=RECIPES.find(r=>r.id===ida), B=RECIPES.find(r=>r.id===idb);
+  const nm = r => r ? r.t.replace(/^Untitled: /,"") : "";
+  if(!A||!B){ location.hash="compare~"+(ida||"")+"~"+(idb||""); return; }
+  const {one}=diffLines(recipeLines(A.s||[]), recipeLines(B.s||[]));
+  // Lines that differ next to each other are two versions of the same thing: keep recipe 1's unless you choose otherwise
+  const rows=one.map(([x,c])=>({x, c, on:true, grp:-1})); let g=0;
+  for(let i=0;i<rows.length;){ if(!rows[i].c||rows[i].x.k==="h"){ i++; continue; }
+    let j=i; while(j<rows.length && rows[j].c && rows[j].x.k!=="h") j++;
+    const run=rows.slice(i,j); if(run.some(r=>r.c==="del") && run.some(r=>r.c==="add")){ run.forEach(r=>{ r.grp=g; if(r.c==="add") r.on=false; }); g++; }
+    i=j; }
+  const tag = c => c==="del"?`<span class="cmp-tag del">1</span>`:c==="add"?`<span class="cmp-tag add">2</span>`:`<span class="mg-both">Both</span>`;
+  let html="", open=-1;
+  rows.forEach((r,i)=>{
+    if(r.grp!==open){ if(open>=0) html+=`</div>`; if(r.grp>=0) html+=`<div class="mg-pick"><p>Different in each recipe — tick what to keep</p>`; open=r.grp; }
+    html += r.x.k==="h" ? `<div class="cmp-h">${esc(r.x.t)}</div>`
+      : `<label class="mg-row${r.c?" "+r.c:""}"><input type="checkbox" data-mg="${i}"${r.on?" checked":""}>${tag(r.c)}<span>${esc(r.x.t)}</span></label>`;
+  });
+  if(open>=0) html+=`</div>`;
+  app.innerHTML=`<section class="wrap admin">
+    <div class="section-head" style="margin-top:28px"><h2>Merge two recipes</h2><p>Choose what to keep from each one</p></div>
+    <div class="panel-a"><div class="cmp-names"><a class="link" href="#${esc(A.id)}"><span class="cmp-tag del">1</span> ${esc(nm(A))}</a><a class="link" href="#${esc(B.id)}"><span class="cmp-tag add">2</span> ${esc(nm(B))}</a></div>
+      <p class="hint" style="margin:10px 0 0">Untick what you don't want. Lines both recipes share are shown once. Where the two say something different, recipe 1's is ticked — tick recipe 2's instead if it's better, or both.</p></div>
+    <div class="panel-a"><b>Name, category and details from</b>
+      <div class="mg-base" role="radiogroup"><label><input type="radio" name="mg-base" value="a" checked> <span class="cmp-tag del">1</span> ${esc(nm(A))}</label><label><input type="radio" name="mg-base" value="b"> <span class="cmp-tag add">2</span> ${esc(nm(B))}</label></div>
+      <p class="hint" style="margin:6px 0 0">The merged recipe is sent as a change to that recipe; the other one stays as it is.</p></div>
+    <div class="panel-a"><div class="row mg-quick"><span>Tick:</span><button type="button" class="btn sm" data-mgall="del">Everything from 1</button><button type="button" class="btn sm" data-mgall="add">Everything from 2</button><button type="button" class="btn sm" data-mgall="all">Everything</button></div>
+      <div class="mg-list">${html}</div></div>
+    <div class="row" style="margin:14px 0 30px"><button type="button" class="btn solid" id="mg-go">Continue — check the merged recipe</button><a class="btn" href="#compare~${esc(A.id)}~${esc(B.id)}">Back to compare</a><span class="hint" id="mg-n"></span></div>
+  </section>`;
+  const boxes=[...app.querySelectorAll("[data-mg]")];
+  const count=()=>{ document.getElementById("mg-n").textContent = boxes.filter(b=>b.checked).length+" of "+boxes.length+" lines ticked"; };
+  boxes.forEach(b=>b.onchange=count); count();
+  app.querySelectorAll("[data-mgall]").forEach(b=>b.onclick=()=>{ boxes.forEach(x=>{ const c=rows[+x.dataset.mg].c; x.checked = b.dataset.mgall==="all" || !c || c===b.dataset.mgall; }); count(); });
+  document.getElementById("mg-go").onclick=()=>{
+    const parts=[], find=(ing,h)=>parts.find(p=>p[0]===ing && p[1].toLowerCase()===h.toLowerCase());
+    boxes.filter(b=>b.checked).forEach(b=>{ const {x}=rows[+b.dataset.mg]; let p=find(x.ing, x.h); if(!p){ p=[x.ing, x.h, []]; parts.push(p); } p[2].push(x.raw); });
+    if(!parts.length){ toast("Tick at least one line."); return; }
+    const useB = app.querySelector('[name=mg-base]:checked').value==="b", base=useB?B:A, other=useB?A:B;
+    const otherName = nm(other)+(codeOf(other)?" ("+codeOf(other)+")":"");
+    editor(null, base.c, null, Object.assign({}, base, {s:parts, editOf:base.id, n:[base.n, `Merged with ${otherName}.`].filter(Boolean).join(" "), serves:base.serves||other.serves||"", time:base.time||other.time||""}));
+    window.scrollTo(0,0);
+  };
+}
 // Compare any two recipes (employees and admins): #compare~<id>~<id>
 function comparePage(ida, idb){
   const A=RECIPES.find(r=>r.id===ida), B=RECIPES.find(r=>r.id===idb);
@@ -3871,7 +3922,9 @@ function comparePage(ida, idb){
   app.innerHTML=`<section class="wrap admin">
     <div class="section-head" style="margin-top:28px"><h2>Compare recipes</h2><p>Side by side, or one list with the differences marked</p></div>
     <div class="panel-a cmp-pickers">${picker("a",A)}${picker("b",B)}</div>
-    ${A&&B?`<div class="panel-a"><div class="cmp-names"><a class="link" href="#${esc(A.id)}"><span class="cmp-tag del">1</span> ${esc(nm(A))}</a><a class="link" href="#${esc(B.id)}"><span class="cmp-tag add">2</span> ${esc(nm(B))}</a></div>
+    ${A&&B?`<div class="panel-a cmp-merge"><b>Merge them into one recipe</b><span>Pick, line by line, which ingredients and steps to keep from each recipe. The result goes through the three steps like any change.</span>
+      <div class="row"><a class="btn solid" href="#merge~${esc(A.id)}~${esc(B.id)}">⇄ Merge — choose what to keep</a></div></div>
+      <div class="panel-a"><div class="cmp-names"><a class="link" href="#${esc(A.id)}"><span class="cmp-tag del">1</span> ${esc(nm(A))}</a><a class="link" href="#${esc(B.id)}"><span class="cmp-tag add">2</span> ${esc(nm(B))}</a></div>
       ${compareHTML(A, Object.assign({id:B.id}, toDoc(B)), {a:"1. "+nm(A), b:"2. "+nm(B), del:"only in 1", add:"only in 2", what:"Differences", one:"One list, differences marked"})}</div>`
       :`<div class="panel-a"><p class="hint">Choose two recipes to compare.</p></div>`}
   </section>`;
@@ -5970,6 +6023,7 @@ function routePage(){
   if(h==="inbox" && may("inbox")){ q.value=""; inboxPage(); window.scrollTo(0,0); return; }
   if(h==="feedback" || h.startsWith("feedback-")){ q.value=""; feedbackPage(h.startsWith("feedback-")?h.slice(9):""); window.scrollTo(0,0); return; }
   if((h==="review"||h==="approve") && may("review")){ q.value=""; recipeInbox("approve"); window.scrollTo(0,0); return; }
+  if(h.startsWith("merge~") && isTeam()){ const [,a,b2]=h.split("~"); q.value=""; mergePage(a||"", b2||""); window.scrollTo(0,0); return; }
   if(h.startsWith("compare~") && isTeam()){ const [,a,b2]=h.split("~"); q.value=""; comparePage(a||"", b2||""); window.scrollTo(0,0); return; }
   if(h==="admin-approval" && isAdmin()){ q.value=""; adminApprovalPage(); window.scrollTo(0,0); return; }
   if(h==="proof" && may("proofread")){ q.value=""; recipeInbox("proof"); window.scrollTo(0,0); return; }
