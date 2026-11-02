@@ -50,12 +50,12 @@ service cloud.firestore {
       return isAdmin()
         || (approvedMember() && me.get('role', 'public') == 'employee' && me.get('perms', {}).get(k, empAllow(k, false)) == true);
     }
-    // Who may write recipes: admins, and employees allowed to edit or to approve.
+    // Who may write recipes: admins, and employees allowed to approve (only admins edit; everyone else requests a change).
     // Those employees can't change whether the public sees a recipe; new recipes follow their category.
     function publishOk() {
       let p = /databases/$(database)/documents/meta/public;
       return isAdmin()
-        || ((extra('edit') || extra('review'))
+        || (extra('review')
             && (resource == null
                 ? request.resource.data.get('pub', true) == (!exists(p) || get(p).data.get('cats', {}).get(request.resource.data.c, true) != false)
                 : request.resource.data.get('pub', null) == resource.data.get('pub', null)));
@@ -147,7 +147,7 @@ service cloud.firestore {
     }
     match /meta/codes {
       allow get: if signedIn();
-      allow write: if isAdmin() || extra('edit') || extra('review');
+      allow write: if isAdmin() || extra('review');
     }
 
     // Who the owner is and the name shown for them. Only the owner can change it, and only to themselves.
@@ -330,7 +330,7 @@ service cloud.firestore {
         && request.resource.data.msgs[0].by == request.auth.uid
         && request.resource.data.msgs[0].text is string && request.resource.data.msgs[0].text.size() <= 1500;
       allow update: if isTeam() && request.auth.uid in resource.data.members
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['msgs', 'updated', 'lastBy', 'readAt', 'done', 'checks'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['msgs', 'updated', 'lastBy', 'readAt', 'done', 'checks', 'unreadFor'])
         // proofreading: each person marks only their own check
         && (!('checks' in request.resource.data) || request.resource.data.checks.diff(resource.data.get('checks', {})).affectedKeys().hasOnly([request.auth.uid]))
         && request.resource.data.msgs is list && request.resource.data.msgs.size() <= 200
@@ -409,7 +409,7 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/names/$(request.resource.data.name.lower())).data.uid == request.auth.uid)
         // an admin gives an approved member their number (once)
         || (isAdmin() && !('no' in resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['no'])
-            && request.resource.data.no is int && request.resource.data.no > 1000));
+            && request.resource.data.no is int && request.resource.data.no > 0));
       allow delete: if (isAdmin() && canManage(uid)) || (signedIn() && request.auth.uid == uid)
         || (signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.from == uid);
     }
