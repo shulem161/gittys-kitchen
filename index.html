@@ -548,6 +548,8 @@ body.viewing-as .bar{top:calc(env(safe-area-inset-top,0px) + 42px)}
 .menu a.m-team{font-weight:600}
 .tm-list2{display:grid}
 .tm-row{display:grid;gap:2px;padding:10px 4px;border-bottom:1px solid var(--line);text-decoration:none;color:var(--ink)}
+.tm-rowwrap{position:relative;border-bottom:1px solid var(--line)}.tm-rowwrap .tm-row{border-bottom:0;padding-bottom:2px}
+.tm-mark{font-size:12.5px;margin:0 4px 8px;display:inline-block}
 .tm-row.unread b::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#C2581A;margin-right:6px;vertical-align:1px}
 .tm-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .tm-sub{font-size:13.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -595,6 +597,9 @@ body.guiding{overflow:hidden}
 .ai-box{display:grid;gap:10px;margin:14px 0 6px;padding:14px;border-radius:14px;border:1px dashed var(--accent);background:var(--accent-soft)}
 .ai-box b{display:block;font-size:16px}.ai-box span{display:block;font-size:14px;color:var(--muted);margin-top:2px}.ai-box .hint:empty{display:none}
 .cmp{margin-top:10px}
+.cmp-pickers{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media (max-width:640px){.cmp-pickers{grid-template-columns:1fr}}
+.cmp-names{display:flex;flex-wrap:wrap;gap:8px 16px;margin-bottom:6px;font-weight:600}
+.cmp-tag{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font-size:12px}
 .cmp-sum{font-size:14.5px;margin:0 0 10px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline}
 .cmp-key{margin-left:auto;display:inline-flex;gap:6px;font-size:12.5px}.cmp-key span{padding:1px 8px;border-radius:6px}
 .cmp .del{background:#FBE3E1;color:#8A2A20}.cmp .add{background:#DDF3E3;color:#1E6B37}
@@ -1233,7 +1238,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.10";
+const WEB_VERSION = "4.11";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1865,6 +1870,7 @@ function recipe(r){
       <div class="tools">
         ${recipesOnline&&!offline&&(can("suggest")||may("edit"))?`<a class="btn solid" href="#edit-${r.id}">${may("edit")?"Edit recipe":"Suggest changes"}</a>`:""}
         ${isTeam()&&!offline&&!r.rv?`<button class="btn" id="proof-btn" type="button">✓ Ask someone to proofread</button>`:""}
+        ${isTeam()?`<a class="btn" href="#compare~${esc(r.id)}~">⇄ Compare with another recipe</a>`:""}
         ${isTeam()&&!offline?`<button class="btn" id="askteam-btn" type="button">${TOOL_IC.ask.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Ask the team about this</button>`:""}
         ${isAdmin()&&recipesOnline&&!offline?`<button class="btn" id="mv-btn" type="button">Move to another category</button>`:""}
         ${myRole()==="employee"&&recipesOnline&&!offline?(myMoveAsk(r.id)?`<span class="btn pub-state" aria-disabled="true">Asked to move to ${esc(myMoveAsk(r.id).to)} ✓</span>`:`<button class="btn" id="mv-btn" type="button">Ask to move to another category</button>`):""}
@@ -2207,30 +2213,25 @@ function wirePermTable(redraw){
 }
 function employeesPage(){
   const emps = members.filter(m=>m.status==="approved" && roleOf(m)==="employee").sort((a,b)=>byName(a.name,b.name)), own = emps.filter(m=>Object.keys(m.perms||{}).length);
-  const row = ([k,l]) => `<label class="pub-row"><input type="checkbox" data-ea="${k}" ${empDefault(k)?"checked":""}><span>${esc(l)}</span></label>`;
-  app.innerHTML = `<section class="wrap admin tools-page">
-    <div class="section-head" style="margin-top:28px"><h2>Employee settings</h2><p>${emps.length} ${emps.length===1?"employee":"employees"} · <a class="link" href="#admin">Members</a></p></div>
-    <div class="panel-a"><h3>What every employee may do</h3>
-      <p class="hint">These apply to all employees. To change something for one person only, use Permissions next to their name in Members.</p>
-      <div class="perm-h">Everyday</div><div class="pub-allow">${PUB_ALLOW.map(row).join("")}</div>
-      <div class="perm-h">Extra</div><div class="pub-allow">${EXTRA_PERMS.filter(([k])=>!isInboxPerm(k)).map(row).join("")}</div>
-      <p class="hint" style="margin-top:8px">Who may use each inbox is in <a class="link" href="#inbox-settings">Inbox settings</a>.</p>
-    </div>
-    ${emps.length?`<div class="panel-a"><h3>Each employee</h3>
-      <p class="hint">Tick or untick for one person. A <span class="perm-dot">●</span> means it's set for that person and differs from the list above.</p>
-      <div class="ibs-wrap perms-wrap"><table class="ibs perms-t"><thead><tr><th>Permission</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
-      <tbody>${[["Everyday",PUB_ALLOW],["Extra",EXTRA_PERMS.filter(([k])=>!isInboxPerm(k))]].map(([g,L])=>`<tr class="perm-grp"><th>${g}</th>${emps.map(()=>"<td></td>").join("")}</tr>`+L.map(([k,l])=>`<tr><th>${PERM_SHORT[k]||esc(l)}</th>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")).join("")}
-      <tr class="perm-reset"><th>Back to the list above</th>${emps.map(m=>`<td>${Object.keys(m.perms||{}).length?`<button type="button" class="link" data-preset="${esc(m.uid)}" title="Use Employee settings for everything">Reset</button>`:""}</td>`).join("")}</tr></tbody></table></div>
+  const perms=[["Everyday",PUB_ALLOW],["Extra",EXTRA_PERMS.filter(([k])=>!isInboxPerm(k))]];
+  app.innerHTML = `<section class="wrap admin">
+    <div class="section-head" style="margin-top:28px"><h2>Employee settings</h2><p>What employees may do</p></div>
+    <div class="panel-a"><p class="hint">Tick what each employee may do. <b>All employees</b> is the starting point for everyone; a <span class="perm-dot">●</span> marks a person's own setting. Who may use each inbox is in <a class="link" href="#inbox-settings">Inbox settings</a>.</p>
+      <div class="ibs-wrap perms-wrap"><table class="ibs perms-t"><thead><tr><th>Permission</th><th>All employees</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
+      <tbody>${perms.map(([g,L])=>`<tr class="perm-grp"><th>${g}</th><td></td>${emps.map(()=>"<td></td>").join("")}</tr>`+L.map(([k,l])=>`<tr><th>${PERM_SHORT[k]||esc(l)}</th>
+        <td><label class="ibs-c"><input type="checkbox" data-ea="${k}" ${empDefault(k)?"checked":""}><span class="sr">All employees: ${esc(l)}</span></label></td>
+        ${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")).join("")}
+      ${own.length?`<tr class="perm-reset"><th>Back to All employees</th><td></td>${emps.map(m=>`<td>${Object.keys(m.perms||{}).length?`<button type="button" class="link" data-preset="${esc(m.uid)}">Reset</button>`:""}</td>`).join("")}</tr>`:""}</tbody></table></div>
       <p class="perms-hint" hidden>Swipe inside the table to see everything: up and down, and side to side for more people.</p>
-      ${own.length?`<p class="hint" style="margin-top:8px">${own.length} ${own.length===1?"employee has":"employees have"} their own settings. “Reset” at the bottom puts that person back on the list above.</p>`:""}</div>`:""}
+      ${emps.length?"":`<p class="hint" style="margin-top:8px">No employees yet. To make someone an employee, use <a class="link" href="#admin">Members</a>.</p>`}</div>
   </section>`;
-  // the names stay at the top of the screen, just under the search bar
   fitPermBox();
-  wirePermTable(()=>{ const y=window.scrollY, w=app.querySelector(".perms-wrap"), wy=w?w.scrollTop:0, wx=w?w.scrollLeft:0; employeesPage(); window.scrollTo(0,y); const w2=app.querySelector(".perms-wrap"); if(w2){ w2.scrollTop=wy; w2.scrollLeft=wx; } });
+  const redraw=()=>{ const y=window.scrollY, w=app.querySelector(".perms-wrap"), wy=w?w.scrollTop:0, wx=w?w.scrollLeft:0; employeesPage(); window.scrollTo(0,y); const w2=app.querySelector(".perms-wrap"); if(w2){ w2.scrollTop=wy; w2.scrollLeft=wx; } };
+  wirePermTable(redraw);
   app.querySelectorAll("[data-preset]").forEach(b=>b.onclick=async()=>{ const m=members.find(x=>x.uid===b.dataset.preset); if(!m) return;
-    try{ await db.collection("users").doc(m.uid).update({perms:{}}); m.perms={}; toast(`${m.name} now follows Employee settings`); syncTeamList(); const y=window.scrollY; employeesPage(); window.scrollTo(0,y); }catch(e){ toast("Couldn't save. Check your connection."); } });
+    try{ await db.collection("users").doc(m.uid).update({perms:{}}); m.perms={}; toast(`${m.name} now follows All employees`); syncTeamList(); redraw(); }catch(e){ toast("Couldn't save. Check your connection."); } });
   app.querySelectorAll("[data-ea]").forEach(c=>c.onchange=async()=>{ const d={allow:Object.assign({},EMP.allow,{[c.dataset.ea]:c.checked})};
-    try{ await db.collection("meta").doc("employees").set(d); EMP=d; toast(c.checked?"All employees can do this now":"Employees can't do this now"); const y=window.scrollY; employeesPage(); window.scrollTo(0,y); }
+    try{ await db.collection("meta").doc("employees").set(d); EMP=d; toast(c.checked?"All employees can do this now":"Employees can't do this now"); redraw(); }
     catch(e){ c.checked=!c.checked; toast("Couldn't save. Check your connection."); } });
 }
 const pubOpen = new Set();   // categories left open in Customer portal settings
@@ -3182,7 +3183,13 @@ async function assignNumbers(){
   }catch(e){} finally{ numbering=false; }
 }
 let lastReqWatch=null, lastRateWatch=null; const lastInboxWatch={};
-const unreadThreads = () => { const u=who(); return THREADS.filter(t=>t.lastBy && t.lastBy!==u && (t.updated||0) > ((t.readAt||{})[u]||0) && !t.done).length; };
+const isUnread = (t, u) => (t.unreadFor||[]).includes(u) || (t.lastBy && t.lastBy!==u && (t.updated||0) > ((t.readAt||{})[u]||0) && !t.done);
+const unreadThreads = () => { const u=who(); return THREADS.filter(t=>isUnread(t,u)).length; };
+async function markThread(t, unread){
+  if(previewBlocked()) return;
+  const now=Date.now(), readAt=Object.assign({}, t.readAt||{}, {[me]: unread ? 0 : now}), unreadFor = unread ? [...new Set([...(t.unreadFor||[]), me])] : (t.unreadFor||[]).filter(u=>u!==me);
+  try{ await db.collection("threads").doc(t.id).update({readAt, unreadFor}); Object.assign(t, {readAt, unreadFor}); renderAcct(); toast(unread?"Marked as unread":"Marked as read"); }catch(e){ toast("Couldn't save. Check your connection."); }
+}
 // Proofreading: everyone it was sent to marks it
 const proofers = t => (t.members||[]).filter(u=>u!==t.by);
 function proofCounts(t){ const c=t.checks||{}, ps=proofers(t); return {ok:ps.filter(u=>c[u]&&c[u].ok).length, no:ps.filter(u=>c[u]&&!c[u].ok).length, wait:ps.filter(u=>!c[u]).length, n:ps.length}; }
@@ -3256,9 +3263,10 @@ function askTeamBox(r, btn, kind){
 }
 function teamPage(){
   const open=THREADS.filter(t=>!t.done), done=THREADS.filter(t=>t.done);
-  const row = t => { const last=(t.msgs||[])[ (t.msgs||[]).length-1 ]||{}, unread=t.lastBy!==me && (t.updated||0)>((t.readAt||{})[me]||0) && !t.done;
-    return `<a class="tm-row${unread?" unread":""}" href="#team-${esc(t.id)}"><div class="tm-top"><b>${esc(threadTitle(t))}</b><span class="hint">${fmtWhen(t.updated)}</span></div>
-      <div class="tm-sub"><span class="tm-to">${esc(threadWho(t))}</span> · ${esc(last.by===me?"You":last.name||"")}: ${esc((last.text||"").slice(0,90))}</div></a>`; };
+  const row = t => { const last=(t.msgs||[])[ (t.msgs||[]).length-1 ]||{}, unread=isUnread(t, me);
+    return `<div class="tm-rowwrap"><a class="tm-row${unread?" unread":""}" href="#team-${esc(t.id)}"><div class="tm-top"><b>${esc(threadTitle(t))}</b><span class="hint">${fmtWhen(t.updated)}</span></div>
+      <div class="tm-sub"><span class="tm-to">${esc(threadWho(t))}</span> · ${esc(last.by===me?"You":last.name||"")}: ${esc((last.text||"").slice(0,90))}</div></a>
+      <button type="button" class="link tm-mark" data-mark="${esc(t.id)}" data-unread="${unread?0:1}">${unread?"Mark as read":"Mark as unread"}</button></div>`; };
   app.innerHTML = `<section class="wrap tools-page">
     <div class="section-head" style="margin-top:28px"><h2>Team messages</h2><p>Only employees and admins see these</p></div>
     <form class="panel-a" id="tn-form"><h3>New message</h3>
@@ -3268,6 +3276,7 @@ function teamPage(){
     <div class="panel-a"><h3>Conversations</h3>${open.length?`<div class="tm-list2">${open.map(row).join("")}</div>`:`<p class="hint">No open conversations.</p>`}</div>
     ${done.length?`<details class="panel-a"><summary><b>Done</b> <span class="hint">${done.length}</span></summary><div class="tm-list2">${done.map(row).join("")}</div></details>`:""}
   </section>`;
+  app.querySelectorAll("[data-mark]").forEach(b=>b.onclick=async()=>{ const t=THREADS.find(x=>x.id===b.dataset.mark); if(!t) return; await markThread(t, b.dataset.unread==="1"); const y=window.scrollY; teamPage(); window.scrollTo(0,y); });
   document.getElementById("tn-form").onsubmit=async e=>{ e.preventDefault(); const text=document.getElementById("tn-text").value.trim(); if(!text) return;
     try{ const id=await startThread(document.getElementById("tn-to").value, text, null); toast("Sent"); location.hash="team-"+id; }catch(err){ toast("Couldn't send. Check your connection."); } };
 }
@@ -3289,10 +3298,10 @@ function threadPage(id){
       <form class="td-add" id="tm-form" style="margin:10px 0 6px"><textarea id="tm-reply" rows="2" maxlength="1500" placeholder="Reply…" style="flex:1"></textarea><button class="btn solid" type="submit">Send</button></form>
       <p class="hint" style="margin:0 0 4px">Newest first</p>
       <ul class="tm-msgs">${(t.msgs||[]).map((m,i)=>[m,i]).reverse().map(([m,i])=>`<li class="${m.by===me?"me":""}"><div class="tm-bub">${esc(m.text).replace(/\n/g,"<br>")}</div><span class="hint">${esc(m.by===me?"You":m.name)} · ${fmtWhen(m.at)} · <button type="button" class="link tm-fw" data-fw="${i}">Forward</button></span><div class="tm-fwbox" data-fwbox="${i}"></div></li>`).join("")}</ul>
-      <div class="row mn-actions" style="margin-top:10px"><button type="button" class="btn" id="tm-done">${t.done?"Open it again":"Mark done"}</button></div>
+      <div class="row mn-actions" style="margin-top:10px"><button type="button" class="btn" id="tm-unread">Mark as unread</button><button type="button" class="btn" id="tm-done">${t.done?"Open it again":"Mark done"}</button></div>
     </div></section>`;
   // read
-  const now=Date.now(); if(!pv() && ((t.readAt||{})[me]||0) < (t.updated||0)){ t.readAt=Object.assign({}, t.readAt||{}, {[me]:now}); db.collection("threads").doc(t.id).update({readAt:t.readAt}).catch(()=>{}); renderAcct(); }
+  const now=Date.now(); if(!pv() && (((t.readAt||{})[me]||0) < (t.updated||0) || (t.unreadFor||[]).includes(me))){ t.readAt=Object.assign({}, t.readAt||{}, {[me]:now}); t.unreadFor=(t.unreadFor||[]).filter(u=>u!==me); db.collection("threads").doc(t.id).update({readAt:t.readAt, unreadFor:t.unreadFor}).catch(()=>{}); renderAcct(); }
   document.getElementById("tm-form").onsubmit=async e=>{ e.preventDefault(); const ta=document.getElementById("tm-reply"), text=ta.value.trim(); if(!text) return;
     try{ await replyThread(t, text); ta.value=""; threadPage(id); window.scrollTo(0,0); }catch(err){ toast("Couldn't send. Check your connection."); } };
   const pok=document.getElementById("pf-ok"), pno=document.getElementById("pf-no"), pff=document.getElementById("pf-form");
@@ -3309,6 +3318,7 @@ function threadPage(id){
       const note=document.getElementById("fw-note-"+i).value.trim(), to=document.getElementById("fw-to-"+i).value, r=t.rid&&RECIPES.find(x=>x.id===t.rid);
       const text=(note?note+"\n\n":"")+`Forwarded from ${m.name} (${threadTitle(t)}):\n“${m.text}”`;
       try{ const nid=await startThread(to, text, r||null); toast("Forwarded"); location.hash="team-"+nid; }catch(x){ e.target.disabled=false; toast("Couldn't forward. Check your connection."); } }; });
+  document.getElementById("tm-unread").onclick=async()=>{ await markThread(t, true); location.hash="team"; };
   document.getElementById("tm-done").onclick=async()=>{ const v=!t.done; try{ await db.collection("threads").doc(t.id).update({done:v}); t.done=v; toast(v?"Marked done":"Opened again"); threadPage(id); }catch(e){ toast("Couldn't save. Check your connection."); } };
 }
 
@@ -3426,6 +3436,7 @@ function openMenu(confirming){
     ${group("manage","Manage", manage, manageN)}
     ${group("recipes","Recipes", recipes, 0)}
     ${group("tools","Kitchen tools", [
+      isTeam() ? item("#compare~~","Compare recipes") : "",
       item("#grocery","Grocery list"), item("#timers","Timers", timersRunning()?timersRunning()+" running":""), item("#plan","Calendar &amp; menus"), item("#convert","Calculator"),
       offline||!can("ai") ? "" : item("#menu","Menu ideas"),
       offline||(may("edit")&&!recipesOnline)||!can("ai")||!can("suggest") ? "" : item("#scan","Scan a recipe"),
@@ -3832,7 +3843,8 @@ function recipeLines(parts){   // parts: [[isIng, heading, items]]
   parts.forEach(([ing,h,items])=>{ out.push({k:"h", t:(h?h+" · ":"")+(ing?"Ingredients":"Method")}); (items||[]).forEach(x=>out.push({k:ing?"i":"s", t:spellUnits(unbracket(x))})); });
   return out;
 }
-function compareHTML(r, sub){
+function compareHTML(r, sub, L){
+  L = L || {a:"Now", b:"Suggested", del:"taken out", add:"new", what:"What changes", one:"One recipe, changes marked"};
   const now=r, sug=fromDoc(sub.id, sub);
   const kindName = k => ({meat:"Meat",dairy:"Dairy",fish:"Fish",other:"None of these"})[k] || "Automatic";
   const fields=[["Name", now.t, sug.t], ["Category", now.c+(now.sec?" · "+now.sec:""), sug.c+(sug.sec?" · "+sug.sec:"")], ["From", now.by||"", sug.by||""],
@@ -3842,15 +3854,34 @@ function compareHTML(r, sub){
   const nDel=left.filter(x=>x[1]).length, nAdd=right.filter(x=>x[1]).length;
   const col=(rows)=>rows.map(([x,c])=>x.k==="h" ? `<div class="cmp-h${c?" "+c:""}">${esc(x.t)}</div>` : `<div class="cmp-l${c?" "+c:""}">${c==="del"?'<span class="sr">Removed: </span>':c==="add"?'<span class="sr">Added: </span>':""}${esc(x.t)}</div>`).join("");
   return `<div class="cmp">
-    <p class="cmp-sum">${fields.length||nDel||nAdd ? `<b>What changes:</b> ${[fields.length?fields.map(f=>f[0].toLowerCase()).join(", "):"", nDel?`${nDel} ${nDel===1?"line":"lines"} taken out`:"", nAdd?`${nAdd} ${nAdd===1?"line":"lines"} added or changed`:""].filter(Boolean).join(" · ")}` : "No differences."}
-      <span class="cmp-key"><span class="del">taken out</span> <span class="add">new</span></span></p>
-    ${fields.length?`<table class="cmp-f"><thead><tr><th></th><th>Now</th><th>Suggested</th></tr></thead><tbody>${fields.map(([l,a,b])=>`<tr><th>${l}</th><td class="del">${esc(a)||'<i>empty</i>'}</td><td class="add">${esc(b)||'<i>empty</i>'}</td></tr>`).join("")}</tbody></table>`:""}
-    <div class="cmp-view" role="radiogroup" aria-label="How to show the changes"><button type="button" role="radio" data-cmpv="one" aria-checked="${cmpView()==="one"}">One recipe, changes marked</button><button type="button" role="radio" data-cmpv="two" aria-checked="${cmpView()==="two"}">Side by side</button></div>
+    <p class="cmp-sum">${fields.length||nDel||nAdd ? `<b>${L.what}:</b> ${[fields.length?fields.map(f=>f[0].toLowerCase()).join(", "):"", nDel?`${nDel} ${nDel===1?"line":"lines"} only in ${esc(L.a)}`:"", nAdd?`${nAdd} ${nAdd===1?"line":"lines"} only in ${esc(L.b)}`:""].filter(Boolean).join(" · ")}` : "No differences."}
+      <span class="cmp-key"><span class="del">${esc(L.del)}</span> <span class="add">${esc(L.add)}</span></span></p>
+    ${fields.length?`<table class="cmp-f"><thead><tr><th></th><th>${esc(L.a)}</th><th>${esc(L.b)}</th></tr></thead><tbody>${fields.map(([l,a,b])=>`<tr><th>${l}</th><td class="del">${esc(a)||'<i>empty</i>'}</td><td class="add">${esc(b)||'<i>empty</i>'}</td></tr>`).join("")}</tbody></table>`:""}
+    <div class="cmp-view" role="radiogroup" aria-label="How to show the changes"><button type="button" role="radio" data-cmpv="one" aria-checked="${cmpView()==="one"}">${L.one}</button><button type="button" role="radio" data-cmpv="two" aria-checked="${cmpView()==="two"}">Side by side</button></div>
     <div class="cmp-one" ${cmpView()==="one"?"":"hidden"}><div class="cmp-col">${col(one)}</div></div>
-    <div class="cmp-cols" ${cmpView()==="two"?"":"hidden"}><div class="cmp-col"><div class="cmp-t">Now</div>${col(left)}</div><div class="cmp-col"><div class="cmp-t">Suggested</div>${col(right)}</div></div>
+    <div class="cmp-cols" ${cmpView()==="two"?"":"hidden"}><div class="cmp-col"><div class="cmp-t">${esc(L.a)}</div>${col(left)}</div><div class="cmp-col"><div class="cmp-t">${esc(L.b)}</div>${col(right)}</div></div>
   </div>`;
 }
 const cmpView = () => store("gk-cmpview") || "one";
+// Compare any two recipes (employees and admins): #compare~<id>~<id>
+function comparePage(ida, idb){
+  const A=RECIPES.find(r=>r.id===ida), B=RECIPES.find(r=>r.id===idb);
+  const nm = r => r ? r.t.replace(/^Untitled: /,"") : "";
+  const picker = (k, r) => `<div class="field cmp-pick"><label for="cp-${k}">Recipe ${k==="a"?"1":"2"}</label><input id="cp-${k}" type="search" autocomplete="off" value="${esc(nm(r))}" placeholder="Type a recipe name or code…"><div class="pre-sugg" id="cp-${k}-s"></div></div>`;
+  app.innerHTML=`<section class="wrap admin">
+    <div class="section-head" style="margin-top:28px"><h2>Compare recipes</h2><p>Side by side, or one list with the differences marked</p></div>
+    <div class="panel-a cmp-pickers">${picker("a",A)}${picker("b",B)}</div>
+    ${A&&B?`<div class="panel-a"><div class="cmp-names"><a class="link" href="#${esc(A.id)}"><span class="cmp-tag del">1</span> ${esc(nm(A))}</a><a class="link" href="#${esc(B.id)}"><span class="cmp-tag add">2</span> ${esc(nm(B))}</a></div>
+      ${compareHTML(A, Object.assign({id:B.id}, toDoc(B)), {a:"1. "+nm(A), b:"2. "+nm(B), del:"only in 1", add:"only in 2", what:"Differences", one:"One list, differences marked"})}</div>`
+      :`<div class="panel-a"><p class="hint">Choose two recipes to compare.</p></div>`}
+  </section>`;
+  wireCompare();
+  ["a","b"].forEach(k=>{ const inp=document.getElementById("cp-"+k), sg=document.getElementById("cp-"+k+"-s");
+    inp.oninput=()=>{ const q=inp.value.trim().toLowerCase(); if(!q){ sg.innerHTML=""; return; }
+      const hits=RECIPES.filter(r=>r.t.toLowerCase().includes(q) || (codeOf(r)||"").toLowerCase().startsWith(q)).slice(0,8);
+      sg.innerHTML = hits.length ? hits.map(r=>`<button type="button" class="pre-opt" data-cp="${esc(r.id)}">${esc(nm(r))} <span>${esc(codeOf(r)||r.c)}</span></button>`).join("") : `<p class="hint">No recipe with that name.</p>`;
+      sg.querySelectorAll("[data-cp]").forEach(b=>b.onclick=()=>{ location.hash="compare~"+(k==="a"?b.dataset.cp:ida||"")+"~"+(k==="b"?b.dataset.cp:idb||""); }); }; });
+}
 function wireCompare(){
   app.querySelectorAll("[data-cmpv]").forEach(b=>b.onclick=()=>{ store("gk-cmpview", b.dataset.cmpv);
     app.querySelectorAll(".cmp").forEach(c=>{ c.querySelector(".cmp-one").hidden = b.dataset.cmpv!=="one"; c.querySelector(".cmp-cols").hidden = b.dataset.cmpv!=="two";
@@ -5939,6 +5970,7 @@ function routePage(){
   if(h==="inbox" && may("inbox")){ q.value=""; inboxPage(); window.scrollTo(0,0); return; }
   if(h==="feedback" || h.startsWith("feedback-")){ q.value=""; feedbackPage(h.startsWith("feedback-")?h.slice(9):""); window.scrollTo(0,0); return; }
   if((h==="review"||h==="approve") && may("review")){ q.value=""; recipeInbox("approve"); window.scrollTo(0,0); return; }
+  if(h.startsWith("compare~") && isTeam()){ const [,a,b2]=h.split("~"); q.value=""; comparePage(a||"", b2||""); window.scrollTo(0,0); return; }
   if(h==="admin-approval" && isAdmin()){ q.value=""; adminApprovalPage(); window.scrollTo(0,0); return; }
   if(h==="proof" && may("proofread")){ q.value=""; recipeInbox("proof"); window.scrollTo(0,0); return; }
   if(h==="release" && may("release")){ q.value=""; recipeInbox("release"); window.scrollTo(0,0); return; }

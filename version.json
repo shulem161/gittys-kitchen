@@ -1,6 +1,6 @@
 {
-  "web": "4.10",
+  "web": "4.11",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New inbox: Needs admin approval (moving recipes, photos, going public)."
+  "notes": "Employee settings look like Inbox settings; mark messages read/unread; compare two recipes."
 }

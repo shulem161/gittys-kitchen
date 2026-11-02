@@ -330,7 +330,7 @@ service cloud.firestore {
         && request.resource.data.msgs[0].by == request.auth.uid
         && request.resource.data.msgs[0].text is string && request.resource.data.msgs[0].text.size() <= 1500;
       allow update: if isTeam() && request.auth.uid in resource.data.members
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['msgs', 'updated', 'lastBy', 'readAt', 'done', 'checks'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['msgs', 'updated', 'lastBy', 'readAt', 'done', 'checks', 'unreadFor'])
         // proofreading: each person marks only their own check
         && (!('checks' in request.resource.data) || request.resource.data.checks.diff(resource.data.get('checks', {})).affectedKeys().hasOnly([request.auth.uid]))
         && request.resource.data.msgs is list && request.resource.data.msgs.size() <= 200

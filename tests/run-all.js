@@ -739,6 +739,18 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await V.locator('.tm-fwform textarea').fill('FYI'); await V.locator('.tm-fwform .btn.solid').click(); await V.waitForTimeout(900);
     ok('a message can be forwarded to someone else on the team', /Forwarded from/.test(await V.locator('.tm-msgs').innerText()) && /oven time/.test(await V.locator('.tm-msgs').innerText()));
     await V.goBack(); await V.waitForTimeout(600);
+    await V.goto(F + '#team'); await V.waitForTimeout(600);
+    await V.locator('.tm-rowwrap', {hasText: '375°F'}).locator('[data-mark]').click(); await V.waitForTimeout(500);
+    ok('a conversation can be marked as unread', (await V.locator('.tm-rowwrap', {hasText: '375°F'}).locator('.tm-row.unread').count()) === 1 && await V.evaluate(() => unreadThreads() >= 1));
+    await V.locator('.tm-rowwrap', {hasText: '375°F'}).locator('[data-mark]').click(); await V.waitForTimeout(500);
+    ok('…and as read again', (await V.locator('.tm-rowwrap', {hasText: '375°F'}).locator('.tm-row.unread').count()) === 0);
+    // Compare two recipes
+    await V.goto(F + '#r-croissants'); await V.waitForTimeout(500); await V.click('a[href="#compare~r-croissants~"]'); await V.waitForTimeout(400);
+    await V.fill('#cp-b', 'challah'); await V.waitForTimeout(200); await V.locator('#cp-b-s [data-cp]').first().click(); await V.waitForTimeout(600);
+    ok('the team can compare two recipes side by side or marked', /Compare recipes/.test(await V.locator('h2').first().innerText()) && (await V.locator('.cmp-one .cmp-l.del').count()) > 0 && (await V.locator('.cmp-one .cmp-l.add').count()) > 0);
+    await PU.goto(F + '#compare~r-croissants~r-challah'); await PU.waitForTimeout(400);
+    ok("…customers can't", (await PU.locator('.cmp').count()) === 0);
+    await V.goto(F + '#team'); await V.waitForTimeout(500); await V.locator('.tm-row', {hasText: '375°F'}).click(); await V.waitForTimeout(600);
     await V.click('#tm-done'); await V.waitForTimeout(600);
     await V.goto(F + '#team'); await V.waitForTimeout(500);
     ok('marking done moves it to Done', (await V.locator('details .tm-row', {hasText: '375°F'}).count()) === 1);
@@ -858,6 +870,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       ok(`the ${pg.slice(1)} table never makes the page wider than the phone, it scrolls inside`, await A.evaluate(() => document.documentElement.scrollWidth <= 390 && document.querySelector('.perms-wrap').scrollWidth > document.querySelector('.perms-wrap').clientWidth)); }
     await A.setViewportSize({width: 1100, height: 900});
     await A.goto(F + '#employees'); await A.waitForTimeout(500);
+    ok('Employee settings looks like Inbox settings, with an All employees column', /All employees/.test(await A.locator('.perms-t thead').innerText()) && (await A.locator('.perms-t [data-ea=suggest]').count()) === 1 && (await A.locator('.pub-allow').count()) === 0);
     ok('Employee settings has a table of every employee and every permission', (await A.locator('.perms-t tbody tr:not(.perm-grp)').count()) >= 7 && (await A.locator(`.perms-t [data-ibs=viewas][data-ibu="${vuid}"]`).count()) === 1 && (await A.locator('.perms-t [data-ibs=ratings]').count()) === 0);
     await A.locator(`.perms-t [data-ibs=viewas][data-ibu="${vuid}"]`).check(); await A.waitForTimeout(800);
     ok('…ticking one gives just that person the permission', await V.evaluate(() => canViewAs()) && await A.evaluate(u => !!document.querySelector(`.perms-t [data-ibs=viewas][data-ibu="${u}"]`).closest('td').querySelector('.perm-dot'), vuid));
