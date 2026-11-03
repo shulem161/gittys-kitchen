@@ -60,6 +60,11 @@ service cloud.firestore {
                 ? request.resource.data.get('pub', true) == (!exists(p) || get(p).data.get('cats', {}).get(request.resource.data.c, true) != false)
                 : request.resource.data.get('pub', null) == resource.data.get('pub', null)));
     }
+    // A merge in Ready to release that says recipe rid is to be deleted when it's released
+    function mergeDrops(rid) {
+      let s = get(/databases/$(database)/documents/submissions/$(request.resource.data.mergedBy)).data;
+      return s.get('dropOf', '') == rid && s.get('stage', '') == 'release' && s.get('status', '') == 'pending';
+    }
     // Recipe inboxes: three different people. Whoever proofread can't approve; neither of them can release.
     // Ordinary edits never move a recipe between inboxes
     function noRvChange() {
@@ -215,7 +220,13 @@ service cloud.firestore {
       allow update: if isTeam() && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rvAsk'])
         || (resource.data.get('rv', '') == '' && request.resource.data.get('rv', '') == 'proof'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog'])));
-      allow write: if (publishOk() && noRvChange())
+      // Merging: whoever releases the merged recipe deletes the one that was merged into it (and nothing else).
+      // Checked first, and only for that change, to stay within the rules' limit on document lookups.
+      allow write: if (resource != null && resource.data.get('deleted', false) == false
+            && request.resource.data.get('deleted', false) == true
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'deletedAt', 'updated', 'mergedBy'])
+            && mergeDrops(id) && extra('release'))
+        || (publishOk() && noRvChange())
         // Recipe inboxes: proofreaders, approvers and releasers move a recipe along (rv); releasers choose public or team only
         || (resource != null && (extra('proofread') || extra('review') || extra('release'))
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog'])

@@ -1,6 +1,6 @@
 {
-  "web": "4.15",
+  "web": "4.16",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Recipe codes are numbers: Pesach recipes start with 2, all others with 1."
+  "notes": "Recipe options are in a ⋮ menu. A deleted, merged or moved recipe's code waits a year before it is used again."
 }

@@ -26,7 +26,13 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
   await ctx.route(/firebasejs\/12\.\d+\.\d+\/firebase-ai\.js/, r => r.fulfill({contentType: 'text/javascript', headers: {'access-control-allow-origin': '*'}, body: 'export class GoogleAIBackend{} export function getAI(){return {}} export function getGenerativeModel(){return {generateContent: async()=>({response:{text:()=>JSON.stringify({title:"Scanned Test Cake",category:"Cakes",from:"",note:"",parts:[{type:"ingredients",heading:"",items:["2 cups flour"]},{type:"method",heading:"",items:["Bake at 350°F"]}]})}})}}'}));
   await ctx.route(/version\.json/, r => r.fulfill({contentType: 'application/json', body: '{"web":"0","apk":0}'}));
   const notes = [], ntfyPaths = []; await ctx.route(/ntfy\.sh/, r => { notes.push(new URL(r.request().url()).searchParams.get('title')); ntfyPaths.push(new URL(r.request().url()).pathname); r.fulfill({status: 200, body: '{}', headers: {'access-control-allow-origin': '*'}}); });
-  const page = async () => { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(e.message + ' @ ' + (e.stack||'').split('\n').slice(1,3).join(' | '))); await p.goto(F); await p.waitForTimeout(400); return p; };
+  // A recipe's options sit in its ⋮ menu: like a person would, open the menu first when clicking one of them
+  const openMenuFor = (p, sel) => p.evaluate(s => { const m = document.getElementById('rmenu'); if (!m || !m.hidden) return;
+    let el = null; try { el = s.startsWith('text=') ? [...m.querySelectorAll('a,button')].find(b => b.textContent.includes(s.slice(5))) : document.querySelector(s); } catch (e) {}
+    if (el && m.contains(el)) document.getElementById('rmore').click(); }, sel).catch(() => {});
+  const page = async () => { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(e.message + ' @ ' + (e.stack||'').split('\n').slice(1,3).join(' | ')));
+    const click = p.click.bind(p); p.click = async (sel, o) => { await openMenuFor(p, sel); return click(sel, o); };
+    await p.goto(F); await p.waitForTimeout(400); return p; };
   const mailOf = name => name.toLowerCase().replace(/\s+/g, '.') + '@example.com';
   // Sign up with name, email and password, then tap the link in the (stand-in) email
   // A recipe goes through the three inboxes: proofread → approve → release
@@ -520,7 +526,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await V.goto(F + '#public'); await V.waitForTimeout(300);
     ok("employees don't get admin pages", (await V.locator('.pub-cats').count()) === 0);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(300);
-    ok('employees request a change, not edit', /Request a change/.test(await V.locator('.rhead').innerText()) && (await V.locator('#pubtog').count()) === 0);
+    ok('employees request a change, not edit', /Request a change/.test(await V.locator('.rhead').textContent()) && (await V.locator('#pubtog').count()) === 0);
     // Suggested changes: the admin sees what changed
     await V.click('.rhead a[href^="#edit-"]'); await V.waitForTimeout(400);
     const firstIng = await V.locator('.sec-items').nth(0).inputValue();
@@ -559,7 +565,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('an everyday permission can be switched off for one employee', (await V.locator('.ph-add').count()) === 0);
     await perm(A, vu0, 'photos', true, 1500);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
-    ok('taking a permission away works', /Request a change/.test(await V.locator('.rhead').innerText()) && (await V.locator('.ph-add').count()) > 0);
+    ok('taking a permission away works', /Request a change/.test(await V.locator('.rhead').textContent()) && (await V.locator('.ph-add').count()) > 0);
     await A.goto(F + '#inbox-settings'); await A.waitForTimeout(400);
     await A.locator('[data-ea=answer]').check(); await A.waitForTimeout(1500);
     await V.goto(F); await V.waitForTimeout(500);
@@ -673,17 +679,37 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.click('[data-sx="1"]'); await A.waitForTimeout(200);
     await A.goto(F + '#r-boston-cream-pie'); await A.waitForTimeout(300);
     ok('recipes without one show a guess', /about/.test(await A.locator('.fact.serves').innerText().catch(() => '')));
+    // Everything you can do with a recipe is in its ⋮ menu
+    ok('a recipe keeps its options in a ⋮ menu, closed to start with', (await A.locator('#rmore').isVisible()) && (await A.locator('#rmenu').isHidden()) && (await A.locator('#rmenu #fav, #rmenu #toplan-btn, #rmenu #mv-btn, #rmenu a[href^="#edit-"]').count()) === 4);
+    await A.locator('#rmore').click(); await A.waitForTimeout(150);
+    const rmOpen = await A.locator('#rmenu').isVisible();
+    await A.keyboard.press('Escape'); await A.waitForTimeout(100);
+    const rmEsc = await A.locator('#rmenu').isHidden();
+    await A.locator('#rmore').click(); await A.locator('.rhead h1').click(); await A.waitForTimeout(100);
+    ok('…it opens with a tap and closes with Escape or a tap outside', rmOpen && rmEsc && (await A.locator('#rmenu').isHidden()));
+    { const vs = A.viewportSize(); await A.setViewportSize({width: 390, height: 900}); await A.locator('#rmore').click(); await A.waitForTimeout(150);
+      if(process.env.SHOT) await A.screenshot({path: process.env.SHOT});
+      const bx = await A.locator('#rmenu').boundingBox();
+      ok('…and fits a phone screen', bx && bx.x >= 0 && bx.x + bx.width <= 390 && await A.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+      await A.keyboard.press('Escape'); await A.setViewportSize(vs); }
+    // A freed code waits a year before a new recipe gets it
+    ok('a deleted or moved recipe\'s code is kept unused for a year, then free again', await A.evaluate(() => { const d = Date.now(), y = 864e5;
+      const h = heldCodes([{code: '199001', deleted: true, deletedAt: d - 400 * y}, {code: '199002', deleted: true, deletedAt: d - 30 * y}, {code: '199004', oldCodes: [{code: '199003', at: d - 2 * y}, {code: '199005', at: d - 366 * y}]}]);
+      return !h.has('199001') && h.has('199002') && h.has('199003') && h.has('199004') && !h.has('199005'); }));
     // Moving recipes to another category
+    const oldCode = await A.evaluate(() => RECIPES.find(x => x.id === 'r-croissants').code);
     await A.goto(F + '#r-croissants'); await A.waitForTimeout(300); await A.click('#mv-btn'); await A.selectOption('#mv1-cat', 'Cakes'); await A.click('#mv1-go'); await A.waitForTimeout(800);
     const mvd = await A.evaluate(() => { const r = RECIPES.find(x => x.id === 'r-croissants'); return [r.c, r.code, CODEMAP.cats.Cakes]; });
     ok('admins can move a recipe to another category, with a new code', mvd[0] === 'Cakes' && mvd[1].startsWith('1' + mvd[2]) && /^\d{6}$/.test(mvd[1]), mvd);
+    await A.waitForTimeout(500);
+    ok('…and its old code is held for a year', await A.evaluate(c => usedCodes.has(c) && RECIPES.find(x => x.id === 'r-croissants').oldCodes.some(o => o.code === c), oldCode));
     await A.goto(F + '#move-cakes'); await A.waitForTimeout(400);
     await A.locator('[data-mv="r-croissants"]').check(); await A.selectOption('#mv-cat', 'Bread'); await A.click('#mv-go'); await A.waitForTimeout(1000);
     ok('…or several at once', await A.evaluate(() => RECIPES.find(x => x.id === 'r-croissants').c) === 'Bread');
     await V.goto(F + '#r-croissants'); await V.waitForTimeout(400);
     ok("employees can't move recipes; they can ask to", /Ask to move/.test(await V.locator('#mv-btn').innerText()) && (await V.locator('.cat-tools a[href^="#move-"]').count()) === 0);
     await V.click('#mv-btn'); await V.selectOption('#mv1-cat', 'Cakes'); await V.click('#mv1-go'); await V.waitForTimeout(800);
-    ok('…which goes to the admins', /Asked to move to Cakes/.test(await V.locator('.rhead').innerText()) && notes.some(n => /asks to move a recipe/.test(n)) && await V.evaluate(() => RECIPES.find(x => x.id === 'r-croissants').c) === 'Bread');
+    ok('…which goes to the admins', /Asked to move to Cakes/.test(await V.locator('.rhead').textContent()) && notes.some(n => /asks to move a recipe/.test(n)) && await V.evaluate(() => RECIPES.find(x => x.id === 'r-croissants').c) === 'Bread');
     await A.goto(F + '#admin-approval'); await A.waitForTimeout(600);
     ok('admins see the request in Needs admin approval', /Requests to move/.test(await A.locator('.admin').innerText()));
     await A.locator('[data-mvq][data-mvok="1"]').first().click(); await A.waitForTimeout(1200);
@@ -754,7 +780,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     const nBox = await V.locator('[data-mg]').count(), n1 = await V.locator('[data-mg]:checked').count();
     ok('merging shows every line with a tick, marked 1, 2 or Both', /Merge two recipes/.test(await V.locator('h2').first().innerText()) && nBox > 4 && (await V.locator('.mg-row.del').count()) > 0 && (await V.locator('.mg-row.add').count()) > 0);
     { const vs = V.viewportSize(); await V.setViewportSize({width: 390, height: 1400}); await V.waitForTimeout(200);
-      if(process.env.SHOT) await V.screenshot({path: process.env.SHOT});
+      if(process.env.SHOT2) await V.screenshot({path: process.env.SHOT2});
       ok('the merge page fits a phone screen', await V.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)); await V.setViewportSize(vs); }
     await V.click('[data-mgall=del]'); const only1 = await V.locator('[data-mg]:checked').count();
     await V.click('[data-mgall=all]'); const all = await V.locator('[data-mg]:checked').count();
@@ -769,7 +795,13 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await V.click('#edform .primary'); await V.waitForTimeout(800);
     await A.goto(F + '#proof'); await A.waitForTimeout(600);
     ok('…as a change to the first recipe', (await A.locator('.sub-card', {hasText: 'Merged with'}).count()) === 1);
-    await A.locator('.sub-card', {hasText: 'Merged with'}).locator('[data-ib="ask-reject"]').click(); await A.locator('[data-ib="reject"]').click(); await A.waitForTimeout(500);
+    await A.goto(F + '#r-challah'); await A.waitForTimeout(500);
+    ok('the other recipe says it will be deleted once the merge is released', /deleted automatically when the merged one is released/.test(await A.locator('.rhead').textContent()));
+    const chCode = await A.evaluate(() => RECIPES.find(x => x.id === 'r-challah').code);
+    await through(A, 'Merged with'); await A.waitForTimeout(800);
+    ok('…and once it is released, the other recipe is deleted automatically', await A.evaluate(() => !RECIPES.some(x => x.id === 'r-challah') && /Merged with/.test(RECIPES.find(x => x.id === 'r-croissants').n)));
+    ok("…while its code isn't given out again for a year", await A.evaluate(c => usedCodes.has(c), chCode));
+    await A.evaluate(async () => { await db.collection('recipes').doc('r-challah').update({deleted: false}); }); await A.waitForTimeout(800);
     await PU.goto(F + '#compare~r-croissants~r-challah'); await PU.waitForTimeout(400);
     ok("…customers can't", (await PU.locator('.cmp').count()) === 0);
     await V.goto(F + '#team'); await V.waitForTimeout(500); await V.locator('.tm-row', {hasText: '375°F'}).click(); await V.waitForTimeout(600);
@@ -854,7 +886,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.fill('#pf-note', 'Step 3 needs the oven heat'); await A.click('#pf-form button[type=submit]'); await A.waitForTimeout(700);
     ok('…and it is marked for everyone to see', /✗ Needs changes/.test(await A.locator('.proof-box').innerText()) && /Step 3 needs the oven heat/.test(await A.locator('.tm-msgs').innerText()));
     await V.goto(F + '#r-croissants'); await V.waitForTimeout(800);
-    ok('the recipe shows how proofreading is going', /Proofreading: .*1 ✗/.test(await V.locator('.rhead').innerText()));
+    ok('the recipe shows how proofreading is going', /Proofreading: .*1 ✗/.test(await V.locator('.rhead').textContent()));
 
     // Cookbook recipes in the inboxes
     await A.evaluate(async () => { await db.collection('recipes').doc('r-croissants').update({rv: 'proof'}); });

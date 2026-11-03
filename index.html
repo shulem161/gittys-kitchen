@@ -278,6 +278,18 @@ button{font:inherit;color:inherit}
 .fact.hot{background:var(--wheat-soft);border-color:transparent}
 .fact.hot b{color:var(--wheat)}
 .tools{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.rmore-btn{position:absolute;top:16px;right:14px;width:42px;height:42px;display:grid;place-items:center;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer;z-index:3}
+.rmore-btn:hover,.rmore-btn[aria-expanded="true"]{border-color:var(--accent);color:var(--accent)}
+.rhead.menu-open{overflow:visible}.rhead.menu-open .tilestripe{border-radius:18px 18px 0 0}
+.rhead .rmenu{position:absolute;top:62px;right:14px;z-index:20;margin:0;flex-direction:column;flex-wrap:nowrap;gap:2px;width:min(310px,calc(100vw - 48px));max-height:min(70vh,560px);overflow:auto;
+  background:var(--paper);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 34px rgba(0,0,0,.18);padding:6px}
+.rhead .rmenu[hidden]{display:none}
+.rhead .rmenu .btn{display:flex;align-items:center;gap:2px;width:100%;justify-content:flex-start;text-align:left;border:0;border-radius:9px;background:none;box-shadow:none;padding:11px 12px;min-height:44px;font-weight:500;color:var(--ink)}
+.rhead .rmenu .btn:hover,.rhead .rmenu .btn:focus-visible{background:var(--accent-soft)}
+.rhead .rmenu .btn.fav[aria-pressed="true"],.rhead .rmenu #wake[aria-pressed="true"]{color:var(--accent)}
+.rhead .rmenu .pub-state{opacity:.75}
+.rm-sep{height:1px;background:var(--line);margin:5px 6px}
+.rhead h1{padding-right:44px}
 .btn{border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:8px 14px;font-size:14px;font-weight:500;cursor:pointer}
 .btn[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 .btn:disabled{opacity:.6;cursor:default}
@@ -601,6 +613,7 @@ body.guiding{overflow:hidden}
 .mg-row:has(input:not(:checked)) span:last-child{text-decoration:line-through;opacity:.55}.mg-row.del{background:rgba(200,60,60,.07)}.mg-row.add{background:rgba(40,150,80,.08)}
 .mg-both{font-size:11px;padding:1px 6px;border-radius:9px;background:var(--line);color:var(--muted);flex:none;margin-top:2px}.mg-row .cmp-tag{flex:none}
 .mg-pick{border:1px dashed var(--accent);border-radius:10px;padding:6px;display:grid;gap:4px}.mg-pick p{margin:0 4px;font-size:13px;color:var(--accent);font-weight:600}
+.mg-drop{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-weight:600}.mg-drop input{margin-top:4px}
 .mg-base{display:grid;gap:6px;margin-top:8px}.mg-quick{align-items:center;margin-bottom:10px}.mg-quick span{font-size:14px;color:var(--muted)}
 .cmp-merge span{font-size:14px;color:var(--muted)}
 .cmp-pickers{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media (max-width:640px){.cmp-pickers{grid-template-columns:1fr}}
@@ -1114,7 +1127,15 @@ const kindChip = r => { const k=kindOf(r); return (KIND_LABEL[k]?`<span class="k
 // category (Pesach: for its section) and the recipe's number from 001: 101001 is the first recipe of category 01,
 // 203001 the first of Pesach section 03. Category and section numbers are kept in meta/codes.
 let CODEMAP = {cats:{}, secs:{}};   // loaded from storage in boot()
-let usedCodes = new Set();       // every code used online, including deleted recipes
+let usedCodes = new Set();       // codes in use, plus codes freed less than a year ago (deleted, merged away or moved)
+const CODE_HOLD = 365*864e5;     // a freed code isn't given to a new recipe until a year has passed, so nobody mixes them up
+function heldCodes(docs){
+  const now=Date.now(), out=new Set();
+  docs.forEach(d=>{ if(d.code && (!d.deleted || !(d.deletedAt||d.updated) || now-(d.deletedAt||d.updated) < CODE_HOLD)) out.add(d.code);
+    (d.oldCodes||[]).forEach(o=>{ if(o && o.code && now-(o.at||0) < CODE_HOLD) out.add(o.code); }); });
+  return out;
+}
+const freeCode = (r, code) => r && r.code && r.code!==code ? [...(r.oldCodes||[]), {code:r.code, at:Date.now()}].slice(-12) : (r && r.oldCodes) || [];
 const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";   // the old letters, in order: A → 01, B → 02 …
 const num2 = v => /^\d+$/.test(String(v||"")) ? String(+v).padStart(2,"0") : String((CODE_LETTERS.indexOf(v)+1)||99).padStart(2,"0");
 const isPesach = c => /^pesach$/i.test(c||"");
@@ -1251,7 +1272,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.15";
+const WEB_VERSION = "4.16";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1866,11 +1887,13 @@ function recipe(r){
   <div class="wrap">
     <a class="back" href="#${slug(r.c)}${r.sec&&r.c==="Pesach"?"--"+secSlug(r.sec):""}">← ${esc(r.c)}${r.sec&&r.c==="Pesach"?" · "+esc(r.sec):""}</a>
     <section class="rhead"><div class="tilestripe"></div>
+      <button type="button" class="rmore-btn" id="rmore" aria-haspopup="true" aria-expanded="false" aria-controls="rmenu" title="More options" aria-label="More options for this recipe"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="5" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="19" r="2" fill="currentColor"/></svg></button>
       ${noChip(r)}${/^pesach$/i.test(r.c)?"":`<span class="chip">${esc(r.c)}</span>`}${r.sec?`<span class="chip">${esc(r.sec)}</span>`:""}${kindChip(r)}
       <h1>${titleHTML(r)}</h1>
       ${!isPublic()?`<div class="aud ${pubVisible(r)?"pub":"priv"}">${pubVisible(r)?"🌐 Public":"🔒 Team only"}</div>`:""}
       ${!isPublic()&&(r.rv||subs.some(s=>s.status==="pending"&&s.editOf===r.id))?`<div class="rv-bar">${r.rv?`<span>📥 In <b>${INBOX_NAME[r.rv]}</b></span>`:""}${subs.filter(s=>s.status==="pending"&&s.editOf===r.id).map(s=>`<span>📝 Suggested changes in <b>${INBOX_NAME[stageOf(s)]}</b></span>`).join("")}
         ${r.rv==="proof"&&r.rvNote?`<div class="ib-note"><b>✗ Needs changes</b> (${esc(r.rvNoteBy||"")}): ${esc(r.rvNote)}</div>`:""}${(r.rvAsk||[]).length?`<span class="hint">Asked to move up: ${r.rvAsk.map(a=>esc(a.name)).join(", ")}</span>`:""}<div class="row rv-acts">${rvButtons(r)}</div></div>`:""}
+      ${!isPublic()&&subs.some(s=>s.status==="pending"&&s.dropOf===r.id)?`<div class="rv-bar"><span>🔀 Merged into <a class="link" href="#${esc(subs.find(s=>s.status==="pending"&&s.dropOf===r.id).editOf)}">${esc(subs.find(s=>s.status==="pending"&&s.dropOf===r.id).t)}</a>. This recipe is deleted automatically when the merged one is released.</span></div>`:""}
       ${!isPublic()&&(r.rvLog||[]).length?`<details class="rv-log"><summary>Who moved it through the inboxes</summary><ul>${rvLogHTML(r.rvLog)}</ul></details>`:""}
       ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}
       <div class="facts">
@@ -1882,15 +1905,15 @@ function recipe(r){
       </div>
       <div class="scale" role="group" aria-label="How much to make"><span>Make</span>${(SCALES.includes(sx)?SCALES:[...SCALES,sx].sort((a,b)=>a-b)).map(x=>`<button type="button" class="btn sm${x===sx?" on":""}" data-sx="${x}" aria-pressed="${x===sx}">${x===1?"1×":fmtNum(x)+"×"}</button>`).join("")}<a class="link" href="#convert-${r.id}">Calculator</a></div>
       ${sx!==1?`<p class="hint scale-note">Amounts are for ${fmtNum(sx)}× the recipe. Pan size and baking time may need adjusting.</p>`:""}
-      <div class="tools">
-        ${recipesOnline&&!offline&&(can("suggest")||may("edit"))?`<a class="btn solid" href="#edit-${r.id}">${may("edit")?"Edit recipe":"Request a change"}</a>`:""}
+      <div class="tools rmenu" id="rmenu" role="menu" hidden>
+        ${recipesOnline&&!offline&&(can("suggest")||may("edit"))?`<a class="btn" href="#edit-${r.id}">${may("edit")?"Edit recipe":"Request a change"}</a>`:""}
         ${isTeam()&&!offline&&!r.rv?`<button class="btn" id="proof-btn" type="button">✓ Ask someone to proofread</button>`:""}
         ${isTeam()?`<a class="btn" href="#compare~${esc(r.id)}~">⇄ Compare with another recipe</a>`:""}
         ${isTeam()&&!offline?`<button class="btn" id="askteam-btn" type="button">${TOOL_IC.ask.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Ask the team about this</button>`:""}
         ${isAdmin()&&recipesOnline&&!offline?`<button class="btn" id="mv-btn" type="button">Move to another category</button>`:""}
         ${myRole()==="employee"&&recipesOnline&&!offline?(myMoveAsk(r.id)?`<span class="btn pub-state" aria-disabled="true">Asked to move to ${esc(myMoveAsk(r.id).to)} ✓</span>`:`<button class="btn" id="mv-btn" type="button">Ask to move to another category</button>`):""}
         ${isTeam()&&!isPublic()&&recipesOnline&&!offline&&!r.rv&&!pubVisible(r)?`<button class="btn" id="go3-btn" type="button">🌐 Send through the 3 steps to go public</button>`:""}
-
+        <div class="rm-sep" role="separator"></div>
         <button class="btn" id="toplan-btn" type="button">${TOOL_IC.cal}Add to calendar</button>
         <a class="btn" href="#timers-${r.id}">${TIMER_IC.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Set a timer</a>
         <button class="btn fav" id="fav" aria-pressed="${isFav}">${HEART}${isFav?"Saved to favorites":"Save to favorites"}</button>
@@ -1928,6 +1951,7 @@ function recipe(r){
   </div>`;
   loadPhotos(r);
   app.querySelectorAll("a.rlink").forEach(a=>a.addEventListener("click", e=>e.stopPropagation()));
+  wireRecipeMenu();
   document.getElementById("dl").onclick=e=>downloadRecipe(r, e.currentTarget);
   document.getElementById("fav").onclick=e=>{
     const b=e.currentTarget, f=favs(), on=!f.includes(r.id);
@@ -2492,7 +2516,7 @@ function dupesPage(){
     box.scrollIntoView({block:"nearest"});
     box.querySelector("[data-dupno]").onclick=()=>{ box.innerHTML=""; };
     box.querySelector("[data-dupyes]").onclick=async e=>{ e.target.disabled=true;
-      try{ await db.collection("recipes").doc(r.id).update({deleted:true, updated:Date.now()}); toast(`“${r.t}” was deleted`); }
+      try{ await db.collection("recipes").doc(r.id).update({deleted:true, deletedAt:Date.now(), updated:Date.now()}); toast(`“${r.t}” was deleted`); }
       catch(err){ e.target.disabled=false; toast("Couldn't delete. Check your connection."); } }; });
 }
 
@@ -2925,6 +2949,23 @@ function menuEditPage(id){
       for(const k in PLAN.days) PLAN.days[k]=PLAN.days[k].filter(e=>e.menuId!==id); savePlan(); toast("Menu deleted"); location.hash="menus"; }catch(e){ toast("Couldn't delete. Check your connection."); } }; };
 }
 // On a recipe page: put it on a day and meal, or into one of my menus
+// The recipe's ⋮ menu: everything you can do with the recipe, in one drop-down
+function setRecipeMenu(open){
+  const m=document.getElementById("rmenu"), b=document.getElementById("rmore"); if(!m||!b) return;
+  m.hidden=!open; b.setAttribute("aria-expanded", open); m.closest(".rhead").classList.toggle("menu-open", open);
+}
+function wireRecipeMenu(){
+  const b=document.getElementById("rmore"), m=document.getElementById("rmenu"); if(!b||!m) return;
+  if(!m.querySelector(".btn")){ b.hidden=true; return; }
+  b.onclick=e=>{ e.stopPropagation(); setRecipeMenu(m.hidden); if(!m.hidden){ const f=m.querySelector(".btn"); if(f) f.focus(); } };
+  // choosing something closes the menu, so whatever it opens shows underneath
+  m.addEventListener("click", e=>{ if(e.target.closest("a.btn, button.btn")) setTimeout(()=>setRecipeMenu(false), 0); });
+  m.addEventListener("keydown", e=>{ const items=[...m.querySelectorAll("a.btn, button.btn:not([disabled])")], i=items.indexOf(document.activeElement);
+    if(e.key==="ArrowDown"||e.key==="ArrowUp"){ e.preventDefault(); const n=items[(i+(e.key==="ArrowDown"?1:-1)+items.length)%items.length]; if(n) n.focus(); }
+    if(e.key==="Escape"){ setRecipeMenu(false); b.focus(); } });
+}
+document.addEventListener("click", e=>{ const m=document.getElementById("rmenu"); if(m && !m.hidden && !e.target.closest("#rmenu, #rmore")) setRecipeMenu(false); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ const m=document.getElementById("rmenu"); if(m && !m.hidden){ setRecipeMenu(false); const b=document.getElementById("rmore"); if(b) b.focus(); } } });
 function addToPlanBox(r, btn){
   const old=document.getElementById("toplan"); if(old){ old.remove(); return; }
   const mine=Object.values(MENUS).filter(m=>m.uid===me), box=document.createElement("div"); box.id="toplan"; box.className="dlpick toplan";
@@ -2975,9 +3016,9 @@ async function moveRecipes(ids, cat, sec){
   sec = cat==="Pesach" ? (sec||"").trim() : "";
   let n=0;
   for(const id of ids){ const r=RECIPES.find(x=>x.id===id); if(!r || (r.c===cat && (r.sec||"")===sec)) continue;
-    const code=nextCode(cat, sec), history=[...(r.history||[]), {a:"moved", by:myName(), at:Date.now(), from:r.c+(r.sec?" · "+r.sec:"")}].slice(-12);
-    await db.collection("recipes").doc(id).update({c:cat, sec, code, history, updated:Date.now()});
-    Object.assign(r, {c:cat, sec, code, history}); n++; }
+    const code=nextCode(cat, sec), history=[...(r.history||[]), {a:"moved", by:myName(), at:Date.now(), from:r.c+(r.sec?" · "+r.sec:"")}].slice(-12), oldCodes=freeCode(r, code);
+    await db.collection("recipes").doc(id).update({c:cat, sec, code, oldCodes, history, updated:Date.now()});
+    Object.assign(r, {c:cat, sec, code, oldCodes, history}); n++; }
   return n;
 }
 function moveCatOptions(cur){ return [...new Set([...CATS, ...ORDER])].sort(byName).map(c=>`<option ${c===cur?"selected":""}>${esc(c)}</option>`).join(""); }
@@ -3037,9 +3078,25 @@ function watchGolive(){
     const changed = before !== GOLIVE.filter(g=>g.status==="open").map(g=>g.id).join();
     if(changed && ["#release","#approve","#review","#admin-approval"].includes(location.hash) && !document.querySelector(".editor, textarea:focus")){ const y=window.scrollY; route(); window.scrollTo(0,y); } }, ()=>{});
 }
-const openGolive = () => may("release") ? GOLIVE.filter(g=>g.status==="open" && g.kind!=="move").length : 0;
+const openGolive = () => may("release") ? GOLIVE.filter(g=>g.status==="open" && !g.kind).length : 0;
 const openMoves = () => may("review") ? GOLIVE.filter(g=>g.status==="open" && g.kind==="move").length : 0;
-const myGolive = rid => GOLIVE.find(g=>g.rid===rid && g.uid===who() && g.status==="open" && g.kind!=="move");
+const openDeletes = () => isAdmin() ? GOLIVE.filter(g=>g.status==="open" && g.kind==="delete" && RECIPES.some(r=>r.id===g.rid)).length : 0;
+function deletesHTML(){
+  const open=GOLIVE.filter(g=>g.status==="open" && g.kind==="delete" && RECIPES.some(r=>r.id===g.rid)); if(!open.length || !isAdmin()) return "";
+  return `<div class="panel-a"><h3>Merged recipes to delete <span class="count">${open.length}</span></h3>
+    <p class="hint">These were merged into another recipe. Their code isn't given to another recipe for a year.</p>
+    <ul class="gl-list">${open.map(g=>{ const r=RECIPES.find(x=>x.id===g.rid);
+      return `<li><div><a class="link" href="#${esc(g.rid)}">${noChip(r)} ${esc(r.t)}</a><span class="hint">merged into <a class="link" href="#${esc(g.to||"")}">${esc(g.from||"another recipe")}</a> · ${esc(g.byName||"")} · ${fmtDate(g.created)}</span></div>
+        <div class="dup-acts"><button type="button" class="btn sm danger-btn" data-dlq="${esc(g.id)}" data-dlok="1">Delete it</button><button type="button" class="btn sm" data-dlq="${esc(g.id)}" data-dlok="0">Keep it</button></div></li>`; }).join("")}</ul></div>`;
+}
+function wireDeletes(){
+  app.querySelectorAll("[data-dlq]").forEach(b=>b.onclick=async()=>{ const g=GOLIVE.find(x=>x.id===b.dataset.dlq); if(!g) return; const ok=b.dataset.dlok==="1"; b.disabled=true;
+    try{ if(ok) await db.collection("recipes").doc(g.rid).update({deleted:true, deletedAt:Date.now(), updated:Date.now()});
+      await db.collection("golive").doc(g.id).update({status:ok?"approved":"declined", decided:Date.now(), decidedBy:myName()}); g.status=ok?"approved":"declined";
+      toast(ok?"Deleted":"Kept"); renderAcct(); const y=window.scrollY; route(); window.scrollTo(0,y); }
+    catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); } });
+}
+const myGolive = rid => GOLIVE.find(g=>g.rid===rid && g.uid===who() && g.status==="open" && !g.kind);
 const myMoveAsk = rid => GOLIVE.find(g=>g.rid===rid && g.uid===who() && g.status==="open" && g.kind==="move");
 // Employees ask an admin to move a recipe to another category (they can't move it themselves)
 async function requestMove(r, to, sec){
@@ -3071,7 +3128,7 @@ async function requestGolive(r){
   notifyAdmin(`${myName()} asks to show a recipe to the public`, `“${r.t}” is waiting in Customer portal settings.`, "#public", "eyes");
 }
 function goliveHTML(){
-  const open=GOLIVE.filter(g=>g.status==="open" && g.kind!=="move").sort((a,b)=>(a.created||0)-(b.created||0)); if(!open.length) return "";
+  const open=GOLIVE.filter(g=>g.status==="open" && !g.kind).sort((a,b)=>(a.created||0)-(b.created||0)); if(!open.length) return "";
   return `<div class="panel-a"><h3>Asked to go public <span class="count">${open.length}</span></h3>
     <p class="hint">Recipes now for the team only that employees asked to show to the public.</p>
     <ul class="gl-list">${open.map(g=>{ const r=RECIPES.find(x=>x.id===g.rid);
@@ -3478,7 +3535,7 @@ const withHistory = (rec, base, action, by) => { rec.history = [...((base&&base.
 const historyLines = r => (r.history||[]).slice(-6).map(h=>h.a==="moved" ? `Moved here${h.from?" from "+h.from:""} by ${h.by} on ${fmtDate(h.at)}` : `${h.a==="added"?"Added":"Changed"} by ${h.by} on ${fmtDate(h.at)}`);
 const toDoc = r => ({pub: r.pub===undefined ? pubDefault(r.c) : !!r.pub, c:r.c, t:r.t, by:r.by||"", n:r.n||"", pre:r.pre||[], kind:r.kind||"", time:r.time||"", serves:r.serves||"", sec:r.sec||"", ...(r.no?{no:r.no}:{}), ...(r.code?{code:r.code}:{}), ord:r.ord||0, deleted:false, updated:Date.now(), ...(r.history?{history:r.history}:{}),
   s:r.s.map(([ing,h,items])=>({k:ing?"ing":"step", h:h||"", items:items}))});
-const fromDoc = (id,d) => ({id, pub: d.pub===undefined ? undefined : !!d.pub, c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, pre:d.pre, kind:d.kind||"", time:d.time||"", serves:d.serves||"", sec:d.sec||"", no:d.no||0, code:d.code||"", ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[], rv:d.rv||"", rvNote:d.rvNote||"", rvNoteBy:d.rvNoteBy||"", rvBy:d.rvBy||"", rvUids:d.rvUids||[], rvAsk:d.rvAsk||[], rvLog:d.rvLog||[],
+const fromDoc = (id,d) => ({id, pub: d.pub===undefined ? undefined : !!d.pub, c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, pre:d.pre, kind:d.kind||"", time:d.time||"", serves:d.serves||"", sec:d.sec||"", no:d.no||0, code:d.code||"", ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[], rv:d.rv||"", rvNote:d.rvNote||"", rvNoteBy:d.rvNoteBy||"", rvBy:d.rvBy||"", rvUids:d.rvUids||[], rvAsk:d.rvAsk||[], rvLog:d.rvLog||[], oldCodes:d.oldCodes||[],
   s:(d.s||[]).map(x=>[x.k==="ing"?1:0, x.h||"", x.items||[]])});
 // Recipes are listed A to Z by category, then by recipe code (101001, 101002…); any without a code go after, A to Z by name.
 const sortName = r => r.t.replace(/^Untitled:\s*/,"").replace(/^[^A-Za-z0-9]+/,"");
@@ -3513,7 +3570,7 @@ function watchRecipes(){
   unsubRecipes = (pubOnly ? db.collection("recipes").where("pub","==",true) : db.collection("recipes")).onSnapshot(s=>{
     onlineIds = new Set(s.docs.map(d=>d.id));
     maxNo = s.docs.reduce((m,d)=>Math.max(m, +d.data().no||0), 0);
-    usedCodes = new Set(s.docs.map(d=>d.data().code).filter(Boolean));
+    usedCodes = heldCodes(s.docs.map(d=>d.data()));
     const live = s.docs.filter(d=>!d.data().deleted).map(d=>fromDoc(d.id,d.data()));
     if(pubOnly){ recipesOnline=true; setRecipes(live); store("gk-recipes-pub", RECIPES); }
     else if(s.docs.length){ recipesOnline=true; setRecipes(live); store("gk-recipes", RECIPES); }
@@ -3681,7 +3738,7 @@ function editor(r, cat, sub, draft){
       F.querySelector("#ed-confirm").innerHTML=`<div class="confirm">Delete “${esc(r.t)}” for everyone? <div class="row"><button type="button" class="btn warn" id="ed-yes">Delete</button><button type="button" class="btn" id="ed-no">Cancel</button></div></div>`;
       F.querySelector("#ed-no").onclick=()=>{F.querySelector("#ed-confirm").innerHTML=""};
       F.querySelector("#ed-yes").onclick=async()=>{
-        try{ await db.collection("recipes").doc(r.id).update({deleted:true, updated:Date.now()}); toast(`“${r.t}” was deleted`); location.hash=slug(r.c); }
+        try{ await db.collection("recipes").doc(r.id).update({deleted:true, deletedAt:Date.now(), updated:Date.now()}); toast(`“${r.t}” was deleted`); location.hash=slug(r.c); }
         catch(e){ toast("Couldn't delete. Check your connection."); }
       };
     };
@@ -3707,7 +3764,7 @@ function editor(r, cat, sub, draft){
         btn0.disabled=true; btn0.textContent="Sending…";
         const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s, ord:0});
         try{
-          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves||"",sec:d.sec,s:d.s, uid:me, byName:myName(), status:"pending", stage:"proof", created:Date.now(), editOf, ...(rqDraft&&rqDraft.id?{rq:rqDraft.id}:{})});
+          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves||"",sec:d.sec,s:d.s, uid:me, byName:myName(), status:"pending", stage:"proof", created:Date.now(), editOf, ...(rqDraft&&rqDraft.id?{rq:rqDraft.id}:{}), ...(draft&&draft.dropOf?{dropOf:draft.dropOf}:{})});
           if(draft && draft.fromSub) db.collection("submissions").doc(draft.fromSub).delete().catch(()=>{});
           notifyWatchers("watch-proof", editOf ? `${myName()} requested a change` : `New recipe from ${myName()}`, `“${editOf&&target?target.t:t}” needs to be proofread.`, "#proof", editOf?"pencil2":"cookie");
           toast("Sent. It will be proofread, approved and released."); location.hash = may("proofread") ? "proof" : "mine";
@@ -3747,7 +3804,7 @@ const INBOXES = [["proof","Need to proofread","proofread"],["approve","For appro
 const mayInboxes = () => may("proofread") || may("review") || may("release");
 const inboxCount = st => st==="proof" ? (may("proofread") ? inStage("proof").length + rvIn("proof").length : 0)
   : st==="approve" ? (may("review") ? inStage("approve").length + rvIn("approve").length : 0)
-  : st==="admin" ? (isAdmin() ? pendingPhotos.length + openMoves() + openGolive() : 0)
+  : st==="admin" ? (isAdmin() ? pendingPhotos.length + openMoves() + openGolive() + openDeletes() : 0)
   : (may("release") ? inStage("release").length + rvIn("release").length : 0);
 const INBOX_NAME = {proof:"Need to proofread", approve:"For approval", release:"Ready to release"};
 // Move a cookbook recipe through the inboxes
@@ -3829,7 +3886,16 @@ async function approveSub(sub, pub){
   if(!rec.sec && tgt) rec.sec = tgt.sec||"";
   rec.code = (tgt && tgt.code && tgt.c===rec.c) ? tgt.code : nextCode(rec.c, rec.sec||"");
   withHistory(rec, tgt, tgt?"changed":"added", sub.byName);
-  await db.collection("recipes").doc(rec.id).set(toDoc(rec), {merge:true});
+  await db.collection("recipes").doc(rec.id).set(Object.assign(toDoc(rec), tgt && tgt.code && tgt.code!==rec.code ? {oldCodes:freeCode(tgt, rec.code)} : {}), {merge:true});
+  // A merge can ask for the other recipe to go: admins delete it now; otherwise it waits in Needs admin approval
+  const drop = sub.dropOf && sub.dropOf!==rec.id ? RECIPES.find(x=>x.id===sub.dropOf) : null;
+  if(drop){
+    let gone=false;
+    try{ await db.collection("recipes").doc(drop.id).update({deleted:true, deletedAt:Date.now(), updated:Date.now(), mergedBy:sub.id}); gone=true; }catch(e){}
+    if(!gone){ await db.collection("golive").doc().set({uid:me, byName:myName(), rid:drop.id, title:drop.t, status:"open", created:Date.now(), kind:"delete", to:rec.id, from:rec.t}).catch(()=>{});
+      notifyAdmin(`A merged recipe can be deleted`, `“${drop.t}” was merged into “${rec.t}”. Delete it in Needs admin approval.`, "#admin-approval", "wastebasket"); }
+    else toast(`“${drop.t}” was merged in, so it's deleted`);
+  }
   await db.collection("submissions").doc(sub.id).update({status:"approved", recipeId:rec.id, decided:Date.now(), releasedAs: rec.pub===false?"private":"public", releasedBy:myName(),
     log:[...(sub.log||[]), {from:"release", to:"done", by:myName(), uid:me, at:Date.now(), pub:rec.pub!==false}].slice(-30)});
   if(sub.rq) db.collection("requests").doc(sub.rq).update({status:"done", recipeId:rec.id, decided:Date.now()}).catch(()=>{});
@@ -3903,7 +3969,9 @@ function mergePage(ida, idb){
       <p class="hint" style="margin:10px 0 0">Untick what you don't want. Lines both recipes share are shown once. Where the two say something different, recipe 1's is ticked — tick recipe 2's instead if it's better, or both.</p></div>
     <div class="panel-a"><b>Name, category and details from</b>
       <div class="mg-base" role="radiogroup"><label><input type="radio" name="mg-base" value="a" checked> <span class="cmp-tag del">1</span> ${esc(nm(A))}</label><label><input type="radio" name="mg-base" value="b"> <span class="cmp-tag add">2</span> ${esc(nm(B))}</label></div>
-      <p class="hint" style="margin:6px 0 0">The merged recipe is sent as a change to that recipe; the other one stays as it is.</p></div>
+      <p class="hint" style="margin:6px 0 0">The merged recipe is sent as a change to that recipe.</p>
+      <label class="mg-drop"><input type="checkbox" id="mg-drop" checked> Delete the other recipe automatically once the merged one is released</label>
+      <p class="hint" style="margin:4px 0 0">The merged recipe goes through proofreading, approval and release first; the other one stays until then. Its code isn't given to another recipe for a year, so nobody mixes them up.</p></div>
     <div class="panel-a"><div class="row mg-quick"><span>Tick:</span><button type="button" class="btn sm" data-mgall="del">Everything from 1</button><button type="button" class="btn sm" data-mgall="add">Everything from 2</button><button type="button" class="btn sm" data-mgall="all">Everything</button></div>
       <div class="mg-list">${html}</div></div>
     <div class="row" style="margin:14px 0 30px"><button type="button" class="btn solid" id="mg-go">Continue — check the merged recipe</button><a class="btn" href="#compare~${esc(A.id)}~${esc(B.id)}">Back to compare</a><span class="hint" id="mg-n"></span></div>
@@ -3918,7 +3986,7 @@ function mergePage(ida, idb){
     if(!parts.length){ toast("Tick at least one line."); return; }
     const useB = app.querySelector('[name=mg-base]:checked').value==="b", base=useB?B:A, other=useB?A:B;
     const otherName = nm(other)+(codeOf(other)?" ("+codeOf(other)+")":"");
-    editor(null, base.c, null, Object.assign({}, base, {s:parts, editOf:base.id, n:[base.n, `Merged with ${otherName}.`].filter(Boolean).join(" "), serves:base.serves||other.serves||"", time:base.time||other.time||""}));
+    editor(null, base.c, null, Object.assign({}, base, {s:parts, editOf:base.id, dropOf:document.getElementById("mg-drop").checked?other.id:"", n:[base.n, `Merged with ${otherName}.`].filter(Boolean).join(" "), serves:base.serves||other.serves||"", time:base.time||other.time||""}));
     window.scrollTo(0,0);
   };
 }
@@ -3955,10 +4023,10 @@ function adminApprovalPage(){
   app.innerHTML=`<section class="wrap admin inbox">
     <div class="section-head" style="margin-top:28px"><h2>Needs admin approval</h2><p>${n} waiting</p></div>
     <p class="hint" style="margin:-6px 0 12px">Everything that needs an admin's OK before it happens: moving a recipe to another category, photos people sent, and requests to go public.</p>
-    ${movesHTML()}${photoReviewHTML()}${goliveHTML()}
+    ${movesHTML()}${deletesHTML()}${photoReviewHTML()}${goliveHTML()}
     ${n?"":`<div class="panel-a"><p class="hint mempty">Nothing waiting for an admin.</p></div>`}
   </section>`;
-  bindPhotoReview(); wireMoves(); wireGolive();
+  bindPhotoReview(); wireMoves(); wireDeletes(); wireGolive();
 }
 const mayFix = r => may("edit") || mayPublish();
 function recipeInbox(stage){
