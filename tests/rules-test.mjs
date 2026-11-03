@@ -340,6 +340,10 @@ const del = (id, sub, extra) => Object.assign({ deleted: true, deletedAt: 1, upd
 await check("a releaser can't delete a recipe the merge didn't name", assertFails(updateDoc(doc(RL, 'recipes', 'r-other'), del('r-other', 'sm1'))));
 await check("…nor one whose merge hasn't reached Ready to release", assertFails(updateDoc(doc(RL, 'recipes', 'r-other'), del('r-other', 'sm2'))));
 await check("…nor change anything else while deleting", assertFails(updateDoc(doc(RL, 'recipes', 'r-gone'), del('r-gone', 'sm1', { t: 'X' }))));
+await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'recipes', 'r-probe'), { t: 'P', c: 'Cakes', rv: 'release', rvUids: [] }); });
+await check('PROBE releaser moves rv', assertSucceeds(updateDoc(doc(RL, 'recipes', 'r-probe'), { rv: '' })));
+await check('PROBE read sub', assertSucceeds(getDoc(doc(RL, 'submissions', 'sm1'))));
+await check('PROBE releaser deletes w/o sub check keys only', assertSucceeds(updateDoc(doc(RL, 'recipes', 'r-probe'), { rvNote: 'x' })));
 await check('whoever releases a merge deletes the recipe merged into it', assertSucceeds(updateDoc(doc(RL, 'recipes', 'r-gone'), del('r-gone', 'sm1'))));
 await check("an employee without release can't", assertFails(updateDoc(doc(EMP, 'recipes', 'r-other'), del('r-other', 'sm2'))));
 
