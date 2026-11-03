@@ -78,7 +78,7 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/users/$(uid)).data.get('role', 'public') != 'admin');
     }
 
-    // Recipe code letters per category, and number blocks per section. Members read, only the admin writes.
+    // Recipe code numbers per category and per Pesach section. Members read, only the admin writes.
     // The design everyone gets (chosen by an admin).
     match /meta/look {
       allow get: if signedIn();
@@ -222,7 +222,15 @@ service cloud.firestore {
             && rvSteps())
         || (resource != null && extra('release')
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub'])
-            && rvSteps());
+            && rvSteps())
+        // Merging: whoever releases the merged recipe deletes the one that was merged into it (and nothing else)
+        || (resource != null && extra('release') && resource.data.get('deleted', false) == false
+            && request.resource.data.deleted == true
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'deletedAt', 'updated', 'mergedBy'])
+            && exists(/databases/$(database)/documents/submissions/$(request.resource.data.mergedBy))
+            && get(/databases/$(database)/documents/submissions/$(request.resource.data.mergedBy)).data.get('dropOf', '') == id
+            && get(/databases/$(database)/documents/submissions/$(request.resource.data.mergedBy)).data.get('stage', '') == 'release'
+            && get(/databases/$(database)/documents/submissions/$(request.resource.data.mergedBy)).data.status == 'pending');
     }
 
     // Employees asking for a recipe to be shown to public members. Admins decide.

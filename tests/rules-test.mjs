@@ -327,6 +327,22 @@ await check('owner can take admin away', assertSucceeds(updateDoc(doc(OWN, 'user
 await check('owner can remove an admin', assertSucceeds(deleteDoc(doc(OWN, 'users', 'emp'))));
 await check('a new admin has admin rights', assertSucceeds(getDoc(doc(as('adm'), 'users', 'pub'))));
 
+// Merging: whoever releases the merged recipe deletes the other one automatically, and nothing else
+await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
+  await setDoc(doc(d, 'users', 'rl1'), { name: 'Rl One', status: 'approved', role: 'employee', perms: { release: true, review: false }, created: 1, favs: [] });
+  await setDoc(doc(d, 'recipes', 'r-keep'), { t: 'Keep', c: 'Cakes', code: '102001', deleted: false });
+  await setDoc(doc(d, 'recipes', 'r-gone'), { t: 'Gone', c: 'Cakes', code: '102002', deleted: false });
+  await setDoc(doc(d, 'recipes', 'r-other'), { t: 'Other', c: 'Cakes', code: '102003', deleted: false });
+  await setDoc(doc(d, 'submissions', 'sm1'), { uid: 'emp', status: 'pending', stage: 'release', editOf: 'r-keep', dropOf: 'r-gone', t: 'Keep' });
+  await setDoc(doc(d, 'submissions', 'sm2'), { uid: 'emp', status: 'pending', stage: 'approve', editOf: 'r-keep', dropOf: 'r-other', t: 'Keep' }); });
+const RL = env.authenticatedContext('rl1').firestore();
+const del = (id, sub, extra) => Object.assign({ deleted: true, deletedAt: 1, updated: 1, mergedBy: sub }, extra || {});
+await check("a releaser can't delete a recipe the merge didn't name", assertFails(updateDoc(doc(RL, 'recipes', 'r-other'), del('r-other', 'sm1'))));
+await check("…nor one whose merge hasn't reached Ready to release", assertFails(updateDoc(doc(RL, 'recipes', 'r-other'), del('r-other', 'sm2'))));
+await check("…nor change anything else while deleting", assertFails(updateDoc(doc(RL, 'recipes', 'r-gone'), del('r-gone', 'sm1', { t: 'X' }))));
+await check('whoever releases a merge deletes the recipe merged into it', assertSucceeds(updateDoc(doc(RL, 'recipes', 'r-gone'), del('r-gone', 'sm1'))));
+await check("an employee without release can't", assertFails(updateDoc(doc(EMP, 'recipes', 'r-other'), del('r-other', 'sm2'))));
+
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(`::notice::Rule checks: ${pass} passed, ${fail} failed`);
