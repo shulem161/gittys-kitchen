@@ -86,6 +86,9 @@ button{font:inherit;color:inherit}
 .brand span{font-family:var(--display);font-size:20px}
 .search{flex:1;min-width:0;max-width:380px;margin-left:auto;position:relative}
 .cb-open-btn{margin-top:8px}
+.upd-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+.upd-tabs button{padding:11px 10px;border-radius:12px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
+.upd-tabs button[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
 .upd-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}.upd-list li{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .upd-list li.wait{border-color:var(--accent);background:var(--accent-soft)}.upd-list li>div{display:grid;gap:2px;min-width:0}.upd-list small{color:var(--muted)}.upd-list p{margin:4px 0}
 .upd-state{font-size:13px;font-weight:600}.upd-list li.on .upd-state{color:#2c7a4b}.upd-list .btn{flex:none}
@@ -1299,7 +1302,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.19";
+const WEB_VERSION = "4.20";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1337,6 +1340,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["updpage","4.20","2026-11-05","App & web updates page","Its own page under Settings, with two tabs: updates to approve and updates already approved. Only you use it.", true],
   ["tabsearch","4.18","2026-11-05","Search bar under the categories","A search bar right under the row of categories, on the home page and category pages, that searches the whole cookbook.", false],
   ["cbbrowse","4.18","2026-11-05","Browse the cookbook for menus and the calendar","A “Browse the cookbook” button when making a menu or adding recipes to a day: pick recipes by category or by searching.", false],
   ["nkhide","4.18","2026-11-05","Not kosher recipes hidden from the cookbook","A recipe in the Not kosher inbox is hidden from the whole cookbook. Approving it puts it back in the cookbook and on to Need to proofread.", false],
@@ -2850,23 +2854,31 @@ function menuOptions(){ const L=Object.values(MENUS).sort((a,b)=>(a.uid!==me)-(b
 // Short holiday names for the small calendar boxes
 const CAL_SHORT = {"ראש השנה":"ר״ה","יום כיפור":"יוה״כ","הושענא רבה":"הוש״ר","שמיני עצרת":"שמ״ע","שמחת תורה":"שמח״ת","שבעה עשר בתמוז":"י״ז תמוז","תשעה באב":"ת״ב","תענית אסתר":"תענית אסתר","שושן פורים":"שושן פורים"};
 const calShort = n => { n=n.replace(/ · .*$/,""); if(/^ראש חודש/.test(n)) return "ר״ח"; if(/^חול המועד/.test(n)) return "חוה״מ"; return CAL_SHORT[n]||n; };
-// App & web updates (owner only, in App settings): every update, and whether everyone else has it yet
-function updatesPanel(){
-  const w=updWaiting();
-  return `<div class="panel-a set-upds" id="set-upds"><h3>App &amp; web updates ${w?`<span class="count">${w} to approve</span>`:""}</h3>
-    <p class="hint">Every update goes live for you first. Admins, employees and customers get it only once you approve it here. You can take an approval back at any time.</p>
-    ${w>1?`<div class="row"><button type="button" class="btn sm" data-updall>Approve all ${w}</button></div>`:""}
-    <ul class="upd-list">${UPDATES.map(([k,v,d,title,about])=>{ const on=featOn(k);
-      return `<li class="${on?"on":"wait"}"><div><b>${esc(title)}</b><small>Version ${esc(v)} · ${fmtDate(new Date(d+"T12:00").getTime())}</small><p>${esc(about)}</p>
-        <span class="upd-state">${on?"✓ Approved – everyone has it":"⏳ Waiting for your approval – only you see it"}</span></div>
-        <button type="button" class="btn sm${on?"":" solid"}" data-upd="${k}" data-on="${on?0:1}">${on?"Take back":"Approve"}</button></li>`; }).join("")}</ul></div>`;
-}
-function wireUpdates(){
-  const save=async on=>{ try{ await db.collection("meta").doc("features").set({on, by:myName(), at:Date.now()}); FEAT=on; setRecipes(RAW_RECIPES); renderAcct(); const y=window.scrollY; settingsPage(); window.scrollTo(0,y); return true; }
+// App & web updates (owner only): its own page under Settings, with two tabs — to approve, and approved
+function updatesPage(){
+  const tab = store("gk-updtab")==="done" ? "done" : "wait";
+  const wait=UPDATES.filter(([k])=>!featOn(k)), done=UPDATES.filter(([k])=>featOn(k)), list = tab==="wait" ? wait : done;
+  app.innerHTML=`<section class="wrap admin settings">
+    <div class="section-head" style="margin-top:28px"><h2>App &amp; web updates</h2><p>${wait.length} to approve · ${done.length} approved</p></div>
+    <p class="hint" style="margin:-6px 0 12px">Every update goes live for you first. Admins, employees and customers get it only once you approve it. You can take an approval back at any time.</p>
+    <div class="upd-tabs" role="tablist" aria-label="Updates">
+      <button type="button" role="tab" data-updtab="wait" aria-selected="${tab==="wait"}">To approve <span class="count">${wait.length}</span></button>
+      <button type="button" role="tab" data-updtab="done" aria-selected="${tab==="done"}">Approved <span class="count">${done.length}</span></button></div>
+    <div class="panel-a set-upds" id="set-upds" role="tabpanel">
+      ${tab==="wait"&&wait.length>1?`<div class="row" style="margin-bottom:8px"><button type="button" class="btn sm" data-updall>Approve all ${wait.length}</button></div>`:""}
+      ${list.length?`<ul class="upd-list">${list.map(([k,v,d,title,about])=>{ const on=featOn(k);
+        return `<li class="${on?"on":"wait"}"><div><b>${esc(title)}</b><small>Version ${esc(v)} · ${fmtDate(new Date(d+"T12:00").getTime())}</small><p>${esc(about)}</p>
+          <span class="upd-state">${on?"✓ Approved – everyone has it":"⏳ Only you see it until you approve it"}</span></div>
+          <button type="button" class="btn sm${on?"":" solid"}" data-upd="${k}" data-on="${on?0:1}">${on?"Take back":"Approve"}</button></li>`; }).join("")}</ul>`
+        : `<p class="hint mempty">${tab==="wait"?"Nothing to approve. Everything is live for everyone.":"Nothing approved yet."}</p>`}
+    </div>
+  </section>`;
+  app.querySelectorAll("[data-updtab]").forEach(b=>b.onclick=()=>{ store("gk-updtab", b.dataset.updtab); updatesPage(); });
+  const save=async on=>{ try{ await db.collection("meta").doc("features").set({on, by:myName(), at:Date.now()}); FEAT=on; setRecipes(RAW_RECIPES); renderAcct(); const y=window.scrollY; updatesPage(); window.scrollTo(0,y); return true; }
     catch(e){ toast("Couldn't save. Check your connection."); return false; } };
   const cur=()=>Object.fromEntries(UPDATES.map(([k])=>[k, featOn(k)]));
   app.querySelectorAll("[data-upd]").forEach(b=>b.onclick=async()=>{ const on=cur(); on[b.dataset.upd]=b.dataset.on==="1"; b.disabled=true;
-    if(await save(on)) toast(on[b.dataset.upd]?"Approved – everyone has it now":"Taken back – only you see it now"); });
+    if(await save(on)) toast(on[b.dataset.upd]?"Approved – it's in Approved, and everyone has it now":"Taken back – it's in To approve, and only you see it now"); });
   const all=app.querySelector("[data-updall]"); if(all) all.onclick=async()=>{ const on=cur(); UPDATES.forEach(([k])=>on[k]=true); if(await save(on)) toast("All approved"); };
 }
 // Browse the whole cookbook by category and pick recipes (for menus and the calendar)
@@ -3677,7 +3689,7 @@ function openMenu(confirming){
       offline||!can("ai") ? "" : item("#menu","Menu ideas"),
       offline||!can("feedback")||may("inbox") ? "" : item("#feedback","Suggestions &amp; comments"),
     ].filter(Boolean), 0)}
-    ${group("settings","Settings", [item("#account","Account settings"), item("#settings-look", LOOK_SET(), updWaiting()?updWaiting()+" to approve":"", updWaiting()), isAdmin()?item("#inbox-settings","Inbox settings"):"", isAdmin()?item("#employees","Employee settings"):"", isAdmin()?item("#public","Customer portal settings", openGolive()?openGolive()+" waiting":"", openGolive()):""].filter(Boolean), isAdmin()?openGolive():0)}
+    ${group("settings","Settings", [item("#account","Account settings"), item("#settings-look", LOOK_SET()), realOwner()&&!viewingAs()?item("#updates","App &amp; web updates", updWaiting()?updWaiting()+" to approve":"", updWaiting()):"", isAdmin()?item("#inbox-settings","Inbox settings"):"", isAdmin()?item("#employees","Employee settings"):"", isAdmin()?item("#public","Customer portal settings", openGolive()?openGolive()+" waiting":"", openGolive()):""].filter(Boolean), isAdmin()?openGolive():0)}
     <button type="button" role="menuitem" id="m-out" class="m-out">Sign out</button>`;
   m.querySelectorAll(".mgroup").forEach(d=>d.addEventListener("toggle",()=>{ d.open ? menuOpen.add(d.dataset.mg) : menuOpen.delete(d.dataset.mg); }));
   m.onclick=e=>e.stopPropagation();
@@ -5872,7 +5884,7 @@ function settingsPage(){
       <div class="field"><label for="pref-todo">Show my to-do list on the home page when there's something to do in…</label>
         <select id="pref-todo">${TODO_CHOICES.map(([v,l])=>`<option value="${v}" ${v===todoDays()?"selected":""}>${l}</option>`).join("")}</select></div>
       <p class="hint">Otherwise it stays out of the way. Today's to-do list is always on the Calendar, on today's date.</p></div>`:""}
-    ${realOwner()&&!viewingAs()?updatesPanel():""}
+    ${realOwner()&&!viewingAs()?`<a class="panel-a set-link" href="#updates"><span><b>App &amp; web updates</b><small>${updWaiting()?updWaiting()+" waiting for your approval":"Everything is approved"}</small></span><span aria-hidden="true">›</span></a>`:""}
     <div class="panel-a set-app"><h3>App</h3>
       <p>Version ${WEB_VERSION}${appBuild?` · Android app ${appBuild}`:""}</p>
       <div class="row mn-actions"><button type="button" class="btn" id="set-upd">Check for updates</button>${isAdmin()?`<button type="button" class="btn" id="set-ntfy">Send a test notification</button>`:""}</div>
@@ -5887,7 +5899,6 @@ function settingsPage(){
   app.querySelectorAll("[data-tsize]").forEach(b=>b.onclick=()=>{ store("gk-textsize", b.dataset.tsize==="1"?null:b.dataset.tsize); applyTextSize(); settingsPage(); });
   const pt=document.getElementById("pref-todo"); if(pt) pt.onchange=()=>{ setPref("todoDays", +pt.value); toast("Saved"); };
   document.getElementById("set-upd").onclick=()=>checkUpdates(true);
-  wireUpdates();
   const stn=document.getElementById("set-ntfy"); if(stn) stn.onclick=async()=>{ const r=await notifyAdmin("Test from Gitty's Kitchen","Notifications are working.","","white_check_mark"); toast(r&&r.ok?"Test sent. Check your device.":"Couldn't send. Check your connection."); };
   document.getElementById("set-copy").onclick=()=>copyText(SITE);
   document.getElementById("set-apkcopy").onclick=()=>copyText(SITE+"Gittys-Kitchen.apk");
@@ -6325,6 +6336,7 @@ function routePage(){
   if(h==="profile"){ q.value=""; profilePage(); window.scrollTo(0,0); return; }
   if(h==="settings"){ q.value=""; settingsPage(); window.scrollTo(0,0); return; }
   if(h==="inbox-settings" && isAdmin()){ q.value=""; inboxSettings(); window.scrollTo(0,0); return; }
+  if(h==="updates" && realOwner() && !viewingAs()){ q.value=""; updatesPage(); window.scrollTo(0,0); return; }
   if(h==="settings-look"){ q.value=""; settingsPage(); window.scrollTo(0,0); return; }
   if(h==="account"){ q.value=""; profilePage("account"); window.scrollTo(0,0); return; }
   if(h==="inbox" && may("inbox")){ q.value=""; inboxPage(); window.scrollTo(0,0); return; }

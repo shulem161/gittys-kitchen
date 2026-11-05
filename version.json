@@ -1,6 +1,6 @@
 {
-  "web": "4.19",
+  "web": "4.20",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "App & web updates in App settings: every update is the owner's first, and goes to everyone once he approves it."
+  "notes": "App & web updates has its own page under Settings: To approve and Approved."
 }

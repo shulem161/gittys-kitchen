@@ -828,20 +828,23 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    await A.goto(F + '#settings-look'); await A.waitForTimeout(400);
-    const upTxt = await A.locator('#set-upds').innerText().catch(() => '');
-    ok('App settings lists every update, with the ones waiting for approval', /App & web updates/.test(upTxt) && /Search bar under the categories/.test(upTxt) && /Not kosher inbox/.test(upTxt) && (await A.locator('#set-upds [data-upd][data-on="1"]').count()) === 3, upTxt.slice(0, 200));
-    ok('…and the menu shows how many are waiting', /3 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=settings]').textContent; closeMenu(); return x; })));
-    await V.goto(F + '#settings-look'); await V.waitForTimeout(300);
-    ok("…only the owner sees it", (await V.locator('#set-upds').count()) === 0);
+    ok('Settings has its own App & web updates item, with how many are waiting', /App & web updates[\s\S]*3 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=settings]').textContent; closeMenu(); return x; })));
+    await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
+    const upTxt = await A.locator('#app').innerText();
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 2 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && !/Not kosher inbox\n/.test(upTxt) && (await A.locator('#set-upds [data-upd][data-on="1"]').count()) === 3, upTxt.slice(0, 300));
+    await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
+    ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-upd][data-on="1"]').count()) === 0);
+    await V.goto(F + '#updates'); await V.waitForTimeout(300);
+    ok("…only the owner has it", (await V.locator('#set-upds').count()) === 0 && !/App & web updates/.test(await V.evaluate(() => { openMenu(); const x = document.querySelector('.menu').textContent; closeMenu(); return x; })));
+    await A.click('[data-updtab=wait]'); await A.waitForTimeout(200);
     await A.locator('#set-upds [data-upd=tabsearch]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update gives it to everyone', (await V.locator('.tab-search').count()) === 1 && await A.evaluate(() => db.collection('meta').doc('features').get().then(s => s.data().on.tabsearch === true)));
-    await A.goto(F + '#settings-look'); await A.waitForTimeout(300); await A.locator('#set-upds [data-upd=tabsearch]').click(); await A.waitForTimeout(800);
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /2/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('…and taking it back takes it away again', (await V.locator('.tab-search').count()) === 0);
-    await A.goto(F + '#settings-look'); await A.waitForTimeout(300); await A.click('[data-updall]'); await A.waitForTimeout(800);
-    ok('“Approve all” approves every waiting update', await A.evaluate(() => UPDATES.every(([k]) => featOn(k))) && (await A.locator('#set-upds [data-upd][data-on="1"]').count()) === 0);
+    ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
+    await A.click('[data-updtab=wait]'); await A.waitForTimeout(200); await A.click('[data-updall]'); await A.waitForTimeout(800);
+    ok('“Approve all” approves every waiting update', await A.evaluate(() => UPDATES.every(([k]) => featOn(k))) && /Nothing to approve/.test(await A.locator('#set-upds').innerText()));
     // Not kosher: an inbox before Need to proofread that only gets what an admin puts there
     await A.goto(F + '#kosher'); await A.waitForTimeout(400);
     ok('there is a Not kosher inbox before Need to proofread, empty to start with', /Not kosher/.test(await A.locator('h2').first().innerText()) && /Nothing in Not kosher/.test(await A.locator('#app').innerText()) && /Not kosher[\s\S]*Need to proofread/.test(await A.locator('.ib-steps').innerText()), [await A.evaluate(() => location.hash + ' ' + state), (await A.locator('#app').innerText()).slice(0, 300)]);
