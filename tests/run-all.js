@@ -614,6 +614,12 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
 
     // Calendar (Hebrew dates, holidays) and menus
     await A.goto(F + '#plan-2026-12-05'); await A.waitForTimeout(500);
+    { await A.goto(F + '#plan-2026-12-08'); await A.waitForTimeout(400);
+      const before = await A.evaluate(() => (PLAN.days['2026-12-08'] || []).length);
+      const hasBrowse = await A.locator('#pl-browse').count();
+      if (hasBrowse) { await A.click('#pl-browse'); await A.waitForTimeout(150); await A.fill('#cb-q', 'challah'); await A.waitForTimeout(150); await A.locator('.cb-pick .cb-r').first().click(); await A.click('#cb-done'); await A.waitForTimeout(500); }
+      ok('a day on the calendar can get recipes by browsing the cookbook', hasBrowse === 1 && await A.evaluate(b => (PLAN.days['2026-12-08'] || []).length === b + 1, before));
+      await A.goto(F + '#plan-2026-12-05'); await A.waitForTimeout(500); }
     const dh = await A.locator('.pl-dhead').innerText();
     ok('calendar writes the Hebrew date and the Yom Tovim in Hebrew', /כ״ה כסלו תשפ״ז/.test(dh) && !/Kislev|Chanukah|Shabbos/.test(dh) && /חנוכה · נר א׳/.test(dh) && /שבת קודש/.test(dh), dh);
     await A.goto(F + '#plan-2026-09-26'); await A.waitForTimeout(400);
@@ -647,6 +653,16 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // edit the menu: the linked day shows the change
     const mid = await A.evaluate(() => Object.values(MENUS).find(m => m.name === 'Test Friday night').id);
     await A.goto(F + '#menu-' + mid); await A.waitForTimeout(300); await A.fill('#mi-q', 'kugel'); await A.waitForTimeout(150); await A.locator('[data-miadd]').first().click(); await A.waitForTimeout(300);
+    { const n0 = await A.evaluate(id => MENUS[id].items.length, mid);
+      await A.click('#mi-browse'); await A.waitForTimeout(200);
+      const cats = await A.locator('.cb-pick [data-cbc]').count();
+      await A.locator('.cb-pick [data-cbc]', {hasText: 'Bread'}).click(); await A.waitForTimeout(150);
+      const inBread = await A.locator('.cb-pick .cb-list [data-cb]').count();
+      if (process.env.SHOTD) { const vs = A.viewportSize(); await A.setViewportSize({width: 390, height: 760}); await A.waitForTimeout(200); await A.screenshot({path: process.env.SHOTD + '-cb.png'}); await A.setViewportSize(vs); }
+      await A.locator('.cb-pick .cb-r:not(.on)').first().click(); await A.fill('#cb-q', 'brownie'); await A.waitForTimeout(150);
+      await A.locator('.cb-pick .cb-r:not(.on)').first().click(); await A.click('#cb-done'); await A.waitForTimeout(500);
+      ok('a menu can be filled by browsing the cookbook, category by category or by searching', cats >= 5 && inBread >= 2 && await A.evaluate(([id, n]) => MENUS[id].items.length === n + 2, [mid, n0]) && (await A.locator('.cb-pick').count()) === 0);
+      await A.evaluate(([id, n]) => { MENUS[id].items = MENUS[id].items.slice(0, n); saveMenu(MENUS[id]); }, [mid, n0]); await A.waitForTimeout(400); await A.goto(F + '#menu-' + mid); await A.waitForTimeout(300); }
     await A.goto(F + '#plan-2026-12-04'); await A.waitForTimeout(400);
     ok('the day is linked to the menu: changes show up', /1 of 3 made/.test(await A.locator('.pl-prog').innerText()));
     // share it
@@ -804,11 +820,23 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.evaluate(async () => { await db.collection('recipes').doc('r-challah').update({deleted: false}); }); await A.waitForTimeout(800);
     await PU.goto(F + '#compare~r-croissants~r-challah'); await PU.waitForTimeout(400);
     ok("…customers can't", (await PU.locator('.cmp').count()) === 0);
+    await A.goto(F + '#c-bread'); await A.waitForTimeout(300);
+    await A.locator('.tab-search .tq').fill('kugel'); await A.waitForTimeout(400);
+    ok('a search bar right under the categories searches the whole cookbook', /Results for “kugel”/.test(await A.locator('h2').first().innerText()) && (await A.locator('.tq').inputValue()) === 'kugel' && await A.evaluate(() => document.activeElement && document.activeElement.classList.contains('tq')));
+    await A.locator('.tab-search .tq').fill(''); await A.waitForTimeout(300);
     // Owner's view: a new version waits in /preview/ until the owner OKs it
     { const pvPage = async (email, pw) => { const P = await page(); await P.addInitScript(() => { window.GK_PREVIEW = true; }); await P.reload(); await P.waitForTimeout(400);
         await P.fill('#nm', email); await P.fill('#pw', pw); await P.click('.primary'); await P.waitForTimeout(1500); return P; };
       const O = await pvPage('shulem.schlesinger@example.com', 'admin123');
       ok("the owner's preview shows a bar to OK the new version", (await O.locator('#pvbar').isVisible()) && /Owner's view/.test(await O.locator('#pvbar').innerText()) && (await O.locator('#pv-ok').count()) === 1, await O.evaluate(() => state));
+      await A.goto(F + '#kosher'); await A.waitForTimeout(400);
+      ok("a new feature stays off for everyone until the owner switches it on", await A.evaluate(() => !feat('nk') && !/Not kosher/.test(document.getElementById('app').innerText)) && await O.evaluate(() => feat('nk')));
+      if (process.env.SHOTD) { await O.setViewportSize({width: 390, height: 760}); await O.waitForTimeout(300); await O.screenshot({path: process.env.SHOTD + '-pv.png'});
+        await O.evaluate(() => window.scrollTo(0, 400)); await O.waitForTimeout(200); await O.screenshot({path: process.env.SHOTD + '-pv2.png'}); await O.evaluate(() => window.scrollTo(0, 0)); }
+      await O.click('#pv-pick'); await O.waitForTimeout(150);
+      ok("…Owner's view lists each new feature with its own switch", (await O.locator('#pv-panel [data-ft=nk]').count()) === 1 && !(await O.locator('#pv-panel [data-ft=nk]').isChecked()));
+      await O.locator('#pv-panel [data-ft=nk]').check(); await O.click('#pv-save'); await O.waitForTimeout(800);
+      ok('…switching one on turns it on for everyone', await A.evaluate(() => feat('nk')) && await O.evaluate(() => db.collection('meta').doc('features').get().then(s => s.data().on.nk === true)));
       await O.click('#pv-ok'); await O.click('#pv-yes'); await O.waitForTimeout(600);
       ok('…OK-ing it saves the OK, so it goes live for everyone', await O.evaluate(() => db.collection('meta').doc('release').get().then(s => s.exists && s.data().approve === WEB_VERSION)) && /goes live/.test(await O.locator('#pvbar').innerText()));
       await O.close();
@@ -822,13 +850,19 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     const bcWasPub = await A.evaluate(() => pubVisible(RECIPES.find(r => r.id === 'r-boston-cream-pie')));
     await A.goto(F + '#r-boston-cream-pie'); await A.waitForTimeout(400); await A.click('#nk-btn'); await A.waitForTimeout(150);
     await A.fill('#nk-why', 'Meat and milk together'); await A.click('#nk-go'); await A.waitForTimeout(700);
-    ok('an admin can put a recipe in Not kosher, with why', await A.evaluate(() => { const r = RECIPES.find(x => x.id === 'r-boston-cream-pie'); return r.rv === 'kosher' && r.pub === false && r.rvNote === 'Meat and milk together'; }) && /Not kosher/.test(await A.locator('.rv-bar').innerText()));
+    ok('an admin can put a recipe in Not kosher, with why', await A.evaluate(() => { const r = findAny('r-boston-cream-pie'); return r.rv === 'kosher' && r.pub === false && r.rvNote === 'Meat and milk together'; }) && /Not kosher/.test(await A.locator('.rv-bar').innerText()));
+    ok("…it's hidden from the cookbook, even for the team", await A.evaluate(() => !RECIPES.some(r => r.id === 'r-boston-cream-pie') && NK.some(r => r.id === 'r-boston-cream-pie')) && await V.evaluate(() => !RECIPES.some(r => r.id === 'r-boston-cream-pie')));
+    await A.goto(F + '#c-desserts'); await A.waitForTimeout(400);
+    ok("…it's not in its category", (await A.locator('.rc', {hasText: 'Boston Cream'}).count()) === 0);
     await PU.goto(F); await PU.waitForTimeout(800);
     ok("…customers don't see it while it's there", await PU.evaluate(() => !RECIPES.some(r => r.id === 'r-boston-cream-pie')));
     await A.goto(F + '#kosher'); await A.waitForTimeout(400);
     ok('…it waits in the Not kosher inbox', (await A.locator('.rv-list li', {hasText: 'Boston'}).count()) === 1 && /Meat and milk/.test(await A.locator('.rv-list').innerText()));
     await A.locator('.rv-list li', {hasText: 'Boston'}).locator('[data-rv=nkOk]').click(); await A.waitForTimeout(700);
-    ok('“It\'s kosher – take it out” puts it back as it was', await A.evaluate(w => { const r = RECIPES.find(x => x.id === 'r-boston-cream-pie'); return !r.rv && pubVisible(r) === w; }, bcWasPub));
+    ok('approving it puts it back in the cookbook and on to Need to proofread', await A.evaluate(w => { const r = RECIPES.find(x => x.id === 'r-boston-cream-pie'); return !!r && r.rv === 'proof' && pubVisible(r) === w && !NK.length; }, bcWasPub));
+    await A.goto(F + '#proof'); await A.waitForTimeout(400);
+    ok('…it waits in Need to proofread', (await A.locator('.rv-list li', {hasText: 'Boston'}).count()) === 1);
+    await A.evaluate(async () => { await db.collection('recipes').doc('r-boston-cream-pie').update({rv: '', rvUids: []}); }); await A.waitForTimeout(500);
     await V.goto(F + '#team'); await V.waitForTimeout(500); await V.locator('.tm-row', {hasText: '375°F'}).click(); await V.waitForTimeout(600);
     await V.click('#tm-done'); await V.waitForTimeout(600);
     await V.goto(F + '#team'); await V.waitForTimeout(500);

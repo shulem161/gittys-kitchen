@@ -156,6 +156,11 @@ service cloud.firestore {
       allow write: if isOwner() && request.resource.data.keys().hasOnly(['approve', 'by', 'at', 'live', 'liveAt'])
         && request.resource.data.approve is string;
     }
+    // Owner's view: which new features are switched on for everyone. Everyone reads it; only the owner switches.
+    match /meta/features {
+      allow get: if approvedMember();
+      allow write: if isOwner() && request.resource.data.keys().hasOnly(['on', 'by', 'at']) && request.resource.data.on is map;
+    }
     match /meta/codes {
       allow get: if signedIn();
       allow write: if isAdmin() || extra('review');

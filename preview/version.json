@@ -1,6 +1,6 @@
 {
-  "web": "4.17",
+  "web": "4.18",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New Not kosher inbox, before Need to proofread. Owner's view: new versions wait for the owner's OK."
+  "notes": "Owner's view: choose which new features go live. Not kosher inbox: recipes in it are hidden from the cookbook until approved."
 }

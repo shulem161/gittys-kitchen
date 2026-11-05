@@ -351,6 +351,11 @@ await check("an employee can't", assertFails(setDoc(doc(EMP, 'meta', 'release'),
 await check("a customer can't see it", assertFails(getDoc(doc(PUB, 'meta', 'release'))));
 await check("…and nothing else can be stored there", assertFails(setDoc(doc(OWN, 'meta', 'release'), { approve: '4.18', x: 1 })));
 
+await check('the owner can switch a new feature on for everyone', assertSucceeds(setDoc(doc(OWN, 'meta', 'features'), { on: { nk: true }, by: 'Owner', at: 1 })));
+await check('…everyone signed in can see the switches', assertSucceeds(getDoc(doc(PUB, 'meta', 'features'))));
+await check("…an admin can't switch them", assertFails(setDoc(doc(ADM, 'meta', 'features'), { on: { nk: false } })));
+await check("…nor an employee", assertFails(setDoc(doc(EMP, 'meta', 'features'), { on: { nk: false } })));
+
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(`::notice::Rule checks: ${pass} passed, ${fail} failed`);
