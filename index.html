@@ -86,7 +86,8 @@ button{font:inherit;color:inherit}
 .brand span{font-family:var(--display);font-size:20px}
 .search{flex:1;min-width:0;max-width:380px;margin-left:auto;position:relative}
 .cb-open-btn{margin-top:8px}
-.upd-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+.upd-acts{display:flex;flex-direction:column;gap:6px;flex:none}.upd-list li.no{opacity:.8}.upd-list li.no .upd-state{color:#a33}
+.upd-tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
 .upd-tabs button{padding:11px 10px;border-radius:12px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
 .upd-tabs button[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
 .upd-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}.upd-list li{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
@@ -1302,7 +1303,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.20";
+const WEB_VERSION = "4.21";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1340,6 +1341,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["upddecline","4.21","2026-11-05","Decline an update","A Decline button next to Approve. A declined update is taken off the app and the website for everyone, you too, and waits in the Declined tab in case you want it back. Only you use this.", true],
   ["updpage","4.20","2026-11-05","App & web updates page","Its own page under Settings, with two tabs: updates to approve and updates already approved. Only you use it.", true],
   ["tabsearch","4.18","2026-11-05","Search bar under the categories","A search bar right under the row of categories, on the home page and category pages, that searches the whole cookbook.", false],
   ["cbbrowse","4.18","2026-11-05","Browse the cookbook for menus and the calendar","A “Browse the cookbook” button when making a menu or adding recipes to a day: pick recipes by category or by searching.", false],
@@ -1348,9 +1350,10 @@ const UPDATES = [
 ];
 const FEATURES = UPDATES;
 const featOn = k => FEAT[k]!==undefined ? FEAT[k]===true : !!(UPDATES.find(f=>f[0]===k)||[])[5];
+const featDeclined = k => FEAT[k]==="declined";   // declined: off for everyone, the owner too
 let FEAT = {};
-const feat = k => (realOwner() && !viewingAs()) || featOn(k);   // the owner sees every update; "Log in as…" shows what others see
-const updWaiting = () => realOwner() ? UPDATES.filter(([k])=>!featOn(k)).length : 0;
+const feat = k => !featDeclined(k) && ((realOwner() && !viewingAs()) || featOn(k));   // the owner sees every update; "Log in as…" shows what others see
+const updWaiting = () => realOwner() ? UPDATES.filter(([k])=>!featOn(k) && !featDeclined(k)).length : 0;
 let unsubFeat = null;
 function watchFeatures(){
   if(unsubFeat || !db) return;
@@ -2856,30 +2859,35 @@ const CAL_SHORT = {"ראש השנה":"ר״ה","יום כיפור":"יוה״כ","
 const calShort = n => { n=n.replace(/ · .*$/,""); if(/^ראש חודש/.test(n)) return "ר״ח"; if(/^חול המועד/.test(n)) return "חוה״מ"; return CAL_SHORT[n]||n; };
 // App & web updates (owner only): its own page under Settings, with two tabs — to approve, and approved
 function updatesPage(){
-  const tab = store("gk-updtab")==="done" ? "done" : "wait";
-  const wait=UPDATES.filter(([k])=>!featOn(k)), done=UPDATES.filter(([k])=>featOn(k)), list = tab==="wait" ? wait : done;
+  const tab = ["done","no"].includes(store("gk-updtab")) ? store("gk-updtab") : "wait";
+  const wait=UPDATES.filter(([k])=>!featOn(k)&&!featDeclined(k)), done=UPDATES.filter(([k])=>featOn(k)), no=UPDATES.filter(([k])=>featDeclined(k));
+  const list = tab==="wait" ? wait : tab==="done" ? done : no;
   app.innerHTML=`<section class="wrap admin settings">
-    <div class="section-head" style="margin-top:28px"><h2>App &amp; web updates</h2><p>${wait.length} to approve · ${done.length} approved</p></div>
+    <div class="section-head" style="margin-top:28px"><h2>App &amp; web updates</h2><p>${wait.length} to approve · ${done.length} approved${no.length?` · ${no.length} declined`:""}</p></div>
     <p class="hint" style="margin:-6px 0 12px">Every update goes live for you first. Admins, employees and customers get it only once you approve it. You can take an approval back at any time.</p>
     <div class="upd-tabs" role="tablist" aria-label="Updates">
       <button type="button" role="tab" data-updtab="wait" aria-selected="${tab==="wait"}">To approve <span class="count">${wait.length}</span></button>
-      <button type="button" role="tab" data-updtab="done" aria-selected="${tab==="done"}">Approved <span class="count">${done.length}</span></button></div>
+      <button type="button" role="tab" data-updtab="done" aria-selected="${tab==="done"}">Approved <span class="count">${done.length}</span></button>
+      <button type="button" role="tab" data-updtab="no" aria-selected="${tab==="no"}">Declined <span class="count">${no.length}</span></button></div>
     <div class="panel-a set-upds" id="set-upds" role="tabpanel">
       ${tab==="wait"&&wait.length>1?`<div class="row" style="margin-bottom:8px"><button type="button" class="btn sm" data-updall>Approve all ${wait.length}</button></div>`:""}
-      ${list.length?`<ul class="upd-list">${list.map(([k,v,d,title,about])=>{ const on=featOn(k);
-        return `<li class="${on?"on":"wait"}"><div><b>${esc(title)}</b><small>Version ${esc(v)} · ${fmtDate(new Date(d+"T12:00").getTime())}</small><p>${esc(about)}</p>
-          <span class="upd-state">${on?"✓ Approved – everyone has it":"⏳ Only you see it until you approve it"}</span></div>
-          <button type="button" class="btn sm${on?"":" solid"}" data-upd="${k}" data-on="${on?0:1}">${on?"Take back":"Approve"}</button></li>`; }).join("")}</ul>`
-        : `<p class="hint mempty">${tab==="wait"?"Nothing to approve. Everything is live for everyone.":"Nothing approved yet."}</p>`}
+      ${list.length?`<ul class="upd-list">${list.map(([k,v,d,title,about])=>{ const on=featOn(k), dec=featDeclined(k);
+        return `<li class="${on?"on":dec?"no":"wait"}"><div><b>${esc(title)}</b><small>Version ${esc(v)} · ${fmtDate(new Date(d+"T12:00").getTime())}</small><p>${esc(about)}</p>
+          <span class="upd-state">${on?"✓ Approved – everyone has it":dec?"✗ Declined – taken off the app and the website for everyone":"⏳ Only you see it until you approve it"}</span></div>
+          <span class="upd-acts">${on?`<button type="button" class="btn sm" data-upd="${k}" data-set="wait">Take back</button>`
+            : dec?`<button type="button" class="btn sm" data-upd="${k}" data-set="wait">Bring it back</button>`
+            : `<button type="button" class="btn sm solid" data-upd="${k}" data-set="on">Approve</button><button type="button" class="btn sm danger-btn" data-upd="${k}" data-set="no">Decline</button>`}</span></li>`; }).join("")}</ul>`
+        : `<p class="hint mempty">${tab==="wait"?"Nothing to approve. Everything is live for everyone.":tab==="done"?"Nothing approved yet.":"Nothing declined."}</p>`}
     </div>
   </section>`;
   app.querySelectorAll("[data-updtab]").forEach(b=>b.onclick=()=>{ store("gk-updtab", b.dataset.updtab); updatesPage(); });
   const save=async on=>{ try{ await db.collection("meta").doc("features").set({on, by:myName(), at:Date.now()}); FEAT=on; setRecipes(RAW_RECIPES); renderAcct(); const y=window.scrollY; updatesPage(); window.scrollTo(0,y); return true; }
     catch(e){ toast("Couldn't save. Check your connection."); return false; } };
-  const cur=()=>Object.fromEntries(UPDATES.map(([k])=>[k, featOn(k)]));
-  app.querySelectorAll("[data-upd]").forEach(b=>b.onclick=async()=>{ const on=cur(); on[b.dataset.upd]=b.dataset.on==="1"; b.disabled=true;
-    if(await save(on)) toast(on[b.dataset.upd]?"Approved – it's in Approved, and everyone has it now":"Taken back – it's in To approve, and only you see it now"); });
-  const all=app.querySelector("[data-updall]"); if(all) all.onclick=async()=>{ const on=cur(); UPDATES.forEach(([k])=>on[k]=true); if(await save(on)) toast("All approved"); };
+  const cur=()=>Object.fromEntries(UPDATES.map(([k])=>[k, featDeclined(k)?"declined":featOn(k)]));
+  const MSG={on:"Approved – it's in Approved, and everyone has it now", wait:"It's in To approve – only you see it now", no:"Declined – it's taken off the app and the website for everyone"};
+  app.querySelectorAll("[data-upd]").forEach(b=>b.onclick=async()=>{ const on=cur(), s=b.dataset.set; on[b.dataset.upd] = s==="on" ? true : s==="no" ? "declined" : false; b.disabled=true;
+    if(await save(on)) toast(MSG[s]); });
+  const all=app.querySelector("[data-updall]"); if(all) all.onclick=async()=>{ const on=cur(); wait.forEach(([k])=>on[k]=true); if(await save(on)) toast("All approved"); };
 }
 // Browse the whole cookbook by category and pick recipes (for menus and the calendar)
 function pickFromCookbook(o){   // o: {title, has(rid), toggle(rid, on), done()}

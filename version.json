@@ -1,6 +1,6 @@
 {
-  "web": "4.20",
+  "web": "4.21",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "App & web updates has its own page under Settings: To approve and Approved."
+  "notes": "Decline an update: it's taken off the app and the website for everyone."
 }
