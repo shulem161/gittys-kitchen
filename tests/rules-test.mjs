@@ -343,6 +343,14 @@ await check("…nor change anything else while deleting", assertFails(updateDoc(
 await check('whoever releases a merge deletes the recipe merged into it', assertSucceeds(updateDoc(doc(RL, 'recipes', 'r-gone'), del('r-gone', 'sm1'))));
 await check("an employee without release can't", assertFails(updateDoc(doc(EMP, 'recipes', 'r-other'), del('r-other', 'sm2'))));
 
+// Owner's view: only the owner OKs a new version
+await check('the owner can OK a new version', assertSucceeds(setDoc(doc(OWN, 'meta', 'release'), { approve: '4.17', by: 'Owner', at: 1 })));
+await check('…and see what was OK\'d', assertSucceeds(getDoc(doc(OWN, 'meta', 'release'))));
+await check("an admin can't OK a version", assertFails(setDoc(doc(ADM, 'meta', 'release'), { approve: '4.18', by: 'Adm', at: 1 })));
+await check("an employee can't", assertFails(setDoc(doc(EMP, 'meta', 'release'), { approve: '4.18', by: 'Emp', at: 1 })));
+await check("a customer can't see it", assertFails(getDoc(doc(PUB, 'meta', 'release'))));
+await check("…and nothing else can be stored there", assertFails(setDoc(doc(OWN, 'meta', 'release'), { approve: '4.18', x: 1 })));
+
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(`::notice::Rule checks: ${pass} passed, ${fail} failed`);
