@@ -1,5 +1,5 @@
 // Automated end-to-end check of Gitty's Kitchen.
-// Runs the real preview/index.html (the next version, waiting for the owner's OK) against a stand-in for Firebase (tests/fake-firebase.js),
+// Runs the real index.html against a stand-in for Firebase (tests/fake-firebase.js),
 // so it never touches the real member list or recipes.
 // Usage: node tests/run-all.js            (needs Playwright with Chromium)
 const {chromium} = require('playwright');
@@ -7,7 +7,7 @@ const fs = require('fs'), path = require('path'), os = require('os');
 const ROOT = path.join(__dirname, '..');
 const FAKE = fs.readFileSync(path.join(__dirname, 'fake-firebase.js'), 'utf8');
 const IMG = path.join(__dirname, 'sample-dish.jpg');
-const html = fs.readFileSync(path.join(ROOT, 'preview', 'index.html'), 'utf8')
+const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8')
   .replace(/\/\*FIREBASE\*\/\{[^}]*\}/, '/*FIREBASE*/{apiKey:"test"}');
 const PAGE = path.join(os.tmpdir(), 'gk-test.html'); fs.writeFileSync(PAGE, html);
 const F = 'file://' + PAGE;
@@ -825,26 +825,23 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('a search bar right under the categories searches the whole cookbook', /Results for “kugel”/.test(await A.locator('h2').first().innerText()) && (await A.locator('.tq').inputValue()) === 'kugel' && await A.evaluate(() => document.activeElement && document.activeElement.classList.contains('tq')));
     await A.locator('.tab-search .tq').fill(''); await A.waitForTimeout(300);
     // Owner's view: a new version waits in /preview/ until the owner OKs it
-    { const pvPage = async (email, pw) => { const P = await page(); await P.addInitScript(() => { window.GK_PREVIEW = true; }); await P.reload(); await P.waitForTimeout(400);
-        await P.fill('#nm', email); await P.fill('#pw', pw); await P.click('.primary'); await P.waitForTimeout(1500); return P; };
-      const O = await pvPage('shulem.schlesinger@example.com', 'admin123');
-      ok("the owner's preview shows a bar to OK the new version", (await O.locator('#pvbar').isVisible()) && /Owner's view/.test(await O.locator('#pvbar').innerText()) && (await O.locator('#pv-ok').count()) === 1, await O.evaluate(() => state));
-      if (process.env.SHOTD) { await O.setViewportSize({width: 390, height: 760}); await O.waitForTimeout(300); await O.screenshot({path: process.env.SHOTD + '-pv.png'});
-        await O.evaluate(() => window.scrollTo(0, 400)); await O.waitForTimeout(200); await O.screenshot({path: process.env.SHOTD + '-pv2.png'}); await O.evaluate(() => window.scrollTo(0, 0)); }
-      await O.click('#pv-pick'); await O.waitForTimeout(150);
-      ok("Owner's view lists each new feature with its own switch (Not kosher starts on: it was already live)", (await O.locator('#pv-panel [data-ft=nk]').count()) === 1 && (await O.locator('#pv-panel [data-ft=nk]').isChecked()));
-      await O.locator('#pv-panel [data-ft=nk]').uncheck(); await O.click('#pv-save'); await O.waitForTimeout(800);
-      await A.goto(F + '#kosher'); await A.waitForTimeout(400);
-      ok("…switching a feature off takes it away from everyone but the owner's preview", await A.evaluate(() => !feat('nk') && !/Not kosher/.test(document.getElementById('app').innerText)) && await O.evaluate(() => feat('nk')));
-      await O.click('#pv-pick'); await O.waitForTimeout(150); await O.locator('#pv-panel [data-ft=nk]').check(); await O.click('#pv-save'); await O.waitForTimeout(800);
-      ok('…and switching it on turns it on for everyone', await A.evaluate(() => feat('nk')) && await O.evaluate(() => db.collection('meta').doc('features').get().then(s => s.data().on.nk === true)));
-      await O.click('#pv-ok'); await O.click('#pv-yes'); await O.waitForTimeout(600);
-      ok('…OK-ing it saves the OK, so it goes live for everyone', await O.evaluate(() => db.collection('meta').doc('release').get().then(s => s.exists && s.data().approve === WEB_VERSION)) && /goes live/.test(await O.locator('#pvbar').innerText()));
-      await O.close();
-      ok("the live site has no owner's bar", await A.locator('#pvbar').isHidden());
-      const OP = await pvPage(mailOf('Public Paula'), 'pub456');
-      ok("…no one else can use the preview", /owner's preview/i.test(await OP.locator('#app').innerText()) && (await OP.locator('#pvbar').isHidden()), await OP.evaluate(() => state));
-      await OP.close(); }
+    // App & web updates: every update is the owner's first; everyone else gets it once he approves it
+    await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
+    ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
+    await A.goto(F + '#settings-look'); await A.waitForTimeout(400);
+    const upTxt = await A.locator('#set-upds').innerText().catch(() => '');
+    ok('App settings lists every update, with the ones waiting for approval', /App & web updates/.test(upTxt) && /Search bar under the categories/.test(upTxt) && /Not kosher inbox/.test(upTxt) && (await A.locator('#set-upds [data-upd][data-on="1"]').count()) === 3, upTxt.slice(0, 200));
+    ok('…and the menu shows how many are waiting', /3 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=settings]').textContent; closeMenu(); return x; })));
+    await V.goto(F + '#settings-look'); await V.waitForTimeout(300);
+    ok("…only the owner sees it", (await V.locator('#set-upds').count()) === 0);
+    await A.locator('#set-upds [data-upd=tabsearch]').click(); await A.waitForTimeout(800);
+    await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
+    ok('approving an update gives it to everyone', (await V.locator('.tab-search').count()) === 1 && await A.evaluate(() => db.collection('meta').doc('features').get().then(s => s.data().on.tabsearch === true)));
+    await A.goto(F + '#settings-look'); await A.waitForTimeout(300); await A.locator('#set-upds [data-upd=tabsearch]').click(); await A.waitForTimeout(800);
+    await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
+    ok('…and taking it back takes it away again', (await V.locator('.tab-search').count()) === 0);
+    await A.goto(F + '#settings-look'); await A.waitForTimeout(300); await A.click('[data-updall]'); await A.waitForTimeout(800);
+    ok('“Approve all” approves every waiting update', await A.evaluate(() => UPDATES.every(([k]) => featOn(k))) && (await A.locator('#set-upds [data-upd][data-on="1"]').count()) === 0);
     // Not kosher: an inbox before Need to proofread that only gets what an admin puts there
     await A.goto(F + '#kosher'); await A.waitForTimeout(400);
     ok('there is a Not kosher inbox before Need to proofread, empty to start with', /Not kosher/.test(await A.locator('h2').first().innerText()) && /Nothing in Not kosher/.test(await A.locator('#app').innerText()) && /Not kosher[\s\S]*Need to proofread/.test(await A.locator('.ib-steps').innerText()), [await A.evaluate(() => location.hash + ' ' + state), (await A.locator('#app').innerText()).slice(0, 300)]);

@@ -1,6 +1,6 @@
 {
-  "web": "4.17",
+  "web": "4.19",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "New Not kosher inbox, before Need to proofread. Owner's view: new versions wait for the owner's OK."
+  "notes": "App & web updates in App settings: every update is the owner's first, and goes to everyone once he approves it."
 }
