@@ -12,6 +12,8 @@ self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
+  // The owner's preview (/preview/) is left alone: it never touches the live site's saved copy.
+  if (url.pathname.includes("/preview/")) return;
   // The page itself: always try for the newest version, fall back to the saved copy offline.
   if (req.mode === "navigate" || (url.origin === location.origin && CORE.some(p => url.pathname.endsWith(p.slice(1)) && p !== "./"))) {
     e.respondWith(fetch(req).then(res => {

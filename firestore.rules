@@ -150,6 +150,12 @@ service cloud.firestore {
       allow write: if isAdmin() && request.resource.data.keys().hasOnly(['list'])
         && request.resource.data.list is list && request.resource.data.list.size() <= 300;
     }
+    // Owner's view: the owner OKs a new version of the site here before admins, employees and customers get it.
+    match /meta/release {
+      allow get: if isOwner();
+      allow write: if isOwner() && request.resource.data.keys().hasOnly(['approve', 'by', 'at', 'live', 'liveAt'])
+        && request.resource.data.approve is string;
+    }
     match /meta/codes {
       allow get: if signedIn();
       allow write: if isAdmin() || extra('review');

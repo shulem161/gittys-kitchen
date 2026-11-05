@@ -6,7 +6,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Gitty&#39;s Kitchen">
-<script>if("serviceWorker" in navigator && location.protocol==="https:") addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>
+<script>if("serviceWorker" in navigator && location.protocol==="https:" && !/\/preview\//.test(location.pathname)) addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>
 <style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Gitty's Kitchen</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -744,6 +744,8 @@ i.added,span.added{background:#C2581A}i.changed,span.changed{background:var(--ac
 @media (prefers-reduced-motion:reduce){.spin{animation:none}}
 
 /* update notice */
+.pvbar{position:sticky;top:0;z-index:60;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;padding:8px 16px;background:#3b2a6b;color:#fff;font-size:14px}
+.pvbar .btn{background:#fff;color:#3b2a6b;border-color:#fff}.pvbar .btn.solid{background:#ffd34d;border-color:#ffd34d;color:#222}.pv-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .updbar{position:fixed;z-index:22;left:50%;top:calc(env(safe-area-inset-top,0px) + 74px);transform:translateX(-50%);width:min(560px, calc(100% - 24px));display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--paper);border:1px solid var(--accent);border-radius:16px;box-shadow:0 10px 30px rgba(27,38,56,.22);padding:12px 14px;font-size:15px}
 .updbar.in{animation:updin .35s ease-out}
 @keyframes updin{from{transform:translate(-50%,-24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
@@ -1035,6 +1037,7 @@ body.out .tpill,body.out .talarm{display:none}
 </header>
 
 <div class="updbar" id="updbar" role="status" aria-live="polite" hidden></div>
+<div class="pvbar" id="pvbar" role="status" hidden></div>
 <div class="offbar" id="offbar" hidden>You're offline. The recipes still work; favorites need internet.</div>
 <main id="app"><section class="auth wrap"><div class="auth-card"><div class="auth-brand"><h1>Gitty's Kitchen</h1><p>175 family recipes in 13 categories.</p></div><div class="auth-form"><h2>Open this in a browser</h2><p class="sub">This preview can't run the cookbook.</p><p class="hint">On Android, install the Gitty's Kitchen app. On iPhone or iPad, open the cookbook's web link in Safari or Chrome.</p></div></div></section></main>
 <footer class="wrap">Gitty's Kitchen · January 2009</footer>
@@ -1302,6 +1305,42 @@ async function notifyRequest(title, message){
 const SITE = "https://shulem161.github.io/gittys-kitchen/";
 const appBuild = (()=>{ const m=navigator.userAgent.match(/GittysKitchenApp\/(\d+)/); return m ? +m[1] : 0; })();
 let update = null;            // {web, apk, apkUrl, notes}
+// Owner's view: every new version of the site goes first to /preview/, which only the owner can open.
+// It reaches admins, employees and customers only after the owner OKs it (meta/release); a GitHub job then puts it live.
+const IS_PREVIEW = window.GK_PREVIEW===true || (/^https?:/.test(location.protocol) && /\/preview\/(index\.html)?$/.test(location.pathname));
+let RELEASE = {};             // meta/release: {approve, by, at, live}
+let previewWeb = "";          // the version waiting in the owner's view (seen from the live site)
+async function checkPreview(){
+  if(IS_PREVIEW || !realOwner()) return;
+  try{ const base = location.protocol==="https:" ? "" : SITE;
+    const v = await (await fetch(base+"preview/version.json?t="+Date.now(), {cache:"no-store"})).json();
+    previewWeb = v && newer(v.web, WEB_VERSION) ? v.web : ""; renderAcct(); }catch(e){}
+}
+async function watchRelease(){
+  if(!realOwner() || !db) return;
+  try{ const s=await db.collection("meta").doc("release").get(); RELEASE = s.exists ? s.data() : {}; }catch(e){}
+  renderPreviewBar();
+}
+function renderPreviewBar(){
+  const bar=document.getElementById("pvbar"); if(!bar) return;
+  if(!IS_PREVIEW || state!=="approved" || !realOwner()){ bar.hidden=true; document.body.classList.remove("in-preview"); return; }
+  document.body.classList.add("in-preview");
+  const ok = RELEASE.approve===WEB_VERSION;
+  bar.hidden=false;
+  bar.innerHTML = `<span><b>👁 Owner's view</b> · version ${WEB_VERSION} · ${ok?"you OK'd it – it goes live for everyone within about 15 minutes":"only you see this until you OK it"}</span>
+    <span class="pv-acts">${ok?"":`<button type="button" class="btn sm solid" id="pv-ok">✓ OK – put it live for everyone</button>`}<a class="btn sm" href="../">Live site</a></span>`;
+  const b=document.getElementById("pv-ok"); if(b) b.onclick=()=>{
+    bar.querySelector(".pv-acts").innerHTML=`<span>Put version ${WEB_VERSION} live for admins, employees and customers?</span><button type="button" class="btn sm solid" id="pv-yes">Yes, put it live</button><button type="button" class="btn sm" id="pv-no">Not yet</button>`;
+    document.getElementById("pv-no").onclick=renderPreviewBar;
+    document.getElementById("pv-yes").onclick=async()=>{ try{ RELEASE={approve:WEB_VERSION, by:myName(), at:Date.now()}; await db.collection("meta").doc("release").set(RELEASE, {merge:true}); toast("OK'd. It goes live within about 15 minutes."); }
+      catch(e){ RELEASE={}; toast("Couldn't save. Check your connection."); } renderPreviewBar(); };
+  };
+}
+function ownerOnlyPage(){
+  app.innerHTML=`<section class="wrap"><div class="panel-a" style="margin-top:40px;text-align:center">
+    <h2>This is the owner's preview</h2><p class="hint">New versions of Gitty's Kitchen are checked here first.</p>
+    <a class="btn solid" href="../">Go to Gitty's Kitchen</a></div></section>`;
+}
 const newer = (a,b) => { const x=String(a).split(".").map(Number), y=String(b).split(".").map(Number);
   for(let i=0;i<Math.max(x.length,y.length);i++){ if((x[i]||0)!==(y[i]||0)) return (x[i]||0)>(y[i]||0); } return false; };
 async function checkUpdates(manual){
@@ -1395,7 +1434,7 @@ function boot(){
       if(isAdmin() && !unsubAll) watchMembers();
       if(isAdmin()) watchDupes();
       if(profile.status==="approved"){ watchGolive(); watchTeam(); }
-      if(state==="approved"){ watchPlans(); watchRecipes(); watchSubs(); watchPendingPhotos(); watchFeedback(); watchRequests(); if(!update){ lastUpdCheck=Date.now(); checkUpdates(false); } else renderUpdateBar(); }
+      if(state==="approved"){ checkPreview(); watchRelease(); watchPlans(); watchRecipes(); watchSubs(); watchPendingPhotos(); watchFeedback(); watchRequests(); if(!update){ lastUpdCheck=Date.now(); checkUpdates(false); } else renderUpdateBar(); }
       if(was!==state || state!=="approved") route();
     }, ()=>{
       const c=store("gk-cache");
@@ -3503,6 +3542,7 @@ function openMenu(confirming){
   const group = (key,title,items,n) => items.length ? `<details class="mgroup" data-mg="${key}" ${menuOpen.has(key)?"open":""}><summary>${title}<span class="n${n?" hot":""}">${n?n+" waiting":""}</span></summary>${items.join("")}</details>` : "";
   const teamItem = isTeam()&&!offline ? `<a href="#team" role="menuitem" class="m-team">Team messages <span class="n${unreadThreads()?" hot":""}">${unreadThreads()?unreadThreads()+" new":""}</span></a>` : "";
   m.innerHTML = `<a class="who" href="#profile" role="menuitem"><b>${esc(shownName())}</b><span>${ROLE_LABEL[myRole()]}${offline?" · offline":""} · My profile</span></a>
+    ${realOwner()&&!IS_PREVIEW&&previewWeb?`<a href="preview/" role="menuitem" class="m-preview">Owner's view <span class="n hot">${esc(previewWeb)} waiting</span></a>`:""}${realOwner()&&IS_PREVIEW?`<a href="../" role="menuitem" class="m-preview">Live site <span class="n">${esc(String((update&&update.web)||""))}</span></a>`:""}
     ${canViewAs()||viewingAs()?`<a href="#viewas" role="menuitem" class="m-viewas">Log in as… <span class="n">${pv()?esc(VIEW_WHO.name):viewingAs()?ROLE_LABEL[viewingAs()].replace("Public","Customer"):realAdmin()?(realOwner()?"admin · employee · customer":"employee · customer"):"customer"}</span></a>`:""}
     ${teamItem}
     ${group("inboxes","Inboxes", inboxes, inboxN)}
@@ -6081,6 +6121,8 @@ function routePage(){
   closeMenu(); stopRecipePhotos();
   if(state!=="approved"){ document.body.classList.add("out"); gate(); return; }
   document.body.classList.remove("out");
+  if(IS_PREVIEW && !realOwner()){ ownerOnlyPage(); return; }
+  renderPreviewBar();
   const h = decodeURIComponent(location.hash.slice(1));
   if(h==="admin" && isAdmin()){ q.value=""; adminPage(); window.scrollTo(0,0); return; }
   if(h==="public" && isAdmin()){ q.value=""; publicPage(); window.scrollTo(0,0); return; }

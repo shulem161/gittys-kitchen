@@ -1,5 +1,5 @@
 // Automated end-to-end check of Gitty's Kitchen.
-// Runs the real index.html against a stand-in for Firebase (tests/fake-firebase.js),
+// Runs the real preview/index.html (the next version, waiting for the owner's OK) against a stand-in for Firebase (tests/fake-firebase.js),
 // so it never touches the real member list or recipes.
 // Usage: node tests/run-all.js            (needs Playwright with Chromium)
 const {chromium} = require('playwright');
@@ -7,7 +7,7 @@ const fs = require('fs'), path = require('path'), os = require('os');
 const ROOT = path.join(__dirname, '..');
 const FAKE = fs.readFileSync(path.join(__dirname, 'fake-firebase.js'), 'utf8');
 const IMG = path.join(__dirname, 'sample-dish.jpg');
-const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8')
+const html = fs.readFileSync(path.join(ROOT, 'preview', 'index.html'), 'utf8')
   .replace(/\/\*FIREBASE\*\/\{[^}]*\}/, '/*FIREBASE*/{apiKey:"test"}');
 const PAGE = path.join(os.tmpdir(), 'gk-test.html'); fs.writeFileSync(PAGE, html);
 const F = 'file://' + PAGE;
@@ -804,6 +804,31 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.evaluate(async () => { await db.collection('recipes').doc('r-challah').update({deleted: false}); }); await A.waitForTimeout(800);
     await PU.goto(F + '#compare~r-croissants~r-challah'); await PU.waitForTimeout(400);
     ok("…customers can't", (await PU.locator('.cmp').count()) === 0);
+    // Owner's view: a new version waits in /preview/ until the owner OKs it
+    { const pvPage = async (email, pw) => { const P = await page(); await P.addInitScript(() => { window.GK_PREVIEW = true; }); await P.reload(); await P.waitForTimeout(400);
+        await P.fill('#nm', email); await P.fill('#pw', pw); await P.click('.primary'); await P.waitForTimeout(1500); return P; };
+      const O = await pvPage('shulem.schlesinger@example.com', 'admin123');
+      ok("the owner's preview shows a bar to OK the new version", (await O.locator('#pvbar').isVisible()) && /Owner's view/.test(await O.locator('#pvbar').innerText()) && (await O.locator('#pv-ok').count()) === 1, await O.evaluate(() => state));
+      await O.click('#pv-ok'); await O.click('#pv-yes'); await O.waitForTimeout(600);
+      ok('…OK-ing it saves the OK, so it goes live for everyone', await O.evaluate(() => db.collection('meta').doc('release').get().then(s => s.exists && s.data().approve === WEB_VERSION)) && /goes live/.test(await O.locator('#pvbar').innerText()));
+      await O.close();
+      ok("the live site has no owner's bar", await A.locator('#pvbar').isHidden());
+      const OP = await pvPage(mailOf('Public Paula'), 'pub456');
+      ok("…no one else can use the preview", /owner's preview/i.test(await OP.locator('#app').innerText()) && (await OP.locator('#pvbar').isHidden()), await OP.evaluate(() => state));
+      await OP.close(); }
+    // Not kosher: an inbox before Need to proofread that only gets what an admin puts there
+    await A.goto(F + '#kosher'); await A.waitForTimeout(400);
+    ok('there is a Not kosher inbox before Need to proofread, empty to start with', /Not kosher/.test(await A.locator('h2').first().innerText()) && /Nothing in Not kosher/.test(await A.locator('#app').innerText()) && /Not kosher[\s\S]*Need to proofread/.test(await A.locator('.ib-steps').innerText()), [await A.evaluate(() => location.hash + ' ' + state), (await A.locator('#app').innerText()).slice(0, 300)]);
+    const bcWasPub = await A.evaluate(() => pubVisible(RECIPES.find(r => r.id === 'r-boston-cream-pie')));
+    await A.goto(F + '#r-boston-cream-pie'); await A.waitForTimeout(400); await A.click('#nk-btn'); await A.waitForTimeout(150);
+    await A.fill('#nk-why', 'Meat and milk together'); await A.click('#nk-go'); await A.waitForTimeout(700);
+    ok('an admin can put a recipe in Not kosher, with why', await A.evaluate(() => { const r = RECIPES.find(x => x.id === 'r-boston-cream-pie'); return r.rv === 'kosher' && r.pub === false && r.rvNote === 'Meat and milk together'; }) && /Not kosher/.test(await A.locator('.rv-bar').innerText()));
+    await PU.goto(F); await PU.waitForTimeout(800);
+    ok("…customers don't see it while it's there", await PU.evaluate(() => !RECIPES.some(r => r.id === 'r-boston-cream-pie')));
+    await A.goto(F + '#kosher'); await A.waitForTimeout(400);
+    ok('…it waits in the Not kosher inbox', (await A.locator('.rv-list li', {hasText: 'Boston'}).count()) === 1 && /Meat and milk/.test(await A.locator('.rv-list').innerText()));
+    await A.locator('.rv-list li', {hasText: 'Boston'}).locator('[data-rv=nkOk]').click(); await A.waitForTimeout(700);
+    ok('“It\'s kosher – take it out” puts it back as it was', await A.evaluate(w => { const r = RECIPES.find(x => x.id === 'r-boston-cream-pie'); return !r.rv && pubVisible(r) === w; }, bcWasPub));
     await V.goto(F + '#team'); await V.waitForTimeout(500); await V.locator('.tm-row', {hasText: '375°F'}).click(); await V.waitForTimeout(600);
     await V.click('#tm-done'); await V.waitForTimeout(600);
     await V.goto(F + '#team'); await V.waitForTimeout(500);

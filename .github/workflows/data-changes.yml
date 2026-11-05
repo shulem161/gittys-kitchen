@@ -1,12 +1,8 @@
 # Applies one-time data changes in data-changes/ to the Firebase database.
 name: Apply data changes
 
+# Data changes wait with the new version for the owner's OK: promote.yml applies them when it goes live.
 on:
-  push:
-    branches: [main]
-    paths:
-      - data-changes/**
-      - .github/workflows/data-changes.yml
   workflow_dispatch:
 
 jobs:
