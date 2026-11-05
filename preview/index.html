@@ -1332,9 +1332,11 @@ const IS_PREVIEW = window.GK_PREVIEW===true || (/^https?:/.test(location.protoco
 let RELEASE = {};             // meta/release: {approve, by, at, live}
 // The new features in this version. Each one has its own switch in Owner's view (meta/features), so the owner chooses
 // which go live for everyone; until he switches one on, only he sees it, in the preview. Fixes come with the version.
-const FEATURES = [["nk","Not kosher inbox","An inbox before Need to proofread. A recipe put in it is hidden from the cookbook until it's approved; then it goes on to Need to proofread."]];
+// [key, name, what it does, on before the owner chooses (true only for a feature that was already live)]
+const FEATURES = [["nk","Not kosher inbox","An inbox before Need to proofread. A recipe put in it is hidden from the cookbook until it's approved; then it goes on to Need to proofread.", true]];
+const featOn = k => FEAT[k]!==undefined ? FEAT[k]===true : !!(FEATURES.find(f=>f[0]===k)||[])[3];
 let FEAT = {};
-const feat = k => (IS_PREVIEW && realOwner()) || FEAT[k]===true;
+const feat = k => (IS_PREVIEW && realOwner()) || featOn(k);
 let unsubFeat = null;
 function watchFeatures(){
   if(unsubFeat || !db) return;
@@ -1360,7 +1362,7 @@ function renderPreviewBar(){
   if(!IS_PREVIEW || state!=="approved" || !realOwner()){ bar.hidden=true; document.body.classList.remove("in-preview"); return; }
   if(bar.querySelector("#pv-panel")) return;   // don't redraw while the owner is choosing
   document.body.classList.add("in-preview");
-  const ok = RELEASE.approve===WEB_VERSION, nOn = FEATURES.filter(([k])=>FEAT[k]===true).length;
+  const ok = RELEASE.approve===WEB_VERSION, nOn = FEATURES.filter(([k])=>featOn(k)).length;
   bar.hidden=false;
   bar.innerHTML = `<span><b>👁 Owner's view</b> · version ${WEB_VERSION} · ${ok?"OK'd – it goes live within about 15 minutes":"only you see this until you OK it"}${FEATURES.length?` · ${nOn} of ${FEATURES.length} new ${FEATURES.length===1?"feature":"features"} switched on for everyone`:""}</span>
     <span class="pv-acts">${FEATURES.length?`<button type="button" class="btn sm" id="pv-pick">Choose what goes live</button>`:""}${ok?"":`<button type="button" class="btn sm solid" id="pv-ok">✓ OK this version</button>`}<a class="btn sm" href="../">Live site</a></span>`;
@@ -1377,7 +1379,7 @@ function pvPanel(){
   const bar=document.getElementById("pvbar");
   bar.innerHTML=`<div id="pv-panel" class="pv-panel"><b>Choose what goes live for everyone</b>
     <p>Tick a feature to switch it on for admins, employees and customers. Untick it to take it away again. Switches work once version ${WEB_VERSION} is live${RELEASE.approve===WEB_VERSION?"":" (OK the version too)"}. Fixes and small changes come with the version itself.</p>
-    ${FEATURES.map(([k,name,about])=>`<label class="pv-ft"><input type="checkbox" data-ft="${k}"${FEAT[k]===true?" checked":""}><span><b>${esc(name)}</b><small>${esc(about)}</small></span></label>`).join("")}
+    ${FEATURES.map(([k,name,about])=>`<label class="pv-ft"><input type="checkbox" data-ft="${k}"${featOn(k)?" checked":""}><span><b>${esc(name)}</b><small>${esc(about)}</small></span></label>`).join("")}
     <div class="pv-acts"><button type="button" class="btn sm solid" id="pv-save">Save</button><button type="button" class="btn sm" id="pv-cancel">Cancel</button></div></div>`;
   document.getElementById("pv-cancel").onclick=()=>{ bar.innerHTML=""; renderPreviewBar(); };
   document.getElementById("pv-save").onclick=async()=>{ const on={}; bar.querySelectorAll("[data-ft]").forEach(x=>on[x.dataset.ft]=x.checked);

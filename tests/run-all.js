@@ -829,14 +829,15 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
         await P.fill('#nm', email); await P.fill('#pw', pw); await P.click('.primary'); await P.waitForTimeout(1500); return P; };
       const O = await pvPage('shulem.schlesinger@example.com', 'admin123');
       ok("the owner's preview shows a bar to OK the new version", (await O.locator('#pvbar').isVisible()) && /Owner's view/.test(await O.locator('#pvbar').innerText()) && (await O.locator('#pv-ok').count()) === 1, await O.evaluate(() => state));
-      await A.goto(F + '#kosher'); await A.waitForTimeout(400);
-      ok("a new feature stays off for everyone until the owner switches it on", await A.evaluate(() => !feat('nk') && !/Not kosher/.test(document.getElementById('app').innerText)) && await O.evaluate(() => feat('nk')));
       if (process.env.SHOTD) { await O.setViewportSize({width: 390, height: 760}); await O.waitForTimeout(300); await O.screenshot({path: process.env.SHOTD + '-pv.png'});
         await O.evaluate(() => window.scrollTo(0, 400)); await O.waitForTimeout(200); await O.screenshot({path: process.env.SHOTD + '-pv2.png'}); await O.evaluate(() => window.scrollTo(0, 0)); }
       await O.click('#pv-pick'); await O.waitForTimeout(150);
-      ok("…Owner's view lists each new feature with its own switch", (await O.locator('#pv-panel [data-ft=nk]').count()) === 1 && !(await O.locator('#pv-panel [data-ft=nk]').isChecked()));
-      await O.locator('#pv-panel [data-ft=nk]').check(); await O.click('#pv-save'); await O.waitForTimeout(800);
-      ok('…switching one on turns it on for everyone', await A.evaluate(() => feat('nk')) && await O.evaluate(() => db.collection('meta').doc('features').get().then(s => s.data().on.nk === true)));
+      ok("Owner's view lists each new feature with its own switch (Not kosher starts on: it was already live)", (await O.locator('#pv-panel [data-ft=nk]').count()) === 1 && (await O.locator('#pv-panel [data-ft=nk]').isChecked()));
+      await O.locator('#pv-panel [data-ft=nk]').uncheck(); await O.click('#pv-save'); await O.waitForTimeout(800);
+      await A.goto(F + '#kosher'); await A.waitForTimeout(400);
+      ok("…switching a feature off takes it away from everyone but the owner's preview", await A.evaluate(() => !feat('nk') && !/Not kosher/.test(document.getElementById('app').innerText)) && await O.evaluate(() => feat('nk')));
+      await O.click('#pv-pick'); await O.waitForTimeout(150); await O.locator('#pv-panel [data-ft=nk]').check(); await O.click('#pv-save'); await O.waitForTimeout(800);
+      ok('…and switching it on turns it on for everyone', await A.evaluate(() => feat('nk')) && await O.evaluate(() => db.collection('meta').doc('features').get().then(s => s.data().on.nk === true)));
       await O.click('#pv-ok'); await O.click('#pv-yes'); await O.waitForTimeout(600);
       ok('…OK-ing it saves the OK, so it goes live for everyone', await O.evaluate(() => db.collection('meta').doc('release').get().then(s => s.exists && s.data().approve === WEB_VERSION)) && /goes live/.test(await O.locator('#pvbar').innerText()));
       await O.close();
