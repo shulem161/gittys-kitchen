@@ -1267,6 +1267,11 @@ const canViewAs = () => realAdmin() || (!!profile && profile.status==="approved"
 // Looking in as one particular person: their name, favorites, calendar, menus, alerts. Nothing is saved while looking.
 const pv = () => !!(viewingAs() && VIEW_WHO && VIEW_WHO.uid);
 const who = () => pv() ? VIEW_WHO.uid : me;
+// “Do things as the person you logged in as”: admins save that person's own things to their account
+const actAs = () => pv() && realAdmin() && !featDeclined("actas") && (realOwner() || featOn("actas"));
+const actUid = () => actAs() ? VIEW_WHO.uid : me;
+const actName = () => actAs() ? VIEW_WHO.name : myName();
+const ownBlocked = () => actAs() ? false : previewBlocked();
 const shownName = () => pv() ? VIEW_WHO.name : myName();
 const previewBlocked = () => { if(!pv()) return false; toast(`You're looking as ${VIEW_WHO.name}. Nothing is saved.`); return true; };
 function setViewAs(v, who){ try{ v ? sessionStorage.setItem("gk-viewas", v) : sessionStorage.removeItem("gk-viewas"); who ? sessionStorage.setItem("gk-viewas-who", JSON.stringify(who)) : sessionStorage.removeItem("gk-viewas-who"); }catch(e){} VIEW_AS=v||"";
@@ -1305,7 +1310,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.26";
+const WEB_VERSION = "4.27";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1343,6 +1348,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["actas","4.27","2026-11-06","Do things as the person you logged in as","When an admin uses “Log in as…”, that person's own things are saved to their account: favorites, calendar, menus, settings, recipe requests and recipes or changes they send. Ratings, messages and inbox moves still can't be done in their name.", false],
   ["updinbox","4.26","2026-11-06","App & web updates in your Inboxes, with an alert","App & web updates is in your Inboxes (no longer under Settings), with how many are waiting, and you get a phone alert when a new update is waiting for your approval. Only you use this.", true],
   ["moveback","4.25","2026-11-05","Undo a move, and edits go back to proofreading","Only the person who moved a recipe up can move it back (“↩ Undo”), for example if it was a mistake. Anyone else asks for a change instead: when a recipe in For approval or Ready to release is edited, or a change to it is sent, it goes back to Need to proofread to be checked again.", false],
   ["askcredit","4.24","2026-11-05","Moving up for someone who asked puts it on their name","When someone asked to move a recipe up and you tap the button, the move is recorded on their name, not yours, and you aren't locked out of the next step.", false],
@@ -1605,12 +1611,16 @@ const myPrefs = () => pv() ? (VIEW_WHO.prefs||{}) : (profile && profile.prefs) |
 const TODO_CHOICES = [[1,"Today only"],[2,"Today and tomorrow"],[3,"The next 3 days"],[7,"The next week"],[30,"The next month"],[-1,"Always"],[0,"Never"]];
 const todoDays = () => { const v=myPrefs().todoDays; return TODO_CHOICES.some(c=>c[0]===v) ? v : 3; };
 function setPref(k, v){
-  if(previewBlocked()) return;
+  if(ownBlocked()) return;
+  if(actAs()){ VIEW_WHO.prefs=Object.assign({}, VIEW_WHO.prefs||{}, {[k]:v}); try{ sessionStorage.setItem("gk-viewas-who", JSON.stringify(VIEW_WHO)); }catch(e){}
+    db.collection("users").doc(VIEW_WHO.uid).update({prefs:VIEW_WHO.prefs}).catch(()=>toast("Couldn't save. Check your connection.")); return; }
   const p=Object.assign({}, myPrefs(), {[k]:v}); if(profile) profile.prefs=p; store(uk("prefs"), p); cacheProfile();
   if(db && !offline) db.collection("users").doc(me).update({prefs:p}).catch(()=>{});
 }
 function setFavs(list){
-  if(previewBlocked()) return;
+  if(ownBlocked()) return;
+  if(actAs()){ VIEW_WHO.favs=list; try{ sessionStorage.setItem("gk-viewas-who", JSON.stringify(VIEW_WHO)); }catch(e){}
+    db.collection("users").doc(VIEW_WHO.uid).update({favs:list}).catch(()=>toast("Couldn't save. Check your connection.")); return; }
   profile.favs=list; cacheProfile();
   if(db && !offline) db.collection("users").doc(me).update({favs:list}).catch(()=>{});
 }
@@ -2813,11 +2823,11 @@ function planRedraw(){
   if(h==="#plan" || h.startsWith("#plan-") || h==="#menus" || h.startsWith("#menu-") || h==="" || h==="#"){ const y=window.scrollY; route(); window.scrollTo(0,y); }
 }
 async function savePlan(){
-  if(previewBlocked()) return;
+  if(ownBlocked()) return;
   const cut=addDays(dayKey(), -120), days={};
   for(const [k,v] of Object.entries(PLAN.days)) if(k>=cut && v && v.length) days[k]=v;
   PLAN={days}; store(uk("plan"), PLAN);
-  try{ await db.collection("plans").doc(me).set({days, updated:Date.now()}); }catch(e){ toast("Couldn't save. Check your connection."); }
+  try{ await db.collection("plans").doc(actUid()).set({days, updated:Date.now()}); }catch(e){ toast("Couldn't save. Check your connection."); }
 }
 const newKey = () => Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const defaultMeal = k => { const d=keyToDate(k), j=jewishDays(d); if(j.some(x=>x.kind==="yt")) return "Yom Tov lunch"; return d.getDay()===5 ? "Friday night" : d.getDay()===6 ? "Shabbos lunch" : "Supper"; };
@@ -3044,7 +3054,7 @@ function planPage(sel){
       document.getElementById("pl-meal").onchange=()=>{ if(nn.dataset.typed!=="1") nn.value=dflt(); };
       nn.oninput=()=>{ nn.dataset.typed="1"; };
       document.getElementById("pl-newgo").onclick=async()=>{ const name=nn.value.trim()||dflt(); const ref=db.collection("menus").doc();
-        const m={uid:me, ownerName:myName(), name, items:[], shared:[], sharedNames:[], created:Date.now(), updated:Date.now()};
+        const m={uid:actUid(), ownerName:actName(), name, items:[], shared:[], sharedNames:[], created:Date.now(), updated:Date.now()};
         try{ await ref.set(m); MENUS[ref.id]=Object.assign({id:ref.id}, m);
           (PLAN.days[k]=PLAN.days[k]||[]).push({k:newKey(), meal:ml(), menuId:ref.id, x:1, done:{}}); await savePlan();
           menuBack=k; location.hash="menu-"+ref.id; }catch(err){ toast("Couldn't save. Check your connection."); } };
@@ -3104,7 +3114,7 @@ function menusPage(){
     ${!mine.length&&!shared.length?`<p class="hint" style="margin-bottom:24px">No menus yet. Make your first one above.</p>`:""}
   </section>`;
   document.getElementById("mn-new").onsubmit=async e=>{ e.preventDefault(); const name=document.getElementById("mn-name").value.trim(); if(!name){ document.getElementById("mn-name").focus(); return; }
-    const ref=db.collection("menus").doc(); const m={uid:me, ownerName:myName(), name, items:[], shared:[], sharedNames:[], created:Date.now(), updated:Date.now()};
+    const ref=db.collection("menus").doc(); const m={uid:actUid(), ownerName:actName(), name, items:[], shared:[], sharedNames:[], created:Date.now(), updated:Date.now()};
     try{ await ref.set(m); MENUS[ref.id]=Object.assign({id:ref.id}, m); location.hash="menu-"+ref.id; }catch(err){ toast("Couldn't save. Check your connection."); } };
 }
 async function saveMenu(m){
@@ -3115,7 +3125,7 @@ async function saveMenu(m){
 function menuEditPage(id){
   const m=MENUS[id];
   if(!m){ app.innerHTML=`<section class="wrap"><p class="hint" style="margin-top:28px">This menu isn't here. It may have been deleted, or it's no longer shared with you. <a class="link" href="#menus">My menus</a></p></section>`; return; }
-  const own=m.uid===me, items=(m.items||[]);
+  const own=m.uid===actUid(), items=(m.items||[]);
   const rows=items.map((it,i)=>{ const r=RECIPES.find(x=>x.id===it.rid);
     return `<li class="mi-row"><div class="mi-main">${r?`<a href="#${r.id}"><b>${esc(r.t.replace(/^Untitled: /,""))}</b></a> <small>${esc(codeOf(r)||r.c)} · ${esc(timeShort(r))}</small>`:`<b class="hint">A recipe you can't see</b>`}</div>
       ${own?`<div class="mi-acts"><input class="mi-course" data-mic="${i}" value="${esc(it.course||"")}" placeholder="Course" maxlength="30" aria-label="Course"><select data-mix="${i}" aria-label="Amount">${[...new Set([...SCALES,it.x||1])].sort((a,b)=>a-b).map(x=>`<option value="${x}" ${x===(it.x||1)?"selected":""}>${x===1?"1×":fmtNum(x)+"×"}</option>`).join("")}</select><button type="button" class="td-x" data-mirm="${i}" aria-label="Remove">✕</button></div>`
@@ -3144,7 +3154,7 @@ function menuEditPage(id){
     (PLAN.days[dk]=PLAN.days[dk]||[]).push({k:newKey(), meal:$("mi-meal").value, menuId:m.id, x:+$("mi-x").value, done:{}}); savePlan();
     planSel=dk; planMonth=null; toast(`“${m.name}” is on ${keyToDate(dk).toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"})}`); location.hash="plan"; };
   $("mi-groc").onclick=()=>addPlanToGrocery(items.map(it=>({r:RECIPES.find(r=>r.id===it.rid), x:it.x||1})));
-  if(!own){ $("mi-copy").onclick=async()=>{ const ref=db.collection("menus").doc(); const c={uid:me, ownerName:myName(), name:m.name, items:JSON.parse(JSON.stringify(items)), shared:[], sharedNames:[], created:Date.now(), updated:Date.now()};
+  if(!own){ $("mi-copy").onclick=async()=>{ const ref=db.collection("menus").doc(); const c={uid:actUid(), ownerName:actName(), name:m.name, items:JSON.parse(JSON.stringify(items)), shared:[], sharedNames:[], created:Date.now(), updated:Date.now()};
     try{ await ref.set(c); MENUS[ref.id]=Object.assign({id:ref.id}, c); toast("Copied to My menus"); location.hash="menu-"+ref.id; }catch(e){ toast("Couldn't save. Check your connection."); } }; return; }
   $("mi-rename").onclick=()=>{ const n=$("mi-name").value.trim(); if(!n) return; m.name=n; saveMenu(m); toast("Renamed"); };
   app.querySelectorAll("[data-mix]").forEach(s=>s.onchange=()=>{ m.items[+s.dataset.mix].x=+s.value; saveMenu(m); });
@@ -3998,7 +4008,7 @@ function editor(r, cat, sub, draft){
         btn0.disabled=true; btn0.textContent="Sending…";
         const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s, ord:0});
         try{
-          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves||"",sec:d.sec,s:d.s, uid:me, byName:myName(), status:"pending", stage:"proof", created:Date.now(), editOf, ...(rqDraft&&rqDraft.id?{rq:rqDraft.id}:{}), ...(draft&&draft.dropOf?{dropOf:draft.dropOf}:{})});
+          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves||"",sec:d.sec,s:d.s, uid:actUid(), byName:actName(), status:"pending", stage:"proof", created:Date.now(), editOf, ...(rqDraft&&rqDraft.id?{rq:rqDraft.id}:{}), ...(draft&&draft.dropOf?{dropOf:draft.dropOf}:{})});
           if(draft && draft.fromSub) db.collection("submissions").doc(draft.fromSub).delete().catch(()=>{});
           { const eb = isTeam() && target ? editedBack(target, Date.now()) : null; if(eb) await db.collection("recipes").doc(target.id).update(eb).catch(()=>{}); }
           notifyWatchers("watch-proof", editOf ? `${myName()} requested a change` : `New recipe from ${myName()}`, `“${editOf&&target?target.t:t}” needs to be proofread.`, "#proof", editOf?"pencil2":"cookie");
@@ -5136,7 +5146,7 @@ function importList(drafts, cat){
         const d=Object.assign({}, drafts[+li.dataset.i], {c: li.querySelector(".imp-cat").value});
         btn.textContent=`Sending… ${done+1} of ${rows.length}`;
         { const doc=toDoc(Object.assign({}, d, {ord:0}));
-          await db.collection("submissions").doc("s-"+newId()).set({c:doc.c,t:doc.t,by:doc.by,n:doc.n,s:doc.s, uid:me, byName:myName(), status:"pending", stage:"proof", created:Date.now(), editOf:""}); }
+          await db.collection("submissions").doc("s-"+newId()).set({c:doc.c,t:doc.t,by:doc.by,n:doc.n,s:doc.s, uid:actUid(), byName:actName(), status:"pending", stage:"proof", created:Date.now(), editOf:""}); }
         done++;
       }
       notifyWatchers("watch-proof", `${done} new ${done===1?"recipe":"recipes"} from ${myName()}`, `Waiting to be proofread.`, "#proof", "cookie");
@@ -5710,7 +5720,7 @@ function showMenu(menu, opts, via){
   if(ga) ga.onclick=()=>{ const g=gStore(); for(const r of recs) if(!g.items.some(i=>i.id===r.id)) g.items.push({id:r.id,x:1}); gSave(g); renderAcct(); toast(`${recs.length} recipes added to the grocery list`); };
   const ms=document.getElementById("mn-save");
   if(ms) ms.onclick=async()=>{ ms.disabled=true; const ref=db.collection("menus").doc();
-    const m={uid:me, ownerName:myName(), name:(menu.title||"My menu").slice(0,60), items:menu.courses.filter(c=>c.recipeId&&RECIPES.some(r=>r.id===c.recipeId)).map(c=>({rid:c.recipeId, x:1, course:c.course||""})), shared:[], sharedNames:[], created:Date.now(), updated:Date.now()};
+    const m={uid:actUid(), ownerName:actName(), name:(menu.title||"My menu").slice(0,60), items:menu.courses.filter(c=>c.recipeId&&RECIPES.some(r=>r.id===c.recipeId)).map(c=>({rid:c.recipeId, x:1, course:c.course||""})), shared:[], sharedNames:[], created:Date.now(), updated:Date.now()};
     try{ await ref.set(m); MENUS[ref.id]=Object.assign({id:ref.id}, m); toast("Saved to My menus"); location.hash="menu-"+ref.id; }catch(e){ ms.disabled=false; toast("Couldn't save. Check your connection."); } };
   document.getElementById("mn-again").onclick=()=>makeMenu([...(lastMenu&&lastMenu.avoid||[]), ...recs.map(r=>r.id)].slice(-30));
 }
@@ -5814,7 +5824,7 @@ ${menuCatalog(RECIPES)}`];
     const send = async list => {
       const b=document.getElementById("rq-send"); if(b){ b.disabled=true; b.textContent="Sending…"; }
       try{
-        await db.collection("requests").doc("q-"+newId()).set({uid:me, byName:myName(), items:list.map(i=>({ask:i.ask, found:i.found})),
+        await db.collection("requests").doc("q-"+newId()).set({uid:actUid(), byName:actName(), items:list.map(i=>({ask:i.ask, found:i.found})),
           text:asks.join("\n").slice(0,800), photo:photo?photo.thumb:"", status:"open", reply:"", recipeId:"", created:Date.now()});
         notifyRequest(`${myName()} is asking for a recipe`, `${myName()} wants a recipe for ${list.map(i=>i.ask).join(", ")}.`);
         F.reset(); photo=null; F.querySelector("#rq-prev").innerHTML="";

@@ -760,6 +760,15 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F); await A.waitForTimeout(300); await perm(A, await V.evaluate(() => me), 'review', true);
     await A.goto(F + '#viewas'); await A.waitForTimeout(400); await A.fill('#va-q', vn4.slice(0, 6)); await A.waitForTimeout(100); await A.locator('.va-person', {hasText: vn4}).click(); await A.waitForTimeout(1500);
     ok('the owner can log in as one particular employee, with their own permissions', new RegExp(vn4).test(await A.locator('#viewas-bar').innerText().catch(() => '')) && await A.evaluate(() => may('review') && !may('edit') && myRole() === 'employee'));
+    { const vuid4 = await V.evaluate(() => me);
+      const wasFav = await A.evaluate(() => favs().includes('r-boston-cream-pie'));
+      await A.goto(F + '#r-boston-cream-pie'); await A.waitForTimeout(400); await A.click('#fav'); await A.waitForTimeout(600);
+      const theirFavs = await A.evaluate(u => db.collection('users').doc(u).get().then(s => s.data().favs || []), vuid4);
+      ok('logged in as someone, the owner can save to their favorites', theirFavs.includes('r-boston-cream-pie') !== wasFav && await A.evaluate(() => actAs()));
+      await A.goto(F + '#menus'); await A.waitForTimeout(300); await A.fill('#mn-name', 'Menu made for them'); await A.click('#mn-new .solid'); await A.waitForTimeout(700);
+      const theirMenu = await A.evaluate(u => db.collection('menus').where('uid', '==', u).get().then(s => s.docs.some(d => d.data().name === 'Menu made for them')), vuid4);
+      ok('…and make a menu in their name', theirMenu);
+      await A.goto(F + '#r-boston-cream-pie'); await A.waitForTimeout(400); await A.click('#fav'); await A.waitForTimeout(400); }
     await A.click('#va-back'); await A.waitForTimeout(1500);
     await A.goto(F); await A.waitForTimeout(300); await perm(A, await V.evaluate(() => me), 'review', false);
     ok('Back to my view brings everything back', (await A.locator('#viewas-bar').count()) === 0 && await A.evaluate(() => isOwner() && isAdmin()));
@@ -834,10 +843,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*11 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 11));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*12 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 12));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=on]').count()) === 11 && (await A.locator('#set-upds [data-set=no]').count()) === 11, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=on]').count()) === 12 && (await A.locator('#set-upds [data-set=no]').count()) === 12, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=on]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -845,7 +854,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.click('[data-updtab=wait]'); await A.waitForTimeout(200);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=on]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /10/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /11/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1079,8 +1088,9 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F); await A.waitForTimeout(600);
     ok('…and shows their home page with their name', /Public Paula/i.test(await A.locator('.hello .eyebrow').innerText()) && /Public Paula/.test(await A.locator('#viewas-bar').innerText()) && await A.evaluate(() => isPublic()));
     ok('…with their favorites', await A.evaluate(() => favs().includes('r-croissants')));
-    await A.evaluate(() => setFavs([])); await A.waitForTimeout(300);
-    ok("…and nothing done while looking is saved", await PU.evaluate(() => favs().includes('r-croissants')) && /Nothing is saved/.test(await A.locator('#toast').innerText()));
+    await A.evaluate(() => setFavs([])); await A.waitForTimeout(600);
+    ok("…and what the owner does for them is saved to their account", await PU.evaluate(() => !favs().includes('r-croissants')));
+    await A.evaluate(() => setFavs(['r-croissants'])); await A.waitForTimeout(600);
     await A.click('#va-back'); await A.waitForTimeout(1500);
     // Employees may look in as customers only, and only when allowed
     await V.goto(F); await V.waitForTimeout(400); await V.click('#avbtn'); await V.waitForTimeout(200);
@@ -1093,6 +1103,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('an allowed employee can log in as customers only', (await V.locator('[data-va]').count()) === 1 && (await V.locator('[data-va=public]').count()) === 1 && /Public Paula/.test(vaTxt) && !/Shulem/.test(vaTxt), vaTxt);
     await V.locator('.va-person', {hasText: 'Public Paula'}).click(); await V.waitForTimeout(1800);
     ok('…and sees what that customer sees', /Public Paula/.test(await V.locator('#viewas-bar').innerText().catch(() => '')) && await V.evaluate(() => isPublic() && favs().includes('r-croissants')));
+    await V.evaluate(() => setFavs([])); await V.waitForTimeout(400);
+    ok("…but an employee looking in can't change anything", await PU.evaluate(() => favs().includes('r-croissants')) && /Nothing is saved/.test(await V.locator('#toast').innerText()));
     await V.click('#va-back'); await V.waitForTimeout(1500);
     await perm(A, vuid, 'viewas', false, 800);
 
