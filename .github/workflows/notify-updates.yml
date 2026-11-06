@@ -1,0 +1,34 @@
+# Sends the owner a phone alert when a new update is waiting for his approval in App & web updates.
+name: Alert the owner about new updates
+
+on:
+  push:
+    branches: [main]
+    paths: [index.html]
+  workflow_dispatch:
+
+concurrency: notify-updates
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Load the Firebase key
+        env:
+          KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$KEY" ]; then echo "::error::The FIREBASE_SERVICE_ACCOUNT secret is missing."; exit 1; fi
+          printf '%s' "$KEY" > "$RUNNER_TEMP/firebase-key.json"
+      - name: Install the Firebase admin library
+        run: npm install --no-save --no-audit --no-fund firebase-admin@12
+      - name: Alert the owner
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-key.json
+        run: node tools/notify-updates.js
+      - name: Remove the key file
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase-key.json"

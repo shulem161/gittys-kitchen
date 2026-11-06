@@ -1300,12 +1300,12 @@ const myName = () => profile ? profile.name : "";
 const uk = k => "gk-u-"+me+"-"+k;
 const favs = () => pv() ? (VIEW_WHO.favs||[]) : (profile && profile.favs) || [];
 const initial = n => (String(n).trim()[0]||"?").toUpperCase();
-const pendingCount = () => members.filter(m=>m.status==="pending").length + inboxTotal() + newFeedback() + openRequests();
+const pendingCount = () => members.filter(m=>m.status==="pending").length + inboxTotal() + newFeedback() + openRequests() + (viewingAs()?0:updWaiting());
 function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catch(e){for(let i=0;i<12;i++)a[i]=Math.random()*256|0} return [...a].map(b=>b.toString(16).padStart(2,"0")).join(""); }
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.25";
+const WEB_VERSION = "4.26";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1343,6 +1343,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["updinbox","4.26","2026-11-06","App & web updates in your Inboxes, with an alert","App & web updates is in your Inboxes (no longer under Settings), with how many are waiting, and you get a phone alert when a new update is waiting for your approval. Only you use this.", true],
   ["moveback","4.25","2026-11-05","Undo a move, and edits go back to proofreading","Only the person who moved a recipe up can move it back (“↩ Undo”), for example if it was a mistake. Anyone else asks for a change instead: when a recipe in For approval or Ready to release is edited, or a change to it is sent, it goes back to Need to proofread to be checked again.", false],
   ["askcredit","4.24","2026-11-05","Moving up for someone who asked puts it on their name","When someone asked to move a recipe up and you tap the button, the move is recorded on their name, not yours, and you aren't locked out of the next step.", false],
   ["codesearch","4.24","2026-11-05","Find recipes by part of the item number","Typing part of an item number (like 103 or 1030) in the search at the top lists every recipe whose number starts that way, in number order. When choosing a recipe by typing, number matches come first, in number order, and more of them show.", false],
@@ -3709,12 +3710,13 @@ function openMenu(confirming){
 
   ].filter(Boolean);
   const manageN = (isAdmin()?mp:0);
-  const inboxes = [feat("nk")&&isAdmin()&&recipesOnline ? item("#kosher","Not kosher", inboxCount("kosher")?inboxCount("kosher")+" waiting":"", inboxCount("kosher")) : "", ...INBOXES.filter(([,,p])=>may(p)).map(([st,l])=>item("#"+st, l, inboxCount(st)?inboxCount(st)+" waiting":"", inboxCount(st))),
+  const inboxes = [realOwner()&&!viewingAs() ? item("#updates","App &amp; web updates", updWaiting()?updWaiting()+" to approve":"", updWaiting()) : "",
+    feat("nk")&&isAdmin()&&recipesOnline ? item("#kosher","Not kosher", inboxCount("kosher")?inboxCount("kosher")+" waiting":"", inboxCount("kosher")) : "", ...INBOXES.filter(([,,p])=>may(p)).map(([st,l])=>item("#"+st, l, inboxCount(st)?inboxCount(st)+" waiting":"", inboxCount(st))),
     isAdmin() ? item("#admin-approval","Needs admin approval", inboxCount("admin")?inboxCount("admin")+" waiting":"", inboxCount("admin")) : "",
     !offline&&may("answer") ? item("#requests","Recipe requests", openRequests()?openRequests()+" waiting":"", openRequests()) : "",
     may("inbox") ? item("#inbox","Suggestions &amp; comments", newFeedback()?newFeedback()+" new":"", newFeedback()) : "",
     may("ratings") ? item("#ratings","Likes &amp; dislikes") : ""].filter(Boolean);
-  const inboxN = inboxTotal() + (may("answer")?openRequests():0) + (may("inbox")?newFeedback():0);
+  const inboxN = inboxTotal() + (may("answer")?openRequests():0) + (may("inbox")?newFeedback():0) + (viewingAs()?0:updWaiting());
   const recipes = [
     !offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit")) ? item("#new","Add a recipe")+(can("ai")?item("#scan","Scan a recipe"):"") : "",
     offline||!can("requests")||may("answer") ? "" : item("#requests","Request a recipe"),
@@ -3738,7 +3740,7 @@ function openMenu(confirming){
       offline||!can("ai") ? "" : item("#menu","Menu ideas"),
       offline||!can("feedback")||may("inbox") ? "" : item("#feedback","Suggestions &amp; comments"),
     ].filter(Boolean), 0)}
-    ${group("settings","Settings", [item("#account","Account settings"), item("#settings-look", LOOK_SET()), realOwner()&&!viewingAs()?item("#updates","App &amp; web updates", updWaiting()?updWaiting()+" to approve":"", updWaiting()):"", isAdmin()?item("#inbox-settings","Inbox settings"):"", isAdmin()?item("#employees","Employee settings"):"", isAdmin()?item("#public","Customer portal settings", openGolive()?openGolive()+" waiting":"", openGolive()):""].filter(Boolean), isAdmin()?openGolive():0)}
+    ${group("settings","Settings", [item("#account","Account settings"), item("#settings-look", LOOK_SET()), isAdmin()?item("#inbox-settings","Inbox settings"):"", isAdmin()?item("#employees","Employee settings"):"", isAdmin()?item("#public","Customer portal settings", openGolive()?openGolive()+" waiting":"", openGolive()):""].filter(Boolean), isAdmin()?openGolive():0)}
     <button type="button" role="menuitem" id="m-out" class="m-out">Sign out</button>`;
   m.querySelectorAll(".mgroup").forEach(d=>d.addEventListener("toggle",()=>{ d.open ? menuOpen.add(d.dataset.mg) : menuOpen.delete(d.dataset.mg); }));
   m.onclick=e=>e.stopPropagation();
@@ -5957,7 +5959,6 @@ function settingsPage(){
       <div class="field"><label for="pref-todo">Show my to-do list on the home page when there's something to do in…</label>
         <select id="pref-todo">${TODO_CHOICES.map(([v,l])=>`<option value="${v}" ${v===todoDays()?"selected":""}>${l}</option>`).join("")}</select></div>
       <p class="hint">Otherwise it stays out of the way. Today's to-do list is always on the Calendar, on today's date.</p></div>`:""}
-    ${realOwner()&&!viewingAs()?`<a class="panel-a set-link" href="#updates"><span><b>App &amp; web updates</b><small>${updWaiting()?updWaiting()+" waiting for your approval":"Everything is approved"}</small></span><span aria-hidden="true">›</span></a>`:""}
     <div class="panel-a set-app"><h3>App</h3>
       <p>Version ${WEB_VERSION}${appBuild?` · Android app ${appBuild}`:""}</p>
       <div class="row mn-actions"><button type="button" class="btn" id="set-upd">Check for updates</button>${isAdmin()?`<button type="button" class="btn" id="set-ntfy">Send a test notification</button>`:""}</div>
