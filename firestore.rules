@@ -272,7 +272,7 @@ service cloud.firestore {
     // Recipes sent in by members. Only the admin sees all of them and decides.
     match /submissions/{id} {
       allow create: if (can('suggest') || extra('edit') || isAdmin())
-        && request.resource.data.uid == request.auth.uid
+        && (request.resource.data.uid == request.auth.uid || (isAdmin() && canManage(request.resource.data.uid)))
         && request.resource.data.status == 'pending';
       allow read: if extra('review') || extra('proofread') || extra('release') || (signedIn() && resource.data.uid == request.auth.uid);
       // three different people: whoever proofread can't approve; neither of them can release
@@ -316,7 +316,7 @@ service cloud.firestore {
     // Recipe requests from members ("I need a recipe for…", optional small photo). Only the admin sees them all.
     match /requests/{id} {
       allow create: if can('requests')
-        && request.resource.data.uid == request.auth.uid
+        && (request.resource.data.uid == request.auth.uid || (isAdmin() && canManage(request.resource.data.uid)))
         && request.resource.data.status == 'open'
         && request.resource.data.reply == '' && request.resource.data.recipeId == ''
         && request.resource.data.items is list && request.resource.data.items.size() <= 12
@@ -330,6 +330,8 @@ service cloud.firestore {
     // Each person's own calendar: only they can see or change it.
     match /plans/{uid} {
       allow read, write: if approvedMember() && request.auth.uid == uid;
+      // "Log in as": an admin can change the calendar of someone they manage
+      allow write: if isAdmin() && canManage(uid);
       // "Log in as": admins, and employees allowed to look in as a customer
       allow read: if isAdmin() || (extra('viewas') && get(/databases/$(database)/documents/users/$(uid)).data.get('role', 'public') == 'public');
     }
@@ -368,16 +370,16 @@ service cloud.firestore {
     match /menus/{id} {
       allow read: if isAdmin() || (approvedMember()
         && (resource.data.uid == request.auth.uid || request.auth.uid in resource.data.get('shared', [])));
-      allow create: if approvedMember() && request.resource.data.uid == request.auth.uid
+      allow create: if approvedMember() && (request.resource.data.uid == request.auth.uid || (isAdmin() && canManage(request.resource.data.uid)))
         && request.resource.data.name is string && request.resource.data.name.size() <= 60
         && request.resource.data.items is list && request.resource.data.items.size() <= 60
         && request.resource.data.shared is list && request.resource.data.shared.size() <= 50;
-      allow update: if approvedMember() && resource.data.uid == request.auth.uid
-        && request.resource.data.uid == request.auth.uid
+      allow update: if approvedMember() && request.resource.data.uid == resource.data.uid
+        && (resource.data.uid == request.auth.uid || (isAdmin() && canManage(resource.data.uid)))
         && request.resource.data.name is string && request.resource.data.name.size() <= 60
         && request.resource.data.items is list && request.resource.data.items.size() <= 60
         && request.resource.data.shared is list && request.resource.data.shared.size() <= 50;
-      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || (isAdmin() && canManage(resource.data.uid)));
     }
 
     // Member profiles. New members always start as "pending";

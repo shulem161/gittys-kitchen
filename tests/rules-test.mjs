@@ -367,6 +367,15 @@ await check("…nor change the recipe while doing it", assertFails(updateDoc(doc
 await check('an edit by anyone on the team sends it back to Need to proofread', assertSucceeds(updateDoc(doc(E9, 'recipes', 'r-eb'), { rv: 'proof', rvUids: [], rvLog: [{ to: 'proof', edited: true }] })));
 await check("a customer can't", assertFails(updateDoc(doc(C9, 'recipes', 'r-eb'), { rv: 'proof', rvUids: [] })));
 
+// "Log in as": an admin saves that person's own things to their account
+await check("the owner can save someone's calendar", assertSucceeds(setDoc(doc(OWN, 'plans', 'e9'), { days: {} })));
+await check('…make a menu in their name', assertSucceeds(setDoc(doc(OWN, 'menus', 'm-e9'), { uid: 'e9', name: 'For E9', items: [], shared: [] })));
+await check('…and send a recipe in their name', assertSucceeds(setDoc(doc(OWN, 'submissions', 's-e9'), { uid: 'e9', status: 'pending', stage: 'proof', t: 'X' })));
+await check("an employee can't save someone else's calendar", assertFails(setDoc(doc(E9, 'plans', 'c9'), { days: {} })));
+await check("…nor make a menu in their name", assertFails(setDoc(doc(E9, 'menus', 'm-c9'), { uid: 'c9', name: 'X', items: [], shared: [] })));
+await check("…nor take over someone's menu", assertFails(updateDoc(doc(E9, 'menus', 'm-e9'), { uid: 'e9', name: 'Mine', items: [], shared: [] })) );
+await check("an admin can't save the owner's calendar", assertFails(setDoc(doc(as('adm'), 'plans', 'own'), { days: {} })));
+
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(`::notice::Rule checks: ${pass} passed, ${fail} failed`);
