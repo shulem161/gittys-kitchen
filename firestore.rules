@@ -229,6 +229,10 @@ service cloud.firestore {
       // Only admins move recipes to another category; employees ask (golive, kind "move").
       // anyone on the team can ask for a recipe to be moved up, or put a hidden one into Need to proofread
       allow update: if isTeam() && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rvAsk'])
+        // edited, or undone by whoever moved it: back one step, or back to Need to proofread
+        || (((resource.data.get('rv', '') in ['approve', 'release'] && request.resource.data.get('rv', '') == 'proof' && request.resource.data.get('rvUids', []).size() == 0)
+             || (resource.data.get('rv', '') == 'release' && request.resource.data.get('rv', '') == 'approve'))
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog']))
         || (resource.data.get('rv', '') == '' && request.resource.data.get('rv', '') == 'proof'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog'])));
       // Merging: whoever releases the merged recipe deletes the one that was merged into it (and nothing else).

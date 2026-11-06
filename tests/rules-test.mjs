@@ -356,6 +356,14 @@ await check('…everyone signed in can see the switches', assertSucceeds(getDoc(
 await check("…an admin can't switch them", assertFails(setDoc(doc(ADM, 'meta', 'features'), { on: { nk: false } })));
 await check("…nor an employee", assertFails(setDoc(doc(EMP, 'meta', 'features'), { on: { nk: false } })));
 
+// An edit sends a recipe back to Need to proofread; nobody can jump it forward that way
+await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'recipes', 'r-eb'), { t: 'EB', c: 'Cakes', rv: 'release', rvUids: ['pr1', 'pr2'] }); });
+await check("an employee can't send a recipe forward", assertFails(updateDoc(doc(EMP, 'recipes', 'r-eb'), { rv: '', rvUids: [] })));
+await check("…nor send it back while keeping who moved it", assertFails(updateDoc(doc(EMP, 'recipes', 'r-eb'), { rv: 'proof' })));
+await check("…nor change the recipe while doing it", assertFails(updateDoc(doc(EMP, 'recipes', 'r-eb'), { rv: 'proof', rvUids: [], t: 'X' })));
+await check('an edit by anyone on the team sends it back to Need to proofread', assertSucceeds(updateDoc(doc(EMP, 'recipes', 'r-eb'), { rv: 'proof', rvUids: [], rvLog: [{ to: 'proof', edited: true }] })));
+await check("a customer can't", assertFails(updateDoc(doc(PUB, 'recipes', 'r-eb'), { rv: 'proof', rvUids: [] })));
+
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(`::notice::Rule checks: ${pass} passed, ${fail} failed`);
