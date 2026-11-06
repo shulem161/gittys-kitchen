@@ -828,10 +828,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('Settings has its own App & web updates item, with how many are waiting', /App & web updates[\s\S]*3 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=settings]').textContent; closeMenu(); return x; })));
+    ok('Settings has its own App & web updates item, with how many are waiting', /App & web updates[\s\S]*6 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=settings]').textContent; closeMenu(); return x; })));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=on]').count()) === 3 && (await A.locator('#set-upds [data-set=no]').count()) === 3, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=on]').count()) === 6 && (await A.locator('#set-upds [data-set=no]').count()) === 6, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=on]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -839,7 +839,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.click('[data-updtab=wait]'); await A.waitForTimeout(200);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=on]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /2/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /5/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -853,6 +853,23 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('…bringing it back puts it in To approve, so the owner sees it again', await A.evaluate(() => feat('cbbrowse') && !featOn('cbbrowse')) && await V.evaluate(() => !feat('cbbrowse')));
     await A.click('[data-updtab=wait]'); await A.waitForTimeout(200); await A.click('[data-updall]'); await A.waitForTimeout(800);
     ok('“Approve all” approves every waiting update', await A.evaluate(() => UPDATES.every(([k]) => featOn(k))) && /Nothing to approve/.test(await A.locator('#set-upds').innerText()));
+    { const s = await A.evaluate(() => { const x = subs.find(s => s.status === 'approved' && s.releasedAs !== 'private' && s.recipeId && RECIPES.some(r => r.id === s.recipeId)); return x ? {t: x.t, rid: x.recipeId} : null; });
+      if (s) { await A.evaluate(async rid => { await db.collection('recipes').doc(rid).update({pub: false}); }, s.rid); await A.waitForTimeout(600); }
+      await A.goto(F + '#release'); await A.waitForTimeout(500);
+      const row = s ? await A.locator('.mrow', {hasText: s.t}).first().innerText().catch(() => '') : '';
+      ok('Recently released shows whether a recipe is public right now', !!s && /Team only/.test(row), [s, row]);
+      if (s) { await A.evaluate(async rid => { await db.collection('recipes').doc(rid).update({pub: true}); }, s.rid); await A.waitForTimeout(400); } }
+    // On a phone, the bottom bar hides while the keyboard is open
+    { await A.goto(F + '#plan'); await A.waitForTimeout(400); const vs = A.viewportSize();
+      await A.setViewportSize({width: 390, height: 840}); await A.waitForTimeout(200);
+      await A.evaluate(() => { window.matchMedia = q => ({matches: /coarse/.test(q), addEventListener() {}, removeEventListener() {}}); });
+      const inp = A.locator('#pl-q, #app input[type=text]').first(); await inp.focus(); await A.waitForTimeout(100);
+      await A.setViewportSize({width: 390, height: 480}); await A.waitForTimeout(500);
+      const hidden = await A.evaluate(() => document.body.classList.contains('kb-open') && getComputedStyle(document.querySelector('.tabbar')).display === 'none');
+      await A.setViewportSize({width: 390, height: 840}); await A.waitForTimeout(500);
+      const back = await A.evaluate(() => !document.body.classList.contains('kb-open') && getComputedStyle(document.querySelector('.tabbar')).display !== 'none');
+      ok('on a phone the bottom bar hides while the keyboard is open, and comes back after', hidden && back, [hidden, back]);
+      await A.evaluate(() => document.activeElement && document.activeElement.blur()); await A.setViewportSize(vs); }
     // Not kosher: an inbox before Need to proofread that only gets what an admin puts there
     await A.goto(F + '#kosher'); await A.waitForTimeout(400);
     ok('there is a Not kosher inbox before Need to proofread, empty to start with', /Not kosher/.test(await A.locator('h2').first().innerText()) && /Nothing in Not kosher/.test(await A.locator('#app').innerText()) && /Not kosher[\s\S]*Need to proofread/.test(await A.locator('.ib-steps').innerText()), [await A.evaluate(() => location.hash + ' ' + state), (await A.locator('#app').innerText()).slice(0, 300)]);
@@ -910,8 +927,15 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await PU.fill('#g-item', 'paper towels'); await PU.click('#g-iadd'); await PU.waitForTimeout(300);
     const gl = await PU.locator('.glist').allInnerTexts();
     ok('any item can go on the grocery list, in its aisle', /apples/.test(gl.join(' ')) && /paper towels/.test(gl.join(' ')) && /2 lb/.test(gl.join(' ')), gl);
-    await PU.locator('[data-gxrm="1"]').click(); await PU.waitForTimeout(300);
+    await PU.locator('[data-gxrm="1"]').click(); await PU.waitForTimeout(150); if (await PU.locator('[data-gyes]').count()) await PU.click('[data-gyes]'); await PU.waitForTimeout(300);
     ok('…and taken off again', !/paper towels/.test((await PU.locator('.glist').allInnerTexts()).join(' ')));
+    { await A.goto(F + '#grocery'); await A.waitForTimeout(300); await A.fill('#g-item', 'dish soap'); await A.click('#g-iadd'); await A.waitForTimeout(300);
+      const x = A.locator('.g-rec', {hasText: 'dish soap'}).locator('[data-gxrm]'); await x.click(); await A.waitForTimeout(150);
+      const asked = /Take it off the list\?/.test(await A.locator('.g-rec', {hasText: 'dish soap'}).innerText());
+      await A.locator('[data-gno]').click(); await A.waitForTimeout(150);
+      const kept = (await A.locator('.g-rec', {hasText: 'dish soap'}).locator('[data-gxrm]').count()) === 1;
+      await A.locator('.g-rec', {hasText: 'dish soap'}).locator('[data-gxrm]').click(); await A.locator('[data-gyes]').click(); await A.waitForTimeout(300);
+      ok('✕ on the grocery list asks first; Keep keeps it, Yes takes it off', asked && kept && (await A.locator('.g-rec', {hasText: 'dish soap'}).count()) === 0, [asked, kept]); }
 
     // Tablespoon and teaspoon spelled out everywhere
     await PU.goto(F + '#r-challah'); await PU.waitForTimeout(400);

@@ -86,6 +86,7 @@ button{font:inherit;color:inherit}
 .brand span{font-family:var(--display);font-size:20px}
 .search{flex:1;min-width:0;max-width:380px;margin-left:auto;position:relative}
 .cb-open-btn{margin-top:8px}
+.g-ask{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end;font-size:14px;font-weight:600}
 .upd-acts{display:flex;flex-direction:column;gap:6px;flex:none}.upd-list li.no{opacity:.8}.upd-list li.no .upd-state{color:#a33}
 .upd-tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
 .upd-tabs button{padding:11px 10px;border-radius:12px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
@@ -954,6 +955,7 @@ footer{padding-bottom:24px}
 .tabbar a[aria-current="page"]{color:var(--accent)}
 .tb-badge{position:absolute;top:0;left:calc(50% + 4px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#C2581A;color:#fff;font-size:11px;line-height:18px;text-align:center;font-variant-numeric:tabular-nums}
 body.out .tabbar,body.on-recipe .tabbar{display:none}
+body.kb-open .tabbar,body.kb-open .ractions{display:none}
 /* home */
 .hello{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding-top:22px}
 .hello h1{font-size:clamp(28px,6vw,40px);margin-top:2px}
@@ -1303,7 +1305,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.21";
+const WEB_VERSION = "4.22";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1341,6 +1343,9 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["relstate","4.22","2026-11-05","Recently released shows if a recipe is public now","Ready to release → Recently released shows whether each recipe is public or team only right now, instead of what it was labelled when it was released.", false],
+  ["grconfirm","4.22","2026-11-05","Ask before taking something off the grocery list","Tapping ✕ on the grocery list asks “Take it off the list?” first, with Yes and Keep.", false],
+  ["kbnav","4.22","2026-11-05","Bottom bar stays down while typing","On a phone, when the keyboard opens, the bottom bar (Home, Categories, Grocery, Timers, Calendar) hides instead of riding up on top of the keyboard. It comes back when the keyboard closes.", false],
   ["upddecline","4.21","2026-11-05","Decline an update","A Decline button next to Approve. A declined update is taken off the app and the website for everyone, you too, and waits in the Declined tab in case you want it back. Only you use this.", true],
   ["updpage","4.20","2026-11-05","App & web updates page","Its own page under Settings, with two tabs: updates to approve and updates already approved. Only you use it.", true],
   ["tabsearch","4.18","2026-11-05","Search bar under the categories","A search bar right under the row of categories, on the home page and category pages, that searches the whole cookbook.", false],
@@ -2889,6 +2894,22 @@ function updatesPage(){
     if(await save(on)) toast(MSG[s]); });
   const all=app.querySelector("[data-updall]"); if(all) all.onclick=async()=>{ const on=cur(); wait.forEach(([k])=>on[k]=true); if(await save(on)) toast("All approved"); };
 }
+// While the phone keyboard is open, the bars fixed to the bottom of the screen hide, so only the keyboard comes up
+(function(){
+  const typing = el => !!el && (el.tagName==="TEXTAREA" || el.isContentEditable || (el.tagName==="INPUT" && !["checkbox","radio","button","submit","reset","range","color","file","image"].includes(el.type)));
+  const touch = () => { try{ return matchMedia("(pointer: coarse)").matches; }catch(e){ return false; } };
+  let full = 0;
+  const check = () => {
+    const h = Math.min(innerHeight, window.visualViewport ? visualViewport.height : innerHeight);
+    if(!typing(document.activeElement)) full = Math.max(full, h);
+    const open = feat("kbnav") && touch() && typing(document.activeElement) && (!full || h < full - 120);
+    document.body.classList.toggle("kb-open", open);
+  };
+  addEventListener("resize", check); if(window.visualViewport) visualViewport.addEventListener("resize", check);
+  document.addEventListener("focusin", ()=>{ check(); setTimeout(check, 350); });
+  document.addEventListener("focusout", ()=>setTimeout(check, 60));
+  window.kbCheck = check;
+})();
 // Browse the whole cookbook by category and pick recipes (for menus and the calendar)
 function pickFromCookbook(o){   // o: {title, has(rid), toggle(rid, on), done()}
   const old=document.querySelector(".cb-pick"); if(old) old.remove();
@@ -4307,7 +4328,7 @@ function recipeInbox(stage){
         ${s.editOf&&RECIPES.find(x=>x.id===s.editOf)?compareHTML(RECIPES.find(x=>x.id===s.editOf), s):`<div class="pv">${previewHTML(s)}</div>`}
         <div class="macts sub-acts">${acts(s)}</div></article>`).join("")
       : rvIn(stage).length ? "" : `<div class="panel-a"><p class="hint mempty">${stage==="proof"?"Nothing to proofread. Every new recipe and suggested change comes here first.":stage==="approve"?"Nothing waiting for approval. Recipes come here after they're proofread.":"Nothing to release. Recipes come here after they're approved."}</p></div>`}
-    ${done.length?`<div class="panel-a"><h3>Recently released</h3><ul class="mlist">${done.map(s=>`<li class="mrow"><div class="mwho"><b>${esc(s.t)}</b><span>${s.releasedAs==="private"?"🔒 Team only":"🌐 Public"} · ${fmtDate(s.decided)}${s.releasedBy?" · "+esc(s.releasedBy):""}</span></div>
+    ${done.length?`<div class="panel-a"><h3>Recently released</h3><ul class="mlist">${done.map(s=>`<li class="mrow"><div class="mwho"><b>${esc(s.t)}</b><span>${(()=>{ const rr=feat("relstate")&&s.recipeId?findAny(s.recipeId):null; const pubNow = rr ? pubVisible(rr) : s.releasedAs!=="private"; return pubNow?"🌐 Public":"🔒 Team only"; })()} · ${fmtDate(s.decided)}${s.releasedBy?" · "+esc(s.releasedBy):""}</span></div>
       <div class="macts">${s.recipeId&&RECIPES.some(r=>r.id===s.recipeId)?`<a class="btn" href="#${esc(s.recipeId)}">Open</a>`:""}</div></li>`).join("")}</ul></div>`:""}
   </section>`;
 
@@ -5491,12 +5512,16 @@ function groceryPage(){
   </section>`;
   const $=id=>document.getElementById(id);
   app.querySelectorAll("[data-gx]").forEach(s=>s.onchange=()=>{ const v=gStore(); const it=v.items.find(i=>i.id===s.dataset.gx); if(it){ it.x=+s.value; gSave(v); groceryPage(); } });
-  app.querySelectorAll("[data-grm]").forEach(b=>b.onclick=()=>{ const v=gStore(); v.items=v.items.filter(i=>i.id!==b.dataset.grm); gSave(v); renderAcct(); groceryPage(); });
+  // ✕ asks first (once approved): “Take it off the list?” Yes / Keep
+  const askOff = (b, go) => { if(!feat("grconfirm")){ go(); return; }
+    const box=document.createElement("span"); box.className="g-ask"; box.innerHTML=`<span>Take it off the list?</span><button type="button" class="btn sm warn" data-gyes>Yes</button><button type="button" class="btn sm" data-gno>Keep</button>`;
+    b.replaceWith(box); box.querySelector("[data-gyes]").onclick=go; box.querySelector("[data-gno]").onclick=()=>box.replaceWith(b); box.querySelector("[data-gyes]").focus(); };
+  app.querySelectorAll("[data-grm]").forEach(b=>b.onclick=()=>askOff(b, ()=>{ const v=gStore(); v.items=v.items.filter(i=>i.id!==b.dataset.grm); gSave(v); renderAcct(); const y=window.scrollY; groceryPage(); window.scrollTo(0,y); }));
   app.querySelectorAll("[data-gk]").forEach(c=>c.onchange=()=>{ const v=gStore(), k=c.dataset.gk;
     v.have = c.checked ? [...new Set([...v.have,k])] : v.have.filter(x=>x!==k);
     if(!c.checked && v.part && v.part[k]){ const L=lines.find(x=>x.key===k); if(L && L.enough) delete v.part[k]; }   // un-ticking a "have enough" line
     gSave(v); const y=window.scrollY; groceryPage(); window.scrollTo(0,y); });
-  app.querySelectorAll("[data-gxrm]").forEach(b=>b.onclick=()=>{ const v=gStore(); v.extra=(v.extra||[]).filter((e,i)=>i!==+b.dataset.gxrm); gSave(v); renderAcct(); const y=window.scrollY; groceryPage(); window.scrollTo(0,y); });
+  app.querySelectorAll("[data-gxrm]").forEach(b=>b.onclick=()=>askOff(b, ()=>{ const v=gStore(); v.extra=(v.extra||[]).filter((e,i)=>i!==+b.dataset.gxrm); gSave(v); renderAcct(); const y=window.scrollY; groceryPage(); window.scrollTo(0,y); }));
   const xa=$("g-item"), xs=$("g-isugg");
   const addItem = txt => { txt=String(txt||"").trim().replace(/\s+/g," "); if(!txt) return; const v=gStore(); v.extra=[...(v.extra||[]), {t:txt.slice(0,80)}]; gSave(v); renderAcct(); groceryPage(); const a2=$("g-item"); if(a2) a2.focus(); toast("Added: "+txt); };
   xa.oninput=()=>{ const q=xa.value.trim().toLowerCase(); if(q.length<2){ xs.innerHTML=""; return; }
