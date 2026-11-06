@@ -87,7 +87,7 @@ button{font:inherit;color:inherit}
 .search{flex:1;min-width:0;max-width:380px;margin-left:auto;position:relative}
 .cb-open-btn{margin-top:8px}
 .g-ask{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end;font-size:14px;font-weight:600}
-.upd-acts{display:flex;flex-direction:column;gap:6px;flex:none}.upd-list li.no{opacity:.8}.upd-list li.no .upd-state{color:#a33}
+.upd-acts{display:flex;flex-direction:column;gap:6px;flex:none;max-width:48%}.upd-for{font-size:12px;font-weight:700;color:var(--muted)}.upd-list li.no{opacity:.8}.upd-list li.no .upd-state{color:#a33}
 .upd-tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
 .upd-tabs button{padding:11px 10px;border-radius:12px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
 .upd-tabs button[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
@@ -650,6 +650,10 @@ body.guiding{overflow:hidden}
 .cmp-key{margin-left:auto;display:inline-flex;gap:6px;font-size:12.5px}.cmp-key span{padding:1px 8px;border-radius:6px}
 .cmp .del{background:#FBE3E1;color:#8A2A20}.cmp .add{background:#DDF3E3;color:#1E6B37}
 .hist-v{display:grid;gap:6px}.hist-h{display:grid;gap:2px}.rv-loglist{margin:6px 0 0;padding-left:18px;display:grid;gap:4px;font-size:14px}
+.cmp-viewsel-l{display:inline-flex;gap:8px;align-items:center;font-weight:600;font-size:14px;margin:6px 0 8px}.cmp-viewsel{font:inherit;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink)}
+.bl-sum{display:none;margin:0 0 6px;font-size:14px;font-weight:600}.bl-sum .add{color:#2e7d32}.bl-sum .del{color:#c62828}
+.bl-plain .bl-who,.bl-plain .bl-key{display:none}.bl-plain .bl-sum{display:block}
+.bl-plain .bl-add{--bc:#2e7d32 !important}.bl-plain .bl-del{--bc:#c62828 !important}
 .blame{display:grid;gap:2px;margin-top:10px}.bl-key{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:0 0 6px;font-size:14px}
 .bl-p{display:inline-flex;gap:5px;align-items:center}.bl-p i{width:12px;height:12px;border-radius:50%;display:inline-block}
 .bl-l{font-size:14.5px;line-height:1.45;padding:3px 6px;border-radius:6px;overflow-wrap:anywhere;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
@@ -1276,7 +1280,7 @@ const canViewAs = () => realAdmin() || (!!profile && profile.status==="approved"
 const pv = () => !!(viewingAs() && VIEW_WHO && VIEW_WHO.uid);
 const who = () => pv() ? VIEW_WHO.uid : me;
 // “Do things as the person you logged in as”: admins save that person's own things to their account
-const actAs = () => pv() && realAdmin() && !featDeclined("actas") && (realOwner() || featOn("actas"));
+const actAs = () => pv() && realAdmin() && !featDeclined("actas") && (realOwner() || featLevel("actas")==="admin" || featLevel("actas")==="team" || featLevel("actas")==="all");
 const actUid = () => actAs() ? VIEW_WHO.uid : me;
 const actName = () => actAs() ? VIEW_WHO.name : myName();
 const ownBlocked = () => actAs() ? false : previewBlocked();
@@ -1318,7 +1322,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.28";
+const WEB_VERSION = "4.29";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1356,31 +1360,39 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
-  ["history","4.28","2026-11-06","History for every recipe","Every recipe has a History page (in its ⋮ menu, for the team): each version, what changed and who changed it — in color, person by person — and who moved it through the inboxes. It stays after the recipe is released. History is kept from now on.", false],
+  ["updaud","4.29","2026-11-06","Approve an update for admins, the team or everyone","When you approve an update you choose who gets it: admins only, admins and employees, or everyone (customers too), where it applies. You can change it later in Approved.", true, "admin"],
+  ["blamechoice","4.29","2026-11-06","Names on changes only when you choose","Changes show plainly at first: green for added, red for taken out, no names. A “Show” drop-down chooses: Changes marked, Side by side, or Who changed what (each person's color and name). It remembers your choice, also in History.", false, "team"],
+  ["history","4.28","2026-11-06","History for every recipe","Every recipe has a History page (in its ⋮ menu, for the team): each version, what changed and who changed it — in color, person by person — and who moved it through the inboxes. It stays after the recipe is released. History is kept from now on.", false, "team"],
   ["aiadd","4.28","2026-11-06","Add something with AI","In the recipe editor, next to “Make it better with AI”: write what you want added (a glaze, a topping, a dairy-free option…) and AI works it into the recipe — new ingredients and the steps for them. You can undo it.", false],
-  ["blame","4.28","2026-11-06","See who changed what, in color, until it goes live","In the inboxes, every change to a recipe stays marked until it's released: each person who changed it has their own color, with their name on what they added (and on what they took out, crossed out). A row at the top shows who did what.", false],
-  ["actas","4.27","2026-11-06","Do things as the person you logged in as","When an admin uses “Log in as…”, that person's own things are saved to their account: favorites, calendar, menus, settings, recipe requests and recipes or changes they send. Ratings, messages and inbox moves still can't be done in their name.", false],
-  ["updinbox","4.26","2026-11-06","App & web updates in your Inboxes, with an alert","App & web updates is in your Inboxes (no longer under Settings), with how many are waiting, and you get a phone alert when a new update is waiting for your approval. Only you use this.", true],
-  ["moveback","4.25","2026-11-05","Undo a move, and edits go back to proofreading","Only the person who moved a recipe up can move it back (“↩ Undo”), for example if it was a mistake. Anyone else asks for a change instead: when a recipe in For approval or Ready to release is edited, or a change to it is sent, it goes back to Need to proofread to be checked again.", false],
-  ["askcredit","4.24","2026-11-05","Moving up for someone who asked puts it on their name","When someone asked to move a recipe up and you tap the button, the move is recorded on their name, not yours, and you aren't locked out of the next step.", false],
+  ["blame","4.28","2026-11-06","See who changed what, in color, until it goes live","In the inboxes, every change to a recipe stays marked until it's released: each person who changed it has their own color, with their name on what they added (and on what they took out, crossed out). A row at the top shows who did what.", false, "team"],
+  ["actas","4.27","2026-11-06","Do things as the person you logged in as","When an admin uses “Log in as…”, that person's own things are saved to their account: favorites, calendar, menus, settings, recipe requests and recipes or changes they send. Ratings, messages and inbox moves still can't be done in their name.", false, "admin"],
+  ["updinbox","4.26","2026-11-06","App & web updates in your Inboxes, with an alert","App & web updates is in your Inboxes (no longer under Settings), with how many are waiting, and you get a phone alert when a new update is waiting for your approval. Only you use this.", true, "admin"],
+  ["moveback","4.25","2026-11-05","Undo a move, and edits go back to proofreading","Only the person who moved a recipe up can move it back (“↩ Undo”), for example if it was a mistake. Anyone else asks for a change instead: when a recipe in For approval or Ready to release is edited, or a change to it is sent, it goes back to Need to proofread to be checked again.", false, "team"],
+  ["askcredit","4.24","2026-11-05","Moving up for someone who asked puts it on their name","When someone asked to move a recipe up and you tap the button, the move is recorded on their name, not yours, and you aren't locked out of the next step.", false, "team"],
   ["codesearch","4.24","2026-11-05","Find recipes by part of the item number","Typing part of an item number (like 103 or 1030) in the search at the top lists every recipe whose number starts that way, in number order. When choosing a recipe by typing, number matches come first, in number order, and more of them show.", false],
   ["planconfirm","4.23","2026-11-05","Ask before taking something off the calendar","Tapping ✕ on a recipe or menu on the calendar asks “Take it off this day?” first, with Yes and Keep.", false],
   ["codepick","4.23","2026-11-05","Pick a recipe by its item number","Everywhere you choose a recipe by typing (calendar, menus, grocery list, calculator, “Make first”), you can type its item number too, even just the start of it (like 1010), and the number shows next to each choice.", false],
-  ["relstate","4.22","2026-11-05","Recently released shows if a recipe is public now","Ready to release → Recently released shows whether each recipe is public or team only right now, instead of what it was labelled when it was released.", false],
+  ["relstate","4.22","2026-11-05","Recently released shows if a recipe is public now","Ready to release → Recently released shows whether each recipe is public or team only right now, instead of what it was labelled when it was released.", false, "team"],
   ["grconfirm","4.22","2026-11-05","Ask before taking something off the grocery list","Tapping ✕ on the grocery list asks “Take it off the list?” first, with Yes and Keep.", false],
   ["kbnav","4.22","2026-11-05","Bottom bar stays down while typing","On a phone, when the keyboard opens, the bottom bar (Home, Categories, Grocery, Timers, Calendar) hides instead of riding up on top of the keyboard. It comes back when the keyboard closes.", false],
-  ["upddecline","4.21","2026-11-05","Decline an update","A Decline button next to Approve. A declined update is taken off the app and the website for everyone, you too, and waits in the Declined tab in case you want it back. Only you use this.", true],
-  ["updpage","4.20","2026-11-05","App & web updates page","Its own page under Settings, with two tabs: updates to approve and updates already approved. Only you use it.", true],
+  ["upddecline","4.21","2026-11-05","Decline an update","A Decline button next to Approve. A declined update is taken off the app and the website for everyone, you too, and waits in the Declined tab in case you want it back. Only you use this.", true, "admin"],
+  ["updpage","4.20","2026-11-05","App & web updates page","Its own page under Settings, with two tabs: updates to approve and updates already approved. Only you use it.", true, "admin"],
   ["tabsearch","4.18","2026-11-05","Search bar under the categories","A search bar right under the row of categories, on the home page and category pages, that searches the whole cookbook.", false],
   ["cbbrowse","4.18","2026-11-05","Browse the cookbook for menus and the calendar","A “Browse the cookbook” button when making a menu or adding recipes to a day: pick recipes by category or by searching.", false],
   ["nkhide","4.18","2026-11-05","Not kosher recipes hidden from the cookbook","A recipe in the Not kosher inbox is hidden from the whole cookbook. Approving it puts it back in the cookbook and on to Need to proofread.", false],
-  ["nk","4.17","2026-11-05","Not kosher inbox","An inbox before Need to proofread. Admins put a recipe there from its ⋮ menu; customers don't see it while it's there.", true],
+  ["nk","4.17","2026-11-05","Not kosher inbox","An inbox before Need to proofread. Admins put a recipe there from its ⋮ menu; customers don't see it while it's there.", true, "admin"],
 ];
 const FEATURES = UPDATES;
-const featOn = k => FEAT[k]!==undefined ? FEAT[k]===true : !!(UPDATES.find(f=>f[0]===k)||[])[5];
+// Who has an approved update: "all" (everyone), "team" (admins and employees) or "admin"; false = waiting
+const featLevel = k => { const u=UPDATES.find(f=>f[0]===k)||[], v = FEAT[k]!==undefined ? FEAT[k] : (u[5] ? true : false);
+  return v===true ? "all" : (v==="team"||v==="admin"||v==="declined") ? v : false; };
+const featOn = k => ["all","team","admin"].includes(featLevel(k));   // approved for someone
+const featFor = k => { const l=featLevel(k); return l==="all" || (l==="team" && isTeam()) || (l==="admin" && isAdmin()); };
+const featMax = k => (UPDATES.find(f=>f[0]===k)||[])[6] || "all";
+const AUD_LABEL = {admin:"admins only", team:"admins and employees", all:"everyone, customers too"};
 const featDeclined = k => FEAT[k]==="declined";   // declined: off for everyone, the owner too
 let FEAT = {};
-const feat = k => !featDeclined(k) && ((realOwner() && !viewingAs()) || featOn(k));   // the owner sees every update; "Log in as…" shows what others see
+const feat = k => !featDeclined(k) && ((realOwner() && !viewingAs()) || featFor(k));   // the owner sees every update; "Log in as…" shows what others see
 const updWaiting = () => realOwner() ? UPDATES.filter(([k])=>!featOn(k) && !featDeclined(k)).length : 0;
 let unsubFeat = null;
 function watchFeatures(){
@@ -2894,6 +2906,13 @@ function menuOptions(){ const L=Object.values(MENUS).sort((a,b)=>(a.uid!==me)-(b
 const CAL_SHORT = {"ראש השנה":"ר״ה","יום כיפור":"יוה״כ","הושענא רבה":"הוש״ר","שמיני עצרת":"שמ״ע","שמחת תורה":"שמח״ת","שבעה עשר בתמוז":"י״ז תמוז","תשעה באב":"ת״ב","תענית אסתר":"תענית אסתר","שושן פורים":"שושן פורים"};
 const calShort = n => { n=n.replace(/ · .*$/,""); if(/^ראש חודש/.test(n)) return "ר״ח"; if(/^חול המועד/.test(n)) return "חוה״מ"; return CAL_SHORT[n]||n; };
 // App & web updates (owner only): its own page under Settings, with two tabs — to approve, and approved
+// Approve buttons for each group the update can matter to (the ones it doesn't have yet)
+function levelBtns(k, cur){
+  const levels = {admin:["admin"], team:["admin","team"], all:["admin","team","all"]}[featMax(k)];
+  const lab = {admin:"Admins only", team:"Admins and employees", all:"Everyone"};
+  if(levels.length===1 && !cur) return `<button type="button" class="btn sm solid" data-upd="${k}" data-set="${levels[0]}">Approve${levels[0]==="admin"?" (admins)":""}</button>`;
+  return `${cur?"":`<span class="upd-for">Approve for:</span>`}${levels.filter(l=>l!==cur).map(l=>`<button type="button" class="btn sm${!cur&&l===levels[levels.length-1]?" solid":""}" data-upd="${k}" data-set="${l}">${cur?"Change to "+lab[l].toLowerCase():lab[l]}</button>`).join("")}`;
+}
 function updatesPage(){
   const tab = ["done","no"].includes(store("gk-updtab")) ? store("gk-updtab") : "wait";
   const wait=UPDATES.filter(([k])=>!featOn(k)&&!featDeclined(k)), done=UPDATES.filter(([k])=>featOn(k)), no=UPDATES.filter(([k])=>featDeclined(k));
@@ -2909,21 +2928,21 @@ function updatesPage(){
       ${tab==="wait"&&wait.length>1?`<div class="row" style="margin-bottom:8px"><button type="button" class="btn sm" data-updall>Approve all ${wait.length}</button></div>`:""}
       ${list.length?`<ul class="upd-list">${list.map(([k,v,d,title,about])=>{ const on=featOn(k), dec=featDeclined(k);
         return `<li class="${on?"on":dec?"no":"wait"}"><div><b>${esc(title)}</b><small>Version ${esc(v)} · ${fmtDate(new Date(d+"T12:00").getTime())}</small><p>${esc(about)}</p>
-          <span class="upd-state">${on?"✓ Approved – everyone has it":dec?"✗ Declined – taken off the app and the website for everyone":"⏳ Only you see it until you approve it"}</span></div>
-          <span class="upd-acts">${on?`<button type="button" class="btn sm" data-upd="${k}" data-set="wait">Take back</button>`
+          <span class="upd-state">${on?(feat("updaud")?`✓ Approved for ${AUD_LABEL[featLevel(k)]}`:"✓ Approved – everyone has it"):dec?"✗ Declined – taken off the app and the website for everyone":"⏳ Only you see it until you approve it"}</span></div>
+          <span class="upd-acts">${on?`${feat("updaud")?levelBtns(k, featLevel(k)):""}<button type="button" class="btn sm" data-upd="${k}" data-set="wait">Take back</button>`
             : dec?`<button type="button" class="btn sm" data-upd="${k}" data-set="wait">Bring it back</button>`
-            : `<button type="button" class="btn sm solid" data-upd="${k}" data-set="on">Approve</button><button type="button" class="btn sm danger-btn" data-upd="${k}" data-set="no">Decline</button>`}</span></li>`; }).join("")}</ul>`
+            : `${feat("updaud")?levelBtns(k, ""):`<button type="button" class="btn sm solid" data-upd="${k}" data-set="all">Approve</button>`}<button type="button" class="btn sm danger-btn" data-upd="${k}" data-set="no">Decline</button>`}</span></li>`; }).join("")}</ul>`
         : `<p class="hint mempty">${tab==="wait"?"Nothing to approve. Everything is live for everyone.":tab==="done"?"Nothing approved yet.":"Nothing declined."}</p>`}
     </div>
   </section>`;
   app.querySelectorAll("[data-updtab]").forEach(b=>b.onclick=()=>{ store("gk-updtab", b.dataset.updtab); updatesPage(); });
   const save=async on=>{ try{ await db.collection("meta").doc("features").set({on, by:myName(), at:Date.now()}); FEAT=on; setRecipes(RAW_RECIPES); renderAcct(); const y=window.scrollY; updatesPage(); window.scrollTo(0,y); return true; }
     catch(e){ toast("Couldn't save. Check your connection."); return false; } };
-  const cur=()=>Object.fromEntries(UPDATES.map(([k])=>[k, featDeclined(k)?"declined":featOn(k)]));
-  const MSG={on:"Approved – it's in Approved, and everyone has it now", wait:"It's in To approve – only you see it now", no:"Declined – it's taken off the app and the website for everyone"};
-  app.querySelectorAll("[data-upd]").forEach(b=>b.onclick=async()=>{ const on=cur(), s=b.dataset.set; on[b.dataset.upd] = s==="on" ? true : s==="no" ? "declined" : false; b.disabled=true;
+  const cur=()=>Object.fromEntries(UPDATES.map(([k])=>{ const l=featLevel(k); return [k, l==="all"?true:l||false]; }));
+  const MSG={all:"Approved – everyone has it now", team:"Approved – admins and employees have it now", admin:"Approved – admins have it now", wait:"It's in To approve – only you see it now", no:"Declined – it's taken off the app and the website for everyone"};
+  app.querySelectorAll("[data-upd]").forEach(b=>b.onclick=async()=>{ const on=cur(), s=b.dataset.set; on[b.dataset.upd] = s==="all" ? true : s==="no" ? "declined" : s==="wait" ? false : s; b.disabled=true;
     if(await save(on)) toast(MSG[s]); });
-  const all=app.querySelector("[data-updall]"); if(all) all.onclick=async()=>{ const on=cur(); wait.forEach(([k])=>on[k]=true); if(await save(on)) toast("All approved"); };
+  const all=app.querySelector("[data-updall]"); if(all) all.onclick=async()=>{ const on=cur(); wait.forEach(([k])=>{ const m=featMax(k); on[k] = m==="all" ? true : m; }); if(await save(on)) toast("All approved, each for everyone it can matter to"); };
 }
 // While the phone keyboard is open, the bars fixed to the bottom of the screen hide, so only the keyboard comes up
 (function(){
@@ -4292,7 +4311,7 @@ async function historyPage(id){
   const nm = r ? r.t.replace(/^Untitled: /,"") : "This recipe";
   const card = (v, i) => { const prev=vers[i-1], revs=(v.revs&&v.revs.length)?v.revs:[{by:v.by, uid:v.uid, at:v.at, s:v.s}];
     const people=[...new Set(revs.map(x=>x.by).filter(Boolean))];
-    const body = prev ? blameHTML({revs}, prev.s) : revs.length>1 ? blameHTML({revs}) : `<div class="pv">${previewHTML(v)}</div>`;
+    const body = prev ? blameWrap(blameHTML({revs}, prev.s), false) : revs.length>1 ? blameWrap(blameHTML({revs}), false) : `<div class="pv">${previewHTML(v)}</div>`;
     return `<article class="panel-a hist-v"><div class="hist-h"><b>${esc(v.how||"Saved")}</b><span class="hint">${fmtDate(v.at)} · ${new Date(v.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})} · by ${esc(v.by||"")}${people.length&&people.join()!==v.by?` · changes by ${people.map(esc).join(", ")}`:""}</span></div>
       ${prev&&prev.t!==v.t?`<p class="hint">Name: <s>${esc(prev.t)}</s> → <b>${esc(v.t)}</b></p>`:""}${prev&&prev.c!==v.c?`<p class="hint">Category: <s>${esc(prev.c)}</s> → <b>${esc(v.c)}</b></p>`:""}
       ${body}</article>`; };
@@ -4300,7 +4319,8 @@ async function historyPage(id){
   app.innerHTML=`<section class="wrap admin">
     <a class="back" href="#${esc(id)}">← ${esc(nm)}</a>
     <div class="section-head" style="margin-top:8px"><h2>History</h2><p>${vers.length} ${vers.length===1?"version":"versions"} saved</p></div>
-    <p class="hint" style="margin:-6px 0 12px">Every version, newest first: what changed and who changed it. Each person has their own color; crossed-out lines were taken out.</p>
+    <p class="hint" style="margin:-6px 0 12px">Every version, newest first: what changed${feat("blamechoice")?". Choose “Who changed what” to see each person's changes in their own color":" and who changed it. Each person has their own color"}; crossed-out lines were taken out.</p>
+    ${feat("blamechoice")&&vers.length>1?`<div class="hist-sel">${cmpViewSel(false)}</div>`:""}
     ${vers.length ? vers.map((v,i)=>card(v,i)).reverse().join("") : `<div class="panel-a"><p class="hint mempty">No versions saved yet. From now on, every change to this recipe is kept here.</p></div>`}
     ${r&&(r.rvLog||[]).length?`<div class="panel-a"><h3>Through the inboxes</h3><ul class="rv-loglist">${rvLogHTML(r.rvLog)}</ul></div>`:""}
     ${older.length?`<div class="panel-a"><h3>Earlier changes</h3><p class="hint">From before the full history was kept: who changed it and when.</p><ul class="rv-loglist">${older.slice().reverse().map(h=>`<li><b>${esc(h.a==="added"?"Added":h.a==="moved"?"Moved"+(h.from?" from "+h.from:""):"Changed")}</b> · ${esc(h.by||"")} · ${fmtDate(h.at)}</li>`).join("")}</ul></div>`:""}
@@ -4346,6 +4366,7 @@ function blameHTML(s, baseParts){
   const tag = i => `<span class="bl-who" style="background:${col(i)}">${esc((people[i]||{}).name||"")}</span>`;
   const shown = people.map((p,i)=>[p,i]).filter(([p])=>p.add||p.del);
   return `<div class="blame">
+    <p class="bl-sum">${(()=>{ const a=items.filter(i=>i.add>=0&&i.del===undefined&&i.x.k!=="h").length, d=items.filter(i=>i.del!==undefined&&i.x.k!=="h").length; return a||d ? [a?`<span class="add">${a} added</span>`:"", d?`<span class="del">${d} taken out</span>`:""].filter(Boolean).join(" · ") : `<span class="hint">No changes yet.</span>`; })()}</p>
     <p class="bl-key">${shown.length?shown.map(([p,i])=>`<span class="bl-p"><i style="background:${col(i)}"></i><b>${esc(p.name)}</b> ${[p.add?`added ${p.add}`:"", p.del?`took out ${p.del}`:""].filter(Boolean).join(", ")}</span>`).join(""):`<span class="hint">No changes yet${base?" from the recipe in the cookbook":""}.</span>`}
       ${base?`<span class="hint">Plain lines are the recipe as it ${baseParts?"was before":"is in the cookbook"}.</span>`:revs.length?`<span class="hint">Plain lines are what ${esc(revs[0].by||"the cook")} first wrote.</span>`:""}</p>
     ${items.map(it=>{ const del=it.del!==undefined, ad=it.add>=0;
@@ -4385,12 +4406,19 @@ function compareHTML(r, sub, L, oneHTML){
     <p class="cmp-sum">${fields.length||nDel||nAdd ? `<b>${L.what}:</b> ${[fields.length?fields.map(f=>f[0].toLowerCase()).join(", "):"", nDel?`${nDel} ${nDel===1?"line":"lines"} only in ${esc(L.a)}`:"", nAdd?`${nAdd} ${nAdd===1?"line":"lines"} only in ${esc(L.b)}`:""].filter(Boolean).join(" · ")}` : "No differences."}
       <span class="cmp-key"><span class="del">${esc(L.del)}</span> <span class="add">${esc(L.add)}</span></span></p>
     ${fields.length?`<table class="cmp-f"><thead><tr><th></th><th>${esc(L.a)}</th><th>${esc(L.b)}</th></tr></thead><tbody>${fields.map(([l,a,b])=>`<tr><th>${l}</th><td class="del">${esc(a)||'<i>empty</i>'}</td><td class="add">${esc(b)||'<i>empty</i>'}</td></tr>`).join("")}</tbody></table>`:""}
-    <div class="cmp-view" role="radiogroup" aria-label="How to show the changes"><button type="button" role="radio" data-cmpv="one" aria-checked="${cmpView()==="one"}">${L.one}</button><button type="button" role="radio" data-cmpv="two" aria-checked="${cmpView()==="two"}">Side by side</button></div>
-    <div class="cmp-one" ${cmpView()==="one"?"":"hidden"}>${oneHTML || `<div class="cmp-col">${col(one)}</div>`}</div>
+    ${feat("blamechoice")&&oneHTML ? `${cmpViewSel(true)}
+    <div class="cmp-one" ${cmpView()==="one"?"":"hidden"}><div class="cmp-col">${col(one)}</div></div>
+    <div class="cmp-who" ${cmpView()==="who"?"":"hidden"}>${oneHTML}</div>`
+    : `<div class="cmp-view" role="radiogroup" aria-label="How to show the changes"><button type="button" role="radio" data-cmpv="one" aria-checked="${cmpView()!=="two"}">${L.one}</button><button type="button" role="radio" data-cmpv="two" aria-checked="${cmpView()==="two"}">Side by side</button></div>
+    <div class="cmp-one" ${cmpView()!=="two"?"":"hidden"}>${oneHTML || `<div class="cmp-col">${col(one)}</div>`}</div>`}
     <div class="cmp-cols" ${cmpView()==="two"?"":"hidden"}><div class="cmp-col"><div class="cmp-t">${esc(L.a)}</div>${col(left)}</div><div class="cmp-col"><div class="cmp-t">${esc(L.b)}</div>${col(right)}</div></div>
   </div>`;
 }
 const cmpView = () => store("gk-cmpview") || "one";
+// The "Show" drop-down: changes marked (no names), side by side, or who changed what
+const cmpViewSel = has2 => { const v=cmpView(), cur = v==="two"&&!has2 ? "one" : v;
+  return `<label class="cmp-viewsel-l">Show <select class="cmp-viewsel" aria-label="How to show the changes"><option value="one"${cur==="one"?" selected":""}>Changes marked</option>${has2?`<option value="two"${cur==="two"?" selected":""}>Side by side</option>`:""}<option value="who"${cur==="who"?" selected":""}>Who changed what</option></select></label>`; };
+const blameWrap = (html, withSel=true) => feat("blamechoice") ? `<div class="bl-wrap${cmpView()==="who"?"":" bl-plain"}">${withSel?cmpViewSel(false):""}${html}</div>` : html;
 // Merge two recipes, choosing line by line what to keep: #merge~<id>~<id>
 function mergePage(ida, idb){
   const A=RECIPES.find(r=>r.id===ida), B=RECIPES.find(r=>r.id===idb);
@@ -4460,6 +4488,10 @@ function comparePage(ida, idb){
       sg.querySelectorAll("[data-cp]").forEach(b=>b.onclick=()=>{ location.hash="compare~"+(k==="a"?b.dataset.cp:ida||"")+"~"+(k==="b"?b.dataset.cp:idb||""); }); }; });
 }
 function wireCompare(){
+  app.querySelectorAll(".cmp-viewsel").forEach(s=>s.onchange=()=>{ const v=s.value; store("gk-cmpview", v);
+    app.querySelectorAll(".cmp-viewsel").forEach(x=>{ x.value = [...x.options].some(o=>o.value===v) ? v : "one"; });
+    app.querySelectorAll(".cmp").forEach(c=>{ const w=c.querySelector(".cmp-who"); if(!w) return; c.querySelector(".cmp-one").hidden = v!=="one"; c.querySelector(".cmp-cols").hidden = v!=="two"; w.hidden = v!=="who"; });
+    app.querySelectorAll(".bl-wrap").forEach(b=>b.classList.toggle("bl-plain", v!=="who")); });
   app.querySelectorAll("[data-cmpv]").forEach(b=>b.onclick=()=>{ store("gk-cmpview", b.dataset.cmpv);
     app.querySelectorAll(".cmp").forEach(c=>{ c.querySelector(".cmp-one").hidden = b.dataset.cmpv!=="one"; c.querySelector(".cmp-cols").hidden = b.dataset.cmpv!=="two";
       c.querySelectorAll("[data-cmpv]").forEach(x=>x.setAttribute("aria-checked", x.dataset.cmpv===b.dataset.cmpv)); }); });
@@ -4507,7 +4539,7 @@ function recipeInbox(stage){
         ${s.editOf?`<p class="edit-of">Changes to <a class="link" href="#${esc(s.editOf)}">${esc((RECIPES.find(x=>x.id===s.editOf)||{t:s.t}).t)}</a> (opens the current version)</p>`:`<p class="edit-of">New recipe</p>`}
         <h3>${esc(s.t)}</h3>${s.by&&s.by!==s.byName?`<div class="credit">Recipe from ${esc(s.by)}</div>`:""}
         ${s.n?`<div class="note"><b>Note:</b> ${esc(s.n)}</div>`:""}
-        ${s.editOf&&findAny(s.editOf) ? compareHTML(findAny(s.editOf), s, null, feat("blame")?blameHTML(s):"") : feat("blame")&&(s.revs||[]).length>1 ? blameHTML(s) : `<div class="pv">${previewHTML(s)}</div>`}
+        ${s.editOf&&findAny(s.editOf) ? compareHTML(findAny(s.editOf), s, null, feat("blame")?blameHTML(s):"") : feat("blame")&&(s.revs||[]).length>1 ? blameWrap(blameHTML(s)) : `<div class="pv">${previewHTML(s)}</div>`}
         <div class="macts sub-acts">${acts(s)}</div></article>`).join("")
       : rvIn(stage).length ? "" : `<div class="panel-a"><p class="hint mempty">${stage==="proof"?"Nothing to proofread. Every new recipe and suggested change comes here first.":stage==="approve"?"Nothing waiting for approval. Recipes come here after they're proofread.":"Nothing to release. Recipes come here after they're approved."}</p></div>`}
     ${done.length?`<div class="panel-a"><h3>Recently released</h3><ul class="mlist">${done.map(s=>`<li class="mrow"><div class="mwho"><b>${esc(s.t)}</b><span>${(()=>{ const rr=feat("relstate")&&s.recipeId?findAny(s.recipeId):null; const pubNow = rr ? pubVisible(rr) : s.releasedAs!=="private"; return pubNow?"🌐 Public":"🔒 Team only"; })()} · ${fmtDate(s.decided)}${s.releasedBy?" · "+esc(s.releasedBy):""}</span></div>

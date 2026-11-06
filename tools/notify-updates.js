@@ -9,7 +9,7 @@ const db = admin.firestore();
 (async () => {
   const html = fs.readFileSync('index.html', 'utf8');
   const block = html.slice(html.indexOf('const UPDATES = ['), html.indexOf('];', html.indexOf('const UPDATES = [')));
-  const ups = [...block.matchAll(/^\s*\["([a-z0-9]+)","([^"]*)","([^"]*)","([^"]*)","[^\n]*?,\s*(true|false)\],?\s*$/gm)].map(m => ({k: m[1], v: m[2], title: m[4], pre: m[5] === 'true'}));
+  const ups = [...block.matchAll(/^\s*\["([a-z0-9]+)","([^"]*)","([^"]*)","([^"]*)","[^\n]*?,\s*(true|false)(?:,\s*"[a-z]+")?\],?\s*$/gm)].map(m => ({k: m[1], v: m[2], title: m[4], pre: m[5] === 'true'}));
   const on = ((await db.doc('meta/features').get()).data() || {}).on || {};
   const ref = db.doc('meta/updnotified'), seen = new Set(((await ref.get()).data() || {}).keys || []);
   const waiting = ups.filter(u => on[u.k] === undefined ? !u.pre : on[u.k] === false);

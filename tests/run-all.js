@@ -534,17 +534,20 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await V.click('#edform .primary'); await V.waitForTimeout(900);
     await A.goto(F + '#proof'); await A.waitForTimeout(600);
     const cmpCard = A.locator('.sub-card', {has: A.locator('.cmp')}).first();
-    ok('suggested changes show the recipe once, with the changes marked', (await cmpCard.locator('.cmp-one .cmp-l.del, .cmp-one .bl-del').count()) === 1 && /3 tbsp honey/.test(await cmpCard.locator('.cmp-one .cmp-l.add, .cmp-one .bl-add').first().innerText()) && !(await cmpCard.locator('.cmp-cols').isVisible()));
-    await cmpCard.locator('[data-cmpv=two]').click(); await A.waitForTimeout(100);
+    ok('suggested changes show the recipe once, with the changes marked', (await cmpCard.locator('.cmp-one .cmp-l.del').count()) === 1 && /3 tbsp honey/.test(await cmpCard.locator('.cmp-one .cmp-l.add').first().innerText()) && (await cmpCard.locator('.cmp-one .bl-who').count()) === 0 && !(await cmpCard.locator('.cmp-cols').isVisible()));
+    await cmpCard.locator('.cmp-viewsel').selectOption('two'); await A.waitForTimeout(100);
     ok('…or side by side, now and suggested', await cmpCard.locator('.cmp-cols').isVisible() && (await cmpCard.locator('.cmp-cols .cmp-col').nth(0).locator('.del').count()) === 1 && (await cmpCard.locator('.cmp-cols .cmp-col').nth(1).locator('.add').count()) === 1);
-    await cmpCard.locator('[data-cmpv=one]').click();
+    await cmpCard.locator('.cmp-viewsel').selectOption('one');
     { const sid = await cmpCard.getAttribute('data-id'), vnB = await V.evaluate(() => myName());
       await A.goto(F + '#review-' + sid); await A.waitForTimeout(500);
       const v0 = await A.locator('.sec-items').nth(0).inputValue(); await A.locator('.sec-items').nth(0).fill(v0 + '\n1 cup raisins'); await A.click('#edform .primary'); await A.waitForTimeout(900);
       await A.goto(F + '#proof'); await A.waitForTimeout(600);
       const card = A.locator('.sub-card[data-id="' + sid + '"]');
-      const who = await card.locator('.bl-who').allInnerTexts();
-      ok('each person who changed a recipe has their own color and name on their changes', (await card.locator('.bl-p').count()) === 2 && who.some(w => w === vnB) && who.some(w => /Shulem/.test(w)) && /raisins/.test(await card.locator('.bl-add', {hasText: 'raisins'}).innerText()), who); }
+      ok('changes show without names at first', (await card.locator('.cmp-who').isHidden()) && (await card.locator('.cmp-one .bl-who').count()) === 0);
+      await card.locator('.cmp-viewsel').selectOption('who'); await A.waitForTimeout(150);
+      const who = await card.locator('.cmp-who .bl-who').allInnerTexts();
+      ok('each person who changed a recipe has their own color and name on their changes', (await card.locator('.bl-p').count()) === 2 && who.some(w => w === vnB) && who.some(w => /Shulem/.test(w)) && /raisins/.test(await card.locator('.cmp-who .bl-add', {hasText: 'raisins'}).innerText()), who);
+      await card.locator('.cmp-viewsel').selectOption('one'); await A.waitForTimeout(100); }
     const cmpCard2 = A.locator('.sub-card', {has: A.locator('.cmp')}).first();
     await cmpCard2.locator('[data-ib="ask-reject"]').click(); await A.locator('[data-ib="reject"]').click(); await A.waitForTimeout(600);
     await A.goto(F + '#admin'); await A.waitForTimeout(400);
@@ -851,22 +854,30 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*15 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 15));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*16 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 16));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=on]').count()) === 15 && (await A.locator('#set-upds [data-set=no]').count()) === 15, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 16, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
-    ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=on]').count()) === 0);
+    ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
     ok("…only the owner has it", (await V.locator('#set-upds').count()) === 0 && !/App & web updates/.test(await V.evaluate(() => { openMenu(); const x = document.querySelector('.menu').textContent; closeMenu(); return x; })));
     await A.click('[data-updtab=wait]'); await A.waitForTimeout(200);
-    await A.locator('#set-upds [data-upd=tabsearch][data-set=on]').click(); await A.waitForTimeout(800);
+    await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /14/.test(await A.locator('[data-updtab=wait] .count').innerText()));
-    await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch]').click(); await A.waitForTimeout(800);
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /15/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
     await A.click('[data-updtab=wait]'); await A.waitForTimeout(200);
+    { const btns = await A.locator('#set-upds [data-upd=relstate]').allInnerTexts();
+      await A.locator('#set-upds [data-upd=relstate][data-set=team]').click(); await A.waitForTimeout(800);
+      ok('an update can be approved for admins and employees only', btns.join('|') === 'Admins only|Admins and employees|Decline' && await V.evaluate(() => feat('relstate')) && await PU.evaluate(() => !feat('relstate')), btns);
+      const nkB = await A.locator('#set-upds [data-upd=actas]').allInnerTexts();
+      ok('…and one that only matters to admins offers just admins', nkB.join('|') === 'Approve (admins)|Decline', nkB);
+      await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
+      ok('…Approved says who has it, and it can be changed', /Approved for admins and employees/.test(await A.locator('#set-upds li', {hasText: 'Recently released'}).innerText()) && (await A.locator('#set-upds [data-upd=relstate][data-set=admin]').count()) === 1);
+      await A.click('[data-updtab=wait]'); await A.waitForTimeout(200); }
     await A.locator('#set-upds [data-upd=cbbrowse][data-set=no]').click(); await A.waitForTimeout(800);
     await A.goto(F + '#menus'); await A.waitForTimeout(300);
     ok('declining an update takes it off for everyone, the owner too', await A.evaluate(() => !feat('cbbrowse')) && await V.evaluate(() => !feat('cbbrowse')));
@@ -901,7 +912,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       await A.goto(F + '#r-bobbys-challah'); await A.waitForTimeout(400);
       const hasLink = (await A.locator('#rmenu a[href="#history-r-bobbys-challah"]').count()) === 1;
       await A.goto(F + '#history-r-bobbys-challah'); await A.waitForTimeout(800);
-      ok('every recipe has a History: each version, what changed and who changed it', hasLink && (await A.locator('.hist-v').count()) >= 2 && /Edited/.test(await A.locator('.hist-v').first().innerText()) && /honey/.test(await A.locator('.hist-v').first().locator('.bl-add').innerText()) && (await A.locator('.hist-v').first().locator('.bl-who').count()) >= 1, [hasLink, await A.locator('#app').innerText().then(x => x.slice(0, 600))]); }
+      ok('every recipe has a History: each version, what changed and who changed it', hasLink && (await A.locator('.hist-v').count()) >= 2 && /Edited/.test(await A.locator('.hist-v').first().innerText()) && /honey/.test(await A.locator('.hist-v').first().locator('.bl-add').innerText()) && (await A.locator('.hist-v').first().locator('.bl-wrap.bl-plain').count()) === 1 && (await A.locator('.hist-v').first().locator('.bl-who').isHidden()), [hasLink, await A.locator('#app').innerText().then(x => x.slice(0, 600))]); }
     // On a phone, the bottom bar hides while the keyboard is open
     { await A.goto(F + '#plan'); await A.waitForTimeout(400); const vs = A.viewportSize();
       await A.setViewportSize({width: 390, height: 840}); await A.waitForTimeout(200);

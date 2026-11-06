@@ -1,6 +1,6 @@
 {
-  "web": "4.28",
+  "web": "4.29",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "See who changed what in color until a recipe goes live; Add something with AI."
+  "notes": "Names on changes only when you choose “Who changed what”."
 }
