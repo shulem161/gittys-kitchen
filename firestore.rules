@@ -161,6 +161,12 @@ service cloud.firestore {
       allow get: if approvedMember();
       allow write: if isOwner() && request.resource.data.keys().hasOnly(['on', 'by', 'at']) && request.resource.data.on is map;
     }
+    // History: each saved version of a recipe, kept for the team. Written once, never changed.
+    match /versions/{id} {
+      allow read: if isTeam();
+      allow create: if isTeam() && request.resource.data.rid is string
+        && (request.resource.data.uid == request.auth.uid || request.resource.data.uid == '');
+    }
     match /meta/codes {
       allow get: if signedIn();
       allow write: if isAdmin() || extra('review');
