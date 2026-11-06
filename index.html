@@ -639,6 +639,7 @@ body.guiding{overflow:hidden}
 .mg-pick{border:1px dashed var(--accent);border-radius:10px;padding:6px;display:grid;gap:4px}.mg-pick p{margin:0 4px;font-size:13px;color:var(--accent);font-weight:600}
 .ib-steps.with-nk{grid-template-columns:repeat(4,minmax(0,1fr))}.ib-steps li.nk b{background:none;width:auto}.nk-box{margin-top:12px;display:grid;gap:8px}.nk-box textarea{width:100%}
 @media (max-width:560px){.ib-steps.with-nk{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ai-add{display:grid;gap:6px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}.ai-add label{display:grid;gap:2px}.ai-add label span{font-size:14px;color:var(--muted)}.ai-add textarea{width:100%;box-sizing:border-box}
 .mg-drop{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-weight:600}.mg-drop input{margin-top:4px}
 .mg-base{display:grid;gap:6px;margin-top:8px}.mg-quick{align-items:center;margin-bottom:10px}.mg-quick span{font-size:14px;color:var(--muted)}
 .cmp-merge span{font-size:14px;color:var(--muted)}
@@ -648,6 +649,13 @@ body.guiding{overflow:hidden}
 .cmp-sum{font-size:14.5px;margin:0 0 10px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline}
 .cmp-key{margin-left:auto;display:inline-flex;gap:6px;font-size:12.5px}.cmp-key span{padding:1px 8px;border-radius:6px}
 .cmp .del{background:#FBE3E1;color:#8A2A20}.cmp .add{background:#DDF3E3;color:#1E6B37}
+.hist-v{display:grid;gap:6px}.hist-h{display:grid;gap:2px}.rv-loglist{margin:6px 0 0;padding-left:18px;display:grid;gap:4px;font-size:14px}
+.blame{display:grid;gap:2px;margin-top:10px}.bl-key{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:0 0 6px;font-size:14px}
+.bl-p{display:inline-flex;gap:5px;align-items:center}.bl-p i{width:12px;height:12px;border-radius:50%;display:inline-block}
+.bl-l{font-size:14.5px;line-height:1.45;padding:3px 6px;border-radius:6px;overflow-wrap:anywhere;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.bl-add{background:color-mix(in srgb, var(--bc) 13%, transparent);border-left:4px solid var(--bc)}
+.bl-del{background:rgba(200,60,60,.08);border-left:4px solid var(--bc)}.bl-del .bl-t{text-decoration:line-through;text-decoration-color:rgba(138,42,32,.6);opacity:.75}
+.bl-who{color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:9px;white-space:nowrap;flex:none}
 .cmp-l.del{text-decoration:line-through;text-decoration-color:rgba(138,42,32,.5)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cmp .del{background:#4A2420;color:#F6C7C1}:root:not([data-theme="light"]) .cmp .add{background:#1E3D28;color:#BDEBCB}}
 :root[data-theme="dark"] .cmp .del{background:#4A2420;color:#F6C7C1}:root[data-theme="dark"] .cmp .add{background:#1E3D28;color:#BDEBCB}
@@ -1310,7 +1318,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.27";
+const WEB_VERSION = "4.28";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1348,6 +1356,9 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["history","4.28","2026-11-06","History for every recipe","Every recipe has a History page (in its ⋮ menu, for the team): each version, what changed and who changed it — in color, person by person — and who moved it through the inboxes. It stays after the recipe is released. History is kept from now on.", false],
+  ["aiadd","4.28","2026-11-06","Add something with AI","In the recipe editor, next to “Make it better with AI”: write what you want added (a glaze, a topping, a dairy-free option…) and AI works it into the recipe — new ingredients and the steps for them. You can undo it.", false],
+  ["blame","4.28","2026-11-06","See who changed what, in color, until it goes live","In the inboxes, every change to a recipe stays marked until it's released: each person who changed it has their own color, with their name on what they added (and on what they took out, crossed out). A row at the top shows who did what.", false],
   ["actas","4.27","2026-11-06","Do things as the person you logged in as","When an admin uses “Log in as…”, that person's own things are saved to their account: favorites, calendar, menus, settings, recipe requests and recipes or changes they send. Ratings, messages and inbox moves still can't be done in their name.", false],
   ["updinbox","4.26","2026-11-06","App & web updates in your Inboxes, with an alert","App & web updates is in your Inboxes (no longer under Settings), with how many are waiting, and you get a phone alert when a new update is waiting for your approval. Only you use this.", true],
   ["moveback","4.25","2026-11-05","Undo a move, and edits go back to proofreading","Only the person who moved a recipe up can move it back (“↩ Undo”), for example if it was a mistake. Anyone else asks for a change instead: when a recipe in For approval or Ready to release is edited, or a change to it is sent, it goes back to Need to proofread to be checked again.", false],
@@ -2045,6 +2056,7 @@ function recipe(r){
         ${recipesOnline&&!offline&&(can("suggest")||may("edit"))?`<a class="btn" href="#edit-${r.id}">${may("edit")?"Edit recipe":"Request a change"}</a>`:""}
         ${isTeam()&&!offline&&!r.rv?`<button class="btn" id="proof-btn" type="button">✓ Ask someone to proofread</button>`:""}
         ${isTeam()?`<a class="btn" href="#compare~${esc(r.id)}~">⇄ Compare with another recipe</a>`:""}
+        ${isTeam()&&feat("history")&&!offline?`<a class="btn" href="#history-${esc(r.id)}">🕘 History – who changed what</a>`:""}
         ${isTeam()&&!offline?`<button class="btn" id="askteam-btn" type="button">${TOOL_IC.ask.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Ask the team about this</button>`:""}
         ${isAdmin()&&recipesOnline&&!offline?`<button class="btn" id="mv-btn" type="button">Move to another category</button>`:""}
         ${myRole()==="employee"&&recipesOnline&&!offline?(myMoveAsk(r.id)?`<span class="btn pub-state" aria-disabled="true">Asked to move to ${esc(myMoveAsk(r.id).to)} ✓</span>`:`<button class="btn" id="mv-btn" type="button">Ask to move to another category</button>`):""}
@@ -3845,6 +3857,23 @@ function adminBanner(){
 
 /* ---------- recipe editor (admin) ---------- */
 let edAiUndo = null;
+// "Add something with AI": work one addition into the recipe, keeping everything else as it is
+function addPrompt(title, secs, what){
+  const written = secs.filter(s=>s.items.trim()).map(s=>`${s.ing?"INGREDIENTS":"STEPS"}${s.h?" ("+s.h+")":""}:\n${s.items.trim()}`).join("\n\n");
+  return `You help a family with recipes for their kosher cookbook, "Gitty's Kitchen".
+Recipe name: "${String(title||"(no name yet)").replace(/"/g,"'")}"
+The recipe now:
+${written}
+
+The cook wants to add: "${String(what).replace(/"/g,"'")}"
+Add exactly that to the recipe and nothing else:
+- Keep every ingredient, amount and step that is there now, word for word and in the same order.
+- Add the new ingredients (amount first, "tbsp" and "tsp" in lowercase) and the steps to make it and when to use it, where they belong. If it has its own part (like "Glaze" or "Topping"), give it its own heading.
+- It must stay kosher: never mix meat and dairy. If the addition can't be kosher with this recipe, add the closest pareve way to do it.
+- Write only English. Fractions like ½ ¼ ¾ ⅓.
+Answer with JSON only, the whole recipe with the addition:
+{"parts":[{"kind":"ingredients"|"steps","heading":"", "items":["..."]}], "note":"one short line about what was added, or empty"}`;
+}
 // "Make it better with AI": tidy ingredients and write clear, complete steps from what the cook wrote
 function improvePrompt(title, serves, secs){
   const written = secs.filter(s=>s.items.trim()).map(s=>`${s.ing?"INGREDIENTS":"STEPS"}${s.h?" ("+s.h+")":""}:\n${s.items.trim()}`).join("\n\n");
@@ -3920,7 +3949,10 @@ function editor(r, cat, sub, draft){
           </div>`).join("")}</div>
         <div class="tools"><button type="button" class="btn" data-add="ing">+ Ingredients</button><button type="button" class="btn" data-add="step">+ Method</button></div>
         ${offline||!can("ai")?"":`<div class="ai-box"><div><b>✨ Make it better with AI</b><span>Write the basics in your own words. AI tidies the ingredients and turns your steps into clear, complete instructions: what to do, in what order, the oven heat, the pan and how long. You can undo it.</span></div>
-          <div class="row"><button type="button" class="btn solid" id="ed-ai">Make it better</button>${edAiUndo?`<button type="button" class="btn" id="ed-ai-undo">Undo</button>`:""}</div><p class="hint" id="ed-ai-msg" role="status"></p></div>`}
+          <div class="row"><button type="button" class="btn solid" id="ed-ai">Make it better</button>${edAiUndo?`<button type="button" class="btn" id="ed-ai-undo">Undo</button>`:""}</div><p class="hint" id="ed-ai-msg" role="status"></p>
+          ${feat("aiadd")?`<div class="ai-add"><label for="ed-ai-what"><b>➕ Add something with AI</b><span>Say what to add: a glaze, a topping, a filling, a dairy-free option… AI adds the ingredients and the steps for it.</span></label>
+            <textarea id="ed-ai-what" rows="2" maxlength="300" placeholder="e.g. add a chocolate glaze on top"></textarea>
+            <div class="row"><button type="button" class="btn solid" id="ed-ai-add">Add it</button></div></div>`:""}</div>`}
         <p class="err" id="ed-err" role="alert" hidden></p>
         <div class="ed-actions">
           <button class="primary" type="submit">${sub?"Save changes":suggest?(editOf?"Send the request":"Send to be proofread"):isNew?"Add recipe":"Save changes"}</button>
@@ -3972,6 +4004,26 @@ function editor(r, cat, sub, draft){
         G.querySelector(".ai-box").scrollIntoView({block:"center"});
       }catch(e){ aib.disabled=false; msg.textContent="The AI couldn't do it right now. Try again in a minute."; }
     };
+    const aia=F.querySelector("#ed-ai-add");
+    if(aia) aia.onclick=async()=>{
+      sync(); const msg=F.querySelector("#ed-ai-msg"), what=F.querySelector("#ed-ai-what").value.trim(), title=F.querySelector("#ed-t").value.trim();
+      if(!what){ msg.textContent="Write what you want added first."; F.querySelector("#ed-ai-what").focus(); return; }
+      if(!secs.some(s=>s.items.trim())){ msg.textContent="Write the recipe first, then say what to add to it."; return; }
+      aia.disabled=true; msg.textContent="Adding it… this takes about half a minute.";
+      try{
+        const res=await askReader([addPrompt(title, secs, what)]);
+        const j=JSON.parse(res.response.text().trim().replace(/^```(?:json)?\s*/,"").replace(/```$/,""));
+        const parts=(j.parts||[]).filter(x=>x && Array.isArray(x.items) && x.items.length).map(x=>({ing:!/^(steps|method)$/i.test(x.kind||x.type||""), h:String(x.heading||"").slice(0,40), items:x.items.map(s=>String(s).trim()).filter(Boolean).join("\n")}));
+        if(!parts.length) throw new Error("empty");
+        edAiUndo = secs.map(s=>Object.assign({},s));
+        secs.splice(0, secs.length, ...parts); secs.__skip=1;
+        redraw();
+        const G=document.getElementById("edform");
+        if(j.note) { const n=G.querySelector("#ed-n"); if(!n.value.includes(String(j.note))) n.value=[n.value.trim(), String(j.note).slice(0,200)].filter(Boolean).join(" "); }
+        G.querySelector("#ed-ai-msg").textContent="Added. Read it over, change anything you like, then save. Not right? Tap Undo.";
+        G.querySelector(".ai-box").scrollIntoView({block:"center"});
+      }catch(e){ aia.disabled=false; msg.textContent="The AI couldn't do it right now. Try again in a minute."; }
+    };
     const aiu=F.querySelector("#ed-ai-undo");
     if(aiu) aiu.onclick=()=>{ if(!edAiUndo) return; secs.splice(0, secs.length, ...edAiUndo); edAiUndo=null; secs.__skip=1; redraw(); toast("Back to what you wrote"); };
     F.querySelectorAll(".sec-k").forEach(s=>s.onchange=()=>sync());
@@ -3998,7 +4050,8 @@ function editor(r, cat, sub, draft){
         btn0.disabled=true; btn0.textContent="Saving…";
         const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s});
         const back = feat("moveback") && stageOf(sub)!=="proof" ? {stage:"proof", proofUid:"", proofBy:"", approvedUid:"", approvedBy:"", uids:[], log:[...(sub.log||[]), {from:stageOf(sub), to:"proof", by:myName(), uid:me, at:Date.now(), back:true, edited:true}].slice(-30)} : {};
-        try{ await db.collection("submissions").doc(sub.id).update(Object.assign({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves,sec:d.sec,s:d.s, fixedBy:myName(), fixedAt:Date.now()}, back));
+        const revs = [...subRevs(sub), {by:myName(), uid:me, at:Date.now(), s:d.s, t:d.t}].slice(-15);
+        try{ await db.collection("submissions").doc(sub.id).update(Object.assign({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves,sec:d.sec,s:d.s, fixedBy:myName(), fixedAt:Date.now(), revs}, back));
           if(back.stage) notifyWatchers("watch-proof", `${sub.t} was edited`, `${myName()} edited it, so it needs to be proofread again.`, "#proof", "pencil2");
           toast(back.stage?"Saved. It was edited, so it goes back to Need to proofread.":"Saved"); location.hash=back.stage||stageOf(sub); }
         catch(e){ btn0.disabled=false; btn0.textContent="Save changes"; fail("Couldn't save. Check your internet connection and try again."); }
@@ -4008,7 +4061,7 @@ function editor(r, cat, sub, draft){
         btn0.disabled=true; btn0.textContent="Sending…";
         const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s, ord:0});
         try{
-          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves||"",sec:d.sec,s:d.s, uid:actUid(), byName:actName(), status:"pending", stage:"proof", created:Date.now(), editOf, ...(rqDraft&&rqDraft.id?{rq:rqDraft.id}:{}), ...(draft&&draft.dropOf?{dropOf:draft.dropOf}:{})});
+          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves||"",sec:d.sec,s:d.s, uid:actUid(), byName:actName(), status:"pending", stage:"proof", created:Date.now(), revs:[{by:actName(), uid:actUid(), at:Date.now(), s:d.s, t:d.t}], editOf, ...(rqDraft&&rqDraft.id?{rq:rqDraft.id}:{}), ...(draft&&draft.dropOf?{dropOf:draft.dropOf}:{})});
           if(draft && draft.fromSub) db.collection("submissions").doc(draft.fromSub).delete().catch(()=>{});
           { const eb = isTeam() && target ? editedBack(target, Date.now()) : null; if(eb) await db.collection("recipes").doc(target.id).update(eb).catch(()=>{}); }
           notifyWatchers("watch-proof", editOf ? `${myName()} requested a change` : `New recipe from ${myName()}`, `“${editOf&&target?target.t:t}” needs to be proofread.`, "#proof", editOf?"pencil2":"cookie");
@@ -4026,6 +4079,8 @@ function editor(r, cat, sub, draft){
       const btn=F.querySelector(".primary"); btn.disabled=true; btn.textContent="Saving…";
       try{
         await db.collection("recipes").doc(id).set(Object.assign(toDoc(rec), editedBack(r||target, Date.now())||{}), {merge:true});
+        { const b=r||target; if(b && !(await db.collection("versions").where("rid","==",b.id).get().then(q=>q.size).catch(()=>1))) await saveVersion(b, "Before this history was kept", {by:"", uid:""});
+          await saveVersion(rec, b?"Edited":"Added"); }
         if(sub) await db.collection("submissions").doc(sub.id).update({status:"approved", recipeId:id, decided:Date.now()});
         if(rqDraft && rqDraft.id) db.collection("requests").doc(rqDraft.id).update({status:"done", recipeId:id, decided:Date.now()}).catch(()=>{});
         toast(sub?"Recipe approved and published":r?"Changes saved":"Recipe added"); location.hash=id;
@@ -4202,6 +4257,8 @@ async function approveSub(sub, pub){
   rec.code = (tgt && tgt.code && tgt.c===rec.c) ? tgt.code : nextCode(rec.c, rec.sec||"");
   withHistory(rec, tgt, tgt?"changed":"added", sub.byName);
   await db.collection("recipes").doc(rec.id).set(Object.assign(toDoc(rec), tgt && tgt.code && tgt.code!==rec.code ? {oldCodes:freeCode(tgt, rec.code)} : {}), {merge:true});
+  if(tgt && !(await db.collection("versions").where("rid","==",tgt.id).get().then(q=>q.size).catch(()=>1))) await saveVersion(tgt, "Before this history was kept", {by:"", uid:""});
+  await saveVersion(rec, (tgt?"Change released":"Added")+(rec.pub===false?" for the team only":" to the public"), {revs:subRevs(sub).map(x=>({by:x.by||"", uid:x.uid||"", at:x.at||0, s:x.s||[]})), from:sub.byName||""});
   // A merge can ask for the other recipe to go: admins delete it now; otherwise it waits in Needs admin approval
   const drop = sub.dropOf && sub.dropOf!==rec.id ? findAny(sub.dropOf) : null;
   if(drop){
@@ -4221,6 +4278,82 @@ function previewHTML(sub){
   return (sub.s||[]).map(x=>`<div class="pv-part">${x.h?`<div class="group">${esc(x.h)}</div>`:`<div class="group">${x.k==="ing"?"Ingredients":"Method"}</div>`}
     ${x.k==="ing"?`<ul>${x.items.map(i=>`<li>${esc(spellUnits(i))}</li>`).join("")}</ul>`:`<ol>${x.items.map(i=>`<li>${hiTemps(i)}</li>`).join("")}</ol>`}</div>`).join("");
 }
+// History: every saved version of a recipe (versions collection), kept after it's released
+async function saveVersion(rec, how, extra){
+  if(!feat("history") || !db) return;
+  const d=toDoc(rec);
+  try{ await db.collection("versions").doc().set(Object.assign({rid:rec.id, at:Date.now(), by:myName(), uid:me, how, t:d.t, c:d.c, sec:d.sec||"", s:d.s, n:d.n||"", time:d.time||"", serves:d.serves||""}, extra||{})); }catch(e){}
+}
+async function historyPage(id){
+  const r=findAny(id);
+  app.innerHTML=`<section class="wrap admin"><p class="hint" style="margin-top:28px">Loading the history…</p></section>`;
+  let vers=[]; try{ vers=(await db.collection("versions").where("rid","==",id).get()).docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(a.at||0)-(b.at||0)); }catch(e){}
+  if(location.hash!=="#history-"+id) return;
+  const nm = r ? r.t.replace(/^Untitled: /,"") : "This recipe";
+  const card = (v, i) => { const prev=vers[i-1], revs=(v.revs&&v.revs.length)?v.revs:[{by:v.by, uid:v.uid, at:v.at, s:v.s}];
+    const people=[...new Set(revs.map(x=>x.by).filter(Boolean))];
+    const body = prev ? blameHTML({revs}, prev.s) : revs.length>1 ? blameHTML({revs}) : `<div class="pv">${previewHTML(v)}</div>`;
+    return `<article class="panel-a hist-v"><div class="hist-h"><b>${esc(v.how||"Saved")}</b><span class="hint">${fmtDate(v.at)} · ${new Date(v.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})} · by ${esc(v.by||"")}${people.length&&people.join()!==v.by?` · changes by ${people.map(esc).join(", ")}`:""}</span></div>
+      ${prev&&prev.t!==v.t?`<p class="hint">Name: <s>${esc(prev.t)}</s> → <b>${esc(v.t)}</b></p>`:""}${prev&&prev.c!==v.c?`<p class="hint">Category: <s>${esc(prev.c)}</s> → <b>${esc(v.c)}</b></p>`:""}
+      ${body}</article>`; };
+  const older = r ? (r.history||[]) : [];
+  app.innerHTML=`<section class="wrap admin">
+    <a class="back" href="#${esc(id)}">← ${esc(nm)}</a>
+    <div class="section-head" style="margin-top:8px"><h2>History</h2><p>${vers.length} ${vers.length===1?"version":"versions"} saved</p></div>
+    <p class="hint" style="margin:-6px 0 12px">Every version, newest first: what changed and who changed it. Each person has their own color; crossed-out lines were taken out.</p>
+    ${vers.length ? vers.map((v,i)=>card(v,i)).reverse().join("") : `<div class="panel-a"><p class="hint mempty">No versions saved yet. From now on, every change to this recipe is kept here.</p></div>`}
+    ${r&&(r.rvLog||[]).length?`<div class="panel-a"><h3>Through the inboxes</h3><ul class="rv-loglist">${rvLogHTML(r.rvLog)}</ul></div>`:""}
+    ${older.length?`<div class="panel-a"><h3>Earlier changes</h3><p class="hint">From before the full history was kept: who changed it and when.</p><ul class="rv-loglist">${older.slice().reverse().map(h=>`<li><b>${esc(h.a==="added"?"Added":h.a==="moved"?"Moved"+(h.from?" from "+h.from:""):"Changed")}</b> · ${esc(h.by||"")} · ${fmtDate(h.at)}</li>`).join("")}</ul></div>`:""}
+  </section>`;
+  wireCompare();
+}
+// Who changed what: each version of a recipe on its way to going live (sub.revs), one color per person
+const BLAME_COLORS = ["#2e7d32","#1565c0","#8e24aa","#ef6c00","#00838f","#ad1457","#5d4037","#3949ab"];
+function lineOps(a, b){   // a, b: arrays of keys; returns [["=",i,j]|["-",i]|["+",j]] in order
+  const n=a.length, m=b.length, L=Array.from({length:n+1},()=>new Array(m+1).fill(0));
+  for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--) L[i][j] = a[i]===b[j] ? L[i+1][j+1]+1 : Math.max(L[i+1][j], L[i][j+1]);
+  const ops=[]; let i=0, j=0;
+  while(i<n || j<m){ if(i<n && j<m && a[i]===b[j]){ ops.push(["=",i,j]); i++; j++; } else if(i<n && (j>=m || L[i+1][j]>=L[i][j+1])){ ops.push(["-",i]); i++; } else { ops.push(["+",j]); j++; } }
+  return ops;
+}
+const subRevs = s => (s.revs&&s.revs.length) ? s.revs : [{by:s.byName||"", uid:s.uid||"", at:s.created||0, s:s.s||[]}];
+function blameHTML(s, baseParts){
+  const key = x => x.k+"|"+x.t.trim().toLowerCase().replace(/\s+/g," ");
+  const base = baseParts ? {s:fromDoc("x", {s:baseParts}).s} : s.editOf ? findAny(s.editOf) : null;
+  const revs = subRevs(s);
+  // items: {x, add: person index or -1 (was there before), del: person index or undefined}
+  let items = base ? recipeLines(base.s||[]).map(x=>({x, add:-1})) : [];
+  const people=[], pIdx = (rv,i) => { const k=rv.uid||rv.by||("#"+i); let n=people.findIndex(p=>p.k===k); if(n<0){ people.push({k, name:rv.by||"Someone", add:0, del:0}); n=people.length-1; } return n; };
+  revs.forEach((rv, ri)=>{
+    const who = (!base && ri===0) ? -1 : pIdx(rv, ri);   // a new recipe's first version is the starting point
+    if(who<0) pIdx(rv, ri);
+    const next = recipeLines(fromDoc("x", rv).s||[]), live = items.filter(it=>it.del===undefined);
+    const ops = lineOps(live.map(it=>key(it.x)), next.map(key));
+    const out=[]; let li=0;
+    const flush = upto => { /* nothing: positions follow the live lines */ };
+    let oi=0;
+    for(const it of items){
+      if(it.del!==undefined){ out.push(it); continue; }
+      while(oi<ops.length && ops[oi][0]==="+"){ out.push({x:next[ops[oi][1]], add:who}); if(who>=0) people[who].add++; oi++; }
+      const op=ops[oi++];
+      if(op && op[0]==="="){ out.push(Object.assign({}, it, {x:next[op[2]]})); }
+      else { out.push(Object.assign({}, it, {del: who<0?0:who})); if(who>=0) people[who].del++; }
+    }
+    while(oi<ops.length){ if(ops[oi][0]==="+"){ out.push({x:next[ops[oi][1]], add:who}); if(who>=0) people[who].add++; } oi++; }
+    items = out;
+  });
+  const col = i => BLAME_COLORS[i % BLAME_COLORS.length];
+  const tag = i => `<span class="bl-who" style="background:${col(i)}">${esc((people[i]||{}).name||"")}</span>`;
+  const shown = people.map((p,i)=>[p,i]).filter(([p])=>p.add||p.del);
+  return `<div class="blame">
+    <p class="bl-key">${shown.length?shown.map(([p,i])=>`<span class="bl-p"><i style="background:${col(i)}"></i><b>${esc(p.name)}</b> ${[p.add?`added ${p.add}`:"", p.del?`took out ${p.del}`:""].filter(Boolean).join(", ")}</span>`).join(""):`<span class="hint">No changes yet${base?" from the recipe in the cookbook":""}.</span>`}
+      ${base?`<span class="hint">Plain lines are the recipe as it ${baseParts?"was before":"is in the cookbook"}.</span>`:revs.length?`<span class="hint">Plain lines are what ${esc(revs[0].by||"the cook")} first wrote.</span>`:""}</p>
+    ${items.map(it=>{ const del=it.del!==undefined, ad=it.add>=0;
+      if(it.x.k==="h") return `<div class="cmp-h${del?" bl-del":""}">${esc(it.x.t)}${del?tag(it.del):ad?tag(it.add):""}</div>`;
+      const c = del ? col(it.del) : ad ? col(it.add) : "";
+      return `<div class="bl-l${del?" bl-del":ad?" bl-add":""}"${c?` style="--bc:${c}"`:""}>${del?'<span class="sr">Taken out: </span>':ad?'<span class="sr">Added: </span>':""}<span class="bl-t">${esc(it.x.t)}</span>${del?tag(it.del):ad?tag(it.add):""}</div>`; }).join("")}
+  </div>`;
+}
 // Suggested changes: the recipe now and the suggestion, side by side (top and bottom on a phone), with the differences marked
 function diffLines(a, b){
   const n=a.length, m=b.length, L=Array.from({length:n+1},()=>new Array(m+1).fill(0)), key=s=>s.k+"|"+s.t.trim().toLowerCase().replace(/\s+/g," ");
@@ -4238,7 +4371,7 @@ function recipeLines(parts){   // parts: [[isIng, heading, items]]
   parts.forEach(([ing,h,items])=>{ out.push({k:"h", t:(h?h+" · ":"")+(ing?"Ingredients":"Method"), ing:!!ing, h:h||""}); (items||[]).forEach(x=>out.push({k:ing?"i":"s", t:spellUnits(unbracket(x)), ing:!!ing, h:h||"", raw:x})); });
   return out;
 }
-function compareHTML(r, sub, L){
+function compareHTML(r, sub, L, oneHTML){
   L = L || {a:"Now", b:"Suggested", del:"taken out", add:"new", what:"What changes", one:"One recipe, changes marked"};
   const now=r, sug=fromDoc(sub.id, sub);
   const kindName = k => ({meat:"Meat",dairy:"Dairy",fish:"Fish",other:"None of these"})[k] || "Automatic";
@@ -4253,7 +4386,7 @@ function compareHTML(r, sub, L){
       <span class="cmp-key"><span class="del">${esc(L.del)}</span> <span class="add">${esc(L.add)}</span></span></p>
     ${fields.length?`<table class="cmp-f"><thead><tr><th></th><th>${esc(L.a)}</th><th>${esc(L.b)}</th></tr></thead><tbody>${fields.map(([l,a,b])=>`<tr><th>${l}</th><td class="del">${esc(a)||'<i>empty</i>'}</td><td class="add">${esc(b)||'<i>empty</i>'}</td></tr>`).join("")}</tbody></table>`:""}
     <div class="cmp-view" role="radiogroup" aria-label="How to show the changes"><button type="button" role="radio" data-cmpv="one" aria-checked="${cmpView()==="one"}">${L.one}</button><button type="button" role="radio" data-cmpv="two" aria-checked="${cmpView()==="two"}">Side by side</button></div>
-    <div class="cmp-one" ${cmpView()==="one"?"":"hidden"}><div class="cmp-col">${col(one)}</div></div>
+    <div class="cmp-one" ${cmpView()==="one"?"":"hidden"}>${oneHTML || `<div class="cmp-col">${col(one)}</div>`}</div>
     <div class="cmp-cols" ${cmpView()==="two"?"":"hidden"}><div class="cmp-col"><div class="cmp-t">${esc(L.a)}</div>${col(left)}</div><div class="cmp-col"><div class="cmp-t">${esc(L.b)}</div>${col(right)}</div></div>
   </div>`;
 }
@@ -4374,7 +4507,7 @@ function recipeInbox(stage){
         ${s.editOf?`<p class="edit-of">Changes to <a class="link" href="#${esc(s.editOf)}">${esc((RECIPES.find(x=>x.id===s.editOf)||{t:s.t}).t)}</a> (opens the current version)</p>`:`<p class="edit-of">New recipe</p>`}
         <h3>${esc(s.t)}</h3>${s.by&&s.by!==s.byName?`<div class="credit">Recipe from ${esc(s.by)}</div>`:""}
         ${s.n?`<div class="note"><b>Note:</b> ${esc(s.n)}</div>`:""}
-        ${s.editOf&&RECIPES.find(x=>x.id===s.editOf)?compareHTML(RECIPES.find(x=>x.id===s.editOf), s):`<div class="pv">${previewHTML(s)}</div>`}
+        ${s.editOf&&findAny(s.editOf) ? compareHTML(findAny(s.editOf), s, null, feat("blame")?blameHTML(s):"") : feat("blame")&&(s.revs||[]).length>1 ? blameHTML(s) : `<div class="pv">${previewHTML(s)}</div>`}
         <div class="macts sub-acts">${acts(s)}</div></article>`).join("")
       : rvIn(stage).length ? "" : `<div class="panel-a"><p class="hint mempty">${stage==="proof"?"Nothing to proofread. Every new recipe and suggested change comes here first.":stage==="approve"?"Nothing waiting for approval. Recipes come here after they're proofread.":"Nothing to release. Recipes come here after they're approved."}</p></div>`}
     ${done.length?`<div class="panel-a"><h3>Recently released</h3><ul class="mlist">${done.map(s=>`<li class="mrow"><div class="mwho"><b>${esc(s.t)}</b><span>${(()=>{ const rr=feat("relstate")&&s.recipeId?findAny(s.recipeId):null; const pubNow = rr ? pubVisible(rr) : s.releasedAs!=="private"; return pubNow?"🌐 Public":"🔒 Team only"; })()} · ${fmtDate(s.decided)}${s.releasedBy?" · "+esc(s.releasedBy):""}</span></div>
@@ -6420,6 +6553,7 @@ function routePage(){
   if(h==="profile"){ q.value=""; profilePage(); window.scrollTo(0,0); return; }
   if(h==="settings"){ q.value=""; settingsPage(); window.scrollTo(0,0); return; }
   if(h==="inbox-settings" && isAdmin()){ q.value=""; inboxSettings(); window.scrollTo(0,0); return; }
+  if(h.startsWith("history-") && isTeam() && !offline){ q.value=""; historyPage(h.slice(8)); window.scrollTo(0,0); return; }
   if(h==="updates" && realOwner() && !viewingAs()){ q.value=""; updatesPage(); window.scrollTo(0,0); return; }
   if(h==="settings-look"){ q.value=""; settingsPage(); window.scrollTo(0,0); return; }
   if(h==="account"){ q.value=""; profilePage("account"); window.scrollTo(0,0); return; }

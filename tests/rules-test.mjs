@@ -377,6 +377,13 @@ await check('the owner can make a menu for a customer too', assertSucceeds(setDo
 await check("…and an employee can't change that customer's menu", assertFails(updateDoc(doc(E9, 'menus', 'm-c9b'), { uid: 'c9', name: 'Mine', items: [], shared: [] })));
 await check("an admin can't save the owner's calendar", assertFails(setDoc(doc(as('adm'), 'plans', 'own'), { days: {} })));
 
+// History: versions are kept for the team, written once
+await check('the team can save a version to the history', assertSucceeds(setDoc(doc(E9, 'versions', 'v1'), { rid: 'r-eb', uid: 'e9', by: 'E Nine', at: 1, s: [] })));
+await check('…and read it', assertSucceeds(getDoc(doc(E9, 'versions', 'v1'))));
+await check("…but not change it afterwards", assertFails(updateDoc(doc(E9, 'versions', 'v1'), { by: 'Someone else' })));
+await check("…nor save one in someone else's name", assertFails(setDoc(doc(E9, 'versions', 'v2'), { rid: 'r-eb', uid: 'own', by: 'Owner', at: 1, s: [] })));
+await check("customers can't see the history", assertFails(getDoc(doc(C9, 'versions', 'v1'))));
+
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(`::notice::Rule checks: ${pass} passed, ${fail} failed`);
