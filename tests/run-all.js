@@ -619,6 +619,12 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       const hasBrowse = await A.locator('#pl-browse').count();
       if (hasBrowse) { await A.click('#pl-browse'); await A.waitForTimeout(150); await A.fill('#cb-q', 'challah'); await A.waitForTimeout(150); await A.locator('.cb-pick .cb-r').first().click(); await A.click('#cb-done'); await A.waitForTimeout(500); }
       ok('a day on the calendar can get recipes by browsing the cookbook', hasBrowse === 1 && await A.evaluate(b => (PLAN.days['2026-12-08'] || []).length === b + 1, before));
+      await A.locator('[data-pdel]').last().click(); await A.waitForTimeout(150);
+      const askedP = (await A.locator('[data-pyes]').count()) === 1;
+      await A.click('[data-pno]'); await A.waitForTimeout(150);
+      const keptP = await A.evaluate(b => (PLAN.days['2026-12-08'] || []).length === b + 1, before);
+      await A.locator('[data-pdel]').last().click(); await A.click('[data-pyes]'); await A.waitForTimeout(300);
+      ok('✕ on the calendar asks first; Keep keeps it, Yes takes it off', askedP && keptP && await A.evaluate(b => (PLAN.days['2026-12-08'] || []).length === b, before), [askedP, keptP]);
       await A.goto(F + '#plan-2026-12-05'); await A.waitForTimeout(500); }
     const dh = await A.locator('.pl-dhead').innerText();
     ok('calendar writes the Hebrew date and the Yom Tovim in Hebrew', /כ״ה כסלו תשפ״ז/.test(dh) && !/Kislev|Chanukah|Shabbos/.test(dh) && /חנוכה · נר א׳/.test(dh) && /שבת קודש/.test(dh), dh);
@@ -828,10 +834,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('Settings has its own App & web updates item, with how many are waiting', /App & web updates[\s\S]*6 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=settings]').textContent; closeMenu(); return x; })));
+    ok('Settings has its own App & web updates item, with how many are waiting', /App & web updates[\s\S]*8 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=settings]').textContent; closeMenu(); return x; })));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=on]').count()) === 6 && (await A.locator('#set-upds [data-set=no]').count()) === 6, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=on]').count()) === 8 && (await A.locator('#set-upds [data-set=no]').count()) === 8, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=on]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -839,7 +845,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.click('[data-updtab=wait]'); await A.waitForTimeout(200);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=on]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /5/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /7/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -859,6 +865,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       const row = s ? await A.locator('.mrow', {hasText: s.t}).first().innerText().catch(() => '') : '';
       ok('Recently released shows whether a recipe is public right now', !!s && /Team only/.test(row), [s, row]);
       if (s) { await A.evaluate(async rid => { await db.collection('recipes').doc(rid).update({pub: true}); }, s.rid); await A.waitForTimeout(400); } }
+    { await A.goto(F + '#grocery'); await A.waitForTimeout(300); const [code, nm] = await A.evaluate(() => { const have = gStore().items.map(i => i.id); const r = RECIPES.find(r => codeOf(r) && !have.includes(r.id) && r.c !== 'Bread'); return [codeOf(r), r.t]; });
+      await A.fill('#g-add', code.slice(0, 6)); await A.waitForTimeout(200);
+      const sug = await A.locator('#g-sugg').innerText();
+      ok('a recipe can be picked by typing its item number, or the start of it', sug.includes(nm) && sug.includes(code), [code, nm, sug.slice(0, 200)]);
+      await A.fill('#g-add', ''); }
     // On a phone, the bottom bar hides while the keyboard is open
     { await A.goto(F + '#plan'); await A.waitForTimeout(400); const vs = A.viewportSize();
       await A.setViewportSize({width: 390, height: 840}); await A.waitForTimeout(200);

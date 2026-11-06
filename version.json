@@ -1,6 +1,6 @@
 {
-  "web": "4.22",
+  "web": "4.23",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "On a phone the bottom bar stays down while the keyboard is open."
+  "notes": "Pick a recipe by its item number wherever you choose one by typing."
 }

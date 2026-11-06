@@ -1305,7 +1305,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.22";
+const WEB_VERSION = "4.23";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1343,6 +1343,8 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["planconfirm","4.23","2026-11-05","Ask before taking something off the calendar","Tapping ✕ on a recipe or menu on the calendar asks “Take it off this day?” first, with Yes and Keep.", false],
+  ["codepick","4.23","2026-11-05","Pick a recipe by its item number","Everywhere you choose a recipe by typing (calendar, menus, grocery list, calculator, “Make first”), you can type its item number too, even just the start of it (like 1010), and the number shows next to each choice.", false],
   ["relstate","4.22","2026-11-05","Recently released shows if a recipe is public now","Ready to release → Recently released shows whether each recipe is public or team only right now, instead of what it was labelled when it was released.", false],
   ["grconfirm","4.22","2026-11-05","Ask before taking something off the grocery list","Tapping ✕ on the grocery list asks “Take it off the list?” first, with Yes and Keep.", false],
   ["kbnav","4.22","2026-11-05","Bottom bar stays down while typing","On a phone, when the keyboard opens, the bottom bar (Home, Categories, Grocery, Timers, Calendar) hides instead of riding up on top of the keyboard. It comes back when the keyboard closes.", false],
@@ -2910,6 +2912,9 @@ function updatesPage(){
   document.addEventListener("focusout", ()=>setTimeout(check, 60));
   window.kbCheck = check;
 })();
+// Typing a recipe's item number (or the start of it) finds it too, once “Pick a recipe by its item number” is approved
+const codeHit = (r, q) => feat("codepick") && /\d/.test(q) && (codeOf(r)||"").startsWith(String(q).replace(/[\s#]/g,""));
+const pickTag = r => feat("codepick") && codeOf(r) ? codeOf(r)+" · "+r.c : r.c;
 // Browse the whole cookbook by category and pick recipes (for menus and the calendar)
 function pickFromCookbook(o){   // o: {title, has(rid), toggle(rid, on), done()}
   const old=document.querySelector(".cb-pick"); if(old) old.remove();
@@ -3010,7 +3015,10 @@ function planPage(sel){
   app.querySelectorAll("[data-pdone]").forEach(c=>c.onchange=()=>{ const e=(PLAN.days[k]||[]).find(x=>x.k===c.dataset.pdone); if(!e) return;
     if(e.menuId){ e.done=Object.assign({}, e.done||{}); if(c.checked) e.done[c.dataset.prid]=true; else delete e.done[c.dataset.prid]; } else e.done=c.checked;
     savePlan(); const y=window.scrollY; planPage(); window.scrollTo(0,y); });
-  app.querySelectorAll("[data-pdel]").forEach(b=>b.onclick=()=>{ PLAN.days[k]=(PLAN.days[k]||[]).filter(x=>x.k!==b.dataset.pdel); savePlan(); const y=window.scrollY; planPage(); window.scrollTo(0,y); });
+  app.querySelectorAll("[data-pdel]").forEach(b=>b.onclick=()=>{ const go=()=>{ PLAN.days[k]=(PLAN.days[k]||[]).filter(x=>x.k!==b.dataset.pdel); savePlan(); const y=window.scrollY; planPage(); window.scrollTo(0,y); };
+    if(!feat("planconfirm")) return go();
+    const box=document.createElement("span"); box.className="g-ask"; box.innerHTML=`<span>Take it off this day?</span><button type="button" class="btn sm warn" data-pyes>Yes</button><button type="button" class="btn sm" data-pno>Keep</button>`;
+    b.replaceWith(box); box.querySelector("[data-pyes]").onclick=go; box.querySelector("[data-pno]").onclick=()=>box.replaceWith(b); box.querySelector("[data-pyes]").focus(); });
   // adding a recipe or a menu to this day
   const pick=document.getElementById("pl-pick"), what=document.getElementById("pl-what");
   const addEntry = e => { (PLAN.days[k]=PLAN.days[k]||[]).push(Object.assign({k:newKey(), meal:document.getElementById("pl-meal").value}, e)); savePlan(); const y=window.scrollY; planPage(); window.scrollTo(0,y); toast("Added to "+d.toLocaleDateString(undefined,{weekday:"long"})); };
@@ -3037,7 +3045,7 @@ function planPage(sel){
     const q2=document.getElementById("pl-q"), sg=document.getElementById("pl-sugg");
     q2.onfocus=()=>q2.classList.add("plan-typing"); q2.onblur=()=>setTimeout(()=>q2.classList.remove("plan-typing"),300);
     q2.oninput=()=>{ const s=q2.value.trim().toLowerCase(); if(!s){ sg.innerHTML=""; return; }
-      const hits=RECIPES.filter(r=>r.t.toLowerCase().includes(s) || (codeOf(r)||"").toLowerCase()===s).slice(0,8);
+      const hits=RECIPES.filter(r=>r.t.toLowerCase().includes(s) || (codeOf(r)||"").toLowerCase()===s || codeHit(r, s)).slice(0,8);
       sg.innerHTML = hits.length ? hits.map(r=>`<button type="button" class="pre-opt" data-padd="${esc(r.id)}">${esc(r.t)} <span>${esc(codeOf(r)||r.c)}</span></button>`).join("") : `<p class="hint">No recipe with that name.</p>`;
       sg.querySelectorAll("[data-padd]").forEach(b=>b.onclick=()=>addEntry({rid:b.dataset.padd, x:1, done:false})); };
     q2.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=sg.querySelector("[data-padd]"); if(b) b.click(); } };
@@ -3134,7 +3142,7 @@ function menuEditPage(id){
   const q2=$("mi-q"), sg=$("mi-sugg");
   q2.onfocus=()=>q2.classList.add("plan-typing"); q2.onblur=()=>setTimeout(()=>q2.classList.remove("plan-typing"),300);
   q2.oninput=()=>{ const s=q2.value.trim().toLowerCase(); if(!s){ sg.innerHTML=""; return; }
-    const hits=RECIPES.filter(r=>!items.some(i=>i.rid===r.id) && (r.t.toLowerCase().includes(s) || (codeOf(r)||"").toLowerCase()===s)).slice(0,8);
+    const hits=RECIPES.filter(r=>!items.some(i=>i.rid===r.id) && (r.t.toLowerCase().includes(s) || (codeOf(r)||"").toLowerCase()===s || codeHit(r, s))).slice(0,8);
     sg.innerHTML = hits.length ? hits.map(r=>`<button type="button" class="pre-opt" data-miadd="${esc(r.id)}">${esc(r.t)} <span>${esc(codeOf(r)||r.c)}</span></button>`).join("") : `<p class="hint">No recipe with that name.</p>`;
     sg.querySelectorAll("[data-miadd]").forEach(b=>b.onclick=()=>{ m.items.push({rid:b.dataset.miadd, x:1, course:""}); saveMenu(m); menuEditPage(id); const n=$("mi-q"); if(n) n.focus(); }); };
   q2.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=sg.querySelector("[data-miadd]"); if(b) b.click(); } };
@@ -3868,7 +3876,7 @@ function editor(r, cat, sub, draft){
         ${suggest?"":`<label class="pub-row"><input type="checkbox" id="ed-pub" ${(r ? pubVisible(r) : target ? pubVisible(target) : pubDefault(catNow))?"checked":""}><span>Live: public members can see this recipe</span></label>`}
         <div class="field"><label for="ed-pre-q">Make first (optional)</label>
           <div class="pre-chips" id="ed-pre">${pre.map(id=>{ const x=RECIPES.find(y=>y.id===id); return `<span class="chip pre-chip">${esc(x.t)}<button type="button" data-unpre="${esc(id)}" aria-label="Remove ${esc(x.t)}">✕</button></span>`; }).join("")}</div>
-          <input id="ed-pre-q" type="text" autocomplete="off" placeholder="Type a recipe name to link it…">
+          <input id="ed-pre-q" type="text" autocomplete="off" placeholder="${feat("codepick")?"Type a recipe name or item number…":"Type a recipe name to link it…"}">
           <div class="pre-sugg" id="ed-pre-sugg" role="listbox"></div>
           <p class="hint">Recipes to make before this one, like a dough, a starter or a filling. Each one shows “Make first” here and “Use it in” on the other recipe.</p></div>
         <h3>Ingredients and steps</h3>
@@ -3906,8 +3914,8 @@ function editor(r, cat, sub, draft){
     const showSugg=()=>{
       const q=pq.value.trim().toLowerCase();
       if(!q){ ps.innerHTML=""; return; }
-      const hits=RECIPES.filter(x=>x.id!==selfId && !pre.includes(x.id) && x.t.toLowerCase().includes(q)).slice(0,6);
-      ps.innerHTML = hits.length ? hits.map(x=>`<button type="button" class="pre-opt" role="option" data-pre="${esc(x.id)}">${esc(x.t)} <span>${esc(x.c)}</span></button>`).join("") : `<p class="hint">No recipe with that name.</p>`;
+      const hits=RECIPES.filter(x=>x.id!==selfId && !pre.includes(x.id) && (x.t.toLowerCase().includes(q) || codeHit(x, q))).slice(0,6);
+      ps.innerHTML = hits.length ? hits.map(x=>`<button type="button" class="pre-opt" role="option" data-pre="${esc(x.id)}">${esc(x.t)} <span>${esc(pickTag(x))}</span></button>`).join("") : `<p class="hint">No recipe with that name.</p>`;
       ps.querySelectorAll("[data-pre]").forEach(b=>b.onclick=()=>{ pre.push(b.dataset.pre); redraw(); const q2=document.getElementById("ed-pre-q"); if(q2) q2.focus(); });
     };
     pq.oninput=showSugg;
@@ -5309,7 +5317,7 @@ function calcPage(preId){
   app.innerHTML = `<section class="wrap admin tools-page">
     <div class="section-head" style="margin-top:28px"><h2>Kitchen calculator</h2><p>Change recipes, convert amounts</p></div>
     <div class="panel-a" id="wr"><h3>Double or halve a whole recipe</h3>
-      <div class="field"><label for="wr-q">Recipe</label><input id="wr-q" type="text" autocomplete="off" placeholder="Type a recipe name…"><div class="pre-sugg" id="wr-sugg"></div></div>
+      <div class="field"><label for="wr-q">Recipe</label><input id="wr-q" type="text" autocomplete="off" placeholder="${feat("codepick")?"Type a recipe name or item number…":"Type a recipe name…"}"><div class="pre-sugg" id="wr-sugg"></div></div>
       <div id="wr-body"></div>
     </div>
     <div class="panel-a"><h3>Convert</h3>
@@ -5381,8 +5389,8 @@ function calcPage(preId){
     $("wr-groc").onclick=()=>{ const g=gStore(), it=g.items.find(i=>i.id===r.id); if(it) it.x=x; else g.items.push({id:r.id,x}); gSave(g); renderAcct(); toast(it?"Grocery list updated":"Added to the grocery list"); drawWhole(); };
   };
   wq.oninput=()=>{ const q=wq.value.trim().toLowerCase(); if(!q){ ws.innerHTML=""; return; }
-    const hits=RECIPES.filter(x=>x.t.toLowerCase().includes(q)).slice(0,6);
-    ws.innerHTML = hits.length ? hits.map(x=>`<button type="button" class="pre-opt" data-wr="${esc(x.id)}">${esc(x.t)} <span>${esc(x.c)}</span></button>`).join("") : `<p class="hint">No recipe with that name.</p>`;
+    const hits=RECIPES.filter(x=>x.t.toLowerCase().includes(q) || codeHit(x, q)).slice(0,6);
+    ws.innerHTML = hits.length ? hits.map(x=>`<button type="button" class="pre-opt" data-wr="${esc(x.id)}">${esc(x.t)} <span>${esc(pickTag(x))}</span></button>`).join("") : `<p class="hint">No recipe with that name.</p>`;
     ws.querySelectorAll("[data-wr]").forEach(b=>b.onclick=()=>{ calcRec.id=b.dataset.wr; ws.innerHTML=""; drawWhole(); }); };
   wq.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=ws.querySelector("[data-wr]"); if(b) b.click(); } };
   wq.onfocus=()=>{ if(calcRec.id) wq.select(); };
@@ -5489,7 +5497,7 @@ function groceryPage(){
     <div class="section-head" style="margin-top:28px"><h2>Grocery list</h2><p>${g.items.length} ${g.items.length===1?"recipe":"recipes"}${(g.extra||[]).length?` · ${g.extra.length} other ${g.extra.length===1?"item":"items"}`:""}</p></div>
     <div class="panel-a"><h3>What you're making</h3>
       ${g.items.length?`<ul class="g-recs">${rows}</ul>`:`<p class="hint">Nothing yet. Add recipes here, or open a recipe and tap “Add to grocery list”.</p>`}
-      <div class="field" style="margin-top:12px"><label for="g-add">Add a recipe</label><input id="g-add" type="text" autocomplete="off" placeholder="Type a recipe name…"><div class="pre-sugg" id="g-sugg"></div></div>
+      <div class="field" style="margin-top:12px"><label for="g-add">Add a recipe</label><input id="g-add" type="text" autocomplete="off" placeholder="${feat("codepick")?"Type a recipe name or item number…":"Type a recipe name…"}"><div class="pre-sugg" id="g-sugg"></div></div>
     </div>
     <div class="panel-a"><h3>Anything else to buy</h3>
       ${(g.extra||[]).length?`<ul class="g-recs">${g.extra.map((e,i)=>`<li class="g-rec"><span>${esc(e.t)}</span><button type="button" class="btn sm" data-gxrm="${i}" aria-label="Remove ${esc(e.t)}">✕</button></li>`).join("")}</ul>`:""}
@@ -5547,8 +5555,8 @@ function groceryPage(){
   });
   const add=$("g-add"), sg=$("g-sugg");
   add.oninput=()=>{ const q=add.value.trim().toLowerCase(); if(!q){ sg.innerHTML=""; return; }
-    const have=gStore().items.map(i=>i.id), hits=RECIPES.filter(x=>!have.includes(x.id) && x.t.toLowerCase().includes(q)).slice(0,6);
-    sg.innerHTML = hits.length ? hits.map(x=>`<button type="button" class="pre-opt" data-gadd="${esc(x.id)}">${esc(x.t)} <span>${esc(x.c)}</span></button>`).join("") : `<p class="hint">No recipe with that name.</p>`;
+    const have=gStore().items.map(i=>i.id), hits=RECIPES.filter(x=>!have.includes(x.id) && (x.t.toLowerCase().includes(q) || codeHit(x, q))).slice(0,6);
+    sg.innerHTML = hits.length ? hits.map(x=>`<button type="button" class="pre-opt" data-gadd="${esc(x.id)}">${esc(x.t)} <span>${esc(pickTag(x))}</span></button>`).join("") : `<p class="hint">No recipe with that name.</p>`;
     sg.querySelectorAll("[data-gadd]").forEach(b=>b.onclick=()=>{ const r=RECIPES.find(x=>x.id===b.dataset.gadd); if(r){ groceryToggle(r,1); groceryPage(); const a2=$("g-add"); if(a2) a2.focus(); } }); };
   add.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=sg.querySelector("[data-gadd]"); if(b) b.click(); } };
   const hb=$("g-hide"); if(hb) hb.onclick=()=>{ store("gk-hidehave", !store("gk-hidehave")); groceryPage(); };
