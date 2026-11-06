@@ -1305,7 +1305,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.24";
+const WEB_VERSION = "4.25";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1343,7 +1343,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
-  ["moveback","4.24","2026-11-05","Move a recipe back to an earlier inbox","In For approval and Ready to release you can send a recipe back to an earlier inbox: Need to proofread, For approval, or (admins) Not kosher. Works for cookbook recipes and new recipes.", false],
+  ["moveback","4.25","2026-11-05","Undo a move, and edits go back to proofreading","Only the person who moved a recipe up can move it back (“↩ Undo”), for example if it was a mistake. Anyone else asks for a change instead: when a recipe in For approval or Ready to release is edited, or a change to it is sent, it goes back to Need to proofread to be checked again.", false],
   ["askcredit","4.24","2026-11-05","Moving up for someone who asked puts it on their name","When someone asked to move a recipe up and you tap the button, the move is recorded on their name, not yours, and you aren't locked out of the next step.", false],
   ["codesearch","4.24","2026-11-05","Find recipes by part of the item number","Typing part of an item number (like 103 or 1030) in the search at the top lists every recipe whose number starts that way, in number order. When choosing a recipe by typing, number matches come first, in number order, and more of them show.", false],
   ["planconfirm","4.23","2026-11-05","Ask before taking something off the calendar","Tapping ✕ on a recipe or menu on the calendar asks “Take it off this day?” first, with Yes and Keep.", false],
@@ -3985,8 +3985,10 @@ function editor(r, cat, sub, draft){
       if(sub){   // fixing a recipe in an inbox: save it there; it goes on through the inboxes
         btn0.disabled=true; btn0.textContent="Saving…";
         const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s});
-        try{ await db.collection("submissions").doc(sub.id).update({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves,sec:d.sec,s:d.s, fixedBy:myName(), fixedAt:Date.now()});
-          toast("Saved"); location.hash=stageOf(sub); }
+        const back = feat("moveback") && stageOf(sub)!=="proof" ? {stage:"proof", proofUid:"", proofBy:"", approvedUid:"", approvedBy:"", uids:[], log:[...(sub.log||[]), {from:stageOf(sub), to:"proof", by:myName(), uid:me, at:Date.now(), back:true, edited:true}].slice(-30)} : {};
+        try{ await db.collection("submissions").doc(sub.id).update(Object.assign({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves,sec:d.sec,s:d.s, fixedBy:myName(), fixedAt:Date.now()}, back));
+          if(back.stage) notifyWatchers("watch-proof", `${sub.t} was edited`, `${myName()} edited it, so it needs to be proofread again.`, "#proof", "pencil2");
+          toast(back.stage?"Saved. It was edited, so it goes back to Need to proofread.":"Saved"); location.hash=back.stage||stageOf(sub); }
         catch(e){ btn0.disabled=false; btn0.textContent="Save changes"; fail("Couldn't save. Check your internet connection and try again."); }
         return;
       }
@@ -3996,6 +3998,7 @@ function editor(r, cat, sub, draft){
         try{
           await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves||"",sec:d.sec,s:d.s, uid:me, byName:myName(), status:"pending", stage:"proof", created:Date.now(), editOf, ...(rqDraft&&rqDraft.id?{rq:rqDraft.id}:{}), ...(draft&&draft.dropOf?{dropOf:draft.dropOf}:{})});
           if(draft && draft.fromSub) db.collection("submissions").doc(draft.fromSub).delete().catch(()=>{});
+          { const eb = isTeam() && target ? editedBack(target, Date.now()) : null; if(eb) await db.collection("recipes").doc(target.id).update(eb).catch(()=>{}); }
           notifyWatchers("watch-proof", editOf ? `${myName()} requested a change` : `New recipe from ${myName()}`, `“${editOf&&target?target.t:t}” needs to be proofread.`, "#proof", editOf?"pencil2":"cookie");
           toast("Sent. It will be proofread, approved and released."); location.hash = may("proofread") ? "proof" : "mine";
         }catch(e){ btn0.disabled=false; btn0.textContent="Send for approval"; fail("Couldn't send. Check your internet connection and try again."); }
@@ -4010,7 +4013,7 @@ function editor(r, cat, sub, draft){
         withHistory(rec, base, sub ? (sub.editOf&&base?"changed":"added") : (base?"changed":"added"), sub ? sub.byName : myName()); }
       const btn=F.querySelector(".primary"); btn.disabled=true; btn.textContent="Saving…";
       try{
-        await db.collection("recipes").doc(id).set(toDoc(rec), {merge:true});
+        await db.collection("recipes").doc(id).set(Object.assign(toDoc(rec), editedBack(r||target, Date.now())||{}), {merge:true});
         if(sub) await db.collection("submissions").doc(sub.id).update({status:"approved", recipeId:id, decided:Date.now()});
         if(rqDraft && rqDraft.id) db.collection("requests").doc(rqDraft.id).update({status:"done", recipeId:id, decided:Date.now()}).catch(()=>{});
         toast(sub?"Recipe approved and published":r?"Changes saved":"Recipe added"); location.hash=id;
@@ -4098,7 +4101,7 @@ function rvMove(r, to, extra, msg){
   return setRv(r, Object.assign({rv:to, rvBy:myName(), rvAt:now, rvUids:uids, rvAsk:[], rvLog:[...(r.rvLog||[]), entry].slice(-30)}, extra||{}), msg);
 }
 const RV_STEP = {kosher:"🚫 Put in Not kosher", "kosher-ok":"✓ Checked: kosher, taken out of Not kosher", approve:"Proofread ✓ → For approval", release:"Approved → Ready to release", done:"Released", proof:"Put in Need to proofread"};
-const rvLogHTML = log => log.slice().reverse().map(e=>`<li><b>${e.back?"↩ Moved back to "+(INBOX_NAME[e.to]||e.to):e.kosherOk?"✓ Approved out of Not kosher → Need to proofread":RV_STEP[e.to]||e.to}${e.to==="done"?(e.pub===false?" for the team only":" to the public"):""}</b> · moved up by ${esc(e.by)}${(e.asked||[]).length?`, asked by ${e.asked.map(a=>esc(a.name)).join(", ")}`:""} · ${fmtDate(e.at)}</li>`).join("");
+const rvLogHTML = log => log.slice().reverse().map(e=>`<li><b>${e.edited?"✎ Edited – back to "+(INBOX_NAME[e.to]||e.to):e.undo?"↩ Undone – back to "+(INBOX_NAME[e.to]||e.to):e.back?"↩ Moved back to "+(INBOX_NAME[e.to]||e.to):e.kosherOk?"✓ Approved out of Not kosher → Need to proofread":RV_STEP[e.to]||e.to}${e.to==="done"?(e.pub===false?" for the team only":" to the public"):""}</b> · moved up by ${esc(e.by)}${(e.asked||[]).length?`, asked by ${e.asked.map(a=>esc(a.name)).join(", ")}`:""} · ${fmtDate(e.at)}</li>`).join("");
 // Everything one person moved up (or asked to move up), newest first
 const movedUp = () => { const u=who(), out=[];
   RECIPES.forEach(r=>(r.rvLog||[]).forEach(e=>{ if(e.to!=="proof" && e.to!=="kosher" && e.to!=="kosher-ok" && !e.back && (e.uid===u || (e.asked||[]).some(a=>a.uid===u) || (e.credited||[]).some(a=>a.uid===u))) out.push({rid:r.id, t:r.t.replace(/^Untitled: /,""), e}); }));
@@ -4126,8 +4129,9 @@ const rvActs = {
   ok: r => rvMove(r, "approve", {rvNote:"", rvNoteBy:""}, "Proofread ✓ – now in For approval"),
   approve: r => rvMove(r, "release", null, "Approved – now in Ready to release"),
   back: r => rvMove(r, "proof", null, "Back in Need to proofread"),
-  backA: r => { const now=Date.now(); return setRv(r, {rv:"approve", rvBy:myName(), rvAt:now, rvAsk:[], rvLog:[...(r.rvLog||[]), {from:r.rv, to:"approve", by:myName(), uid:me, at:now, back:true}].slice(-30)}, "Moved back to For approval"); },
-  backNK: r => nkPut(r, "Moved back from "+(INBOX_NAME[r.rv]||"an inbox")),
+  undo: r => { const e=lastMove(r); if(!e) return false; const now=Date.now(), movers=[e.uid, e.tappedUid, ...(e.credited||[]).map(a=>a.uid)].filter(Boolean);
+    return setRv(r, {rv:e.from, rvBy:myName(), rvAt:now, rvAsk:[], rvUids: e.from==="proof" ? [] : (r.rvUids||[]).filter(u=>!movers.includes(u)),
+      rvLog:[...(r.rvLog||[]), {from:r.rv, to:e.from, by:myName(), uid:me, at:now, back:true, undo:true}].slice(-30)}, `Undone – back in ${INBOX_NAME[e.from]}`); },
   pub: r => rvMove(r, "", {pub:true}, "Released to the public"),
   priv: r => rvMove(r, "", {pub:false}, "Released for the team only"),
   fix: (r, note) => setRv(r, {rvNote:note, rvNoteBy:myName()}, "Marked: needs changes"),
@@ -4135,19 +4139,25 @@ const rvActs = {
     if(!(r.rvAsk||[]).some(a=>a.uid===me)) await setRv(r, {rvAsk:[...(r.rvAsk||[]), {uid:me, name:myName(), at:Date.now()}]}, "Asked");
     await notifyWatchers("watch-"+r.rv, `${myName()} asks to move a recipe on`, `“${r.t}” is in ${INBOX_NAME[r.rv]}. Please move it to the next step.`, "#"+r.id, "point_right"); toast("Asked. They'll get a notice."); return false; },
 };
+// The move that put a recipe in its inbox now, if this person made it (they may undo it)
+const lastMove = r => { const L=r.rvLog||[], e=L[L.length-1];
+  return e && e.to===r.rv && ["proof","approve"].includes(e.from) && !e.back && (e.uid===me || e.tappedUid===me || (e.credited||[]).some(a=>a.uid===me)) ? e : null; };
+// A recipe in For approval or Ready to release that gets edited goes back to Need to proofread
+const editedBack = (r, at) => feat("moveback") && r && (r.rv==="approve"||r.rv==="release") ? {rv:"proof", rvUids:[], rvAsk:[], rvBy:myName(), rvAt:at,
+  rvLog:[...(r.rvLog||[]), {from:r.rv, to:"proof", by:myName(), uid:me, at, back:true, edited:true}].slice(-30)} : null;
 // The buttons for one stage (for a recipe already in the cookbook)
 function rvButtons(r){
   const st=r.rv; if(!st) return "";
-  const nkBack = feat("moveback") && feat("nk") && isAdmin() ? `<button type="button" class="btn sm" data-rv="backNK" data-rid="${esc(r.id)}">↩ Back to Not kosher</button>` : "";
+  const undo = feat("moveback") && lastMove(r) ? `<button type="button" class="btn sm" data-rv="undo" data-rid="${esc(r.id)}">↩ Undo – move it back to ${INBOX_NAME[lastMove(r).from]}</button>` : "";
   if(st==="kosher") return !isAdmin() ? "" : nkHidden() ? `<button type="button" class="btn sm solid" data-rv="nkOk" data-rid="${esc(r.id)}">✓ Approve – back in the cookbook, on to Need to proofread</button><a class="btn sm" href="#edit-${esc(r.id)}">Fix it</a>`
     : `<button type="button" class="btn sm solid" data-rv="nkFix" data-rid="${esc(r.id)}">Fixed – send to Need to proofread</button><button type="button" class="btn sm" data-rv="nkOut" data-rid="${esc(r.id)}">✓ It's kosher – take it out</button>`;
-  if(rvLocked(r) && ((st==="approve" && may("review")) || (st==="release" && may("release")))) return `<span class="hint lock">🔒 You moved this one up already, so someone else has to do the next step.</span>`;
-  if((r.rvAsk||[]).some(a=>a.uid===me) && !((st==="proof"&&may("proofread"))||(st==="approve"&&may("review"))||(st==="release"&&may("release")))) return `<span class="hint lock">You asked to move it up. You count as moving it, so you can't do the step after.</span>`;
-  if(st==="proof" && may("proofread")) return `<button type="button" class="btn sm solid" data-rv="ok" data-rid="${esc(r.id)}">✓ Proofread – send to For approval</button><button type="button" class="btn sm" data-rv="fix" data-rid="${esc(r.id)}">✗ Needs changes</button>${nkBack}`;
-  if(st==="approve" && may("review")) return `<button type="button" class="btn sm solid" data-rv="approve" data-rid="${esc(r.id)}">✓ Approve – send to Ready to release</button><button type="button" class="btn sm" data-rv="back" data-rid="${esc(r.id)}">${feat("moveback")?"↩ Back to Need to proofread":"Back to proofread"}</button>${nkBack}`;
-  if(st==="release" && may("release")) return `<button type="button" class="btn sm solid" data-rv="pub" data-rid="${esc(r.id)}">🌐 Release to the public</button><button type="button" class="btn sm" data-rv="priv" data-rid="${esc(r.id)}">🔒 Release for the team only</button>${feat("moveback")?`<button type="button" class="btn sm" data-rv="backA" data-rid="${esc(r.id)}">↩ Back to For approval</button><button type="button" class="btn sm" data-rv="back" data-rid="${esc(r.id)}">↩ Back to Need to proofread</button>`:""}${nkBack}`;
+  if(rvLocked(r) && ((st==="approve" && may("review")) || (st==="release" && may("release")))) return `<span class="hint lock">🔒 You moved this one up already, so someone else has to do the next step.</span>${undo}`;
+  if((r.rvAsk||[]).some(a=>a.uid===me) && !((st==="proof"&&may("proofread"))||(st==="approve"&&may("review"))||(st==="release"&&may("release")))) return `<span class="hint lock">You asked to move it up. You count as moving it, so you can't do the step after.${undo?"</span>"+undo+"<span hidden>":""}</span>`;
+  if(st==="proof" && may("proofread")) return `<button type="button" class="btn sm solid" data-rv="ok" data-rid="${esc(r.id)}">✓ Proofread – send to For approval</button><button type="button" class="btn sm" data-rv="fix" data-rid="${esc(r.id)}">✗ Needs changes</button>`;
+  if(st==="approve" && may("review")) return `<button type="button" class="btn sm solid" data-rv="approve" data-rid="${esc(r.id)}">✓ Approve – send to Ready to release</button>${feat("moveback")?undo:`<button type="button" class="btn sm" data-rv="back" data-rid="${esc(r.id)}">Back to proofread</button>`}`;
+  if(st==="release" && may("release")) return `<button type="button" class="btn sm solid" data-rv="pub" data-rid="${esc(r.id)}">🌐 Release to the public</button><button type="button" class="btn sm" data-rv="priv" data-rid="${esc(r.id)}">🔒 Release for the team only</button>${undo}`;
   // everyone else on the team can ask the people who may do it
-  if(isTeam() && !isPublic()) return `<button type="button" class="btn sm" data-rv="ask" data-rid="${esc(r.id)}">Ask to move it to the next step</button>`;
+  if(isTeam() && !isPublic()) return `<button type="button" class="btn sm" data-rv="ask" data-rid="${esc(r.id)}">Ask to move it to the next step</button>${undo}`;
   return "";
 }
 function wireRv(root, after){
@@ -4328,9 +4338,11 @@ function recipeInbox(stage){
   const steps=inboxSteps(stage);
   // Three different people: whoever proofread it can't approve it, and neither of them can release it
   const lockMsg = s => (stage==="approve"||stage==="release") && ((s.uids||[]).includes(me) || s.proofUid===me || s.approvedUid===me) ? "You moved this one up already, so someone else has to do the next step." : "";
-  const acts = s => lockMsg(s) ? `<span class="hint lock">🔒 ${lockMsg(s)}</span>` : stage==="proof" ? `<button type="button" class="btn solid" data-ib="ok">✓ Proofread – send to For approval</button><button type="button" class="btn" data-ib="fix">✗ Needs changes</button><a class="btn" href="#review-${esc(s.id)}">Edit</a><button type="button" class="btn" data-ib="ask-reject">Decline</button>`
-    : stage==="approve" ? `<button type="button" class="btn solid" data-ib="approve">✓ Approve – send to Ready to release</button><a class="btn" href="#review-${esc(s.id)}">Edit</a><button type="button" class="btn" data-ib="back">${feat("moveback")?"↩ Back to Need to proofread":"Back to proofread"}</button><button type="button" class="btn" data-ib="ask-reject">Decline</button>`
-    : `<button type="button" class="btn solid" data-ib="pub">🌐 Release to the public</button><button type="button" class="btn" data-ib="priv">🔒 Release for the team only</button><a class="btn" href="#review-${esc(s.id)}">Edit</a>${feat("moveback")?`<button type="button" class="btn" data-ib="backA">↩ Back to For approval</button><button type="button" class="btn" data-ib="back">↩ Back to Need to proofread</button>`:""}`;
+  const subLast = s => { const L=s.log||[], e=L[L.length-1]; return feat("moveback") && e && e.to===stageOf(s) && ["proof","approve"].includes(e.from) && !e.back && e.uid===me ? e : null; };
+  const subUndo = s => subLast(s) ? `<button type="button" class="btn" data-ib="undo">↩ Undo – move it back to ${INBOX_NAME[subLast(s).from]}</button>` : "";
+  const acts = s => lockMsg(s) ? `<span class="hint lock">🔒 ${lockMsg(s)}</span>${subUndo(s)}` : stage==="proof" ? `<button type="button" class="btn solid" data-ib="ok">✓ Proofread – send to For approval</button><button type="button" class="btn" data-ib="fix">✗ Needs changes</button><a class="btn" href="#review-${esc(s.id)}">Edit</a><button type="button" class="btn" data-ib="ask-reject">Decline</button>`
+    : stage==="approve" ? `<button type="button" class="btn solid" data-ib="approve">✓ Approve – send to Ready to release</button><a class="btn" href="#review-${esc(s.id)}">Edit</a>${feat("moveback")?"":`<button type="button" class="btn" data-ib="back">Back to proofread</button>`}<button type="button" class="btn" data-ib="ask-reject">Decline</button>${subUndo(s)}`
+    : `<button type="button" class="btn solid" data-ib="pub">🌐 Release to the public</button><button type="button" class="btn" data-ib="priv">🔒 Release for the team only</button><a class="btn" href="#review-${esc(s.id)}">Edit</a>${subUndo(s)}`;
   app.innerHTML = `<section class="wrap admin inbox">
     <div class="section-head" style="margin-top:28px"><h2>${title}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}</p></div>
     ${steps}
@@ -4375,7 +4387,9 @@ function recipeInbox(stage){
         if(await upd(s, {proofNote:note, proofNoteBy:myName(), proofNoteAt:Date.now()}, "Marked: needs changes")) notifyWatchers("watch-proof", `${s.t} needs changes`, `${myName()}: ${note}`, "#proof", "pencil2"); }; });
     on("approve", async()=>{ if(await upd(s, logged("release", {stage:"release", approvedBy:myName(), approvedUid:me, approvedAt:Date.now()}), "Approved – ready to release")) notifyWatchers("watch-release", `Ready to release`, `“${s.t}” was approved by ${myName()}.`, "#release", "white_check_mark"); });
     on("back", ()=>upd(s, Object.assign(logged("proof", {stage:"proof", proofUid:"", approvedUid:"", proofBy:"", approvedBy:""}), {uids:[]}), "Sent back to proofread"));
-    on("backA", ()=>upd(s, {stage:"approve", approvedUid:"", approvedBy:"", uids:(s.uids||[]).filter(u=>u!==s.approvedUid), log:[...(s.log||[]), {from:stageOf(s), to:"approve", by:myName(), uid:me, at:Date.now(), back:true}].slice(-30)}, "Moved back to For approval"));
+    on("undo", ()=>{ const e=subLast(s); if(!e) return; const to=e.from;
+      upd(s, Object.assign(to==="proof" ? {proofUid:"", proofBy:"", approvedUid:"", approvedBy:"", uids:[]} : {approvedUid:"", approvedBy:"", uids:(s.uids||[]).filter(u=>u!==me)},
+        {stage:to, log:[...(s.log||[]), {from:stageOf(s), to, by:myName(), uid:me, at:Date.now(), back:true, undo:true}].slice(-30)}), `Undone – back in ${INBOX_NAME[to]}`); });
     on("pub", async e=>{ e.target.disabled=true; try{ await approveSub(s, true); }catch(err){ e.target.disabled=false; toast("Couldn't release. Check your connection."); } });
     on("priv", async e=>{ e.target.disabled=true; try{ await approveSub(s, false); }catch(err){ e.target.disabled=false; toast("Couldn't release. Check your connection."); } });
     on("ask-reject", ()=>{ acts.innerHTML=`<span class="hint">Decline “${esc(s.t)}”?</span><button type="button" class="btn warn" data-ib="reject">Decline</button><button type="button" class="btn" data-ib="cancel">Cancel</button>`;
