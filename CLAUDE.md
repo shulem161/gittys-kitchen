@@ -9,7 +9,9 @@ Family cookbook web app for Shulem Schlesinger (admin). Live at https://shulem16
 - EVERY UPDATE IS THE OWNER'S FIRST: add an entry at the top of the `UPDATES` list in index.html
   ([key, version, date, title, what it does, false]) and put the new behaviour behind `feat("key")`, keeping the old
   behaviour when it's off. The owner sees all updates at once; admins, employees and customers get one only after he
-  approves it in Settings → App/Website settings → App & web updates (stored in `meta/features.on`). Never approve for him.
+  approves it in Inboxes → App & web updates (stored in `meta/features.on`). Never approve for him.
+  Pushing index.html runs `.github/workflows/notify-updates.yml` (`tools/notify-updates.js`), which alerts his phone about new
+  waiting updates once each (`meta/updnotified`).
 - `sw.js` (offline cache), `manifest.webmanifest`, `icon-*.png` — installable web app.
 - `version.json` — drives the in-app "Update now" / "Download update" bar.
 - `firestore.rules` — Firestore security rules. Pushing a change deploys it automatically
@@ -29,7 +31,7 @@ Admin = whoever owns `names/shulem schlesinger`. Notifications: ntfy.sh topic in
 ## Releasing a change
 1. Edit `index.html`, with a new `UPDATES` entry and `feat()` switch for the update. 2. Bump `WEB_VERSION` in index.html,
 `"web"` in version.json and `CACHE` in sw.js together. 3. `node tests/run-all.js` must pass. 4. Commit and push to `main`.
-5. Tell the owner it's waiting for his approval in App/Website settings → App & web updates.
+5. Tell the owner it's waiting for his approval in Inboxes → App & web updates.
 The APK only needs rebuilding for native changes; its signing key is NOT in this repo (the owner has it
 in Gittys-Kitchen-backup.zip). Never commit keys or the Firebase service account.
 
