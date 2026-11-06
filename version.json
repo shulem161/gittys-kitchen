@@ -1,6 +1,6 @@
 {
-  "web": "4.23",
+  "web": "4.24",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Pick a recipe by its item number wherever you choose one by typing."
+  "notes": "Find recipes by part of the item number, in number order."
 }

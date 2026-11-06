@@ -1305,7 +1305,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.23";
+const WEB_VERSION = "4.24";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1343,6 +1343,9 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["moveback","4.24","2026-11-05","Move a recipe back to an earlier inbox","In For approval and Ready to release you can send a recipe back to an earlier inbox: Need to proofread, For approval, or (admins) Not kosher. Works for cookbook recipes and new recipes.", false],
+  ["askcredit","4.24","2026-11-05","Moving up for someone who asked puts it on their name","When someone asked to move a recipe up and you tap the button, the move is recorded on their name, not yours, and you aren't locked out of the next step.", false],
+  ["codesearch","4.24","2026-11-05","Find recipes by part of the item number","Typing part of an item number (like 103 or 1030) in the search at the top lists every recipe whose number starts that way, in number order. When choosing a recipe by typing, number matches come first, in number order, and more of them show.", false],
   ["planconfirm","4.23","2026-11-05","Ask before taking something off the calendar","Tapping ✕ on a recipe or menu on the calendar asks “Take it off this day?” first, with Yes and Keep.", false],
   ["codepick","4.23","2026-11-05","Pick a recipe by its item number","Everywhere you choose a recipe by typing (calendar, menus, grocery list, calculator, “Make first”), you can type its item number too, even just the start of it (like 1010), and the number shows next to each choice.", false],
   ["relstate","4.22","2026-11-05","Recently released shows if a recipe is public now","Ready to release → Recently released shows whether each recipe is public or team only right now, instead of what it was labelled when it was released.", false],
@@ -1958,7 +1961,10 @@ function results(term){
   const t = term.toLowerCase();
   const num = (t.match(/^(?:#|no\.?\s*|number\s*)?(\d{1,4})$/)||[])[1];
   const code = (term.trim().match(/^#?([12](?:\s?\d\d){1,2}\s?\d{3})$/)||[])[1];
-  const list = code ? RECIPES.filter(r=>codeOf(r)===code.replace(/\s/g,"")) : num ? RECIPES.filter(r=>String(r.no)===num) : RECIPES.filter(r=>[r.t,r.by,r.c,r.sec||"",allText(r)].join(" ").toLowerCase().includes(t));
+  const digits = feat("codesearch") ? (term.trim().match(/^#?(\d[\d\s]*)$/)||[])[1] : "";
+  const list = digits ? (()=>{ const d=digits.replace(/\s/g,""); const hit=RECIPES.filter(r=>(codeOf(r)||"").startsWith(d) || String(r.no||"")===d);
+      return hit.sort((a,b)=>(codeOf(a)||"~").localeCompare(codeOf(b)||"~", undefined, {numeric:true})); })()
+    : code ? RECIPES.filter(r=>codeOf(r)===code.replace(/\s/g,"")) : num ? RECIPES.filter(r=>String(r.no)===num) : RECIPES.filter(r=>[r.t,r.by,r.c,r.sec||"",allText(r)].join(" ").toLowerCase().includes(t));
   const titleHits = list.filter(r=>r.t.toLowerCase().includes(t)), so = sortChoice("search", ["best",...SO_ALL], "best");
   const rest = list.filter(r=>!r.t.toLowerCase().includes(t));
   app.innerHTML = `<section class="wrap">${tabs(null)}
@@ -2900,9 +2906,10 @@ function updatesPage(){
 (function(){
   const typing = el => !!el && (el.tagName==="TEXTAREA" || el.isContentEditable || (el.tagName==="INPUT" && !["checkbox","radio","button","submit","reset","range","color","file","image"].includes(el.type)));
   const touch = () => { try{ return matchMedia("(pointer: coarse)").matches; }catch(e){ return false; } };
-  let full = 0;
+  let full = 0, fw = 0;
   const check = () => {
     const h = Math.min(innerHeight, window.visualViewport ? visualViewport.height : innerHeight);
+    if(innerWidth!==fw){ fw=innerWidth; full=h; }
     if(!typing(document.activeElement)) full = Math.max(full, h);
     const open = feat("kbnav") && touch() && typing(document.activeElement) && (!full || h < full - 120);
     document.body.classList.toggle("kb-open", open);
@@ -2914,6 +2921,11 @@ function updatesPage(){
 })();
 // Typing a recipe's item number (or the start of it) finds it too, once “Pick a recipe by its item number” is approved
 const codeHit = (r, q) => feat("codepick") && /\d/.test(q) && (codeOf(r)||"").startsWith(String(q).replace(/[\s#]/g,""));
+// Item-number matches first, in number order (once “Find recipes by part of the item number” is approved)
+const byCodeFor = q => (a, b) => { if(!feat("codesearch") || !/^\s*#?\d/.test(q)) return 0;
+  const n=String(q).replace(/[\s#]/g,""), ca=codeOf(a)||"", cb=codeOf(b)||"", ha=ca.startsWith(n), hb=cb.startsWith(n);
+  return (hb-ha) || ca.localeCompare(cb, undefined, {numeric:true}); };
+const pickMax = (q, n) => feat("codesearch") && /^\s*#?\d/.test(q) ? 30 : n;
 const pickTag = r => feat("codepick") && codeOf(r) ? codeOf(r)+" · "+r.c : r.c;
 // Browse the whole cookbook by category and pick recipes (for menus and the calendar)
 function pickFromCookbook(o){   // o: {title, has(rid), toggle(rid, on), done()}
@@ -3045,7 +3057,7 @@ function planPage(sel){
     const q2=document.getElementById("pl-q"), sg=document.getElementById("pl-sugg");
     q2.onfocus=()=>q2.classList.add("plan-typing"); q2.onblur=()=>setTimeout(()=>q2.classList.remove("plan-typing"),300);
     q2.oninput=()=>{ const s=q2.value.trim().toLowerCase(); if(!s){ sg.innerHTML=""; return; }
-      const hits=RECIPES.filter(r=>r.t.toLowerCase().includes(s) || (codeOf(r)||"").toLowerCase()===s || codeHit(r, s)).slice(0,8);
+      const hits=RECIPES.filter(r=>r.t.toLowerCase().includes(s) || (codeOf(r)||"").toLowerCase()===s || codeHit(r, s)).sort(byCodeFor(s)).slice(0,pickMax(s,8));
       sg.innerHTML = hits.length ? hits.map(r=>`<button type="button" class="pre-opt" data-padd="${esc(r.id)}">${esc(r.t)} <span>${esc(codeOf(r)||r.c)}</span></button>`).join("") : `<p class="hint">No recipe with that name.</p>`;
       sg.querySelectorAll("[data-padd]").forEach(b=>b.onclick=()=>addEntry({rid:b.dataset.padd, x:1, done:false})); };
     q2.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=sg.querySelector("[data-padd]"); if(b) b.click(); } };
@@ -3142,7 +3154,7 @@ function menuEditPage(id){
   const q2=$("mi-q"), sg=$("mi-sugg");
   q2.onfocus=()=>q2.classList.add("plan-typing"); q2.onblur=()=>setTimeout(()=>q2.classList.remove("plan-typing"),300);
   q2.oninput=()=>{ const s=q2.value.trim().toLowerCase(); if(!s){ sg.innerHTML=""; return; }
-    const hits=RECIPES.filter(r=>!items.some(i=>i.rid===r.id) && (r.t.toLowerCase().includes(s) || (codeOf(r)||"").toLowerCase()===s || codeHit(r, s))).slice(0,8);
+    const hits=RECIPES.filter(r=>!items.some(i=>i.rid===r.id) && (r.t.toLowerCase().includes(s) || (codeOf(r)||"").toLowerCase()===s || codeHit(r, s))).sort(byCodeFor(s)).slice(0,pickMax(s,8));
     sg.innerHTML = hits.length ? hits.map(r=>`<button type="button" class="pre-opt" data-miadd="${esc(r.id)}">${esc(r.t)} <span>${esc(codeOf(r)||r.c)}</span></button>`).join("") : `<p class="hint">No recipe with that name.</p>`;
     sg.querySelectorAll("[data-miadd]").forEach(b=>b.onclick=()=>{ m.items.push({rid:b.dataset.miadd, x:1, course:""}); saveMenu(m); menuEditPage(id); const n=$("mi-q"); if(n) n.focus(); }); };
   q2.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=sg.querySelector("[data-miadd]"); if(b) b.click(); } };
@@ -3914,7 +3926,7 @@ function editor(r, cat, sub, draft){
     const showSugg=()=>{
       const q=pq.value.trim().toLowerCase();
       if(!q){ ps.innerHTML=""; return; }
-      const hits=RECIPES.filter(x=>x.id!==selfId && !pre.includes(x.id) && (x.t.toLowerCase().includes(q) || codeHit(x, q))).slice(0,6);
+      const hits=RECIPES.filter(x=>x.id!==selfId && !pre.includes(x.id) && (x.t.toLowerCase().includes(q) || codeHit(x, q))).sort(byCodeFor(q)).slice(0,pickMax(q,6));
       ps.innerHTML = hits.length ? hits.map(x=>`<button type="button" class="pre-opt" role="option" data-pre="${esc(x.id)}">${esc(x.t)} <span>${esc(pickTag(x))}</span></button>`).join("") : `<p class="hint">No recipe with that name.</p>`;
       ps.querySelectorAll("[data-pre]").forEach(b=>b.onclick=()=>{ pre.push(b.dataset.pre); redraw(); const q2=document.getElementById("ed-pre-q"); if(q2) q2.focus(); });
     };
@@ -4079,15 +4091,17 @@ async function setRv(r, data, msg){
 // A move from one inbox to the next: logged with who did it, and anyone who asked for it counts as having moved it too
 function rvMove(r, to, extra, msg){
   const now=Date.now(), asked=(r.rvAsk||[]).filter(a=>a.uid!==me);
-  const entry={from:r.rv, to:to||"done", by:myName(), uid:me, at:now, ...(asked.length?{asked:asked.map(a=>({uid:a.uid, name:a.name}))}:{}), ...(extra&&extra.pub!==undefined?{pub:extra.pub}:{})};
-  const uids = to==="proof" ? [] : [...new Set([...(r.rvUids||[]), me, ...asked.map(a=>a.uid)])];
+  const credit = feat("askcredit") && asked.length && to!=="proof";   // the move goes on the name of whoever asked
+  const entry = credit ? {from:r.rv, to:to||"done", by:asked.map(a=>a.name).join(", "), uid:asked[0].uid, at:now, tappedBy:myName(), tappedUid:me, credited:asked.map(a=>({uid:a.uid, name:a.name})), ...(extra&&extra.pub!==undefined?{pub:extra.pub}:{})}
+    : {from:r.rv, to:to||"done", by:myName(), uid:me, at:now, ...(asked.length?{asked:asked.map(a=>({uid:a.uid, name:a.name}))}:{}), ...(extra&&extra.pub!==undefined?{pub:extra.pub}:{})};
+  const uids = to==="proof" ? [] : credit ? [...new Set([...(r.rvUids||[]), ...asked.map(a=>a.uid)])] : [...new Set([...(r.rvUids||[]), me, ...asked.map(a=>a.uid)])];
   return setRv(r, Object.assign({rv:to, rvBy:myName(), rvAt:now, rvUids:uids, rvAsk:[], rvLog:[...(r.rvLog||[]), entry].slice(-30)}, extra||{}), msg);
 }
 const RV_STEP = {kosher:"🚫 Put in Not kosher", "kosher-ok":"✓ Checked: kosher, taken out of Not kosher", approve:"Proofread ✓ → For approval", release:"Approved → Ready to release", done:"Released", proof:"Put in Need to proofread"};
-const rvLogHTML = log => log.slice().reverse().map(e=>`<li><b>${e.kosherOk?"✓ Approved out of Not kosher → Need to proofread":RV_STEP[e.to]||e.to}${e.to==="done"?(e.pub===false?" for the team only":" to the public"):""}</b> · moved up by ${esc(e.by)}${(e.asked||[]).length?`, asked by ${e.asked.map(a=>esc(a.name)).join(", ")}`:""} · ${fmtDate(e.at)}</li>`).join("");
+const rvLogHTML = log => log.slice().reverse().map(e=>`<li><b>${e.back?"↩ Moved back to "+(INBOX_NAME[e.to]||e.to):e.kosherOk?"✓ Approved out of Not kosher → Need to proofread":RV_STEP[e.to]||e.to}${e.to==="done"?(e.pub===false?" for the team only":" to the public"):""}</b> · moved up by ${esc(e.by)}${(e.asked||[]).length?`, asked by ${e.asked.map(a=>esc(a.name)).join(", ")}`:""} · ${fmtDate(e.at)}</li>`).join("");
 // Everything one person moved up (or asked to move up), newest first
 const movedUp = () => { const u=who(), out=[];
-  RECIPES.forEach(r=>(r.rvLog||[]).forEach(e=>{ if(e.to!=="proof" && e.to!=="kosher" && e.to!=="kosher-ok" && (e.uid===u || (e.asked||[]).some(a=>a.uid===u))) out.push({rid:r.id, t:r.t.replace(/^Untitled: /,""), e}); }));
+  RECIPES.forEach(r=>(r.rvLog||[]).forEach(e=>{ if(e.to!=="proof" && e.to!=="kosher" && e.to!=="kosher-ok" && !e.back && (e.uid===u || (e.asked||[]).some(a=>a.uid===u) || (e.credited||[]).some(a=>a.uid===u))) out.push({rid:r.id, t:r.t.replace(/^Untitled: /,""), e}); }));
   subs.forEach(s=>(s.log||[]).forEach(e=>{ if(e.to!=="proof" && e.uid===u) out.push({rid:s.recipeId||"", t:s.t, e}); }));
   return out.sort((a,b)=>b.e.at-a.e.at); };
 const rvLocked = r => (r.rv==="approve"||r.rv==="release") && (r.rvUids||[]).includes(me);
@@ -4112,6 +4126,8 @@ const rvActs = {
   ok: r => rvMove(r, "approve", {rvNote:"", rvNoteBy:""}, "Proofread ✓ – now in For approval"),
   approve: r => rvMove(r, "release", null, "Approved – now in Ready to release"),
   back: r => rvMove(r, "proof", null, "Back in Need to proofread"),
+  backA: r => { const now=Date.now(); return setRv(r, {rv:"approve", rvBy:myName(), rvAt:now, rvAsk:[], rvLog:[...(r.rvLog||[]), {from:r.rv, to:"approve", by:myName(), uid:me, at:now, back:true}].slice(-30)}, "Moved back to For approval"); },
+  backNK: r => nkPut(r, "Moved back from "+(INBOX_NAME[r.rv]||"an inbox")),
   pub: r => rvMove(r, "", {pub:true}, "Released to the public"),
   priv: r => rvMove(r, "", {pub:false}, "Released for the team only"),
   fix: (r, note) => setRv(r, {rvNote:note, rvNoteBy:myName()}, "Marked: needs changes"),
@@ -4122,13 +4138,14 @@ const rvActs = {
 // The buttons for one stage (for a recipe already in the cookbook)
 function rvButtons(r){
   const st=r.rv; if(!st) return "";
+  const nkBack = feat("moveback") && feat("nk") && isAdmin() ? `<button type="button" class="btn sm" data-rv="backNK" data-rid="${esc(r.id)}">↩ Back to Not kosher</button>` : "";
   if(st==="kosher") return !isAdmin() ? "" : nkHidden() ? `<button type="button" class="btn sm solid" data-rv="nkOk" data-rid="${esc(r.id)}">✓ Approve – back in the cookbook, on to Need to proofread</button><a class="btn sm" href="#edit-${esc(r.id)}">Fix it</a>`
     : `<button type="button" class="btn sm solid" data-rv="nkFix" data-rid="${esc(r.id)}">Fixed – send to Need to proofread</button><button type="button" class="btn sm" data-rv="nkOut" data-rid="${esc(r.id)}">✓ It's kosher – take it out</button>`;
   if(rvLocked(r) && ((st==="approve" && may("review")) || (st==="release" && may("release")))) return `<span class="hint lock">🔒 You moved this one up already, so someone else has to do the next step.</span>`;
   if((r.rvAsk||[]).some(a=>a.uid===me) && !((st==="proof"&&may("proofread"))||(st==="approve"&&may("review"))||(st==="release"&&may("release")))) return `<span class="hint lock">You asked to move it up. You count as moving it, so you can't do the step after.</span>`;
-  if(st==="proof" && may("proofread")) return `<button type="button" class="btn sm solid" data-rv="ok" data-rid="${esc(r.id)}">✓ Proofread – send to For approval</button><button type="button" class="btn sm" data-rv="fix" data-rid="${esc(r.id)}">✗ Needs changes</button>`;
-  if(st==="approve" && may("review")) return `<button type="button" class="btn sm solid" data-rv="approve" data-rid="${esc(r.id)}">✓ Approve – send to Ready to release</button><button type="button" class="btn sm" data-rv="back" data-rid="${esc(r.id)}">Back to proofread</button>`;
-  if(st==="release" && may("release")) return `<button type="button" class="btn sm solid" data-rv="pub" data-rid="${esc(r.id)}">🌐 Release to the public</button><button type="button" class="btn sm" data-rv="priv" data-rid="${esc(r.id)}">🔒 Release for the team only</button>`;
+  if(st==="proof" && may("proofread")) return `<button type="button" class="btn sm solid" data-rv="ok" data-rid="${esc(r.id)}">✓ Proofread – send to For approval</button><button type="button" class="btn sm" data-rv="fix" data-rid="${esc(r.id)}">✗ Needs changes</button>${nkBack}`;
+  if(st==="approve" && may("review")) return `<button type="button" class="btn sm solid" data-rv="approve" data-rid="${esc(r.id)}">✓ Approve – send to Ready to release</button><button type="button" class="btn sm" data-rv="back" data-rid="${esc(r.id)}">${feat("moveback")?"↩ Back to Need to proofread":"Back to proofread"}</button>${nkBack}`;
+  if(st==="release" && may("release")) return `<button type="button" class="btn sm solid" data-rv="pub" data-rid="${esc(r.id)}">🌐 Release to the public</button><button type="button" class="btn sm" data-rv="priv" data-rid="${esc(r.id)}">🔒 Release for the team only</button>${feat("moveback")?`<button type="button" class="btn sm" data-rv="backA" data-rid="${esc(r.id)}">↩ Back to For approval</button><button type="button" class="btn sm" data-rv="back" data-rid="${esc(r.id)}">↩ Back to Need to proofread</button>`:""}${nkBack}`;
   // everyone else on the team can ask the people who may do it
   if(isTeam() && !isPublic()) return `<button type="button" class="btn sm" data-rv="ask" data-rid="${esc(r.id)}">Ask to move it to the next step</button>`;
   return "";
@@ -4312,8 +4329,8 @@ function recipeInbox(stage){
   // Three different people: whoever proofread it can't approve it, and neither of them can release it
   const lockMsg = s => (stage==="approve"||stage==="release") && ((s.uids||[]).includes(me) || s.proofUid===me || s.approvedUid===me) ? "You moved this one up already, so someone else has to do the next step." : "";
   const acts = s => lockMsg(s) ? `<span class="hint lock">🔒 ${lockMsg(s)}</span>` : stage==="proof" ? `<button type="button" class="btn solid" data-ib="ok">✓ Proofread – send to For approval</button><button type="button" class="btn" data-ib="fix">✗ Needs changes</button><a class="btn" href="#review-${esc(s.id)}">Edit</a><button type="button" class="btn" data-ib="ask-reject">Decline</button>`
-    : stage==="approve" ? `<button type="button" class="btn solid" data-ib="approve">✓ Approve – send to Ready to release</button><a class="btn" href="#review-${esc(s.id)}">Edit</a><button type="button" class="btn" data-ib="back">Back to proofread</button><button type="button" class="btn" data-ib="ask-reject">Decline</button>`
-    : `<button type="button" class="btn solid" data-ib="pub">🌐 Release to the public</button><button type="button" class="btn" data-ib="priv">🔒 Release for the team only</button><a class="btn" href="#review-${esc(s.id)}">Edit</a>`;
+    : stage==="approve" ? `<button type="button" class="btn solid" data-ib="approve">✓ Approve – send to Ready to release</button><a class="btn" href="#review-${esc(s.id)}">Edit</a><button type="button" class="btn" data-ib="back">${feat("moveback")?"↩ Back to Need to proofread":"Back to proofread"}</button><button type="button" class="btn" data-ib="ask-reject">Decline</button>`
+    : `<button type="button" class="btn solid" data-ib="pub">🌐 Release to the public</button><button type="button" class="btn" data-ib="priv">🔒 Release for the team only</button><a class="btn" href="#review-${esc(s.id)}">Edit</a>${feat("moveback")?`<button type="button" class="btn" data-ib="backA">↩ Back to For approval</button><button type="button" class="btn" data-ib="back">↩ Back to Need to proofread</button>`:""}`;
   app.innerHTML = `<section class="wrap admin inbox">
     <div class="section-head" style="margin-top:28px"><h2>${title}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}</p></div>
     ${steps}
@@ -4358,6 +4375,7 @@ function recipeInbox(stage){
         if(await upd(s, {proofNote:note, proofNoteBy:myName(), proofNoteAt:Date.now()}, "Marked: needs changes")) notifyWatchers("watch-proof", `${s.t} needs changes`, `${myName()}: ${note}`, "#proof", "pencil2"); }; });
     on("approve", async()=>{ if(await upd(s, logged("release", {stage:"release", approvedBy:myName(), approvedUid:me, approvedAt:Date.now()}), "Approved – ready to release")) notifyWatchers("watch-release", `Ready to release`, `“${s.t}” was approved by ${myName()}.`, "#release", "white_check_mark"); });
     on("back", ()=>upd(s, Object.assign(logged("proof", {stage:"proof", proofUid:"", approvedUid:"", proofBy:"", approvedBy:""}), {uids:[]}), "Sent back to proofread"));
+    on("backA", ()=>upd(s, {stage:"approve", approvedUid:"", approvedBy:"", uids:(s.uids||[]).filter(u=>u!==s.approvedUid), log:[...(s.log||[]), {from:stageOf(s), to:"approve", by:myName(), uid:me, at:Date.now(), back:true}].slice(-30)}, "Moved back to For approval"));
     on("pub", async e=>{ e.target.disabled=true; try{ await approveSub(s, true); }catch(err){ e.target.disabled=false; toast("Couldn't release. Check your connection."); } });
     on("priv", async e=>{ e.target.disabled=true; try{ await approveSub(s, false); }catch(err){ e.target.disabled=false; toast("Couldn't release. Check your connection."); } });
     on("ask-reject", ()=>{ acts.innerHTML=`<span class="hint">Decline “${esc(s.t)}”?</span><button type="button" class="btn warn" data-ib="reject">Decline</button><button type="button" class="btn" data-ib="cancel">Cancel</button>`;
@@ -5389,7 +5407,7 @@ function calcPage(preId){
     $("wr-groc").onclick=()=>{ const g=gStore(), it=g.items.find(i=>i.id===r.id); if(it) it.x=x; else g.items.push({id:r.id,x}); gSave(g); renderAcct(); toast(it?"Grocery list updated":"Added to the grocery list"); drawWhole(); };
   };
   wq.oninput=()=>{ const q=wq.value.trim().toLowerCase(); if(!q){ ws.innerHTML=""; return; }
-    const hits=RECIPES.filter(x=>x.t.toLowerCase().includes(q) || codeHit(x, q)).slice(0,6);
+    const hits=RECIPES.filter(x=>x.t.toLowerCase().includes(q) || codeHit(x, q)).sort(byCodeFor(q)).slice(0,pickMax(q,6));
     ws.innerHTML = hits.length ? hits.map(x=>`<button type="button" class="pre-opt" data-wr="${esc(x.id)}">${esc(x.t)} <span>${esc(pickTag(x))}</span></button>`).join("") : `<p class="hint">No recipe with that name.</p>`;
     ws.querySelectorAll("[data-wr]").forEach(b=>b.onclick=()=>{ calcRec.id=b.dataset.wr; ws.innerHTML=""; drawWhole(); }); };
   wq.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=ws.querySelector("[data-wr]"); if(b) b.click(); } };
@@ -5555,7 +5573,7 @@ function groceryPage(){
   });
   const add=$("g-add"), sg=$("g-sugg");
   add.oninput=()=>{ const q=add.value.trim().toLowerCase(); if(!q){ sg.innerHTML=""; return; }
-    const have=gStore().items.map(i=>i.id), hits=RECIPES.filter(x=>!have.includes(x.id) && (x.t.toLowerCase().includes(q) || codeHit(x, q))).slice(0,6);
+    const have=gStore().items.map(i=>i.id), hits=RECIPES.filter(x=>!have.includes(x.id) && (x.t.toLowerCase().includes(q) || codeHit(x, q))).sort(byCodeFor(q)).slice(0,pickMax(q,6));
     sg.innerHTML = hits.length ? hits.map(x=>`<button type="button" class="pre-opt" data-gadd="${esc(x.id)}">${esc(x.t)} <span>${esc(pickTag(x))}</span></button>`).join("") : `<p class="hint">No recipe with that name.</p>`;
     sg.querySelectorAll("[data-gadd]").forEach(b=>b.onclick=()=>{ const r=RECIPES.find(x=>x.id===b.dataset.gadd); if(r){ groceryToggle(r,1); groceryPage(); const a2=$("g-add"); if(a2) a2.focus(); } }); };
   add.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const b=sg.querySelector("[data-gadd]"); if(b) b.click(); } };
