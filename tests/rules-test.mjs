@@ -357,12 +357,15 @@ await check("…an admin can't switch them", assertFails(setDoc(doc(ADM, 'meta',
 await check("…nor an employee", assertFails(setDoc(doc(EMP, 'meta', 'features'), { on: { nk: false } })));
 
 // An edit sends a recipe back to Need to proofread; nobody can jump it forward that way
-await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'recipes', 'r-eb'), { t: 'EB', c: 'Cakes', rv: 'release', rvUids: ['pr1', 'pr2'] }); });
-await check("an employee can't send a recipe forward", assertFails(updateDoc(doc(EMP, 'recipes', 'r-eb'), { rv: '', rvUids: [] })));
-await check("…nor send it back while keeping who moved it", assertFails(updateDoc(doc(EMP, 'recipes', 'r-eb'), { rv: 'proof' })));
-await check("…nor change the recipe while doing it", assertFails(updateDoc(doc(EMP, 'recipes', 'r-eb'), { rv: 'proof', rvUids: [], t: 'X' })));
-await check('an edit by anyone on the team sends it back to Need to proofread', assertSucceeds(updateDoc(doc(EMP, 'recipes', 'r-eb'), { rv: 'proof', rvUids: [], rvLog: [{ to: 'proof', edited: true }] })));
-await check("a customer can't", assertFails(updateDoc(doc(PUB, 'recipes', 'r-eb'), { rv: 'proof', rvUids: [] })));
+await env.withSecurityRulesDisabled(async c => { const d = c.firestore(); await setDoc(doc(d, 'recipes', 'r-eb'), { t: 'EB', c: 'Cakes', rv: 'release', rvUids: ['pr1', 'pr2'] });
+  await setDoc(doc(d, 'users', 'e9'), { name: 'E Nine', status: 'approved', role: 'employee', created: 1, favs: [] });
+  await setDoc(doc(d, 'users', 'c9'), { name: 'C Nine', status: 'approved', role: 'public', created: 1, favs: [] }); });
+const E9 = as('e9'), C9 = as('c9');
+await check("an employee can't send a recipe forward", assertFails(updateDoc(doc(E9, 'recipes', 'r-eb'), { rv: '', rvUids: [] })));
+await check("…nor send it back while keeping who moved it", assertFails(updateDoc(doc(E9, 'recipes', 'r-eb'), { rv: 'proof' })));
+await check("…nor change the recipe while doing it", assertFails(updateDoc(doc(E9, 'recipes', 'r-eb'), { rv: 'proof', rvUids: [], t: 'X' })));
+await check('an edit by anyone on the team sends it back to Need to proofread', assertSucceeds(updateDoc(doc(E9, 'recipes', 'r-eb'), { rv: 'proof', rvUids: [], rvLog: [{ to: 'proof', edited: true }] })));
+await check("a customer can't", assertFails(updateDoc(doc(C9, 'recipes', 'r-eb'), { rv: 'proof', rvUids: [] })));
 
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
