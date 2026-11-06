@@ -373,7 +373,8 @@ await check('…make a menu in their name', assertSucceeds(setDoc(doc(OWN, 'menu
 await check('…and send a recipe in their name', assertSucceeds(setDoc(doc(OWN, 'submissions', 's-e9'), { uid: 'e9', status: 'pending', stage: 'proof', t: 'X' })));
 await check("an employee can't save someone else's calendar", assertFails(setDoc(doc(E9, 'plans', 'c9'), { days: {} })));
 await check("…nor make a menu in their name", assertFails(setDoc(doc(E9, 'menus', 'm-c9'), { uid: 'c9', name: 'X', items: [], shared: [] })));
-await check("…nor take over someone's menu", assertFails(updateDoc(doc(E9, 'menus', 'm-e9'), { uid: 'e9', name: 'Mine', items: [], shared: [] })) );
+await check('the owner can make a menu for a customer too', assertSucceeds(setDoc(doc(OWN, 'menus', 'm-c9b'), { uid: 'c9', name: 'For C9', items: [], shared: [] })));
+await check("…and an employee can't change that customer's menu", assertFails(updateDoc(doc(E9, 'menus', 'm-c9b'), { uid: 'c9', name: 'Mine', items: [], shared: [] })));
 await check("an admin can't save the owner's calendar", assertFails(setDoc(doc(as('adm'), 'plans', 'own'), { days: {} })));
 
 await env.cleanup();
