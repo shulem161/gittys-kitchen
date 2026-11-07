@@ -273,6 +273,23 @@ await check("…and can't release it too", assertFails(updateDoc(doc(PR2, 'recip
 await check('a third person releases it', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-ib'), { rv: '', pub: false })));
 await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'recipes', 'r-hid2'), { c: 'Cakes', t: 'Hidden two', pub: false, rv: '', s: [] }); });
 await check('anyone on the team can send a hidden recipe through the 3 steps', assertSucceeds(updateDoc(doc(EMP, 'recipes', 'r-hid2'), { rv: 'proof', rvUids: [], rvAsk: [], rvLog: [] })));
+// The three steps are kept by the rules, not only by the app
+await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
+  await setDoc(doc(d, 'recipes', 'r-skip'), { c: 'Cakes', t: 'Skip', pub: false, rv: '', s: [] });
+  await setDoc(doc(d, 'recipes', 'r-skip2'), { c: 'Cakes', t: 'Skip two', pub: false, rv: 'proof', rvUids: [], s: [] });
+  await setDoc(doc(d, 'recipes', 'r-skip3'), { c: 'Cakes', t: 'Skip three', pub: false, rv: 'approve', rvUids: ['pr2'], s: [] });
+  await setDoc(doc(d, 'recipes', 'r-nk'), { c: 'Cakes', t: 'Not kosher', pub: true, rv: '', s: [] });
+  await setDoc(doc(d, 'recipes', 'r-edb'), { c: 'Cakes', t: 'Edit back', pub: true, rv: 'approve', rvUids: ['pr2'], s: [] }); });
+await check("a releaser can't make a recipe public without the 3 steps", assertFails(updateDoc(doc(PR2, 'recipes', 'r-skip'), { pub: true })));
+await check("…nor release it straight from Need to proofread", assertFails(updateDoc(doc(PR1, 'recipes', 'r-skip2'), { rv: '', pub: true, rvUids: ['pr1'] })));
+await check("a proofreader can't jump it to Ready to release", assertFails(updateDoc(doc(PR1, 'recipes', 'r-skip2'), { rv: 'release', rvUids: ['pr1'] })));
+await check("moving it on can't wipe out who moved it before", assertFails(updateDoc(doc(PR1, 'recipes', 'r-skip3'), { rv: 'release', rvUids: [] })));
+await check("…nor leave out who is moving it", assertFails(updateDoc(doc(PR1, 'recipes', 'r-skip3'), { rv: 'release', rvUids: ['pr2'] })));
+await check('moving it on the right way still works', assertSucceeds(updateDoc(doc(PR1, 'recipes', 'r-skip3'), { rv: 'release', rvUids: ['pr2', 'pr1'] })));
+await check('an admin can put a recipe in Not kosher', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-nk'), { rv: 'kosher', kosherFrom: '', kosherPub: true, pub: false, rvNote: 'x', rvNoteBy: 'Adm', rvBy: 'Adm', rvAt: 1, rvUids: [], rvAsk: [], rvLog: [] })));
+await check("…an employee can't take it out", assertFails(updateDoc(doc(PR1, 'recipes', 'r-nk'), { rv: 'proof', rvUids: [] })));
+await check('…an admin can', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-nk'), { rv: 'proof', pub: true, kosherPub: null, kosherFrom: '', rvNote: '', rvNoteBy: '', rvUids: [], rvAsk: [], rvLog: [] })));
+await check('an admin can edit a recipe in For approval, sending it back in the same save', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-edb'), { t: 'Edited', rv: 'proof', rvUids: [], rvAsk: [], rvBy: 'Adm', rvAt: 1, rvLog: [] })));
 await check("…but nobody can make it public directly, not even with that", assertFails(updateDoc(doc(EMP, 'recipes', 'r-hid2'), { pub: true })));
 // Team messages: employees and admins only, and only the people in the conversation
 const th = (by, members) => ({ by, lastBy: by, members, names: {}, to: 'admins', rid: 'r-pub', rtitle: 'X', subject: '', msgs: [{ by, name: 'X', text: 'Can you look at this?', at: 1 }], updated: 1, readAt: {}, done: false, created: 1 });
@@ -319,6 +336,8 @@ await check("admin can't make a reset code for the owner", assertFails(setDoc(do
 await check("admin can't make a reset code for another admin", assertFails(setDoc(doc(ADM, 'resets', 'ADMTWOCODE'), code('adm two', 'adm2', 'admin', now + DAY))));
 await check('admin can make a reset code for an employee', assertSucceeds(setDoc(doc(ADM, 'resets', 'EMPCODE12'), code('emp', 'emp', 'admin', now + DAY))));
 await check("admin can't take over as owner", assertFails(setDoc(doc(ADM, 'meta', 'admin'), { uid: 'adm', name: 'Adm' })));
+await check("…nor set a member up to take over as owner", assertFails(updateDoc(doc(ADM, 'users', 'pub'), { from: 'own' })));
+await check('admin can still approve and change a member', assertSucceeds(updateDoc(doc(ADM, 'users', 'pub'), { status: 'approved', role: 'public' })));
 await check('admin can change public settings', assertSucceeds(setDoc(doc(ADM, 'meta', 'public'), { allow: { requests: true }, cats: { Cakes: false } })));
 await check("employee can't change public settings", assertFails(setDoc(doc(EMP, 'meta', 'public'), { allow: {}, cats: {} })));
 await check('admin can set the design for everyone', assertSucceeds(setDoc(doc(ADM, 'meta', 'look'), { look: 'garden', by: 'Adm', at: 1 })));
