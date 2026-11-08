@@ -1322,7 +1322,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.29";
+const WEB_VERSION = "4.30";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1360,6 +1360,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["safermove","4.30","2026-11-07","Removing a member happens all at once","When you remove a member, their name and their profile are taken away together, in one save. Before, if the connection dropped in between, the name was free while the profile was still there, and someone new could sign up with that name and get straight in.", false, "admin"],
   ["updaud","4.29","2026-11-06","Approve an update for admins, the team or everyone","When you approve an update you choose who gets it: admins only, admins and employees, or everyone (customers too), where it applies. You can change it later in Approved.", true, "admin"],
   ["blamechoice","4.29","2026-11-06","Names on changes only when you choose","Changes show plainly at first: green for added, red for taken out, no names. A “Show” drop-down chooses: Changes marked, Side by side, or Who changed what (each person's color and name). It remembers your choice, also in History.", false, "team"],
   ["history","4.28","2026-11-06","History for every recipe","Every recipe has a History page (in its ⋮ menu, for the team): each version, what changed and who changed it — in color, person by person — and who moved it through the inboxes. It stays after the recipe is released. History is kept from now on.", false, "team"],
@@ -1649,6 +1650,9 @@ function setFavs(list){
 }
 async function setStatus(uid,status,role){ await db.collection("users").doc(uid).update(Object.assign({status, decided: Date.now()}, role?{role}:{})); }
 async function removeMember(m){
+  if(feat("safermove")){   // both at once: never a free name with the old profile still there
+    const b=db.batch(); b.delete(db.collection("names").doc(nameKey(m.name))); b.delete(db.collection("users").doc(m.uid)); return b.commit();
+  }
   await db.collection("names").doc(nameKey(m.name)).delete().catch(()=>{});
   await db.collection("users").doc(m.uid).delete();
 }

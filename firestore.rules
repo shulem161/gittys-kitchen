@@ -70,11 +70,36 @@ service cloud.firestore {
     function noRvChange() {
       return resource == null || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rv', 'rvUids', 'rvAsk', 'rvLog', 'rvNote', 'rvNoteBy']);
     }
+    // Only one step at a time, in order; nobody takes two steps; who moved it before is never wiped out.
+    // Public or team only changes only when it's released from Ready to release.
     function rvSteps() {
       let was = resource.data.get('rv', '');
       let now = request.resource.data.get('rv', '');
-      return !(((was == 'approve' && now == 'release') || (was == 'release' && now == ''))
-               && request.auth.uid in resource.data.get('rvUids', []));
+      let pubSame = request.resource.data.get('pub', null) == resource.data.get('pub', null);
+      let before = resource.data.get('rvUids', []);
+      let after = request.resource.data.get('rvUids', []);
+      // the person moving it is written down (or it goes on the name of whoever asked)
+      let noted = request.auth.uid in after || resource.data.get('rvAsk', []).size() > 0;
+      return (was == now && pubSame && after == before)
+        || (now == 'proof' && was in ['', 'proof', 'approve', 'release'] && after.size() == 0 && pubSame)
+        || (was == 'release' && now == 'approve' && pubSame && before.hasAll(after))
+        || (was == 'proof' && now == 'approve' && pubSame && after.hasAll(before) && noted && extra('proofread'))
+        || (was == 'approve' && now == 'release' && pubSame && after.hasAll(before) && noted
+            && !(request.auth.uid in before) && extra('review'))
+        || (was == 'release' && now == '' && after.hasAll(before)
+            && !(request.auth.uid in before) && extra('release'));
+    }
+    // Not kosher: only admins put a recipe there and take it out
+    function kosherMove() {
+      return isAdmin()
+        && (request.resource.data.get('rv', '') == 'kosher' || resource.data.get('rv', '') == 'kosher')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub', 'kosherFrom', 'kosherPub']);
+    }
+    // An edit to a recipe in For approval or Ready to release sends it back to Need to proofread, in the same save
+    function editedBack() {
+      return resource != null
+        && resource.data.get('rv', '') in ['approve', 'release'] && request.resource.data.get('rv', '') == 'proof'
+        && request.resource.data.get('rvUids', []).size() == 0;
     }
     // Admins may manage employees and public members, but never the owner or another admin.
     function canManage(uid) {
@@ -247,7 +272,8 @@ service cloud.firestore {
             && request.resource.data.get('deleted', false) == true
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'deletedAt', 'updated', 'mergedBy'])
             && mergeDrops(id) && extra('release'))
-        || (publishOk() && noRvChange())
+        || (publishOk() && (noRvChange() || editedBack()))
+        || kosherMove()
         // Recipe inboxes: proofreaders, approvers and releasers move a recipe along (rv); releasers choose public or team only
         || (resource != null && (extra('proofread') || extra('review') || extra('release'))
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog'])
@@ -413,7 +439,9 @@ service cloud.firestore {
       // The owner can change anyone. Admins can change employees and public members, but can't make admins.
       allow update: if (!('no' in resource.data) || request.resource.data.get('no', 0) == resource.data.no)
         && (isOwner()
-        || (isAdmin() && canManage(uid) && request.resource.data.get('role', 'public') in ['public', 'employee'])
+        || (isAdmin() && canManage(uid) && request.resource.data.get('role', 'public') in ['public', 'employee']
+            // "from" is how a password reset hands over a profile (and the owner's place): admins never set it
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['from']))
         // admins tidy up after a member's password reset (moved), on any profile but the owner's
         || (isAdmin() && uid != ownerUid() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['moved']))
         // the email link was tapped: the join request goes to the admin

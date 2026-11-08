@@ -1,6 +1,6 @@
 {
-  "web": "4.29",
+  "web": "4.30",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Names on changes only when you choose “Who changed what”."
+  "notes": "Safety fixes from the weekly check-up; opens faster on a weak signal."
 }
