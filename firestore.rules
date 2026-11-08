@@ -80,9 +80,11 @@ service cloud.firestore {
       let after = request.resource.data.get('rvUids', []);
       // the person moving it is written down (or it goes on the name of whoever asked)
       let noted = request.auth.uid in after || resource.data.get('rvAsk', []).size() > 0;
-      return (was == now && pubSame && after == before)
-        || (now == 'proof' && was in ['', 'proof', 'approve', 'release'] && after.size() == 0 && pubSame)
-        || (was == 'release' && now == 'approve' && pubSame && before.hasAll(after))
+      return (pubSame
+          && ((was == now && after == before)                                              // a note, nothing moves
+              || (now == 'proof' && was in ['', 'proof', 'approve', 'release'] && after.size() == 0)   // back to the start
+              || (was == 'release' && now == 'approve' && before.hasAll(after)))          // undo one step
+          && (extra('proofread') || extra('review') || extra('release')))
         || (was == 'proof' && now == 'approve' && pubSame && after.hasAll(before) && noted && extra('proofread'))
         || (was == 'approve' && now == 'release' && pubSame && after.hasAll(before) && noted
             && !(request.auth.uid in before) && extra('review'))
@@ -91,9 +93,10 @@ service cloud.firestore {
     }
     // Not kosher: only admins put a recipe there and take it out
     function kosherMove() {
-      return isAdmin()
+      return resource != null
         && (request.resource.data.get('rv', '') == 'kosher' || resource.data.get('rv', '') == 'kosher')
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub', 'kosherFrom', 'kosherPub']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub', 'kosherFrom', 'kosherPub'])
+        && isAdmin();
     }
     // An edit to a recipe in For approval or Ready to release sends it back to Need to proofread, in the same save
     function editedBack() {
@@ -272,13 +275,11 @@ service cloud.firestore {
             && request.resource.data.get('deleted', false) == true
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'deletedAt', 'updated', 'mergedBy'])
             && mergeDrops(id) && extra('release'))
-        || (publishOk() && (noRvChange() || editedBack()))
+        || ((noRvChange() || editedBack()) && publishOk())
         || kosherMove()
-        // Recipe inboxes: proofreaders, approvers and releasers move a recipe along (rv); releasers choose public or team only
-        || (resource != null && (extra('proofread') || extra('review') || extra('release'))
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog'])
-            && rvSteps())
-        || (resource != null && extra('release')
+        // Recipe inboxes: proofreaders, approvers and releasers move a recipe along (rv), one step at a time;
+        // releasers choose public or team only
+        || (resource != null
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub'])
             && rvSteps());
     }
