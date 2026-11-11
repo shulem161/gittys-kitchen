@@ -195,6 +195,25 @@ service cloud.firestore {
       allow create: if isTeam() && request.resource.data.rid is string
         && (request.resource.data.uid == request.auth.uid || request.resource.data.uid == '');
     }
+    // AI menus: each one made, and the 👍/👎 its maker gave it. Everyone signed in may read them (no names inside),
+    // so the AI can learn from the whole family; only the maker rates their own.
+    match /menuideas/{id} {
+      allow read: if approvedMember();
+      // an AI menu starts unrated; a menu someone made themselves (src own) counts as liked
+      allow create: if approvedMember() && request.resource.data.uid == request.auth.uid
+        && ((request.resource.data.v == 0 && request.resource.data.keys().hasOnly(['uid', 'at', 'request', 'courses', 'title', 'picks', 'v']))
+            || (request.resource.data.v == 1 && request.resource.data.get('src', '') == 'own' && id.matches('own-.*')
+                && request.resource.data.keys().hasOnly(['uid', 'at', 'request', 'title', 'picks', 'v', 'src'])))
+        && request.resource.data.request is string && request.resource.data.request.size() <= 300
+        && request.resource.data.picks is list && request.resource.data.picks.size() <= 12;
+      allow update: if approvedMember() && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid
+        && ((resource.data.get('src', '') != 'own'
+             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['v', 'reason', 'text', 'ratedAt'])
+             && request.resource.data.v in [1, -1] && request.resource.data.get('text', '') is string && request.resource.data.get('text', '').size() <= 300)
+          || (resource.data.get('src', '') == 'own'
+             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'request', 'picks', 'at'])
+             && request.resource.data.request.size() <= 300 && request.resource.data.picks is list && request.resource.data.picks.size() <= 12));
+    }
     match /meta/codes {
       allow get: if signedIn();
       allow write: if isAdmin() || extra('review');

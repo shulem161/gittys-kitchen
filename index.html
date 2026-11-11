@@ -640,6 +640,8 @@ body.guiding{overflow:hidden}
 .ib-steps.with-nk{grid-template-columns:repeat(4,minmax(0,1fr))}.ib-steps li.nk b{background:none;width:auto}.nk-box{margin-top:12px;display:grid;gap:8px}.nk-box textarea{width:100%}
 @media (max-width:560px){.ib-steps.with-nk{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .ai-add{display:grid;gap:6px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}.ai-add label{display:grid;gap:2px}.ai-add label span{font-size:14px;color:var(--muted)}.ai-add textarea{width:100%;box-sizing:border-box}
+.mn-rate{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 4px;padding:10px 12px;border-radius:12px;background:var(--accent-soft)}
+.mn-rate .btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:700}.mn-why{display:grid;gap:8px;width:100%}.mn-reasons{display:grid;gap:4px}.mn-why textarea{width:100%;box-sizing:border-box}
 .mg-drop{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-weight:600}.mg-drop input{margin-top:4px}
 .mg-base{display:grid;gap:6px;margin-top:8px}.mg-quick{align-items:center;margin-bottom:10px}.mg-quick span{font-size:14px;color:var(--muted)}
 .cmp-merge span{font-size:14px;color:var(--muted)}
@@ -1322,7 +1324,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.30";
+const WEB_VERSION = "4.31";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1360,6 +1362,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["menurate","4.31","2026-11-10","Like or dislike an AI menu, and the AI learns","Under every menu the AI makes there's 👍 and 👎 (with why). Every AI menu and its rating is kept, and so is every menu people put together themselves in My menus. The AI learns from all of them to make better menus. You see them all in Likes & dislikes.", false],
   ["safermove","4.30","2026-11-07","Removing a member happens all at once","When you remove a member, their name and their profile are taken away together, in one save. Before, if the connection dropped in between, the name was free while the profile was still there, and someone new could sign up with that name and get straight in.", false, "admin"],
   ["updaud","4.29","2026-11-06","Approve an update for admins, the team or everyone","When you approve an update you choose who gets it: admins only, admins and employees, or everyone (customers too), where it applies. You can change it later in Approved.", true, "admin"],
   ["blamechoice","4.29","2026-11-06","Names on changes only when you choose","Changes show plainly at first: green for added, red for taken out, no names. A “Show” drop-down chooses: Changes marked, Side by side, or Who changed what (each person's color and name). It remembers your choice, also in History.", false, "team"],
@@ -3156,6 +3159,13 @@ async function saveMenu(m){
   m.updated=Date.now(); MENUS[m.id]=m; store(uk("menus"), MENUS);
   const {id, ...doc}=m;
   try{ await db.collection("menus").doc(id).set(doc); }catch(e){ toast("Couldn't save. Check your connection."); }
+  learnFromMenu(m);
+}
+// A menu someone put together themselves teaches the AI what the family likes (kept with the AI menus)
+function learnFromMenu(m){
+  if(!feat("menurate") || !db || offline || m.uid!==me || viewingAs() || (m.items||[]).length<2) return;
+  const picks=(m.items||[]).slice(0,12).map(i=>({course:String(i.course||"").slice(0,40), rid:i.rid||"", name:String((RECIPES.find(r=>r.id===i.rid)||{}).t||"").replace(/^Untitled:\s*/,"").slice(0,80)}));
+  db.collection("menuideas").doc("own-"+m.id).set({uid:me, at:Date.now(), request:String(m.name||"").slice(0,300), title:String(m.name||"").slice(0,80), picks, v:1, src:"own"}).catch(()=>{});
 }
 function menuEditPage(id){
   const m=MENUS[id];
@@ -3454,15 +3464,32 @@ async function rateBox(r){
   draw();
 }
 // Admins: every recipe's likes and dislikes, with the reasons
+function menuIdeasHTML(L){
+  L=[...L];
+  const nameOf = u => ((members||[]).find(m=>m.uid===u)||{}).name || "Someone";
+  const own=L.filter(x=>x.src==="own"); L=L.filter(x=>x.src!=="own");
+  const up=L.filter(x=>x.v===1), down=L.filter(x=>x.v===-1);
+  const why=MENU_REASONS.map(([k,l])=>[l, down.filter(x=>x.reason===k).length]).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]);
+  const row=x=>`<li><div class="rate-top"><b>${x.v===1?"👍":x.v===-1?"👎":"·"} ${esc(x.title||"Menu")}</b><span class="hint">${esc(nameOf(x.uid))} · ${fmtDate(x.at)}</span></div>
+    <span class="hint">Asked: “${esc(x.request||"a menu")}” → ${esc((x.picks||[]).map(c=>c.name).filter(Boolean).join(", "))}</span>${x.v===-1?`<div><b>${esc(menuReasonText(x.reason))}</b>${x.text?`: ${esc(x.text)}`:""}</div>`:""}</li>`;
+  return `<div class="panel-a" id="mn-ideas"><h3>AI menus <span class="count">${L.length}</span></h3>
+    <p class="hint">${L.length} menus made · ${up.length} 👍 · ${down.length} 👎. The AI learns from these for the next menus.</p>
+    ${why.length?`<ul class="rate-reasons">${why.map(([l,n])=>`<li><span>${esc(l)}</span><b>${n}</b></li>`).join("")}</ul>`:""}
+    ${L.length?`<ul class="rate-list">${L.slice(0,40).map(row).join("")}</ul>`:`<p class="hint mempty">No AI menus yet.</p>`}
+    ${own.length?`<h3 style="margin-top:14px">Menus people made themselves <span class="count">${own.length}</span></h3><p class="hint">The AI learns from these too.</p>
+      <ul class="rate-list">${own.slice(0,30).map(x=>`<li><div class="rate-top"><b>🧑‍🍳 ${esc(x.title||"Menu")}</b><span class="hint">${esc(nameOf(x.uid))} · ${fmtDate(x.at)}</span></div><span class="hint">${esc((x.picks||[]).map(c=>c.name).filter(Boolean).join(", "))}</span></li>`).join("")}</ul>`:""}</div>`;
+}
 async function ratingsPage(){
   app.innerHTML=`<section class="wrap tools-page"><div class="section-head" style="margin-top:28px"><h2>Likes &amp; dislikes</h2><p>Loading…</p></div></section>`;
   let all=[]; try{ const s=await db.collection("ratings").get(); all=s.docs.map(d=>d.data()); }catch(e){}
+  let mids=[]; if(feat("menurate")){ try{ mids=(await db.collection("menuideas").get()).docs.map(d=>d.data()).sort((a,b)=>(b.at||0)-(a.at||0)); }catch(e){} }
   if(location.hash!=="#ratings") return;
   const by=new Map(); all.forEach(x=>{ if(!by.has(x.rid)) by.set(x.rid,[]); by.get(x.rid).push(x); });
   const rows=[...by.entries()].map(([rid,l])=>({r:RECIPES.find(x=>x.id===rid), up:l.filter(x=>x.v===1).length, down:l.filter(x=>x.v===-1)})).filter(x=>x.r).sort((a,b)=>b.down.length-a.down.length || b.up-a.up);
   const reasons=DISLIKE_REASONS.map(([k])=>[k, all.filter(x=>x.v===-1&&x.reason===k).length]).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]);
   app.innerHTML=`<section class="wrap tools-page">
     <div class="section-head" style="margin-top:28px"><h2>Likes &amp; dislikes</h2><p>${all.filter(x=>x.v===1).length} 👍 · ${all.filter(x=>x.v===-1).length} 👎 on ${rows.length} ${rows.length===1?"recipe":"recipes"}</p></div>
+    ${feat("menurate")?menuIdeasHTML(mids):""}
     ${reasons.length?`<div class="panel-a"><h3>Why people didn't like a recipe</h3><ul class="rate-reasons">${reasons.map(([k,n])=>`<li><span>${esc(reasonText(k))}</span><b>${n}</b></li>`).join("")}</ul></div>`:""}
     <div class="panel-a"><h3>By recipe</h3>${rows.length?`<ul class="rate-list">${rows.map(x=>`<li><div class="rate-top"><a class="link" href="#${esc(x.r.id)}">${esc(x.r.t.replace(/^Untitled: /,""))}</a><span>${x.up} 👍 · ${x.down.length} 👎</span></div>
       ${x.down.length?`<ul>${x.down.map(d=>`<li><b>${esc(reasonText(d.reason))}</b>${d.text?`: ${esc(d.text)}`:""} <span class="hint">– ${esc(d.name||"")}, ${fmtDate(d.at)}</span></li>`).join("")}</ul>`:""}</li>`).join("")}</ul>`:`<p class="hint">No likes or dislikes yet.</p>`}</div>
@@ -5826,6 +5853,23 @@ function localMenu(request, courses, avoid){
     courses: courses.map(c=>({course:c, recipeId:got[c]?got[c].id:null, name:got[c]?got[c].t:"Nothing in the cookbook fits", why:""}))};
 }
 let lastMenu=null;
+// Every AI menu is kept (menuideas): what was asked, what it chose, and later its 👍/👎 and why
+const MENU_REASONS = [["match","The dishes don't go together"],["ask","Not what I asked for"],["heavy","Too heavy or too much food"],["work","Too much work"],["dishes","I don't like these dishes"],["kosher","Meat and dairy problem"],["other","Something else"]];
+const menuReasonText = k => (MENU_REASONS.find(x=>x[0]===k)||["","Something else"])[1];
+async function menuLessons(){   // what everyone thought of earlier AI menus, for the next one
+  if(!feat("menurate") || !db || offline) return "";
+  try{
+    const s=await db.collection("menuideas").get();
+    const L=s.docs.map(d=>d.data()).filter(x=>x.v===1||x.v===-1).sort((a,b)=>(b.ratedAt||b.at||0)-(a.ratedAt||a.at||0)), mine=L.filter(x=>x.uid===who()), rest=L.filter(x=>x.uid!==who());
+    const pick=(f,n)=>[...mine.filter(f), ...rest.filter(f)].slice(0,n);
+    const dishes=x=>(x.picks||[]).map(c=>c.name).filter(Boolean).join(", ");
+    const good=pick(x=>x.v===1&&x.src!=="own",10), bad=pick(x=>x.v===-1,12), own=pick(x=>x.src==="own",10); if(!good.length && !bad.length && !own.length) return "";
+    return `\nWHAT THE FAMILY THOUGHT OF EARLIER MENUS (learn from it; the first ones are from the person asking now):
+${good.length?"LIKED:\n"+good.map(x=>`- "${x.request||"a menu"}": ${dishes(x)}`).join("\n"):""}
+${own.length?"MENUS PEOPLE PUT TOGETHER THEMSELVES (they chose these dishes):\n"+own.map(x=>`- "${x.title||"a menu"}": ${dishes(x)}`).join("\n")+"\n":""}${bad.length?"DISLIKED:\n"+bad.map(x=>`- "${x.request||"a menu"}": ${dishes(x)} (because: ${menuReasonText(x.reason)}${x.text?" – "+String(x.text).slice(0,120):""})`).join("\n"):""}
+Make menus more like the liked ones, and avoid what made people dislike the others.\n`;
+  }catch(e){ return ""; }
+}
 function menuPage(){
   const prev=store("gk-menu-q")||"";
   app.innerHTML = `<section class="wrap admin tools-page">
@@ -5857,7 +5901,8 @@ async function makeMenu(avoid){
   let menu=null, via="ai";
   if(!offline && FIREBASE_CONFIG){
     try{
-      const res=await askReader([menuPrompt(request, courses, onlyBook, avoid.map(id=>(RECIPES.find(r=>r.id===id)||{}).t).filter(Boolean), menuCatalog(RECIPES))]);
+      const lessons=await menuLessons();
+      const res=await askReader([menuPrompt(request, courses, onlyBook, avoid.map(id=>(RECIPES.find(r=>r.id===id)||{}).t).filter(Boolean), menuCatalog(RECIPES))+lessons]);
       const j=JSON.parse(res.response.text().trim().replace(/^```(?:json)?\s*/,"").replace(/```$/,""));
       if(j && Array.isArray(j.courses)) menu=j;
     }catch(e){ menu=null; }
@@ -5865,6 +5910,11 @@ async function makeMenu(avoid){
   if(!menu){ menu=localMenu(request, courses, avoid); via="local"; }
   menu.courses=(menu.courses||[]).map(c=>Object.assign(c,{recipeId: RECIPES.some(r=>r.id===c.recipeId) ? c.recipeId : null}));
   lastMenu={menu, opts:{request, courses, onlyBook}, via, avoid};
+  if(feat("menurate") && via==="ai" && db && !offline && !viewingAs()){
+    try{ const ref=db.collection("menuideas").doc(); lastMenu.logId=ref.id;
+      await ref.set({uid:me, at:Date.now(), request:request.slice(0,300), courses, title:String(menu.title||"").slice(0,80), v:0,
+        picks:menu.courses.map(c=>({course:String(c.course||"").slice(0,40), rid:c.recipeId||"", name:String(c.recipeId?((RECIPES.find(r=>r.id===c.recipeId)||{}).t||c.name||""):(c.name||"")).replace(/^Untitled:\s*/,"").slice(0,80)})).slice(0,12)}); }catch(e){}
+  }
   btn.disabled=false; btn.textContent="Make a menu";
   showMenu(menu, lastMenu.opts, via);
 }
@@ -5883,6 +5933,7 @@ function showMenu(menu, opts, via){
         ${c.why?`<p class="hint">${esc(c.why)}</p>`:""}</li>`; }).join("")}</ol>
     ${recs.length?`<p class="hint">Cooking time adds up to about ${fmtMinutes(mins)}${recs.some(r=>estMinutes(r).overnight)?", plus overnight":""} (if made one after the other).</p>`:""}
     ${via==="local"?`<p class="hint">Picked from the cookbook without AI, because the AI helper isn't available right now.</p>`:""}
+    ${feat("menurate")&&lastMenu&&lastMenu.logId?`<div class="mn-rate" id="mn-rate"><b>How's this menu?</b><button type="button" class="btn sm" data-mnv="1" aria-pressed="${lastMenu.v===1}">👍 Good</button><button type="button" class="btn sm" data-mnv="-1" aria-pressed="${lastMenu.v===-1}">👎 Not good</button>${lastMenu.v?`<span class="hint">Thanks – the AI learns from this.</span>`:""}</div>`:""}
     <div class="row mn-actions">${recs.length?`<button type="button" class="btn solid" id="mn-grocery">Add all to grocery list</button>`:""}<button type="button" class="btn" id="mn-again">Try another menu</button>${recs.length&&!offline?`<button type="button" class="btn" id="mn-save">Save as my menu</button>`:""}</div>
   </div>`;
   const ga=document.getElementById("mn-grocery");
@@ -5891,6 +5942,14 @@ function showMenu(menu, opts, via){
   if(ms) ms.onclick=async()=>{ ms.disabled=true; const ref=db.collection("menus").doc();
     const m={uid:actUid(), ownerName:actName(), name:(menu.title||"My menu").slice(0,60), items:menu.courses.filter(c=>c.recipeId&&RECIPES.some(r=>r.id===c.recipeId)).map(c=>({rid:c.recipeId, x:1, course:c.course||""})), shared:[], sharedNames:[], created:Date.now(), updated:Date.now()};
     try{ await ref.set(m); MENUS[ref.id]=Object.assign({id:ref.id}, m); toast("Saved to My menus"); location.hash="menu-"+ref.id; }catch(e){ ms.disabled=false; toast("Couldn't save. Check your connection."); } };
+  const rateBox=document.getElementById("mn-rate");
+  if(rateBox){ const save=async(v, reason, text)=>{ try{ await db.collection("menuideas").doc(lastMenu.logId).update({v, reason:reason||"", text:(text||"").slice(0,300), ratedAt:Date.now()}); lastMenu.v=v; toast(v===1?"Thanks! The AI will make more menus like this.":"Thanks. The AI will learn from it."); showMenu(menu, opts, via); }catch(e){ toast("Couldn't save. Check your connection."); } };
+    rateBox.querySelector('[data-mnv="1"]').onclick=()=>save(1);
+    rateBox.querySelector('[data-mnv="-1"]').onclick=()=>{ rateBox.innerHTML=`<form class="mn-why"><b>What wasn't good?</b><div class="mn-reasons">${MENU_REASONS.map(([k,l],i)=>`<label><input type="radio" name="mnr" value="${k}"${i?"":" checked"}> ${esc(l)}</label>`).join("")}</div>
+      <textarea rows="2" maxlength="300" placeholder="Tell us more (optional)"></textarea><div class="row"><button type="submit" class="btn solid sm">Send</button><button type="button" class="btn sm" data-x>Cancel</button></div></form>`;
+      const f=rateBox.querySelector("form"); f.querySelector("[data-x]").onclick=()=>showMenu(menu, opts, via);
+      f.onsubmit=e=>{ e.preventDefault(); save(-1, f.querySelector("input[name=mnr]:checked").value, f.querySelector("textarea").value.trim()); }; };
+  }
   document.getElementById("mn-again").onclick=()=>makeMenu([...(lastMenu&&lastMenu.avoid||[]), ...recs.map(r=>r.id)].slice(-30));
 }
 

@@ -377,6 +377,22 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     const mn = await A.locator('.mn-list li').count();
     ok('menu ideas gives a full menu', mn === 6, mn);
     ok('menu never mixes meat and dairy', !/mixes meat and dairy/.test(await A.locator('.mn-result').innerText()));
+    { await A.evaluate(() => { window.__ar = askReader; askReader = async () => ({response: {text: () => JSON.stringify({title: 'Test Shabbos menu', note: '', courses: [{course: 'Main', recipeId: 'r-challah', why: ''}, {course: 'Dessert', recipeId: 'r-boston-cream-pie', why: ''}]})}}); });
+      await A.click('#mnform .primary'); await A.waitForTimeout(1500);
+      const hasRate = (await A.locator('#mn-rate [data-mnv]').count()) === 2;
+      const logged = await A.evaluate(() => db.collection('menuideas').get().then(s => s.docs.some(d => d.data().title === 'Test Shabbos menu' && d.data().v === 0)));
+      await A.click('#mn-rate [data-mnv="-1"]'); await A.waitForTimeout(150); await A.check('#mn-rate input[value=match]'); await A.fill('#mn-rate textarea', 'Challah is not a main'); await A.click('#mn-rate button[type=submit]'); await A.waitForTimeout(600);
+      const rated = await A.evaluate(() => db.collection('menuideas').get().then(s => s.docs.some(d => d.data().title === 'Test Shabbos menu' && d.data().v === -1 && d.data().reason === 'match')));
+      ok('every AI menu is kept, and can get a 👍 or 👎 with why', hasRate && logged && rated, [hasRate, logged, rated]);
+      const lessons = await A.evaluate(() => menuLessons());
+      await A.evaluate(async () => { await saveMenu({id: 'mtest-learn', uid: me, ownerName: myName(), name: 'Hand-made Friday', items: [{rid: 'r-challah', x: 1, course: ''}, {rid: 'r-croissants', x: 1, course: ''}], shared: [], sharedNames: [], created: Date.now()}); }); await A.waitForTimeout(400);
+      const ownLearn = await A.evaluate(() => menuLessons());
+      ok('a menu someone makes themselves teaches the AI too', /PUT TOGETHER THEMSELVES/.test(ownLearn) && /Hand-made Friday/.test(ownLearn));
+      await A.evaluate(async () => { await db.collection('menus').doc('mtest-learn').delete(); delete MENUS['mtest-learn']; }); await A.waitForTimeout(300);
+      ok('…and the AI learns from it for the next menus', /DISLIKED/.test(lessons) && /dishes don't go together/.test(lessons) && /Challah is not a main/.test(lessons));
+      await A.evaluate(() => { askReader = window.__ar; });
+      await A.goto(F + '#ratings'); await A.waitForTimeout(800);
+      ok('…and Likes & dislikes shows every AI menu and why', /Test Shabbos menu/.test(await A.locator('#mn-ideas').innerText().catch(() => '')) && /don't go together/.test(await A.locator('#mn-ideas').innerText().catch(() => ''))); }
 
     // Fish label, recipe numbers, sections
     await A.goto(F + '#c-fish'); await A.waitForTimeout(400);
@@ -854,10 +870,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*17 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 17));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*18 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 18));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 17, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 18, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -865,7 +881,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.click('[data-updtab=wait]'); await A.waitForTimeout(200);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /16/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /17/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);

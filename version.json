@@ -1,6 +1,6 @@
 {
-  "web": "4.30",
+  "web": "4.31",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Safety fixes from the weekly check-up; opens faster on a weak signal."
+  "notes": "Like or dislike an AI menu; the AI learns from everyone's ratings."
 }
