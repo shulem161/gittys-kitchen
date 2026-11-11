@@ -416,6 +416,19 @@ await check('everyone signed in can read them, so the AI can learn', assertSucce
 await check('an admin chooses who sees the names', assertSucceeds(setDoc(doc(OWN, 'meta', 'menunames'), { show: 'none' })));
 await check("…an employee can't", assertFails(setDoc(doc(E9, 'meta', 'menunames'), { show: 'ratings' })));
 
+// "Edit recipes directly": one employee may edit the recipe itself, nothing else
+await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
+  await setDoc(doc(d, 'users', 'ed2'), { name: 'Ed Two', status: 'approved', role: 'employee', perms: { editdirect: true }, created: 1, favs: [] });
+  await setDoc(doc(d, 'recipes', 'r-ed2'), { t: 'Ed', c: 'Cakes', pub: false, deleted: false, s: [] }); });
+const ED2 = as('ed2');
+await check('an employee given “Edit recipes directly” can edit a recipe', assertSucceeds(updateDoc(doc(ED2, 'recipes', 'r-ed2'), { t: 'Ed 2', n: 'note', updated: 2 })));
+await check("…but can't make it public", assertFails(updateDoc(doc(ED2, 'recipes', 'r-ed2'), { pub: true })));
+await check("…nor move it to another category", assertFails(updateDoc(doc(ED2, 'recipes', 'r-ed2'), { c: 'Bread' })));
+await check("…nor delete it", assertFails(updateDoc(doc(ED2, 'recipes', 'r-ed2'), { deleted: true })));
+await check("…nor add a new recipe directly", assertFails(setDoc(doc(ED2, 'recipes', 'r-new-ed2'), { t: 'New', c: 'Cakes', pub: false })));
+await check("an employee without it can't edit", assertFails(updateDoc(doc(E9, 'recipes', 'r-ed2'), { t: 'X' })));
+await check("…nor one who only had the old edit permission", assertFails(updateDoc(doc(as('ed'), 'recipes', 'r-ed2'), { t: 'X' })));
+
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(`::notice::Rule checks: ${pass} passed, ${fail} failed`);

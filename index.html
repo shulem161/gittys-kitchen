@@ -1303,13 +1303,16 @@ const PUB_ALLOW = [["suggest","Suggest changes and send new recipes"],["photos",
 let PUB = {allow:{}, cats:{}};
 // Employees: each person has their own permissions (users/{uid}.perms). The everyday ones are on unless switched off;
 // the extras are off unless granted. Public members all share the Customer portal settings. Admins can do everything.
-const EXTRA_PERMS = [["proofread","Proofread recipes (the Need to proofread inbox)"],["review","Approve recipes and photos (the For approval inbox)"],["release","Release approved recipes, to the public or for the team only (the Ready to release inbox)"],["answer","Recipe requests: see them, answer them, and get a notice for new ones"],["inbox","Read and answer suggestions & comments"],["viewas","Log in as a customer, to see exactly what they see"],["ratings","Likes and dislikes: see them, and get a notice for each one"]];
+const EXTRA_PERMS = [["editdirect","Edit recipes directly, without sending a request (not delete, move or make public)"],["proofread","Proofread recipes (the Need to proofread inbox)"],["review","Approve recipes and photos (the For approval inbox)"],["release","Release approved recipes, to the public or for the team only (the Ready to release inbox)"],["answer","Recipe requests: see them, answer them, and get a notice for new ones"],["inbox","Read and answer suggestions & comments"],["viewas","Log in as a customer, to see exactly what they see"],["ratings","Likes and dislikes: see them, and get a notice for each one"]];
 const isExtra = k => EXTRA_PERMS.some(x=>x[0]===k);
+const extraPerms = () => EXTRA_PERMS.filter(([k])=>k!=="editdirect" || feat("empedit"));
 // Employee settings (meta/employees) apply to every employee; a person's own Permissions override them.
 let EMP = {allow:{}};
 const empDefault = k => EMP.allow[k]!==undefined ? EMP.allow[k]===true : !isExtra(k);
 const permOf = (m,k) => { const p=(m&&m.perms)||{}; return p[k]!==undefined ? p[k]===true : empDefault(k); };
-const may = k => { if(isAdmin()) return true; if(!profile || k==="edit") return false;   // only admins edit recipes
+const may = k => { if(isAdmin()) return true; if(!profile) return false;
+  if(k==="editdirect" && !feat("empedit")) return false;
+  if(k==="edit") return !isPublic() && feat("empedit") && may("editdirect");   // admins, and employees given “Edit recipes directly”
   if(isPublic()) return !isExtra(k) && PUB.allow[k]!==false;
   return viewingAs()==="employee" ? (VIEW_WHO ? permOf({perms:VIEW_WHO.perms||{}}, k) : empDefault(k)) : permOf(profile, k); };
 const can = may;
@@ -1325,7 +1328,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.31";
+const WEB_VERSION = "4.32";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1363,6 +1366,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["empedit","4.32","2026-11-11","Let one employee edit recipes directly","In Employee settings there's a new extra privilege, “Edit recipes directly”. An employee you give it to edits recipes straight away instead of sending a request. They still can't delete recipes, move them to another category or make them public.", false, "team"],
   ["menurate","4.31","2026-11-10","Like or dislike an AI menu, and the AI learns","Under every menu the AI makes there's 👍 and 👎 (with why). Every AI menu and its rating is kept, and so is every menu people put together themselves in My menus. The AI learns from all of them to make better menus. You see them all in Likes & dislikes.", false],
   ["safermove","4.30","2026-11-07","Removing a member happens all at once","When you remove a member, their name and their profile are taken away together, in one save. Before, if the connection dropped in between, the name was free while the profile was still there, and someone new could sign up with that name and get straight in.", false, "admin"],
   ["updaud","4.29","2026-11-06","Approve an update for admins, the team or everyone","When you approve an update you choose who gets it: admins only, admins and employees, or everyone (customers too), where it applies. You can change it later in Approved.", true, "admin"],
@@ -2348,7 +2352,7 @@ function adminPage(){
   const permRow = (m,[k,l]) => `<label class="pub-row"><input type="checkbox" data-pk="${k}" data-pu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span>${esc(l)}${(m.perms||{})[k]!==undefined?' <small class="perm-own">only for this person</small>':""}</span></label>`;
   const permsBox = m => `<div class="permbox" data-pbox="${esc(m.uid)}"><p class="hint">What ${esc(m.name)} may do. Starts from <a class="link" href="#employees">Employee settings</a>; changes here are only for this person.</p>
     <div class="perm-h">Everyday</div>${PUB_ALLOW.map(x=>permRow(m,x)).join("")}
-    <div class="perm-h">Extra</div>${EXTRA_PERMS.map(x=>permRow(m,x)).join("")}
+    <div class="perm-h">Extra</div>${extraPerms().map(x=>permRow(m,x)).join("")}
     ${Object.keys(m.perms||{}).length?`<button type="button" class="link" data-preset="${esc(m.uid)}" style="margin-top:6px;font-size:13px">Use Employee settings for everything</button>`:""}</div>`;
   app.innerHTML = `<section class="wrap admin">
     <div class="section-head" style="margin-top:28px"><h2>Approve members</h2><p>${members.length} ${members.length===1?"profile":"profiles"}</p></div>
@@ -2411,7 +2415,7 @@ function fitPermBox(){
 }
 addEventListener("resize", ()=>{ if(document.querySelector(".perms-wrap")) fitPermBox(); });
 addEventListener("load", ()=>{ if(document.querySelector(".perms-wrap")) fitPermBox(); });
-const ALL_PERMS = () => [...PUB_ALLOW, ...EXTRA_PERMS.filter(([k])=>!isInboxPerm(k))];
+const ALL_PERMS = () => [...PUB_ALLOW, ...extraPerms().filter(([k])=>!isInboxPerm(k))];
 const PERM_SHORT = {suggest:"Suggest", photos:"Photos", requests:"Ask for recipes", ai:"AI tools", feedback:"Comments", edit:"Edit directly", proofread:"1. Proofread", review:"2. Approve", release:"3. Release", answer:"Answer requests", inbox:"Comments inbox", viewas:"Log in as customer", ratings:"Likes"};
 // One tick per person and permission (Employee settings, Inbox settings)
 function wirePermTable(redraw){
@@ -2422,7 +2426,7 @@ function wirePermTable(redraw){
 }
 function employeesPage(){
   const emps = members.filter(m=>m.status==="approved" && roleOf(m)==="employee").sort((a,b)=>byName(a.name,b.name)), own = emps.filter(m=>Object.keys(m.perms||{}).length);
-  const perms=[["Everyday",PUB_ALLOW],["Extra",EXTRA_PERMS.filter(([k])=>!isInboxPerm(k))]];
+  const perms=[["Everyday",PUB_ALLOW],["Extra",extraPerms().filter(([k])=>!isInboxPerm(k))]];
   app.innerHTML = `<section class="wrap admin">
     <div class="section-head" style="margin-top:28px"><h2>Employee settings</h2><p>What employees may do</p></div>
     <div class="panel-a"><p class="hint">Tick what each employee may do. <b>All employees</b> is the starting point for everyone; a <span class="perm-dot">●</span> marks a person's own setting. Who may use each inbox is in <a class="link" href="#inbox-settings">Inbox settings</a>.</p>
@@ -3966,18 +3970,18 @@ function editor(r, cat, sub, draft){
         <div class="field"><label for="ed-t">Recipe name</label><input id="ed-t" type="text" maxlength="80" value="${esc(src?src.t:(rqDraft&&rqDraft.t)||"")}" placeholder="e.g. Potato Kugel"></div>
         <div class="row2">
           <div class="field"><label for="ed-c">Category</label>
-            <select id="ed-c">${catList.map(c=>`<option ${c===catNow?"selected":""}>${esc(c)}</option>`).join("")}<option value="__new">New category…</option></select>
+            <select id="ed-c"${!isAdmin()&&!suggest?" disabled":""}>${catList.map(c=>`<option ${c===catNow?"selected":""}>${esc(c)}</option>`).join("")}<option value="__new">New category…</option></select>
             <input id="ed-cn" type="text" maxlength="30" placeholder="New category name" hidden></div>
           <div class="field"><label for="ed-by">From (optional)</label><input id="ed-by" type="text" maxlength="40" value="${esc(src?src.by:(suggest?myName():""))}" placeholder="e.g. Bobby"></div>
         </div>
         <div class="field"><label for="ed-k">Meat or dairy</label>
           <select id="ed-k">${[["","Automatic"],["meat","Meat"],["dairy","Dairy"],["fish","Fish"],["other","None of these"]].map(([v,l])=>`<option value="${v}" ${(src&&src.kind||"")===v?"selected":""}>${v?l:`${l}: ${({fish:"fish",meat:"meat",dairy:"dairy",other:"neither"})[autoKind(src||{c:catNow,s:[]})]}`}</option>`).join("")}</select>
           <p class="hint">Automatic goes by the category and ingredients. Choose one if it's wrong.</p></div>
-        <div class="field"><label for="ed-sec">Section (optional)</label><input id="ed-sec" type="text" maxlength="40" list="ed-sec-list" value="${esc(src&&src.sec||"")}" placeholder="e.g. Kugel, inside Pesach"><datalist id="ed-sec-list">${[...new Set(RECIPES.map(x=>x.sec).filter(Boolean))].map(s=>`<option value="${esc(s)}">`).join("")}</datalist></div>
+        <div class="field"><label for="ed-sec">Section (optional)</label><input id="ed-sec" type="text" maxlength="40"${!isAdmin()&&!suggest?" disabled":""} list="ed-sec-list" value="${esc(src&&src.sec||"")}" placeholder="e.g. Kugel, inside Pesach"><datalist id="ed-sec-list">${[...new Set(RECIPES.map(x=>x.sec).filter(Boolean))].map(s=>`<option value="${esc(s)}">`).join("")}</datalist></div>
         <div class="field"><label for="ed-serves">Serves</label><input id="ed-serves" type="text" maxlength="40" value="${esc(src&&src.serves||"")}" placeholder="A number like 8 or 6–8, or e.g. Makes 3 dozen"><p class="hint">How many people it serves, or how much it makes.</p></div>
         <div class="field"><label for="ed-time">Time to make (optional)</label><input id="ed-time" type="text" maxlength="40" value="${esc(src&&src.time||"")}" placeholder="Leave empty for an estimate (${src?esc(timeText(Object.assign({},src,{time:""}))):"worked out from the steps"})"></div>
         <div class="field"><label for="ed-n">Note (optional)</label><textarea id="ed-n" rows="2">${esc(src&&src.n?src.n:"")}</textarea></div>
-        ${suggest?"":`<label class="pub-row"><input type="checkbox" id="ed-pub" ${(r ? pubVisible(r) : target ? pubVisible(target) : pubDefault(catNow))?"checked":""}><span>Live: public members can see this recipe</span></label>`}
+        ${suggest||!isAdmin()?"":`<label class="pub-row"><input type="checkbox" id="ed-pub" ${(r ? pubVisible(r) : target ? pubVisible(target) : pubDefault(catNow))?"checked":""}><span>Live: public members can see this recipe</span></label>`}
         <div class="field"><label for="ed-pre-q">Make first (optional)</label>
           <div class="pre-chips" id="ed-pre">${pre.map(id=>{ const x=RECIPES.find(y=>y.id===id); return `<span class="chip pre-chip">${esc(x.t)}<button type="button" data-unpre="${esc(id)}" aria-label="Remove ${esc(x.t)}">✕</button></span>`; }).join("")}</div>
           <input id="ed-pre-q" type="text" autocomplete="off" placeholder="${feat("codepick")?"Type a recipe name or item number…":"Type a recipe name to link it…"}">
@@ -4007,7 +4011,7 @@ function editor(r, cat, sub, draft){
         <p class="err" id="ed-err" role="alert" hidden></p>
         <div class="ed-actions">
           <button class="primary" type="submit">${sub?"Save changes":suggest?(editOf?"Send the request":"Send to be proofread"):isNew?"Add recipe":"Save changes"}</button>
-          ${isNew||suggest?"":`<button type="button" class="btn danger-btn" id="ed-del">Delete recipe</button>`}
+          ${isNew||suggest||!isAdmin()?"":`<button type="button" class="btn danger-btn" id="ed-del">Delete recipe</button>`}
         </div>
         <div id="ed-confirm"></div>
       </form></section>`;
@@ -4129,6 +4133,11 @@ function editor(r, cat, sub, draft){
         withHistory(rec, base, sub ? (sub.editOf&&base?"changed":"added") : (base?"changed":"added"), sub ? sub.byName : myName()); }
       const btn=F.querySelector(".primary"); btn.disabled=true; btn.textContent="Saving…";
       try{
+        if(!isAdmin() && r){   // an employee allowed to edit directly: only the recipe itself changes
+          const d=toDoc(Object.assign({}, rec, {c:r.c, sec:r.sec||""}));
+          await db.collection("recipes").doc(id).update(Object.assign({t:d.t, by:d.by, n:d.n, pre:d.pre, kind:d.kind, time:d.time, serves:d.serves, s:d.s, updated:Date.now()}, d.history?{history:d.history}:{}));
+          const eb=editedBack(r, Date.now()); if(eb) await db.collection("recipes").doc(id).update(eb);
+        } else
         await db.collection("recipes").doc(id).set(Object.assign(toDoc(rec), editedBack(r||target, Date.now())||{}), {merge:true});
         { const b=r||target; if(b && !(await db.collection("versions").where("rid","==",b.id).get().then(q=>q.size).catch(()=>1))) await saveVersion(b, "Before this history was kept", {by:"", uid:""});
           await saveVersion(rec, b?"Edited":"Added"); }

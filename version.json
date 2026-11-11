@@ -1,6 +1,6 @@
 {
-  "web": "4.31",
+  "web": "4.32",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Like or dislike an AI menu; the AI learns from everyone's ratings."
+  "notes": "Employee settings: let one employee edit recipes directly."
 }
