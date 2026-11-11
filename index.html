@@ -640,6 +640,7 @@ body.guiding{overflow:hidden}
 .ib-steps.with-nk{grid-template-columns:repeat(4,minmax(0,1fr))}.ib-steps li.nk b{background:none;width:auto}.nk-box{margin-top:12px;display:grid;gap:8px}.nk-box textarea{width:100%}
 @media (max-width:560px){.ib-steps.with-nk{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .ai-add{display:grid;gap:6px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}.ai-add label{display:grid;gap:2px}.ai-add label span{font-size:14px;color:var(--muted)}.ai-add textarea{width:100%;box-sizing:border-box}
+.mn-names-l{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-weight:600}.mn-names-l select{font:inherit;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink)}
 .mn-rate{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 4px;padding:10px 12px;border-radius:12px;background:var(--accent-soft)}
 .mn-rate .btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:700}.mn-why{display:grid;gap:8px;width:100%}.mn-reasons{display:grid;gap:4px}.mn-why textarea{width:100%;box-sizing:border-box}
 .mg-drop{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-weight:600}.mg-drop input{margin-top:4px}
@@ -3466,23 +3467,23 @@ async function rateBox(r){
 // Admins: every recipe's likes and dislikes, with the reasons
 function menuIdeasHTML(L){
   L=[...L];
-  const nameOf = u => ((members||[]).find(m=>m.uid===u)||{}).name || "Someone";
+  const nameOf = u => seeMenuNames() ? (((members||[]).find(m=>m.uid===u)||{}).name || "Someone") : "Someone";
   const own=L.filter(x=>x.src==="own"); L=L.filter(x=>x.src!=="own");
   const up=L.filter(x=>x.v===1), down=L.filter(x=>x.v===-1);
   const why=MENU_REASONS.map(([k,l])=>[l, down.filter(x=>x.reason===k).length]).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]);
-  const row=x=>`<li><div class="rate-top"><b>${x.v===1?"👍":x.v===-1?"👎":"·"} ${esc(x.title||"Menu")}</b><span class="hint">${esc(nameOf(x.uid))} · ${fmtDate(x.at)}</span></div>
+  const row=x=>`<li><div class="rate-top"><b>${x.v===1?"👍":x.v===-1?"👎":"·"} ${esc(x.title||"Menu")}</b><span class="hint">${seeMenuNames()?esc(nameOf(x.uid))+" · ":""}${fmtDate(x.at)}</span></div>
     <span class="hint">Asked: “${esc(x.request||"a menu")}” → ${esc((x.picks||[]).map(c=>c.name).filter(Boolean).join(", "))}</span>${x.v===-1?`<div><b>${esc(menuReasonText(x.reason))}</b>${x.text?`: ${esc(x.text)}`:""}</div>`:""}</li>`;
   return `<div class="panel-a" id="mn-ideas"><h3>AI menus <span class="count">${L.length}</span></h3>
     <p class="hint">${L.length} menus made · ${up.length} 👍 · ${down.length} 👎. The AI learns from these for the next menus.</p>
     ${why.length?`<ul class="rate-reasons">${why.map(([l,n])=>`<li><span>${esc(l)}</span><b>${n}</b></li>`).join("")}</ul>`:""}
     ${L.length?`<ul class="rate-list">${L.slice(0,40).map(row).join("")}</ul>`:`<p class="hint mempty">No AI menus yet.</p>`}
     ${own.length?`<h3 style="margin-top:14px">Menus people made themselves <span class="count">${own.length}</span></h3><p class="hint">The AI learns from these too.</p>
-      <ul class="rate-list">${own.slice(0,30).map(x=>`<li><div class="rate-top"><b>🧑‍🍳 ${esc(x.title||"Menu")}</b><span class="hint">${esc(nameOf(x.uid))} · ${fmtDate(x.at)}</span></div><span class="hint">${esc((x.picks||[]).map(c=>c.name).filter(Boolean).join(", "))}</span></li>`).join("")}</ul>`:""}</div>`;
+      <ul class="rate-list">${own.slice(0,30).map(x=>`<li><div class="rate-top"><b>🧑‍🍳 ${esc(x.title||"Menu")}</b><span class="hint">${seeMenuNames()?esc(nameOf(x.uid))+" · ":""}${fmtDate(x.at)}</span></div><span class="hint">${esc((x.picks||[]).map(c=>c.name).filter(Boolean).join(", "))}</span></li>`).join("")}</ul>`:""}</div>`;
 }
 async function ratingsPage(){
   app.innerHTML=`<section class="wrap tools-page"><div class="section-head" style="margin-top:28px"><h2>Likes &amp; dislikes</h2><p>Loading…</p></div></section>`;
   let all=[]; try{ const s=await db.collection("ratings").get(); all=s.docs.map(d=>d.data()); }catch(e){}
-  let mids=[]; if(feat("menurate")){ try{ mids=(await db.collection("menuideas").get()).docs.map(d=>d.data()).sort((a,b)=>(b.at||0)-(a.at||0)); }catch(e){} }
+  let mids=[]; if(feat("menurate")){ await loadMenuNames(); try{ mids=(await db.collection("menuideas").get()).docs.map(d=>d.data()).sort((a,b)=>(b.at||0)-(a.at||0)); }catch(e){} }
   if(location.hash!=="#ratings") return;
   const by=new Map(); all.forEach(x=>{ if(!by.has(x.rid)) by.set(x.rid,[]); by.get(x.rid).push(x); });
   const rows=[...by.entries()].map(([rid,l])=>({r:RECIPES.find(x=>x.id===rid), up:l.filter(x=>x.v===1).length, down:l.filter(x=>x.v===-1)})).filter(x=>x.r).sort((a,b)=>b.down.length-a.down.length || b.up-a.up);
@@ -5855,6 +5856,11 @@ function localMenu(request, courses, avoid){
 let lastMenu=null;
 // Every AI menu is kept (menuideas): what was asked, what it chose, and later its 👍/👎 and why
 const MENU_REASONS = [["match","The dishes don't go together"],["ask","Not what I asked for"],["heavy","Too heavy or too much food"],["work","Too much work"],["dishes","I don't like these dishes"],["kosher","Meat and dairy problem"],["other","Something else"]];
+// Who sees the names on AI menus in Likes & dislikes (meta/menunames, chosen in Inbox settings). The AI never sees names.
+let MENU_NAMES = "admin";
+const MENU_NAME_OPTS = [["none","Nobody"],["owner","Only the owner"],["admin","Admins"],["ratings","Everyone who can see Likes & dislikes"]];
+const seeMenuNames = () => MENU_NAMES==="ratings" ? may("ratings") : MENU_NAMES==="admin" ? isAdmin() : MENU_NAMES==="owner" ? isOwner() : false;
+async function loadMenuNames(){ try{ const s=await db.collection("meta").doc("menunames").get(); MENU_NAMES = s.exists && MENU_NAME_OPTS.some(o=>o[0]===s.data().show) ? s.data().show : "admin"; }catch(e){} }
 const menuReasonText = k => (MENU_REASONS.find(x=>x[0]===k)||["","Something else"])[1];
 async function menuLessons(){   // what everyone thought of earlier AI menus, for the next one
   if(!feat("menurate") || !db || offline) return "";
@@ -6173,9 +6179,15 @@ function inboxSettings(){
       <thead><tr><th>Inbox</th><th>All employees</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
       <tbody>${INBOX_PERMS.map(([k,l])=>`<tr><th>${esc(l)}</th><td><label class="ibs-c"><input type="checkbox" data-ea="${k}" ${empDefault(k)?"checked":""}><span class="sr">All employees: ${esc(l)}</span></label></td>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="perms-hint" hidden>Swipe inside the table to see everything: up and down, and side to side for more people.</p>`
       :`<p class="hint">No employees yet.</p>`}
-      <p class="hint" style="margin-top:8px">“All employees” is for everyone who has nothing of their own set; a <span class="perm-dot">●</span> marks a person's own setting. Admins${admins.length?` (${admins.map(m=>esc(m.name)).join(", ")})`:""} can always use every inbox. To make someone an admin or an employee, use <a class="link" href="#admin">Members</a>.</p></div>
+      <p class="hint" style="margin-top:8px" data-ibs-note>“All employees” is for everyone who has nothing of their own set; a <span class="perm-dot">●</span> marks a person's own setting. Admins${admins.length?` (${admins.map(m=>esc(m.name)).join(", ")})`:""} can always use every inbox. To make someone an admin or an employee, use <a class="link" href="#admin">Members</a>.</p></div>
+    ${feat("menurate")?`<div class="panel-a" id="mn-names"><h3>AI menus: who sees who made each menu</h3>
+      <p class="hint">In Likes &amp; dislikes, next to each AI menu and each menu people made themselves. The AI itself never sees names.</p>
+      <label class="mn-names-l">Show the names to <select id="mn-names-sel">${MENU_NAME_OPTS.map(([k,l])=>`<option value="${k}"${MENU_NAMES===k?" selected":""}>${esc(l)}</option>`).join("")}</select></label></div>`:""}
   </section>`;
   fitPermBox();
+  const mns=document.getElementById("mn-names-sel");
+  if(mns){ if(!inboxSettings.loaded){ inboxSettings.loaded=1; loadMenuNames().then(()=>{ if(location.hash==="#inbox-settings"){ const x=document.getElementById("mn-names-sel"); if(x) x.value=MENU_NAMES; } }); }
+    mns.onchange=async()=>{ try{ await db.collection("meta").doc("menunames").set({show:mns.value}); MENU_NAMES=mns.value; toast("Saved: "+(MENU_NAME_OPTS.find(o=>o[0]===mns.value)||[])[1]); }catch(e){ toast("Couldn't save. Check your connection."); mns.value=MENU_NAMES; } }; }
   const redraw=()=>{ const y=window.scrollY, w=app.querySelector(".perms-wrap"), wy=w?w.scrollTop:0, wx=w?w.scrollLeft:0; inboxSettings(); window.scrollTo(0,y); const w2=app.querySelector(".perms-wrap"); if(w2){ w2.scrollTop=wy; w2.scrollLeft=wx; } };
   wirePermTable(redraw);
   app.querySelectorAll("[data-ea]").forEach(c=>c.onchange=async()=>{ const d={allow:Object.assign({},EMP.allow,{[c.dataset.ea]:c.checked})};

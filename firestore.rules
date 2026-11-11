@@ -214,6 +214,12 @@ service cloud.firestore {
              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'request', 'picks', 'at'])
              && request.resource.data.request.size() <= 300 && request.resource.data.picks is list && request.resource.data.picks.size() <= 12));
     }
+    // Who sees the names on AI menus (Inbox settings). Admins choose.
+    match /meta/menunames {
+      allow get: if approvedMember();
+      allow write: if isAdmin() && request.resource.data.keys().hasOnly(['show'])
+        && request.resource.data.show in ['none', 'owner', 'admin', 'ratings'];
+    }
     match /meta/codes {
       allow get: if signedIn();
       allow write: if isAdmin() || extra('review');

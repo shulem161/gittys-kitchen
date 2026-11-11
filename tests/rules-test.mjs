@@ -403,6 +403,19 @@ await check("…but not change it afterwards", assertFails(updateDoc(doc(E9, 've
 await check("…nor save one in someone else's name", assertFails(setDoc(doc(E9, 'versions', 'v2'), { rid: 'r-eb', uid: 'own', by: 'Owner', at: 1, s: [] })));
 await check("customers can't see the history", assertFails(getDoc(doc(C9, 'versions', 'v1'))));
 
+// AI menus: kept for the AI to learn from; each person rates only their own
+await check('anyone signed in can keep an AI menu they made', assertSucceeds(setDoc(doc(C9, 'menuideas', 'mi1'), { uid: 'c9', at: 1, request: 'chicken', courses: ['Main'], title: 'T', picks: [], v: 0 })));
+await check('…and rate it', assertSucceeds(updateDoc(doc(C9, 'menuideas', 'mi1'), { v: -1, reason: 'match', text: 'no', ratedAt: 2 })));
+await check("…but not rate someone else's", assertFails(updateDoc(doc(E9, 'menuideas', 'mi1'), { v: 1, ratedAt: 3 })));
+await check("…nor keep one in someone else's name", assertFails(setDoc(doc(E9, 'menuideas', 'mi2'), { uid: 'c9', at: 1, request: 'x', courses: [], title: 'T', picks: [], v: 0 })));
+await check("…nor add a made-up rating when keeping it", assertFails(setDoc(doc(E9, 'menuideas', 'mi3'), { uid: 'e9', at: 1, request: 'x', courses: [], title: 'T', picks: [], v: 1 })));
+await check('a menu someone made themselves counts as liked', assertSucceeds(setDoc(doc(E9, 'menuideas', 'own-m1'), { uid: 'e9', at: 1, request: 'Friday', title: 'Friday', picks: [], v: 1, src: 'own' })));
+await check('…and stays up to date when they change it', assertSucceeds(setDoc(doc(E9, 'menuideas', 'own-m1'), { uid: 'e9', at: 2, request: 'Friday night', title: 'Friday night', picks: [], v: 1, src: 'own' })));
+await check("…but can't be turned into a dislike", assertFails(updateDoc(doc(E9, 'menuideas', 'own-m1'), { v: -1 })));
+await check('everyone signed in can read them, so the AI can learn', assertSucceeds(getDoc(doc(C9, 'menuideas', 'own-m1'))));
+await check('an admin chooses who sees the names', assertSucceeds(setDoc(doc(OWN, 'meta', 'menunames'), { show: 'none' })));
+await check("…an employee can't", assertFails(setDoc(doc(E9, 'meta', 'menunames'), { show: 'ratings' })));
+
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(`::notice::Rule checks: ${pass} passed, ${fail} failed`);

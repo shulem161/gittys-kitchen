@@ -392,6 +392,12 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       ok('…and the AI learns from it for the next menus', /DISLIKED/.test(lessons) && /dishes don't go together/.test(lessons) && /Challah is not a main/.test(lessons));
       await A.evaluate(() => { askReader = window.__ar; });
       await A.goto(F + '#ratings'); await A.waitForTimeout(800);
+      const named = /Shulem/.test(await A.locator('#mn-ideas').innerText().catch(() => ''));
+      await A.goto(F + '#inbox-settings'); await A.waitForTimeout(600); await A.selectOption('#mn-names-sel', 'none'); await A.waitForTimeout(500);
+      await A.goto(F + '#ratings'); await A.waitForTimeout(800);
+      ok('Inbox settings chooses who sees who made each menu (admins at first; here: nobody)', named && !/Shulem/.test(await A.locator('#mn-ideas').innerText().catch(() => '')));
+      await A.goto(F + '#inbox-settings'); await A.waitForTimeout(500); await A.selectOption('#mn-names-sel', 'admin'); await A.waitForTimeout(400);
+      await A.goto(F + '#ratings'); await A.waitForTimeout(800);
       ok('…and Likes & dislikes shows every AI menu and why', /Test Shabbos menu/.test(await A.locator('#mn-ideas').innerText().catch(() => '')) && /don't go together/.test(await A.locator('#mn-ideas').innerText().catch(() => ''))); }
 
     // Fish label, recipe numbers, sections
@@ -1028,7 +1034,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#r-croissants'); await A.waitForTimeout(800); await A.reload(); await A.waitForTimeout(1200);
     ok('admins see the likes, dislikes and reasons on the recipe', /0 👍 · 1 👎/.test(await A.locator('.rate-admin').innerText()) && /Too sweet for us/.test(await A.locator('.rate-admin').innerText()));
     await A.goto(F + '#ratings'); await A.waitForTimeout(800);
-    ok('…and all of them on Likes & dislikes', /Croissants/.test(await A.locator('.rate-list').innerText()) && /Something else/.test(await A.locator('.rate-reasons').innerText()));
+    ok('…and all of them on Likes & dislikes', /Croissants/.test(await A.locator('.panel-a:not(#mn-ideas) .rate-list').innerText()) && /Something else/.test(await A.locator('.panel-a:not(#mn-ideas) .rate-reasons').innerText()));
     // Chosen employees see likes and dislikes, and get a notice for each
     await A.goto(F + '#admin'); await A.waitForTimeout(500);
     await A.goto(F); await A.waitForTimeout(300); await perm(A, vuid, 'ratings', true, 4500);
