@@ -222,7 +222,7 @@ service cloud.firestore {
     }
     match /meta/codes {
       allow get: if signedIn();
-      allow write: if isAdmin() || extra('review') || extra('move');
+      allow write: if isAdmin() || extra('review') || extra('moverec');
     }
 
     // Who the owner is and the name shown for them. Only the owner can change it, and only to themselves.
@@ -310,7 +310,7 @@ service cloud.firestore {
         // Employees given "Edit recipes directly": the recipe itself only, never where it is, who sees it or whether it's deleted
         || (resource != null && request.resource.data.get('deleted', false) == true && resource.data.get('deleted', false) == false
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'deletedAt', 'updated']) && extra('del'))
-        || (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['c', 'sec', 'code', 'oldCodes', 'history', 'updated']) && extra('move'))
+        || (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['c', 'sec', 'code', 'oldCodes', 'history', 'updated']) && extra('moverec'))
         || (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pub', 'updated']) && extra('pub'))
         || (resource != null && (resource.data.get('rv', '') == 'kosher' || request.resource.data.get('rv', '') == 'kosher')
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'pub', 'kosherPub', 'kosherFrom'])
@@ -325,8 +325,8 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.status == 'open'
         && request.resource.data.keys().hasOnly(['uid', 'byName', 'rid', 'title', 'status', 'created', 'kind', 'to', 'sec', 'from']);
-      allow read: if isAdmin() || extra('release') || extra('review') || extra('move') || extra('pub') || (signedIn() && resource.data.uid == request.auth.uid);
-      allow update: if isAdmin() || extra('release') || extra('review') || extra('move') || extra('pub');
+      allow read: if isAdmin() || extra('release') || extra('review') || extra('moverec') || extra('pub') || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update: if isAdmin() || extra('release') || extra('review') || extra('moverec') || extra('pub');
       allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
     }
 

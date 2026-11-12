@@ -431,7 +431,7 @@ await check("…nor one who only had the old edit permission", assertFails(updat
 
 // More extra privileges for one employee: each only its own part, off unless given
 await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
-  await setDoc(doc(d, 'users', 'xp'), { name: 'X P', status: 'approved', role: 'employee', perms: { del: true, move: true, pub: true, kosher: true, members: true, portal: true }, created: 1, favs: [] });
+  await setDoc(doc(d, 'users', 'xp'), { name: 'X P', status: 'approved', role: 'employee', perms: { del: true, moverec: true, pub: true, kosher: true, members: true, portal: true }, created: 1, favs: [] });
   await setDoc(doc(d, 'users', 'jn'), { name: 'Joiner', status: 'pending', created: 1, favs: [] });
   await setDoc(doc(d, 'recipes', 'r-xp'), { t: 'XP', c: 'Cakes', pub: false, deleted: false, s: [] });
   await setDoc(doc(d, 'recipes', 'r-xp2'), { t: 'XP2', c: 'Cakes', pub: false, deleted: false, s: [] }); });

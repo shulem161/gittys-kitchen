@@ -606,19 +606,19 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
     ok('…and taking it away brings back Request a change', /Request a change/.test(await V.locator('.rhead').textContent()));
     // More extra privileges: all off until given to one employee
-    { const allOff = await V.evaluate(() => ['del', 'move', 'pub', 'kosher', 'members', 'activity', 'portal'].every(k => !may(k)));
+    { const allOff = await V.evaluate(() => ['del', 'moverec', 'pub', 'kosher', 'members', 'activity', 'portal'].every(k => !may(k)));
       await A.goto(F + '#employees'); await A.waitForTimeout(400);
       const empTxt = await A.locator('#app').innerText();
       const listed = ['Delete recipes', 'Move recipes', 'Make recipes public', 'Not kosher inbox', 'ask to join', 'See Activity', 'Customer portal settings'].every(x => new RegExp(x, 'i').test(empTxt));
       await A.evaluate(async () => { const on = Object.fromEntries(UPDATES.map(([k]) => { const l = featLevel(k); return [k, l === 'all' ? true : l || false]; })); on.empextra = 'team'; await db.collection('meta').doc('features').set({on}); }); await A.waitForTimeout(600);
-      const stillOff = await V.evaluate(() => ['del', 'move', 'activity'].every(k => !may(k)));
-      await perm(A, vu0, 'activity', true, 900); await perm(A, vu0, 'move', true, 1500);
+      const stillOff = await V.evaluate(() => ['del', 'moverec', 'activity'].every(k => !may(k)));
+      await perm(A, vu0, 'activity', true, 900); await perm(A, vu0, 'moverec', true, 1500);
       await V.goto(F + '#activity'); await V.waitForTimeout(500);
       const act = /Activity|Inbox moves/.test(await V.locator('main').innerText());
       await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
       const mv = (await V.locator('#rmenu #mv-btn').count()) === 1 && !/Ask to move/.test(await V.locator('.rhead').textContent());
       ok('more extra privileges: off for everyone until one is given to one employee', allOff && listed && stillOff && act && mv, [allOff, listed, stillOff, act, mv]);
-      await perm(A, vu0, 'activity', false, 600); await perm(A, vu0, 'move', false, 1200); }
+      await perm(A, vu0, 'activity', false, 600); await perm(A, vu0, 'moverec', false, 1200); }
     await perm(A, vu0, 'photos', false, 1500);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
     ok('an everyday permission can be switched off for one employee', (await V.locator('.ph-add').count()) === 0);
