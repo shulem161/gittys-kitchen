@@ -451,7 +451,7 @@ await check("…nor approve people", assertFails(updateDoc(doc(E9, 'users', 'jn'
 // Recycle bin: employees allowed to delete can restore, but only admins delete forever
 await check('an employee allowed to delete can restore from the Recycle bin', assertSucceeds(updateDoc(doc(XP, 'recipes', 'r-xp'), { deleted: false, restoredAt: 6, updated: 6 })));
 await check("…but can't delete it forever", assertFails(setDoc(doc(XP, 'recipes', 'r-xp'), { deleted: true, purged: true, code: '', updated: 7 })));
-await check('an admin can delete one forever', assertSucceeds(setDoc(doc(ADM, 'recipes', 'r-xp2'), { deleted: true, purged: true, code: '', updated: 7 })));
+await check('an admin (here the owner) can delete one forever', assertSucceeds(setDoc(doc(OWN, 'recipes', 'r-xp2'), { deleted: true, purged: true, code: '', updated: 7 })));
 
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
