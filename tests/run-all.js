@@ -972,13 +972,13 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       ok('…and Restore puts it back in the cookbook', await A.evaluate(() => RECIPES.some(r => r.id === 'r-boston-cream-pie')) && /#r-boston-cream-pie$/.test(await A.evaluate(() => location.hash)));
       await V.goto(F + '#bin'); await V.waitForTimeout(300);
       ok("…the Recycle bin isn't for employees who can't delete", (await V.locator('#bin-list').count()) === 0);
-      await A.evaluate(async () => { await db.collection('recipes').doc('r-bin-test').set({t: 'Bin Test Cake', c: 'Cakes', code: '102998', deleted: true, deletedAt: Date.now(), deletedBy: 'Shulem', s: []}); }); await A.waitForTimeout(500);
+      await A.evaluate(async () => { await db.collection('recipes').doc('r-bin-test').set({t: 'Bin Test Cake', c: 'Cakes', code: '102998', deleted: true, deletedAt: Date.now(), deletedBy: 'Shulem', s: [], rv: 'proof', rvLog: [{to: 'proof'}]}); }); await A.waitForTimeout(500);
       await A.goto(F + '#bin'); await A.waitForTimeout(500);
       await A.locator('#bin-list li', {hasText: 'Bin Test Cake'}).locator('[data-purge]').click(); await A.waitForTimeout(150);
       const asked = /can't be undone/.test(await A.locator('#bin-list li', {hasText: 'Bin Test Cake'}).innerText());
       await A.locator('#bin-list li', {hasText: 'Bin Test Cake'}).locator('[data-pyes]').click(); await A.waitForTimeout(700);
       const doc = await A.evaluate(() => db.collection('recipes').doc('r-bin-test').get().then(s => s.data()));
-      ok('an admin can delete one forever from the Recycle bin (it asks first; only its number is kept for a year)', asked && (await A.locator('#bin-list li', {hasText: 'Bin Test Cake'}).count()) === 0 && doc.purged === true && !doc.t && !doc.s && await A.evaluate(() => usedCodes.has('102998')), doc); }
+      ok('an admin can delete one forever from the Recycle bin (it asks first; only its number is kept for a year)', asked && (await A.locator('#bin-list li', {hasText: 'Bin Test Cake'}).count()) === 0 && doc.purged === true && !doc.t && !doc.s && doc.rv === 'proof' && await A.evaluate(() => usedCodes.has('102998')), doc); }
     // On a phone, the bottom bar hides while the keyboard is open
     { await A.goto(F + '#plan'); await A.waitForTimeout(400); const vs = A.viewportSize();
       await A.setViewportSize({width: 390, height: 840}); await A.waitForTimeout(200);

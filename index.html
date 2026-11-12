@@ -3027,7 +3027,10 @@ function binPage(){
   app.querySelectorAll("[data-purge]").forEach(b=>b.onclick=()=>{ const r=BIN.find(x=>x.id===b.dataset.purge); if(!r) return; const acts=b.closest(".macts");
     acts.innerHTML=`<span class="hint">Delete “${esc(r.t.replace(/^Untitled: /,""))}” forever? This can't be undone.</span><button type="button" class="btn warn" data-pyes>Delete forever</button><button type="button" class="btn" data-pno>Keep it</button>`;
     acts.querySelector("[data-pno]").onclick=binPage;
-    acts.querySelector("[data-pyes]").onclick=async()=>{ try{ await db.collection("recipes").doc(r.id).set({deleted:true, purged:true, code:r.code||"", oldCodes:r.oldCodes||[], deletedAt:r.deletedAt||Date.now(), purgedAt:Date.now(), purgedBy:myName(), updated:Date.now()});
+    acts.querySelector("[data-pyes]").onclick=async()=>{ try{ const ref=db.collection("recipes").doc(r.id), raw=(await ref.get()).data()||{};
+        // the inbox steps stay exactly as they were (the rules never let them change by the way)
+        const keep=Object.fromEntries(["rv","rvUids","rvAsk","rvLog","rvNote","rvNoteBy"].filter(k=>raw[k]!==undefined).map(k=>[k, raw[k]]));
+        await ref.set(Object.assign(keep, {deleted:true, purged:true, code:raw.code||"", oldCodes:raw.oldCodes||[], deletedAt:raw.deletedAt||raw.updated||Date.now(), purgedAt:Date.now(), purgedBy:myName(), updated:Date.now()}));
         BIN=BIN.filter(x=>x.id!==r.id); toast(`“${r.t}” was deleted forever`); renderAcct(); binPage(); }catch(e){ toast("Couldn't delete. Check your connection."); } }; });
   app.querySelectorAll("[data-restore]").forEach(b=>b.onclick=async()=>{ const r=BIN.find(x=>x.id===b.dataset.restore); if(!r) return; b.disabled=true;
     // if its number went to another recipe meanwhile, it gets a new one
