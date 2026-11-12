@@ -298,7 +298,7 @@ service cloud.firestore {
       // Checked first, and only for that change, to stay within the rules' limit on document lookups.
       allow write: if (resource != null && resource.data.get('deleted', false) == false
             && request.resource.data.get('deleted', false) == true
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'deletedAt', 'updated', 'mergedBy'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'deletedAt', 'deletedBy', 'updated', 'mergedBy'])
             && mergeDrops(id) && extra('release'))
         || ((noRvChange() || editedBack()) && publishOk())
         || kosherMove()
@@ -309,7 +309,10 @@ service cloud.firestore {
             && rvSteps())
         // Employees given "Edit recipes directly": the recipe itself only, never where it is, who sees it or whether it's deleted
         || (resource != null && request.resource.data.get('deleted', false) == true && resource.data.get('deleted', false) == false
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'deletedAt', 'updated']) && extra('del'))
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'deletedAt', 'deletedBy', 'updated']) && extra('del'))
+        // Recycle bin: employees allowed to delete may also restore (with a new number if the old one was taken)
+        || (resource != null && resource.data.get('deleted', false) == true && request.resource.data.get('deleted', true) == false
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'restoredAt', 'updated', 'code', 'oldCodes']) && extra('del'))
         || (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['c', 'sec', 'code', 'oldCodes', 'history', 'updated']) && extra('moverec'))
         || (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pub', 'updated']) && extra('pub'))
         || (resource != null && (resource.data.get('rv', '') == 'kosher' || request.resource.data.get('rv', '') == 'kosher')

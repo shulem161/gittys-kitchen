@@ -1,6 +1,6 @@
 {
-  "web": "4.33",
+  "web": "4.34",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "More extra privileges you can give one employee in Employee settings."
+  "notes": "Recycle bin for deleted recipes."
 }

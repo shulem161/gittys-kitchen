@@ -902,10 +902,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*18 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 18));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*19 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 19));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 18, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 19, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -913,7 +913,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.click('[data-updtab=wait]'); await A.waitForTimeout(200);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /17/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /18/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -961,6 +961,24 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       const hasLink = (await A.locator('#rmenu a[href="#history-r-bobbys-challah"]').count()) === 1;
       await A.goto(F + '#history-r-bobbys-challah'); await A.waitForTimeout(800);
       ok('every recipe has a History: each version, what changed and who changed it', hasLink && (await A.locator('.hist-v').count()) >= 2 && /Edited/.test(await A.locator('.hist-v').first().innerText()) && /honey/.test(await A.locator('.hist-v').first().locator('.bl-add').innerText()) && (await A.locator('.hist-v').first().locator('.bl-wrap.bl-plain').count()) === 1 && (await A.locator('.hist-v').first().locator('.bl-who').isHidden()), [hasLink, await A.locator('#app').innerText().then(x => x.slice(0, 600))]); }
+    // Recycle bin
+    { await A.goto(F + '#r-boston-cream-pie'); await A.waitForTimeout(400); await A.click('a[href="#edit-r-boston-cream-pie"]'); await A.waitForTimeout(400);
+      await A.click('#ed-del'); await A.waitForTimeout(200); await A.click('#ed-yes'); await A.waitForTimeout(800);
+      const gone = await A.evaluate(() => !RECIPES.some(r => r.id === 'r-boston-cream-pie'));
+      await A.goto(F + '#bin'); await A.waitForTimeout(500);
+      const row = await A.locator('#bin-list li', {hasText: 'Boston Cream'}).innerText().catch(() => '');
+      ok('a deleted recipe goes to the Recycle bin, with who deleted it', gone && /deleted/.test(row) && /Shulem/.test(row), [gone, row]);
+      await A.locator('#bin-list li', {hasText: 'Boston Cream'}).locator('[data-restore]').click(); await A.waitForTimeout(800);
+      ok('…and Restore puts it back in the cookbook', await A.evaluate(() => RECIPES.some(r => r.id === 'r-boston-cream-pie')) && /#r-boston-cream-pie$/.test(await A.evaluate(() => location.hash)));
+      await V.goto(F + '#bin'); await V.waitForTimeout(300);
+      ok("…the Recycle bin isn't for employees who can't delete", (await V.locator('#bin-list').count()) === 0);
+      await A.evaluate(async () => { await db.collection('recipes').doc('r-bin-test').set({t: 'Bin Test Cake', c: 'Cakes', code: '102998', deleted: true, deletedAt: Date.now(), deletedBy: 'Shulem', s: []}); }); await A.waitForTimeout(500);
+      await A.goto(F + '#bin'); await A.waitForTimeout(500);
+      await A.locator('#bin-list li', {hasText: 'Bin Test Cake'}).locator('[data-purge]').click(); await A.waitForTimeout(150);
+      const asked = /can't be undone/.test(await A.locator('#bin-list li', {hasText: 'Bin Test Cake'}).innerText());
+      await A.locator('#bin-list li', {hasText: 'Bin Test Cake'}).locator('[data-pyes]').click(); await A.waitForTimeout(700);
+      const doc = await A.evaluate(() => db.collection('recipes').doc('r-bin-test').get().then(s => s.data()));
+      ok('an admin can delete one forever from the Recycle bin (it asks first; only its number is kept for a year)', asked && (await A.locator('#bin-list li', {hasText: 'Bin Test Cake'}).count()) === 0 && doc.purged === true && !doc.t && !doc.s && await A.evaluate(() => usedCodes.has('102998')), doc); }
     // On a phone, the bottom bar hides while the keyboard is open
     { await A.goto(F + '#plan'); await A.waitForTimeout(400); const vs = A.viewportSize();
       await A.setViewportSize({width: 390, height: 840}); await A.waitForTimeout(200);

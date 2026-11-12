@@ -1332,7 +1332,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.33";
+const WEB_VERSION = "4.34";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1370,6 +1370,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["recbin","4.34","2026-11-11","Recycle bin for deleted recipes","Deleted recipes go to a Recycle bin (in the menu, under Recipes): who deleted each one and when, and a Restore button that puts it back in the cookbook. Admins can also delete one forever. For admins, and employees allowed to delete recipes (they can restore, not delete forever).", false, "team"],
   ["empextra","4.33","2026-11-11","More extra privileges for one employee","In Employee settings you can now give one employee: deleting recipes, moving recipes, making recipes public, the Not kosher inbox, approving people who ask to join, seeing Activity, and Customer portal settings.", false, "team"],
   ["empedit","4.32","2026-11-11","Let one employee edit recipes directly","In Employee settings there's a new extra privilege, “Edit recipes directly”. An employee you give it to edits recipes straight away instead of sending a request. They still can't delete recipes, move them to another category or make them public.", false, "team"],
   ["menurate","4.31","2026-11-10","Like or dislike an AI menu, and the AI learns","Under every menu the AI makes there's 👍 and 👎 (with why). Every AI menu and its rating is kept, and so is every menu people put together themselves in My menus. The AI learns from all of them to make better menus. You see them all in Likes & dislikes.", false],
@@ -2189,7 +2190,7 @@ function recipe(r){
     const box=document.createElement("div"); box.className="panel-a nk-box"; box.id="del-box";
     box.innerHTML=`<b>Delete “${esc(r.t.replace(/^Untitled: /,""))}”?</b><p class="hint">It's taken out of the cookbook. Its number isn't given to another recipe for a year.</p><div class="row"><button type="button" class="btn warn" id="del-yes">Delete</button><button type="button" class="btn" id="del-no">Keep it</button></div>`;
     e.currentTarget.closest(".tools").after(box); box.querySelector("#del-no").onclick=()=>box.remove();
-    box.querySelector("#del-yes").onclick=async()=>{ try{ await db.collection("recipes").doc(r.id).update({deleted:true, deletedAt:Date.now(), updated:Date.now()}); toast(`“${r.t}” was deleted`); location.hash=slug(r.c); }catch(x){ toast("Couldn't delete. Check your connection."); } }; };
+    box.querySelector("#del-yes").onclick=async()=>{ try{ await db.collection("recipes").doc(r.id).update({deleted:true, deletedAt:Date.now(), deletedBy:myName(), updated:Date.now()}); toast(`“${r.t}” was deleted`); location.hash=slug(r.c); }catch(x){ toast("Couldn't delete. Check your connection."); } }; };
   const g3=document.getElementById("go3-btn"); if(g3) g3.onclick=async()=>{ g3.disabled=true; if(await rvEnter(r)) recipe(r); else g3.disabled=false; };
   document.getElementById("toplan-btn").onclick=e=>addToPlanBox(r, e.currentTarget);
   const tdr=document.getElementById("td-rec"); if(tdr) tdr.onclick=e=>{ const b=e.currentTarget, nm=r.t.replace("Untitled: ","");
@@ -2717,7 +2718,7 @@ function dupesPage(){
     box.scrollIntoView({block:"nearest"});
     box.querySelector("[data-dupno]").onclick=()=>{ box.innerHTML=""; };
     box.querySelector("[data-dupyes]").onclick=async e=>{ e.target.disabled=true;
-      try{ await db.collection("recipes").doc(r.id).update({deleted:true, deletedAt:Date.now(), updated:Date.now()}); toast(`“${r.t}” was deleted`); }
+      try{ await db.collection("recipes").doc(r.id).update({deleted:true, deletedAt:Date.now(), deletedBy:myName(), updated:Date.now()}); toast(`“${r.t}” was deleted`); }
       catch(err){ e.target.disabled=false; toast("Couldn't delete. Check your connection."); } }; });
 }
 
@@ -3008,6 +3009,34 @@ const byCodeFor = q => (a, b) => { if(!feat("codesearch") || !/^\s*#?\d/.test(q)
   return (hb-ha) || ca.localeCompare(cb, undefined, {numeric:true}); };
 const pickMax = (q, n) => feat("codesearch") && /^\s*#?\d/.test(q) ? 30 : n;
 const pickTag = r => feat("codepick") && codeOf(r) ? codeOf(r)+" · "+r.c : r.c;
+// Recycle bin: deleted recipes, newest first, with who deleted them; Restore puts one back
+const mayBin = () => feat("recbin") && (isAdmin() || may("del"));
+function binPage(){
+  const L=BIN.slice().sort((a,b)=>(b.deletedAt||0)-(a.deletedAt||0));
+  app.innerHTML=`<section class="wrap admin">
+    <div class="section-head" style="margin-top:28px"><h2>Recycle bin</h2><p>${L.length} deleted ${L.length===1?"recipe":"recipes"}</p></div>
+    <p class="hint" style="margin:-6px 0 12px">Deleted recipes wait here. Restore puts one back in the cookbook as it was.${isAdmin()?" Delete forever removes it for good.":""}</p>
+    ${L.length>8?`<input type="search" id="bin-q" placeholder="Find a recipe" autocomplete="off" style="width:100%;margin-bottom:10px">`:""}
+    ${L.length?`<div class="panel-a"><ul class="mlist" id="bin-list">${L.map(r=>`<li class="mrow" data-bin="${esc((r.t+" "+r.c+" "+(r.code||"")).toLowerCase())}"><div class="mwho"><b>${noChip(r)} ${esc(r.t.replace(/^Untitled: /,""))}</b>
+        <span>${esc(r.c)}${r.sec?" · "+esc(r.sec):""} · deleted ${r.deletedAt?fmtDate(r.deletedAt):""}${r.deletedBy?" by "+esc(r.deletedBy):""}${r.mergedBy?" · merged into another recipe":""}</span></div>
+        <div class="macts"><button type="button" class="btn solid" data-restore="${esc(r.id)}">Restore</button>${isAdmin()?`<button type="button" class="btn danger-btn" data-purge="${esc(r.id)}">Delete forever</button>`:""}</div></li>`).join("")}</ul></div>`
+      : `<div class="panel-a"><p class="hint mempty">The recycle bin is empty.</p></div>`}
+  </section>`;
+  const bq=document.getElementById("bin-q"); if(bq) bq.oninput=()=>{ const s=bq.value.trim().toLowerCase(); app.querySelectorAll("[data-bin]").forEach(li=>li.hidden=!!s && !li.dataset.bin.includes(s)); };
+  // Delete forever (admins): the recipe is gone for good; only its number is kept, so it isn't given to another recipe for a year
+  app.querySelectorAll("[data-purge]").forEach(b=>b.onclick=()=>{ const r=BIN.find(x=>x.id===b.dataset.purge); if(!r) return; const acts=b.closest(".macts");
+    acts.innerHTML=`<span class="hint">Delete “${esc(r.t.replace(/^Untitled: /,""))}” forever? This can't be undone.</span><button type="button" class="btn warn" data-pyes>Delete forever</button><button type="button" class="btn" data-pno>Keep it</button>`;
+    acts.querySelector("[data-pno]").onclick=binPage;
+    acts.querySelector("[data-pyes]").onclick=async()=>{ try{ await db.collection("recipes").doc(r.id).set({deleted:true, purged:true, code:r.code||"", oldCodes:r.oldCodes||[], deletedAt:r.deletedAt||Date.now(), purgedAt:Date.now(), purgedBy:myName(), updated:Date.now()});
+        BIN=BIN.filter(x=>x.id!==r.id); toast(`“${r.t}” was deleted forever`); renderAcct(); binPage(); }catch(e){ toast("Couldn't delete. Check your connection."); } }; });
+  app.querySelectorAll("[data-restore]").forEach(b=>b.onclick=async()=>{ const r=BIN.find(x=>x.id===b.dataset.restore); if(!r) return; b.disabled=true;
+    // if its number went to another recipe meanwhile, it gets a new one
+    const taken = r.code && RECIPES.some(x=>x.code===r.code), upd={deleted:false, restoredAt:Date.now(), updated:Date.now()};
+    if(taken){ upd.code=nextCode(r.c, r.sec||""); upd.oldCodes=freeCode(r, upd.code); }
+    try{ await db.collection("recipes").doc(r.id).update(upd); saveVersion(Object.assign({}, r, {code:upd.code||r.code}), "Restored from the recycle bin");
+      toast(`“${r.t}” is back in the cookbook${taken?" with a new number, "+upd.code:""}`); location.hash=r.id; }
+    catch(e){ b.disabled=false; toast("Couldn't restore. Check your connection."); } });
+}
 // Browse the whole cookbook by category and pick recipes (for menus and the calendar)
 function pickFromCookbook(o){   // o: {title, has(rid), toggle(rid, on), done()}
   const old=document.querySelector(".cb-pick"); if(old) old.remove();
@@ -3402,7 +3431,7 @@ function deletesHTML(){
 }
 function wireDeletes(){
   app.querySelectorAll("[data-dlq]").forEach(b=>b.onclick=async()=>{ const g=GOLIVE.find(x=>x.id===b.dataset.dlq); if(!g) return; const ok=b.dataset.dlok==="1"; b.disabled=true;
-    try{ if(ok) await db.collection("recipes").doc(g.rid).update({deleted:true, deletedAt:Date.now(), updated:Date.now()});
+    try{ if(ok) await db.collection("recipes").doc(g.rid).update({deleted:true, deletedAt:Date.now(), deletedBy:myName(), updated:Date.now()});
       await db.collection("golive").doc(g.id).update({status:ok?"approved":"declined", decided:Date.now(), decidedBy:myName()}); g.status=ok?"approved":"declined";
       toast(ok?"Deleted":"Kept"); renderAcct(); const y=window.scrollY; route(); window.scrollTo(0,y); }
     catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); } });
@@ -3827,6 +3856,7 @@ function openMenu(confirming){
     may("edit")||(!can("suggest")&&!subs.length) ? "" : item("#mine","My recipes", subs.length||""),
     item("#favorites","My favorites", favs().length||""),
     !offline ? item("#menus","My menus", Object.values(MENUS).filter(m=>m.uid===me).length||"") : "",
+    mayBin()&&recipesOnline ? item("#bin","Recycle bin", BIN.length||"") : "",
     (isAdmin()||may("del"))&&recipesOnline ? item("#dupes","Duplicate recipes", findDupes(0.9).length?findDupes(0.9).length+" pairs":"", findDupes(0.9).length) : "",
   ].filter(Boolean);
   const group = (key,title,items,n) => items.length ? `<details class="mgroup" data-mg="${key}" ${menuOpen.has(key)?"open":""}><summary>${title}<span class="n${n?" hot":""}">${n?n+" waiting":""}</span></summary>${items.join("")}</details>` : "";
@@ -3877,6 +3907,7 @@ let NK = [];   // recipes in the Not kosher inbox: hidden from the cookbook unti
 const findAny = id => RECIPES.find(x=>x.id===id) || (isAdmin()||may("kosher") ? NK.find(x=>x.id===id) : undefined);
 const mayNK = () => feat("nk") && (isAdmin() || may("kosher"));
 let RAW_RECIPES = [];
+let BIN = [];   // deleted recipes: the Recycle bin
 function setRecipes(list){
   RAW_RECIPES = list;
   const hide = feat("nk") && feat("nkhide");
@@ -3909,6 +3940,7 @@ function watchRecipes(){
     maxNo = s.docs.reduce((m,d)=>Math.max(m, +d.data().no||0), 0);
     usedCodes = heldCodes(s.docs.map(d=>d.data()));
     const live = s.docs.filter(d=>!d.data().deleted).map(d=>fromDoc(d.id,d.data()));
+    BIN = pubOnly ? [] : s.docs.filter(d=>d.data().deleted && !d.data().purged).map(d=>Object.assign(fromDoc(d.id,d.data()), {deletedAt:d.data().deletedAt||d.data().updated||0, deletedBy:d.data().deletedBy||"", mergedBy:d.data().mergedBy||""}));
     if(pubOnly){ recipesOnline=true; setRecipes(live); store("gk-recipes-pub", RECIPES); }
     else if(s.docs.length){ recipesOnline=true; setRecipes(live); store("gk-recipes", RECIPES); }
     else { recipesOnline=false; setRecipes(BUNDLED.slice()); }
@@ -4112,10 +4144,10 @@ function editor(r, cat, sub, draft){
     F.querySelectorAll(".sec-k").forEach(s=>s.onchange=()=>sync());
     const del=F.querySelector("#ed-del");
     if(del) del.onclick=()=>{
-      F.querySelector("#ed-confirm").innerHTML=`<div class="confirm">Delete “${esc(r.t)}” for everyone? <div class="row"><button type="button" class="btn warn" id="ed-yes">Delete</button><button type="button" class="btn" id="ed-no">Cancel</button></div></div>`;
+      F.querySelector("#ed-confirm").innerHTML=`<div class="confirm">Delete “${esc(r.t)}” for everyone?${feat("recbin")?` It goes to the Recycle bin, where it can be restored.`:""} <div class="row"><button type="button" class="btn warn" id="ed-yes">Delete</button><button type="button" class="btn" id="ed-no">Cancel</button></div></div>`;
       F.querySelector("#ed-no").onclick=()=>{F.querySelector("#ed-confirm").innerHTML=""};
       F.querySelector("#ed-yes").onclick=async()=>{
-        try{ await db.collection("recipes").doc(r.id).update({deleted:true, deletedAt:Date.now(), updated:Date.now()}); toast(`“${r.t}” was deleted`); location.hash=slug(r.c); }
+        try{ await db.collection("recipes").doc(r.id).update({deleted:true, deletedAt:Date.now(), deletedBy:myName(), updated:Date.now()}); toast(`“${r.t}” was deleted`); location.hash=slug(r.c); }
         catch(e){ toast("Couldn't delete. Check your connection."); }
       };
     };
@@ -4351,7 +4383,7 @@ async function approveSub(sub, pub){
   const drop = sub.dropOf && sub.dropOf!==rec.id ? findAny(sub.dropOf) : null;
   if(drop){
     let gone=false;
-    try{ await db.collection("recipes").doc(drop.id).update({deleted:true, deletedAt:Date.now(), updated:Date.now(), mergedBy:sub.id}); gone=true; }catch(e){}
+    try{ await db.collection("recipes").doc(drop.id).update({deleted:true, deletedAt:Date.now(), deletedBy:myName(), updated:Date.now(), mergedBy:sub.id}); gone=true; }catch(e){}
     if(!gone){ await db.collection("golive").doc().set({uid:me, byName:myName(), rid:drop.id, title:drop.t, status:"open", created:Date.now(), kind:"delete", to:rec.id, from:rec.t}).catch(()=>{});
       notifyAdmin(`A merged recipe can be deleted`, `“${drop.t}” was merged into “${rec.t}”. Delete it in Needs admin approval.`, "#admin-approval", "wastebasket"); }
     else toast(`“${drop.t}” was merged in, so it's deleted`);
@@ -6689,6 +6721,7 @@ function routePage(){
   if(h==="admin" && isAdmin()){ q.value=""; adminPage(); window.scrollTo(0,0); return; }
   if(h==="public" && (isAdmin()||may("portal")||may("pub"))){ q.value=""; publicPage(); window.scrollTo(0,0); return; }
   if(h==="activity" && (isAdmin()||may("activity"))){ q.value=""; activityPage(); window.scrollTo(0,0); return; }
+  if(h==="bin" && mayBin()){ q.value=""; binPage(); window.scrollTo(0,0); return; }
   if(h==="dupes" && (isAdmin()||may("del"))){ q.value=""; dupesPage(); window.scrollTo(0,0); return; }
   if(h==="viewas" && (canViewAs()||viewingAs())){ q.value=""; viewAsPage(); window.scrollTo(0,0); return; }
   if(h==="employees" && isAdmin()){ q.value=""; employeesPage(); window.scrollTo(0,0); return; }
