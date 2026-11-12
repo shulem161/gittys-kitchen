@@ -1,6 +1,6 @@
 {
-  "web": "4.32",
+  "web": "4.33",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Employee settings: let one employee edit recipes directly."
+  "notes": "More extra privileges you can give one employee in Employee settings."
 }
