@@ -2,12 +2,8 @@
 name: Test Firebase rules
 
 on:
+  # Started only by the owner's publishing task (four times a day at most), when a waiting update changed the rules.
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths: [firestore.rules, tests/rules-test.mjs]
-  pull_request:
-    paths: [firestore.rules, tests/rules-test.mjs]
 
 jobs:
   test:

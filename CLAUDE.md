@@ -36,8 +36,9 @@ activity low, it only moves at about 6 am, 12 noon, 6 pm and 12 midnight New Yor
 `feat()` switch for the update. 2. Bump `WEB_VERSION` in index.html, `"web"` in version.json and `CACHE` in sw.js together.
 3. `node tests/run-all.js` must pass. 4. Commit and push to `next` only — one push per finished piece of work, not per step.
 5. Tell the owner it goes live at the next time slot, then waits for his approval in Inboxes → App & web updates.
-Keep GitHub activity low: don't trigger extra workflow runs, avoid empty commits, and run the rules test (workflow_dispatch
-on `next`) only when firestore.rules changed. If the owner explicitly asks for something to go live right away, ask him to
+Keep GitHub activity low: don't trigger workflow runs yourself (no rules-test dispatches, no empty "nudge" commits, no
+polling of runs). The publishing task runs the rules test on `next` once, only when firestore.rules changed, before publishing.
+Test rule changes locally as far as you can, and say in the commit message that the rules changed. If the owner explicitly asks for something to go live right away, ask him to
 confirm that he wants to skip the time slots before pushing to `main`.
 The APK only needs rebuilding for native changes; its signing key is NOT in this repo (the owner has it
 in Gittys-Kitchen-backup.zip). Never commit keys or the Firebase service account.
