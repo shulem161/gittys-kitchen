@@ -1332,7 +1332,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.34";
+const WEB_VERSION = "4.35";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1370,6 +1370,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["alldot","4.35","2026-11-11","A dot by All employees when someone is set differently","In Employee settings and Inbox settings, the All employees column shows the same ● when one or more employees have their own, different setting for that row — so you can see it at a glance.", false, "admin"],
   ["recbin","4.34","2026-11-11","Recycle bin for deleted recipes","Deleted recipes go to a Recycle bin (in the menu, under Recipes): who deleted each one and when, and a Restore button that puts it back in the cookbook. Admins can also delete one forever. For admins, and employees allowed to delete recipes (they can restore, not delete forever).", false, "team"],
   ["empextra","4.33","2026-11-11","More extra privileges for one employee","In Employee settings you can now give one employee: deleting recipes, moving recipes, making recipes public, the Not kosher inbox, approving people who ask to join, seeing Activity, and Customer portal settings.", false, "team"],
   ["empedit","4.32","2026-11-11","Let one employee edit recipes directly","In Employee settings there's a new extra privilege, “Edit recipes directly”. An employee you give it to edits recipes straight away instead of sending a request. They still can't delete recipes, move them to another category or make them public.", false, "team"],
@@ -2456,10 +2457,10 @@ function employeesPage(){
   const perms=[["Everyday",PUB_ALLOW],["Extra",extraPerms().filter(([k])=>!isInboxPerm(k))]];
   app.innerHTML = `<section class="wrap admin">
     <div class="section-head" style="margin-top:28px"><h2>Employee settings</h2><p>What employees may do</p></div>
-    <div class="panel-a"><p class="hint">Tick what each employee may do. <b>All employees</b> is the starting point for everyone; a <span class="perm-dot">●</span> marks a person's own setting. Who may use each inbox is in <a class="link" href="#inbox-settings">Inbox settings</a>.</p>
+    <div class="panel-a"><p class="hint">Tick what each employee may do. <b>All employees</b> is the starting point for everyone; a <span class="perm-dot">●</span> marks a person's own setting${feat("alldot")?", and by All employees it means someone is set differently":""}. Who may use each inbox is in <a class="link" href="#inbox-settings">Inbox settings</a>.</p>
       <div class="ibs-wrap perms-wrap"><table class="ibs perms-t"><thead><tr><th>Permission</th><th>All employees</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
       <tbody>${perms.map(([g,L])=>`<tr class="perm-grp"><th>${g}</th><td></td>${emps.map(()=>"<td></td>").join("")}</tr>`+L.map(([k,l])=>`<tr><th>${PERM_SHORT[k]||esc(l)}</th>
-        <td><label class="ibs-c"><input type="checkbox" data-ea="${k}" ${empDefault(k)?"checked":""}><span class="sr">All employees: ${esc(l)}</span></label></td>
+        <td><label class="ibs-c"><input type="checkbox" data-ea="${k}" ${empDefault(k)?"checked":""}><span class="sr">All employees: ${esc(l)}</span></label>${allDot(k, emps)}</td>
         ${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")).join("")}
       ${own.length?`<tr class="perm-reset"><th>Back to All employees</th><td></td>${emps.map(m=>`<td>${Object.keys(m.perms||{}).length?`<button type="button" class="link" data-preset="${esc(m.uid)}">Reset</button>`:""}</td>`).join("")}</tr>`:""}</tbody></table></div>
       <p class="perms-hint" hidden>Swipe inside the table to see everything: up and down, and side to side for more people.</p>
@@ -6241,6 +6242,12 @@ const TEXT_SIZES = [["1","Normal"],["1.12","Large"],["1.25","Extra large"]];
 const myTextSize = () => store("gk-textsize") || "1";
 function applyTextSize(){ const z=myTextSize(); app.style.zoom = z==="1" ? "" : z; }
 const LOOK_SET = () => appBuild ? "App settings" : "Website settings";
+// The ● by All employees: one or more employees are set differently for this row
+function allDot(k, emps){
+  if(!feat("alldot")) return "";
+  const n=(emps||[]).filter(m=>(m.perms||{})[k]!==undefined && permOf(m,k)!==empDefault(k)).length;
+  return n ? `<span class="perm-dot" title="${n} ${n===1?"employee is":"employees are"} set differently">●</span><span class="sr">${n} set differently</span>` : "";
+}
 function inboxSettings(){
   const team=members.filter(m=>m.status==="approved" && ["owner","admin","employee"].includes(roleOf(m))).sort((a,b)=>({owner:0,admin:1,employee:2}[roleOf(a)]-{owner:0,admin:1,employee:2}[roleOf(b)]) || byName(a.name,b.name));
   const emps=team.filter(m=>roleOf(m)==="employee"), admins=team.filter(m=>roleOf(m)!=="employee");
@@ -6249,9 +6256,9 @@ function inboxSettings(){
     <div class="panel-a"><p class="hint">Recipes go through <b>1 Need to proofread</b> → <b>2 For approval</b> → <b>3 Ready to release</b>, and the same person can never do two steps for one recipe. Whoever has an inbox also gets its notices. <b>Needs admin approval</b> (moving a recipe, photos, going public) is for admins only.</p>
       ${emps.length?`<div class="ibs-wrap perms-wrap"><table class="ibs perms-t">
       <thead><tr><th>Inbox</th><th>All employees</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
-      <tbody>${INBOX_PERMS.map(([k,l])=>`<tr><th>${esc(l)}</th><td><label class="ibs-c"><input type="checkbox" data-ea="${k}" ${empDefault(k)?"checked":""}><span class="sr">All employees: ${esc(l)}</span></label></td>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="perms-hint" hidden>Swipe inside the table to see everything: up and down, and side to side for more people.</p>`
+      <tbody>${INBOX_PERMS.map(([k,l])=>`<tr><th>${esc(l)}</th><td><label class="ibs-c"><input type="checkbox" data-ea="${k}" ${empDefault(k)?"checked":""}><span class="sr">All employees: ${esc(l)}</span></label>${allDot(k, emps)}</td>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="perms-hint" hidden>Swipe inside the table to see everything: up and down, and side to side for more people.</p>`
       :`<p class="hint">No employees yet.</p>`}
-      <p class="hint" style="margin-top:8px" data-ibs-note>“All employees” is for everyone who has nothing of their own set; a <span class="perm-dot">●</span> marks a person's own setting. Admins${admins.length?` (${admins.map(m=>esc(m.name)).join(", ")})`:""} can always use every inbox. To make someone an admin or an employee, use <a class="link" href="#admin">Members</a>.</p></div>
+      <p class="hint" style="margin-top:8px" data-ibs-note>“All employees” is for everyone who has nothing of their own set; a <span class="perm-dot">●</span> marks a person's own setting${feat("alldot")?", and by All employees it means someone is set differently":""}. Admins${admins.length?` (${admins.map(m=>esc(m.name)).join(", ")})`:""} can always use every inbox. To make someone an admin or an employee, use <a class="link" href="#admin">Members</a>.</p></div>
     ${feat("menurate")?`<div class="panel-a" id="mn-names"><h3>AI menus: who sees who made each menu</h3>
       <p class="hint">In Likes &amp; dislikes, next to each AI menu and each menu people made themselves. The AI itself never sees names.</p>
       <label class="mn-names-l">Show the names to <select id="mn-names-sel">${MENU_NAME_OPTS.map(([k,l])=>`<option value="${k}"${MENU_NAMES===k?" selected":""}>${esc(l)}</option>`).join("")}</select></label></div>`:""}
