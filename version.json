@@ -1,6 +1,6 @@
 {
-  "web": "4.37",
+  "web": "4.38",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "“Fix it” fixes a recipe with AI from the proofreader's note."
+  "notes": "Split screen on the website; linked notes in Fix it."
 }

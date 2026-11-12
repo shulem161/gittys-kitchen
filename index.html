@@ -86,6 +86,13 @@ button{font:inherit;color:inherit}
 .brand span{font-family:var(--display);font-size:20px}
 .search{flex:1;min-width:0;max-width:380px;margin-left:auto;position:relative}
 .cb-open-btn{margin-top:8px}
+.split-top{white-space:nowrap}
+.ln-notes ul{margin:4px 0 0;padding-left:18px;display:grid;gap:4px}
+body.split-on main,body.split-on .wrap{max-width:none}body.split-on .tabbar,body.split-on .ractions{display:none}
+.split-bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 16px}.split-bar .btn{margin-left:auto}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 8px 8px;height:calc(100vh - 140px)}
+.split-pane{width:100%;height:100%;border:1px solid var(--line);border-radius:12px;background:var(--paper)}
+body.in-pane .updbar,body.in-pane .pvbar{display:none!important}
 .ed-fix{border:1px dashed var(--accent);background:var(--accent-soft);display:grid;gap:6px;margin-top:14px}.ed-fix ul{margin:4px 0 0;padding-left:20px}.ed-fix-check{color:#8a4b00}.bin-who{font-size:14px;color:var(--ink)}.bin-who i{color:var(--muted)}
 .g-ask{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end;font-size:14px;font-weight:600}
 .upd-acts{display:flex;flex-direction:column;gap:6px;flex:none;max-width:48%}.upd-for{font-size:12px;font-weight:700;color:var(--muted)}.upd-list li.no{opacity:.8}.upd-list li.no .upd-state{color:#a33}
@@ -1066,7 +1073,7 @@ body.out .tpill,body.out .talarm{display:none}
 .tm-acts .btn{min-height:42px}
 </style>
 
-</head><body class="out">
+</head><body class="out"><script>if(new URLSearchParams(location.search).has("pane")) document.body.classList.add("in-pane");</script>
 <div class="pvbar" id="pvbar" role="status" hidden></div>
 <header class="bar">
   <div class="wrap">
@@ -1079,6 +1086,7 @@ body.out .tpill,body.out .talarm{display:none}
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="m14 14 4 4" stroke-linecap="round"/></svg>
       <input id="q" type="search" placeholder="Search recipes or ingredients" aria-label="Search recipes or ingredients" autocomplete="off">
     </div>
+    <button type="button" class="btn sm split-top" id="split-btn" hidden title="Split screen">⧉ Split screen</button>
     <div class="acct" id="acct"></div>
   </div>
 </header>
@@ -1333,7 +1341,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.37";
+const WEB_VERSION = "4.38";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1361,6 +1369,12 @@ async function notifyRequest(title, message){
   try{ const s=await db.collection("meta").doc("reqwatch").get(); if(s.exists) await notifyPeople(s.data().uids||[], title, message, "#requests", "cookie"); }catch(e){}
 }
 const SITE = "https://shulem161.github.io/gittys-kitchen/";
+const SPLIT_PANE = new URLSearchParams(location.search).has("pane");   // inside one half of the split screen
+const splitAvail = () => feat("split") && !appBuild && !SPLIT_PANE;            // the website only
+const splitOn = () => { try{ return localStorage.getItem("gk-splitmode")==="1"; }catch(e){ return false; } };   // off unless turned on in Website settings
+const maySplit = () => splitAvail() && splitOn();
+function renderSplitBtn(){ const b=document.getElementById("split-btn"); if(!b) return; b.hidden = !(maySplit() && state==="approved");
+  b.onclick=()=>{ const h=location.hash.slice(1); if(h.startsWith("split~")){ document.getElementById("split-close")?.click(); return; } location.hash="split~"+(h||"")+"~"; }; }
 const appBuild = (()=>{ const m=navigator.userAgent.match(/GittysKitchenApp\/(\d+)/); return m ? +m[1] : 0; })();
 let update = null;            // {web, apk, apkUrl, notes}
 // Owner's view: every new version of the site goes first to /preview/, which only the owner can open.
@@ -1371,8 +1385,10 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["split","4.38","2026-11-12","Split screen on the website (optional)","On the website (not the phone app) there's a new “Split screen mode” switch in Website settings, off at first. Turned on, a “⧉ Split screen” button at the top opens two full copies of Gitty's Kitchen side by side, so you can see and use two recipes at once.", false],
+  ["linknotes","4.38","2026-11-12","Notes that mention another recipe","When a “Needs changes” note mentions another recipe's number (like “same as 102017”), or another recipe's note mentions this one, the recipe shows it, and “Fix it” uses those notes too.", false, "team"],
   ["rvedit","4.37","2026-11-12","Edit button in the inbox box","The blue inbox box (on a recipe and in the inbox lists) has an Edit button next to the inbox buttons — or Request a change for those who can't edit directly — so you can fix a recipe right there.", false, "team"],
-  ["aifix","4.37","2026-11-12","“Fix it” fixes the recipe with AI","Tapping “Fix it” on a recipe that needs changes opens it with the AI already applying what the note asks. It says what it changed and what it had to guess, so you can check it; Undo puts it back. Nothing is saved until you save.", false, "team"],
+  ["aifix","4.37","2026-11-12","“Fix it” fixes the recipe with AI","Tapping “Fix it” on a recipe that needs changes opens it with the AI already applying what the note asks. It shows every change in green (added) and red (taken out), and what it had to guess, so you can check it; Undo puts it back. Nothing is saved until you save.", false, "team"],
   ["binwho","4.36","2026-11-11","Recycle bin says who put each recipe there","Each recipe in the Recycle bin says clearly who deleted it and when — or, for one taken out by a merge, which recipe it was merged into and who released that.", false, "team"],
   ["alldot","4.35","2026-11-11","A dot by All employees when someone is set differently","In Employee settings and Inbox settings, the All employees column shows the same ● when one or more employees have their own, different setting for that row — so you can see it at a glance.", false, "admin"],
   ["recbin","4.34","2026-11-11","Recycle bin for deleted recipes","Deleted recipes go to a Recycle bin (in the menu, under Recipes): who deleted each one and when, and a Restore button that puts it back in the cookbook. Admins can also delete one forever. For admins, and employees allowed to delete recipes (they can restore, not delete forever).", false, "team"],
@@ -2074,7 +2090,7 @@ function recipe(r){
       <h1>${titleHTML(r)}</h1>
       ${!isPublic()?`<div class="aud ${pubVisible(r)?"pub":"priv"}">${pubVisible(r)?"🌐 Public":"🔒 Team only"}</div>`:""}
       ${!isPublic()&&(r.rv||subs.some(s=>s.status==="pending"&&s.editOf===r.id))?`<div class="rv-bar">${r.rv?`<span>📥 In <b>${INBOX_NAME[r.rv]}</b></span>`:""}${subs.filter(s=>s.status==="pending"&&s.editOf===r.id).map(s=>`<span>📝 Suggested changes in <b>${INBOX_NAME[stageOf(s)]}</b></span>`).join("")}
-        ${r.rv==="kosher"&&nkHidden()?`<div class="ib-note">🚫 Hidden from the cookbook while it's in Not kosher.</div>`:""}${r.rv==="kosher"&&r.rvNote?`<div class="ib-note"><b>🚫 Why:</b> ${esc(r.rvNote)} (${esc(r.rvNoteBy||"")})</div>`:""}${r.rv==="proof"&&r.rvNote?`<div class="ib-note"><b>✗ Needs changes</b> (${esc(r.rvNoteBy||"")}): ${esc(r.rvNote)}</div>`:""}${(r.rvAsk||[]).length?`<span class="hint">Asked to move up: ${r.rvAsk.map(a=>esc(a.name)).join(", ")}</span>`:""}<div class="row rv-acts">${rvButtons(r)}${rvEditBtn(r)}</div></div>`:""}
+        ${r.rv==="kosher"&&nkHidden()?`<div class="ib-note">🚫 Hidden from the cookbook while it's in Not kosher.</div>`:""}${r.rv==="kosher"&&r.rvNote?`<div class="ib-note"><b>🚫 Why:</b> ${esc(r.rvNote)} (${esc(r.rvNoteBy||"")})</div>`:""}${r.rv==="proof"&&r.rvNote?`<div class="ib-note"><b>✗ Needs changes</b> (${esc(r.rvNoteBy||"")}): ${esc(r.rvNote)}</div>${linkedNotesHTML(r)}`:""}${(r.rvAsk||[]).length?`<span class="hint">Asked to move up: ${r.rvAsk.map(a=>esc(a.name)).join(", ")}</span>`:""}<div class="row rv-acts">${rvButtons(r)}${rvEditBtn(r)}</div></div>`:""}
       ${!isPublic()&&subs.some(s=>s.status==="pending"&&s.dropOf===r.id)?`<div class="rv-bar"><span>🔀 Merged into <a class="link" href="#${esc(subs.find(s=>s.status==="pending"&&s.dropOf===r.id).editOf)}">${esc(subs.find(s=>s.status==="pending"&&s.dropOf===r.id).t)}</a>. This recipe is deleted automatically when the merged one is released.</span></div>`:""}
       ${!isPublic()&&(r.rvLog||[]).length?`<details class="rv-log"><summary>Who moved it through the inboxes</summary><ul>${rvLogHTML(r.rvLog)}</ul></details>`:""}
       ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}
@@ -2091,6 +2107,7 @@ function recipe(r){
         ${recipesOnline&&!offline&&(can("suggest")||may("edit"))?`<a class="btn" href="#edit-${r.id}">${may("edit")?"Edit recipe":"Request a change"}</a>`:""}
         ${isTeam()&&!offline&&!r.rv?`<button class="btn" id="proof-btn" type="button">✓ Ask someone to proofread</button>`:""}
         ${isTeam()?`<a class="btn" href="#compare~${esc(r.id)}~">⇄ Compare with another recipe</a>`:""}
+        ${maySplit()?`<a class="btn" href="#split~${esc(r.id)}~">⧉ Split screen – see another recipe beside this one</a>`:""}
         ${isTeam()&&feat("history")&&!offline?`<a class="btn" href="#history-${esc(r.id)}">🕘 History – who changed what</a>`:""}
         ${isTeam()&&!offline?`<button class="btn" id="askteam-btn" type="button">${TOOL_IC.ask.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Ask the team about this</button>`:""}
         ${(isAdmin()||may("moverec"))&&recipesOnline&&!offline?`<button class="btn" id="mv-btn" type="button">Move to another category</button>`:""}
@@ -3990,6 +4007,24 @@ function adminBanner(){
 let edAiUndo = null;
 let edFixNote = null;   // “Fix it”: the note to apply with AI when the editor opens
 const fixHref = (id, note) => `#edit-${esc(id)}${note&&feat("aifix")&&can("ai")&&!offline?"~fix":""}`;
+// Split screen (website only): two full copies of Gitty's Kitchen side by side, each its own page
+function splitPage(a, b){
+  const src = h => location.pathname + "?pane=1" + (h ? "#"+encodeURIComponent(h) : "");
+  document.body.classList.add("split-on");
+  app.innerHTML=`<div class="split-bar"><b>⧉ Split screen</b><span class="hint">Each side works on its own: open recipes, search, cook.</span><button type="button" class="btn sm" id="split-close">Close split screen</button></div>
+    <div class="split"><iframe class="split-pane" id="split-a" title="Left side" src="${src(a)}"></iframe><iframe class="split-pane" id="split-b" title="Right side" src="${src(b||"categories")}"></iframe></div>`;
+  document.getElementById("split-close").onclick=()=>{ let h=""; try{ h=document.getElementById("split-a").contentWindow.location.hash; }catch(e){} document.body.classList.remove("split-on"); location.hash = h || (a?"#"+a:""); };
+}
+// Notes that link recipes by number: this recipe's note mentions another (“same as 102017”), or another's note mentions this one
+function linkedNotes(r){
+  if(!r || !feat("linknotes")) return [];
+  const all=[...RECIPES, ...NK], out=[], seen=new Set([r.id]);
+  const codes=String(r.rvNote||"").match(/\b[12]\d{5}\b/g)||[];
+  codes.forEach(c=>{ const x=all.find(y=>y.code===c); if(x && !seen.has(x.id) && x.rvNote){ seen.add(x.id); out.push({r:x, why:"this note mentions it"}); } });
+  if(r.code) all.forEach(x=>{ if(!seen.has(x.id) && x.rvNote && new RegExp("\\b"+r.code+"\\b").test(x.rvNote)){ seen.add(x.id); out.push({r:x, why:"its note mentions this recipe"}); } });
+  return out.slice(0,5);
+}
+const linkedNotesHTML = r => { const L=linkedNotes(r); return L.length ? `<div class="ib-note ln-notes"><b>💬 Linked notes</b><ul>${L.map(x=>`<li><a class="link" href="#${esc(x.r.id)}">${esc(x.r.code||"")} ${esc(x.r.t.replace(/^Untitled: /,""))}</a> (${x.why}): “${esc(x.r.rvNote)}”${x.r.rvNoteBy?` <span class="hint">– ${esc(x.r.rvNoteBy)}</span>`:""}</li>`).join("")}</ul></div>` : ""; };
 // “Fix it” with AI: apply what the proofreader's note asks, keep everything else
 function fixPrompt(title, serves, time, secs, note){
   const written = secs.filter(s=>s.items.trim()).map(s=>`${s.ing?"INGREDIENTS":"STEPS"}${s.h?" ("+s.h+")":""}:\n${s.items.trim()}`).join("\n\n");
@@ -4180,9 +4215,9 @@ function editor(r, cat, sub, draft){
       if(meta){ const G=document.getElementById("edform"); G.querySelector("#ed-t").value=meta.t; G.querySelector("#ed-serves").value=meta.serves; G.querySelector("#ed-time").value=meta.time; const fm=document.getElementById("ed-fixmsg"); if(fm) fm.remove(); }
       toast("Back to what you wrote"); };
     // “Fix it”: apply the note with AI as soon as the editor opens
-    if(edFixNote && feat("aifix") && can("ai") && !offline){ const note=edFixNote; edFixNote=null;
+    if(edFixNote && feat("aifix") && can("ai") && !offline){ const links=linkedNotes(r), note=edFixNote+(links.length?"\nLinked notes on other recipes: "+links.map(x=>`${x.r.code} “${x.r.t.replace(/^Untitled: /,"")}”: ${x.r.rvNote}`).join(" | "):""); edFixNote=null;
       const bar=document.createElement("div"); bar.className="panel-a ed-fix"; bar.id="ed-fixmsg";
-      bar.innerHTML=`<b>✨ Fixing it with AI</b><p class="hint">From the note: “${esc(note)}”</p><p><span class="spin" aria-hidden="true"></span> Working on it… this takes about half a minute.</p>`;
+      bar.innerHTML=`<b>✨ Fixing it with AI</b><p class="hint">From the note: “${esc(note.split("\nLinked notes")[0])}”</p>${linkedNotesHTML(r)}<p><span class="spin" aria-hidden="true"></span> Working on it… this takes about half a minute.</p>`;
       F.before(bar); bar.scrollIntoView({block:"start"});
       (async()=>{ sync(); const G0=document.getElementById("edform");
         const meta={t:G0.querySelector("#ed-t").value, serves:G0.querySelector("#ed-serves").value, time:G0.querySelector("#ed-time").value};
@@ -4198,12 +4233,20 @@ function editor(r, cat, sub, draft){
           if(j.serves && String(j.serves).trim()) G.querySelector("#ed-serves").value=String(j.serves).slice(0,40);
           if(j.time && String(j.time).trim()) G.querySelector("#ed-time").value=String(j.time).slice(0,40);
           const ch=(j.changed||[]).map(String).filter(Boolean).slice(0,8), ck=(j.check||[]).map(String).filter(Boolean).slice(0,8);
-          bar.innerHTML=`<b>✨ Fixed with AI</b><p class="hint">From the note: “${esc(note)}”</p>
+          // every change, marked: green added, red taken out (as in the inboxes)
+          const asParts = L => L.filter(s=>String(s.items||"").trim()).map(s=>[s.ing?1:0, s.h||"", String(s.items).split("\n").map(x=>x.trim()).filter(Boolean)]);
+          const {one}=diffLines(recipeLines(asParts(edAiUndo)), recipeLines(asParts(parts)));
+          const newT=G.querySelector("#ed-t").value;
+          const marked = `<div class="cmp fix-diff"><p class="cmp-sum"><b>The changes</b> <span class="cmp-key"><span class="del">taken out</span> <span class="add">added</span></span></p>
+            ${newT!==meta.t?`<div class="cmp-l del"><span class="sr">Taken out: </span>Name: ${esc(meta.t)}</div><div class="cmp-l add"><span class="sr">Added: </span>Name: ${esc(newT)}</div>`:""}
+            ${one.some(([,c])=>c) ? `<div class="cmp-col">${one.map(([x,c])=>x.k==="h" ? `<div class="cmp-h${c?" "+c:""}">${esc(x.t)}</div>` : `<div class="cmp-l${c?" "+c:""}">${c==="del"?'<span class="sr">Taken out: </span>':c==="add"?'<span class="sr">Added: </span>':""}${esc(x.t)}</div>`).join("")}</div>` : `<p class="hint">No changes to the ingredients or steps.</p>`}</div>`;
+          bar.innerHTML=`<b>✨ Fixed with AI</b><p class="hint">From the note: “${esc(note.split("\nLinked notes")[0])}”</p>${linkedNotesHTML(r)}
             ${ch.length?`<div><b>What changed</b><ul>${ch.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
+            ${marked}
             ${ck.length?`<div class="ed-fix-check"><b>Please check – the AI had to guess</b><ul>${ck.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
             <p class="hint">Read it over, change anything you like, then save. Not right? <button type="button" class="link" id="ed-fix-undo">Undo</button></p>`;
           bar.querySelector("#ed-fix-undo").onclick=()=>{ const u=document.getElementById("ed-ai-undo"); if(u) u.click(); };
-        }catch(e){ if(!bar.isConnected){ const G=document.getElementById("edform"); if(G) G.before(bar); } bar.innerHTML=`<b>✨ Fix it with AI</b><p class="hint">From the note: “${esc(note)}”</p><p>The AI couldn't do it right now. You can fix it by hand below, or try again in a minute.</p>`; }
+        }catch(e){ if(!bar.isConnected){ const G=document.getElementById("edform"); if(G) G.before(bar); } bar.innerHTML=`<b>✨ Fix it with AI</b><p class="hint">From the note: “${esc(note.split("\nLinked notes")[0])}”</p>${linkedNotesHTML(r)}<p>The AI couldn't do it right now. You can fix it by hand below, or try again in a minute.</p>`; }
       })();
     }
     F.querySelectorAll(".sec-k").forEach(s=>s.onchange=()=>sync());
@@ -4698,7 +4741,7 @@ function recipeInbox(stage){
         <p class="hint">They stay in the cookbook as they are while they wait here. Open one to read it, then mark it here or on the recipe.</p>
         <input type="search" id="rv-q" placeholder="Find a recipe or category" autocomplete="off" style="width:100%;margin:6px 0 8px">
         <ul class="rv-list" id="rv-list">${rl.map((r,i)=>`<li data-rvi="${esc((r.t+" "+r.c+" "+(r.code||"")).toLowerCase())}" ${i>=40?"hidden":""}><div class="rv-top"><a class="link" href="#${esc(r.id)}">${noChip(r)} ${esc(r.t.replace(/^Untitled: /,""))}</a><span class="hint">${esc(r.c)} · ${pubVisible(r)?"🌐 Public":"🔒 Team only"}</span></div>
-          ${r.rvNote&&stage==="proof"?`<div class="ib-note"><b>✗ Needs changes</b> (${esc(r.rvNoteBy||"")}): ${esc(r.rvNote)}${mayFix(r)?` <a class="link" href="${fixHref(r.id, r.rvNote)}">Fix it</a>`:""}</div>`:""}
+          ${r.rvNote&&stage==="proof"?`<div class="ib-note"><b>✗ Needs changes</b> (${esc(r.rvNoteBy||"")}): ${esc(r.rvNote)}${mayFix(r)?` <a class="link" href="${fixHref(r.id, r.rvNote)}">Fix it</a>`:""}</div>${linkedNotesHTML(r)}`:""}
           <div class="row rv-acts">${rvButtons(r)}${rvEditBtn(r)}</div></li>`).join("")}</ul>
         ${rl.length>40?`<button type="button" class="btn" id="rv-more">Show all ${rl.length}</button>`:""}</div>`; })()}
     ${list.length ? list.map(s=>`<article class="panel-a sub-card" data-id="${esc(s.id)}">
@@ -6345,6 +6388,9 @@ function settingsPage(){
       ${seg("theme", [["light","Light"],["dark","Dark"],["auto","Automatic"]], myTheme())}
       <p class="hint" style="margin-top:8px">Automatic follows your ${appBuild?"phone":"device"}'s setting. Also used for the step-by-step cooking guide.</p></div>
     ${lookPanel()}
+    ${splitAvail()?`<div class="panel-a"><h3>Split screen mode</h3>
+      <label class="pub-row"><input type="checkbox" id="pref-split" ${splitOn()?"checked":""}><span>Show a “⧉ Split screen” button at the top, to see two pages side by side</span></label>
+      <p class="hint" style="margin-top:6px">For big screens, on this ${appBuild?"phone":"device"} only. Off until you turn it on.</p></div>`:""}
     <div class="panel-a"><h3>Text size</h3>
       ${seg("tsize", TEXT_SIZES, myTextSize())}
       <p class="hint" style="margin-top:8px">Makes recipes and pages bigger and easier to read.</p></div>
@@ -6364,6 +6410,7 @@ function settingsPage(){
   </section>`;
   app.querySelectorAll("[data-theme]").forEach(b=>b.onclick=()=>{ store("gk-theme", b.dataset.theme==="auto"?null:b.dataset.theme); applyTheme(); settingsPage(); });
   app.querySelectorAll("[data-tsize]").forEach(b=>b.onclick=()=>{ store("gk-textsize", b.dataset.tsize==="1"?null:b.dataset.tsize); applyTextSize(); settingsPage(); });
+  const ps=document.getElementById("pref-split"); if(ps) ps.onchange=()=>{ try{ localStorage.setItem("gk-splitmode", ps.checked?"1":"0"); }catch(e){} renderSplitBtn(); toast(ps.checked?"Split screen button is at the top now":"Split screen is off"); };
   const pt=document.getElementById("pref-todo"); if(pt) pt.onchange=()=>{ setPref("todoDays", +pt.value); toast("Saved"); };
   document.getElementById("set-upd").onclick=()=>checkUpdates(true);
   const stn=document.getElementById("set-ntfy"); if(stn) stn.onclick=async()=>{ const r=await notifyAdmin("Test from Gitty's Kitchen","Notifications are working.","","white_check_mark"); toast(r&&r.ok?"Test sent. Check your device.":"Couldn't send. Check your connection."); };
@@ -6814,6 +6861,8 @@ function routePage(){
   if((h==="review"||h==="approve") && may("review")){ q.value=""; recipeInbox("approve"); window.scrollTo(0,0); return; }
   if(h.startsWith("merge~") && isTeam()){ const [,a,b2]=h.split("~"); q.value=""; mergePage(a||"", b2||""); window.scrollTo(0,0); return; }
   if(h.startsWith("compare~") && isTeam()){ const [,a,b2]=h.split("~"); q.value=""; comparePage(a||"", b2||""); window.scrollTo(0,0); return; }
+  document.body.classList.remove("split-on"); renderSplitBtn();
+  if(h.startsWith("split~") && maySplit()){ const [,a,b2]=h.split("~"); q.value=""; splitPage(a||"", b2||""); return; }
   if(h==="kosher" && mayNK()){ q.value=""; kosherPage(); window.scrollTo(0,0); return; }
   if(h==="admin-approval" && (isAdmin()||may("moverec")||may("pub"))){ q.value=""; adminApprovalPage(); window.scrollTo(0,0); return; }
   if(h==="proof" && may("proofread")){ q.value=""; recipeInbox("proof"); window.scrollTo(0,0); return; }

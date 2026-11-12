@@ -906,10 +906,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*23 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 23));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*25 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 25));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 23, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 25, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -917,7 +917,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.click('[data-updtab=wait]'); await A.waitForTimeout(200);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /22/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /24/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -983,6 +983,26 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       await A.locator('#bin-list li', {hasText: 'Bin Test Cake'}).locator('[data-pyes]').click(); await A.waitForTimeout(700);
       const doc = await A.evaluate(() => db.collection('recipes').doc('r-bin-test').get().then(s => s.data()));
       ok('an admin can delete one forever from the Recycle bin (it asks first; only its number is kept for a year)', asked && (await A.locator('#bin-list li', {hasText: 'Bin Test Cake'}).count()) === 0 && doc.purged === true && !doc.t && !doc.s && doc.rv === 'proof' && await A.evaluate(() => usedCodes.has('102998')), doc); }
+    // Split screen (website only, off until turned on)
+    { await A.goto(F + '#r-challah'); await A.waitForTimeout(400);
+      const offAtFirst = await A.locator('#split-btn').isHidden() && (await A.locator('#rmenu a[href^="#split~"]').count()) === 0;
+      await A.goto(F + '#settings-look'); await A.waitForTimeout(400); await A.check('#pref-split'); await A.waitForTimeout(200);
+      await A.goto(F + '#r-challah'); await A.waitForTimeout(400);
+      const btn = await A.locator('#split-btn').isVisible();
+      await A.click('#split-btn'); await A.waitForTimeout(600);
+      const panes = await A.locator('.split-pane').evaluateAll(f => f.map(x => x.getAttribute('src')));
+      ok('split screen is off until turned on in Website settings; then a button at the top opens two pages side by side', offAtFirst && btn && panes.length === 2 && /pane=1#r-challah$/.test(panes[0]) && /pane=1#categories$/.test(panes[1]), [offAtFirst, btn, panes]);
+      await A.click('#split-close'); await A.waitForTimeout(400);
+      await A.goto(F + '#settings-look'); await A.waitForTimeout(300); await A.uncheck('#pref-split'); await A.waitForTimeout(200); }
+    // Notes that mention another recipe's number
+    { const [ca, cb] = await A.evaluate(async () => { const a = RECIPES.find(r => r.id === 'r-challah'), b = RECIPES.find(r => r.id === 'r-bobbys-challah');
+        await db.collection('recipes').doc(a.id).update({rv: 'proof', rvNote: 'Say what size pan'}); await db.collection('recipes').doc(b.id).update({rv: 'proof', rvNote: 'same as ' + a.code}); return [a.code, b.code]; });
+      await A.waitForTimeout(700); await A.goto(F + '#r-bobbys-challah'); await A.waitForTimeout(500);
+      const bar = await A.locator('.rv-bar').innerText();
+      await A.goto(F + '#r-challah'); await A.waitForTimeout(500);
+      const bar2 = await A.locator('.rv-bar').innerText();
+      ok('a note that mentions another recipe shows that recipe’s note too, both ways', /Linked notes/.test(bar) && /Say what size pan/.test(bar) && /Linked notes/.test(bar2) && new RegExp('same as ' + ca).test(bar2), [bar.slice(0, 200), bar2.slice(0, 200)]);
+      await A.evaluate(async () => { for (const id of ['r-challah', 'r-bobbys-challah']) await db.collection('recipes').doc(id).update({rv: '', rvNote: '', rvUids: []}); }); await A.waitForTimeout(500); }
     // On a phone, the bottom bar hides while the keyboard is open
     { await A.goto(F + '#plan'); await A.waitForTimeout(400); const vs = A.viewportSize();
       await A.setViewportSize({width: 390, height: 840}); await A.waitForTimeout(200);
@@ -1121,6 +1141,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       const fixTxt = await A.locator('#ed-fixmsg').innerText().catch(() => '');
       const fixed = (await A.locator('.sec-items').nth(0).inputValue()).includes('2 cups flour');
       ok('“Fix it” opens the recipe already fixed with AI from the note', /Fixed with AI/.test(fixTxt) && /Say how long to proof the dough/.test(fixTxt) && fixed && /~fix$/.test(await A.evaluate(() => location.hash)), [fixTxt.slice(0, 200), fixed]);
+      ok('…showing every change in green (added) and red (taken out)', (await A.locator('#ed-fixmsg .cmp-l.add', {hasText: '2 cups flour'}).count()) === 1 && (await A.locator('#ed-fixmsg .cmp-l.del').count()) > 0);
       await A.click('#ed-fix-undo'); await A.waitForTimeout(300);
       ok('…and Undo puts it back as it was', !(await A.locator('.sec-items').nth(0).inputValue()).includes('2 cups flour') && (await A.locator('#ed-fixmsg').count()) === 0);
       await A.goto(F + '#proof'); await A.waitForTimeout(600); }
