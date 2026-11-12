@@ -85,7 +85,7 @@ button{font:inherit;color:inherit}
 .brand svg{width:30px;height:30px;color:var(--accent)}
 .brand span{font-family:var(--display);font-size:20px}
 .search{flex:1;min-width:0;max-width:380px;margin-left:auto;position:relative}
-.cb-open-btn{margin-top:8px}
+.cb-open-btn{margin-top:8px}.bin-who{font-size:14px;color:var(--ink)}.bin-who i{color:var(--muted)}
 .g-ask{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end;font-size:14px;font-weight:600}
 .upd-acts{display:flex;flex-direction:column;gap:6px;flex:none;max-width:48%}.upd-for{font-size:12px;font-weight:700;color:var(--muted)}.upd-list li.no{opacity:.8}.upd-list li.no .upd-state{color:#a33}
 .upd-tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
@@ -1332,7 +1332,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.35";
+const WEB_VERSION = "4.36";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1370,6 +1370,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["binwho","4.36","2026-11-11","Recycle bin says who put each recipe there","Each recipe in the Recycle bin says clearly who deleted it and when — or, for one taken out by a merge, which recipe it was merged into and who released that.", false, "team"],
   ["alldot","4.35","2026-11-11","A dot by All employees when someone is set differently","In Employee settings and Inbox settings, the All employees column shows the same ● when one or more employees have their own, different setting for that row — so you can see it at a glance.", false, "admin"],
   ["recbin","4.34","2026-11-11","Recycle bin for deleted recipes","Deleted recipes go to a Recycle bin (in the menu, under Recipes): who deleted each one and when, and a Restore button that puts it back in the cookbook. Admins can also delete one forever. For admins, and employees allowed to delete recipes (they can restore, not delete forever).", false, "team"],
   ["empextra","4.33","2026-11-11","More extra privileges for one employee","In Employee settings you can now give one employee: deleting recipes, moving recipes, making recipes public, the Not kosher inbox, approving people who ask to join, seeing Activity, and Customer portal settings.", false, "team"],
@@ -3010,6 +3011,13 @@ const byCodeFor = q => (a, b) => { if(!feat("codesearch") || !/^\s*#?\d/.test(q)
   return (hb-ha) || ca.localeCompare(cb, undefined, {numeric:true}); };
 const pickMax = (q, n) => feat("codesearch") && /^\s*#?\d/.test(q) ? 30 : n;
 const pickTag = r => feat("codepick") && codeOf(r) ? codeOf(r)+" · "+r.c : r.c;
+// Who put a recipe in the Recycle bin, and when
+function binWho(r){
+  const when = r.deletedAt ? fmtDate(r.deletedAt) : "";
+  if(r.mergedBy){ const s=subs.find(x=>x.id===r.mergedBy), into=s&&(findAny(s.recipeId||s.editOf)||{}).t;
+    return `🔀 Merged into <b>${esc(into?into.replace(/^Untitled: /,""):"another recipe")}</b>${s&&s.releasedBy?` · released by <b>${esc(s.releasedBy)}</b>`:r.deletedBy?` · by <b>${esc(r.deletedBy)}</b>`:""}${when?" · "+when:""}`; }
+  return r.deletedBy ? `🗑 Deleted by <b>${esc(r.deletedBy)}</b>${when?" · "+when:""}` : `🗑 Deleted${when?" "+when:""} · <i>who did it wasn't kept back then</i>`;
+}
 // Recycle bin: deleted recipes, newest first, with who deleted them; Restore puts one back
 const mayBin = () => feat("recbin") && (isAdmin() || may("del"));
 function binPage(){
@@ -3019,7 +3027,8 @@ function binPage(){
     <p class="hint" style="margin:-6px 0 12px">Deleted recipes wait here. Restore puts one back in the cookbook as it was.${isAdmin()?" Delete forever removes it for good.":""}</p>
     ${L.length>8?`<input type="search" id="bin-q" placeholder="Find a recipe" autocomplete="off" style="width:100%;margin-bottom:10px">`:""}
     ${L.length?`<div class="panel-a"><ul class="mlist" id="bin-list">${L.map(r=>`<li class="mrow" data-bin="${esc((r.t+" "+r.c+" "+(r.code||"")).toLowerCase())}"><div class="mwho"><b>${noChip(r)} ${esc(r.t.replace(/^Untitled: /,""))}</b>
-        <span>${esc(r.c)}${r.sec?" · "+esc(r.sec):""} · deleted ${r.deletedAt?fmtDate(r.deletedAt):""}${r.deletedBy?" by "+esc(r.deletedBy):""}${r.mergedBy?" · merged into another recipe":""}</span></div>
+        ${feat("binwho") ? `<span>${esc(r.c)}${r.sec?" · "+esc(r.sec):""}</span><span class="bin-who">${binWho(r)}</span>`
+          : `<span>${esc(r.c)}${r.sec?" · "+esc(r.sec):""} · deleted ${r.deletedAt?fmtDate(r.deletedAt):""}${r.deletedBy?" by "+esc(r.deletedBy):""}${r.mergedBy?" · merged into another recipe":""}</span>`}</div>
         <div class="macts"><button type="button" class="btn solid" data-restore="${esc(r.id)}">Restore</button>${isAdmin()?`<button type="button" class="btn danger-btn" data-purge="${esc(r.id)}">Delete forever</button>`:""}</div></li>`).join("")}</ul></div>`
       : `<div class="panel-a"><p class="hint mempty">The recycle bin is empty.</p></div>`}
   </section>`;
