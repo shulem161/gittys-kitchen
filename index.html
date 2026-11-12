@@ -85,7 +85,8 @@ button{font:inherit;color:inherit}
 .brand svg{width:30px;height:30px;color:var(--accent)}
 .brand span{font-family:var(--display);font-size:20px}
 .search{flex:1;min-width:0;max-width:380px;margin-left:auto;position:relative}
-.cb-open-btn{margin-top:8px}.bin-who{font-size:14px;color:var(--ink)}.bin-who i{color:var(--muted)}
+.cb-open-btn{margin-top:8px}
+.ed-fix{border:1px dashed var(--accent);background:var(--accent-soft);display:grid;gap:6px;margin-top:14px}.ed-fix ul{margin:4px 0 0;padding-left:20px}.ed-fix-check{color:#8a4b00}.bin-who{font-size:14px;color:var(--ink)}.bin-who i{color:var(--muted)}
 .g-ask{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end;font-size:14px;font-weight:600}
 .upd-acts{display:flex;flex-direction:column;gap:6px;flex:none;max-width:48%}.upd-for{font-size:12px;font-weight:700;color:var(--muted)}.upd-list li.no{opacity:.8}.upd-list li.no .upd-state{color:#a33}
 .upd-tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
@@ -1332,7 +1333,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.36";
+const WEB_VERSION = "4.37";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1370,6 +1371,8 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["rvedit","4.37","2026-11-12","Edit button in the inbox box","The blue inbox box (on a recipe and in the inbox lists) has an Edit button next to the inbox buttons — or Request a change for those who can't edit directly — so you can fix a recipe right there.", false, "team"],
+  ["aifix","4.37","2026-11-12","“Fix it” fixes the recipe with AI","Tapping “Fix it” on a recipe that needs changes opens it with the AI already applying what the note asks. It says what it changed and what it had to guess, so you can check it; Undo puts it back. Nothing is saved until you save.", false, "team"],
   ["binwho","4.36","2026-11-11","Recycle bin says who put each recipe there","Each recipe in the Recycle bin says clearly who deleted it and when — or, for one taken out by a merge, which recipe it was merged into and who released that.", false, "team"],
   ["alldot","4.35","2026-11-11","A dot by All employees when someone is set differently","In Employee settings and Inbox settings, the All employees column shows the same ● when one or more employees have their own, different setting for that row — so you can see it at a glance.", false, "admin"],
   ["recbin","4.34","2026-11-11","Recycle bin for deleted recipes","Deleted recipes go to a Recycle bin (in the menu, under Recipes): who deleted each one and when, and a Restore button that puts it back in the cookbook. Admins can also delete one forever. For admins, and employees allowed to delete recipes (they can restore, not delete forever).", false, "team"],
@@ -2071,7 +2074,7 @@ function recipe(r){
       <h1>${titleHTML(r)}</h1>
       ${!isPublic()?`<div class="aud ${pubVisible(r)?"pub":"priv"}">${pubVisible(r)?"🌐 Public":"🔒 Team only"}</div>`:""}
       ${!isPublic()&&(r.rv||subs.some(s=>s.status==="pending"&&s.editOf===r.id))?`<div class="rv-bar">${r.rv?`<span>📥 In <b>${INBOX_NAME[r.rv]}</b></span>`:""}${subs.filter(s=>s.status==="pending"&&s.editOf===r.id).map(s=>`<span>📝 Suggested changes in <b>${INBOX_NAME[stageOf(s)]}</b></span>`).join("")}
-        ${r.rv==="kosher"&&nkHidden()?`<div class="ib-note">🚫 Hidden from the cookbook while it's in Not kosher.</div>`:""}${r.rv==="kosher"&&r.rvNote?`<div class="ib-note"><b>🚫 Why:</b> ${esc(r.rvNote)} (${esc(r.rvNoteBy||"")})</div>`:""}${r.rv==="proof"&&r.rvNote?`<div class="ib-note"><b>✗ Needs changes</b> (${esc(r.rvNoteBy||"")}): ${esc(r.rvNote)}</div>`:""}${(r.rvAsk||[]).length?`<span class="hint">Asked to move up: ${r.rvAsk.map(a=>esc(a.name)).join(", ")}</span>`:""}<div class="row rv-acts">${rvButtons(r)}</div></div>`:""}
+        ${r.rv==="kosher"&&nkHidden()?`<div class="ib-note">🚫 Hidden from the cookbook while it's in Not kosher.</div>`:""}${r.rv==="kosher"&&r.rvNote?`<div class="ib-note"><b>🚫 Why:</b> ${esc(r.rvNote)} (${esc(r.rvNoteBy||"")})</div>`:""}${r.rv==="proof"&&r.rvNote?`<div class="ib-note"><b>✗ Needs changes</b> (${esc(r.rvNoteBy||"")}): ${esc(r.rvNote)}</div>`:""}${(r.rvAsk||[]).length?`<span class="hint">Asked to move up: ${r.rvAsk.map(a=>esc(a.name)).join(", ")}</span>`:""}<div class="row rv-acts">${rvButtons(r)}${rvEditBtn(r)}</div></div>`:""}
       ${!isPublic()&&subs.some(s=>s.status==="pending"&&s.dropOf===r.id)?`<div class="rv-bar"><span>🔀 Merged into <a class="link" href="#${esc(subs.find(s=>s.status==="pending"&&s.dropOf===r.id).editOf)}">${esc(subs.find(s=>s.status==="pending"&&s.dropOf===r.id).t)}</a>. This recipe is deleted automatically when the merged one is released.</span></div>`:""}
       ${!isPublic()&&(r.rvLog||[]).length?`<details class="rv-log"><summary>Who moved it through the inboxes</summary><ul>${rvLogHTML(r.rvLog)}</ul></details>`:""}
       ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}
@@ -3985,6 +3988,26 @@ function adminBanner(){
 
 /* ---------- recipe editor (admin) ---------- */
 let edAiUndo = null;
+let edFixNote = null;   // “Fix it”: the note to apply with AI when the editor opens
+const fixHref = (id, note) => `#edit-${esc(id)}${note&&feat("aifix")&&can("ai")&&!offline?"~fix":""}`;
+// “Fix it” with AI: apply what the proofreader's note asks, keep everything else
+function fixPrompt(title, serves, time, secs, note){
+  const written = secs.filter(s=>s.items.trim()).map(s=>`${s.ing?"INGREDIENTS":"STEPS"}${s.h?" ("+s.h+")":""}:\n${s.items.trim()}`).join("\n\n");
+  return `You help a family fix recipes for their kosher cookbook, "Gitty's Kitchen".
+Recipe name: "${String(title||"").replace(/"/g,"'")}"${serves?`\nServes: ${serves}`:""}${time?`\nTime: ${time}`:""}
+The recipe now:
+${written}
+
+A proofreader checked it and wrote what needs to change: "${String(note).replace(/"/g,"'")}"
+Fix the recipe so it does what the note asks:
+- Change only what the note asks for (and what goes with it). Keep every other ingredient, amount and step word for word.
+- Ingredients: one per line, amount first; "tbsp" and "tsp" in lowercase. Steps: one action per line, in order, starting with a verb; say what to do with each ingredient, the pan and its size, the oven heat in °F and how long.
+- If the note asks something only the cook can know (an exact amount, a pan size, a name), choose the most common sensible answer for this kind of recipe and list it under "check" so the cook can confirm it.
+- If the note asks for a better name, give it in "title"; otherwise repeat the name as it is.
+- Keep it kosher: never mix meat and dairy. Write only English. Fractions like ½ ¼ ¾ ⅓.
+Answer with JSON only:
+{"title":"...", "parts":[{"kind":"ingredients"|"steps","heading":"", "items":["..."]}], "serves":"or empty", "time":"or empty", "changed":["short plain sentence per change"], "check":["what you had to guess, for the cook to confirm"]}`;
+}
 // "Add something with AI": work one addition into the recipe, keeping everything else as it is
 function addPrompt(title, secs, what){
   const written = secs.filter(s=>s.items.trim()).map(s=>`${s.ing?"INGREDIENTS":"STEPS"}${s.h?" ("+s.h+")":""}:\n${s.items.trim()}`).join("\n\n");
@@ -4153,7 +4176,36 @@ function editor(r, cat, sub, draft){
       }catch(e){ aia.disabled=false; msg.textContent="The AI couldn't do it right now. Try again in a minute."; }
     };
     const aiu=F.querySelector("#ed-ai-undo");
-    if(aiu) aiu.onclick=()=>{ if(!edAiUndo) return; secs.splice(0, secs.length, ...edAiUndo); edAiUndo=null; secs.__skip=1; redraw(); toast("Back to what you wrote"); };
+    if(aiu) aiu.onclick=()=>{ if(!edAiUndo) return; const meta=edAiUndo.meta; secs.splice(0, secs.length, ...edAiUndo); edAiUndo=null; secs.__skip=1; redraw();
+      if(meta){ const G=document.getElementById("edform"); G.querySelector("#ed-t").value=meta.t; G.querySelector("#ed-serves").value=meta.serves; G.querySelector("#ed-time").value=meta.time; const fm=document.getElementById("ed-fixmsg"); if(fm) fm.remove(); }
+      toast("Back to what you wrote"); };
+    // “Fix it”: apply the note with AI as soon as the editor opens
+    if(edFixNote && feat("aifix") && can("ai") && !offline){ const note=edFixNote; edFixNote=null;
+      const bar=document.createElement("div"); bar.className="panel-a ed-fix"; bar.id="ed-fixmsg";
+      bar.innerHTML=`<b>✨ Fixing it with AI</b><p class="hint">From the note: “${esc(note)}”</p><p><span class="spin" aria-hidden="true"></span> Working on it… this takes about half a minute.</p>`;
+      F.before(bar); bar.scrollIntoView({block:"start"});
+      (async()=>{ sync(); const G0=document.getElementById("edform");
+        const meta={t:G0.querySelector("#ed-t").value, serves:G0.querySelector("#ed-serves").value, time:G0.querySelector("#ed-time").value};
+        try{
+          const res=await askReader([fixPrompt(meta.t, meta.serves, meta.time, secs, note)]);
+          const j=JSON.parse(res.response.text().trim().replace(/^```(?:json)?\s*/,"").replace(/```$/,""));
+          const parts=(j.parts||[]).filter(x=>x && Array.isArray(x.items) && x.items.length).map(x=>({ing:!/^(steps|method)$/i.test(x.kind||x.type||""), h:String(x.heading||"").slice(0,40), items:x.items.map(s=>String(s).trim()).filter(Boolean).join("\n")}));
+          if(!parts.length) throw new Error("empty");
+          edAiUndo = secs.map(s=>Object.assign({},s)); edAiUndo.meta=meta;
+          secs.splice(0, secs.length, ...parts); secs.__skip=1; redraw();
+          const G=document.getElementById("edform"); if(!bar.isConnected) G.before(bar);
+          if(j.title && String(j.title).trim() && String(j.title).trim()!==meta.t.trim()) G.querySelector("#ed-t").value=String(j.title).trim().slice(0,120);
+          if(j.serves && String(j.serves).trim()) G.querySelector("#ed-serves").value=String(j.serves).slice(0,40);
+          if(j.time && String(j.time).trim()) G.querySelector("#ed-time").value=String(j.time).slice(0,40);
+          const ch=(j.changed||[]).map(String).filter(Boolean).slice(0,8), ck=(j.check||[]).map(String).filter(Boolean).slice(0,8);
+          bar.innerHTML=`<b>✨ Fixed with AI</b><p class="hint">From the note: “${esc(note)}”</p>
+            ${ch.length?`<div><b>What changed</b><ul>${ch.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
+            ${ck.length?`<div class="ed-fix-check"><b>Please check – the AI had to guess</b><ul>${ck.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
+            <p class="hint">Read it over, change anything you like, then save. Not right? <button type="button" class="link" id="ed-fix-undo">Undo</button></p>`;
+          bar.querySelector("#ed-fix-undo").onclick=()=>{ const u=document.getElementById("ed-ai-undo"); if(u) u.click(); };
+        }catch(e){ if(!bar.isConnected){ const G=document.getElementById("edform"); if(G) G.before(bar); } bar.innerHTML=`<b>✨ Fix it with AI</b><p class="hint">From the note: “${esc(note)}”</p><p>The AI couldn't do it right now. You can fix it by hand below, or try again in a minute.</p>`; }
+      })();
+    }
     F.querySelectorAll(".sec-k").forEach(s=>s.onchange=()=>sync());
     const del=F.querySelector("#ed-del");
     if(del) del.onclick=()=>{
@@ -4268,7 +4320,7 @@ function kosherPage(){
     <div class="panel-a"><label for="nk-q"><b>Put a recipe in Not kosher</b></label>
       <input type="search" id="nk-q" placeholder="Type a recipe name or code…" autocomplete="off" style="width:100%;margin-top:6px"><div class="pre-sugg" id="nk-s"></div></div>
     ${rl.length?`<div class="panel-a rv-panel"><ul class="rv-list">${rl.map(r=>`<li><div class="rv-top"><a class="link" href="#${esc(r.id)}">${noChip(r)} ${esc(r.t.replace(/^Untitled: /,""))}</a><span class="hint">${esc(r.c)} · put here by ${esc(r.rvNoteBy||r.rvBy||"")} · ${fmtDate(r.rvAt)}</span></div>
-      ${r.rvNote?`<div class="ib-note"><b>🚫 Why:</b> ${esc(r.rvNote)} <a class="link" href="#edit-${esc(r.id)}">Fix it</a></div>`:""}
+      ${r.rvNote?`<div class="ib-note"><b>🚫 Why:</b> ${esc(r.rvNote)} <a class="link" href="${fixHref(r.id, r.rvNote)}">Fix it</a></div>`:""}
       <div class="row rv-acts">${rvButtons(r)}</div></li>`).join("")}</ul></div>`
     :`<div class="panel-a"><p class="hint mempty">Nothing in Not kosher.</p></div>`}
   </section>`;
@@ -4345,6 +4397,9 @@ const lastMove = r => { const L=r.rvLog||[], e=L[L.length-1];
 // A recipe in For approval or Ready to release that gets edited goes back to Need to proofread
 const editedBack = (r, at) => feat("moveback") && r && (r.rv==="approve"||r.rv==="release") ? {rv:"proof", rvUids:[], rvAsk:[], rvBy:myName(), rvAt:at,
   rvLog:[...(r.rvLog||[]), {from:r.rv, to:"proof", by:myName(), uid:me, at, back:true, edited:true}].slice(-30)} : null;
+// “Edit” next to the inbox buttons: edit directly, or request a change
+const rvEditBtn = r => !feat("rvedit") || offline || !recipesOnline || isPublic() || !(may("edit")||can("suggest")) ? ""
+  : `<a class="btn sm" href="${r.rvNote?fixHref(r.id, r.rvNote):"#edit-"+esc(r.id)}">✎ ${may("edit")?"Edit":"Request a change"}</a>`;
 // The buttons for one stage (for a recipe already in the cookbook)
 function rvButtons(r){
   const st=r.rv; if(!st) return "";
@@ -4643,8 +4698,8 @@ function recipeInbox(stage){
         <p class="hint">They stay in the cookbook as they are while they wait here. Open one to read it, then mark it here or on the recipe.</p>
         <input type="search" id="rv-q" placeholder="Find a recipe or category" autocomplete="off" style="width:100%;margin:6px 0 8px">
         <ul class="rv-list" id="rv-list">${rl.map((r,i)=>`<li data-rvi="${esc((r.t+" "+r.c+" "+(r.code||"")).toLowerCase())}" ${i>=40?"hidden":""}><div class="rv-top"><a class="link" href="#${esc(r.id)}">${noChip(r)} ${esc(r.t.replace(/^Untitled: /,""))}</a><span class="hint">${esc(r.c)} · ${pubVisible(r)?"🌐 Public":"🔒 Team only"}</span></div>
-          ${r.rvNote&&stage==="proof"?`<div class="ib-note"><b>✗ Needs changes</b> (${esc(r.rvNoteBy||"")}): ${esc(r.rvNote)}${mayFix(r)?` <a class="link" href="#edit-${esc(r.id)}">Fix it</a>`:""}</div>`:""}
-          <div class="row rv-acts">${rvButtons(r)}</div></li>`).join("")}</ul>
+          ${r.rvNote&&stage==="proof"?`<div class="ib-note"><b>✗ Needs changes</b> (${esc(r.rvNoteBy||"")}): ${esc(r.rvNote)}${mayFix(r)?` <a class="link" href="${fixHref(r.id, r.rvNote)}">Fix it</a>`:""}</div>`:""}
+          <div class="row rv-acts">${rvButtons(r)}${rvEditBtn(r)}</div></li>`).join("")}</ul>
         ${rl.length>40?`<button type="button" class="btn" id="rv-more">Show all ${rl.length}</button>`:""}</div>`; })()}
     ${list.length ? list.map(s=>`<article class="panel-a sub-card" data-id="${esc(s.id)}">
         <div class="sub-head"><span class="chip">${esc(s.c)}</span><span class="hint">From ${esc(s.byName||"a member")} · ${fmtDate(s.created)}${s.proofBy?` · proofread by ${esc(s.proofBy)}`:""}${s.approvedBy?` · approved by ${esc(s.approvedBy)}`:""}${s.fixedBy?` · fixed by ${esc(s.fixedBy)}`:""}</span></div>
@@ -6746,7 +6801,7 @@ function routePage(){
   if(h==="employees" && isAdmin()){ q.value=""; employeesPage(); window.scrollTo(0,0); return; }
   if(isPublic() && ((/^(new|edit-|review)/.test(h) && !can("suggest")) || (/^scan/.test(h) && !(can("ai")&&can("suggest"))) || (h==="menu" && !can("ai")) || (h==="requests" && !can("requests")) || (/^feedback/.test(h) && !can("feedback")))){
     q.value=""; toast("That isn't available in your portal."); history.replaceState(null,"",location.pathname+location.search); home(); return; }
-  if(!offline && h.startsWith("edit-")){ const er=findAny(h.slice(5)); if(er){ q.value=""; editor(er); window.scrollTo(0,0); return; } }
+  if(!offline && h.startsWith("edit-")){ const fx=h.endsWith("~fix"), er=findAny(h.slice(5).replace(/~fix$/,"")); if(er){ q.value=""; edFixNote = fx ? (er.rvNote||null) : null; editor(er); window.scrollTo(0,0); return; } }
   if(h==="profile"){ q.value=""; profilePage(); window.scrollTo(0,0); return; }
   if(h==="settings"){ q.value=""; settingsPage(); window.scrollTo(0,0); return; }
   if(h==="inbox-settings" && isAdmin()){ q.value=""; inboxSettings(); window.scrollTo(0,0); return; }

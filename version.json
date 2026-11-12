@@ -1,6 +1,6 @@
 {
-  "web": "4.36",
+  "web": "4.37",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "The Recycle bin says who put each recipe there."
+  "notes": "“Fix it” fixes a recipe with AI from the proofreader's note."
 }
