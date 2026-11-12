@@ -135,7 +135,7 @@ service cloud.firestore {
     // What public members may do, and each category's setting for new recipes.
     match /meta/public {
       allow get: if signedIn();
-      allow write: if isAdmin()
+      allow write: if (isAdmin() || extra('portal'))
         && request.resource.data.keys().hasOnly(['allow', 'cats'])
         && request.resource.data.allow is map && request.resource.data.cats is map;
     }
@@ -222,7 +222,7 @@ service cloud.firestore {
     }
     match /meta/codes {
       allow get: if signedIn();
-      allow write: if isAdmin() || extra('review');
+      allow write: if isAdmin() || extra('review') || extra('move');
     }
 
     // Who the owner is and the name shown for them. Only the owner can change it, and only to themselves.
@@ -308,6 +308,13 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub'])
             && rvSteps())
         // Employees given "Edit recipes directly": the recipe itself only, never where it is, who sees it or whether it's deleted
+        || (resource != null && request.resource.data.get('deleted', false) == true && resource.data.get('deleted', false) == false
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'deletedAt', 'updated']) && extra('del'))
+        || (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['c', 'sec', 'code', 'oldCodes', 'history', 'updated']) && extra('move'))
+        || (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pub', 'updated']) && extra('pub'))
+        || (resource != null && (resource.data.get('rv', '') == 'kosher' || request.resource.data.get('rv', '') == 'kosher')
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'pub', 'kosherPub', 'kosherFrom'])
+            && extra('kosher'))
         || (resource != null && resource.data.get('deleted', false) == false && extra('editdirect')
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['t', 'by', 'n', 'pre', 'kind', 'time', 'serves', 's', 'history', 'updated']));
     }
@@ -318,8 +325,8 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.status == 'open'
         && request.resource.data.keys().hasOnly(['uid', 'byName', 'rid', 'title', 'status', 'created', 'kind', 'to', 'sec', 'from']);
-      allow read: if isAdmin() || extra('release') || extra('review') || (signedIn() && resource.data.uid == request.auth.uid);
-      allow update: if isAdmin() || extra('release') || extra('review');
+      allow read: if isAdmin() || extra('release') || extra('review') || extra('move') || extra('pub') || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update: if isAdmin() || extra('release') || extra('review') || extra('move') || extra('pub');
       allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
     }
 
@@ -450,7 +457,7 @@ service cloud.firestore {
         || (extra('viewas') && resource.data.status == 'approved' && resource.data.get('role', 'public') == 'public')
         // after a reset, the new sign-in may read the old profile to copy it
         || get(/databases/$(database)/documents/names/$(resource.data.name.lower())).data.uid == request.auth.uid);
-      allow list: if isAdmin();
+      allow list: if isAdmin() || extra('members');
       allow create: if signedIn() && request.auth.uid == uid
         && get(/databases/$(database)/documents/names/$(request.resource.data.name.lower())).data.uid == request.auth.uid
         && ((request.resource.data.keys().hasOnly(['name', 'status', 'created', 'favs', 'email'])
@@ -471,6 +478,10 @@ service cloud.firestore {
         || (isAdmin() && canManage(uid) && request.resource.data.get('role', 'public') in ['public', 'employee']
             // "from" is how a password reset hands over a profile (and the owner's place): admins never set it
             && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['from']))
+        // employees allowed to approve people who ask to join: approve (as a customer) or deny, nothing else
+        || (resource.data.status in ['pending', 'denied'] && request.resource.data.status in ['approved', 'denied']
+            && request.resource.data.get('role', 'public') == 'public'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'decided', 'role']) && extra('members'))
         // admins tidy up after a member's password reset (moved), on any profile but the owner's
         || (isAdmin() && uid != ownerUid() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['moved']))
         // the email link was tapped: the join request goes to the admin

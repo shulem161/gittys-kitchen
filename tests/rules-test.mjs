@@ -429,6 +429,25 @@ await check("…nor add a new recipe directly", assertFails(setDoc(doc(ED2, 'rec
 await check("an employee without it can't edit", assertFails(updateDoc(doc(E9, 'recipes', 'r-ed2'), { t: 'X' })));
 await check("…nor one who only had the old edit permission", assertFails(updateDoc(doc(as('ed'), 'recipes', 'r-ed2'), { t: 'X' })));
 
+// More extra privileges for one employee: each only its own part, off unless given
+await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
+  await setDoc(doc(d, 'users', 'xp'), { name: 'X P', status: 'approved', role: 'employee', perms: { del: true, move: true, pub: true, kosher: true, members: true, portal: true }, created: 1, favs: [] });
+  await setDoc(doc(d, 'users', 'jn'), { name: 'Joiner', status: 'pending', created: 1, favs: [] });
+  await setDoc(doc(d, 'recipes', 'r-xp'), { t: 'XP', c: 'Cakes', pub: false, deleted: false, s: [] });
+  await setDoc(doc(d, 'recipes', 'r-xp2'), { t: 'XP2', c: 'Cakes', pub: false, deleted: false, s: [] }); });
+const XP = as('xp');
+await check('an employee given “Move recipes” can move one', assertSucceeds(updateDoc(doc(XP, 'recipes', 'r-xp'), { c: 'Bread', sec: '', code: '101099', updated: 2 })));
+await check("…but not change the recipe while moving it", assertFails(updateDoc(doc(XP, 'recipes', 'r-xp'), { c: 'Cakes', t: 'Renamed' })));
+await check('given “Make recipes public”, they can make one public', assertSucceeds(updateDoc(doc(XP, 'recipes', 'r-xp'), { pub: true, updated: 3 })));
+await check('given “Not kosher”, they can put one in Not kosher', assertSucceeds(updateDoc(doc(XP, 'recipes', 'r-xp2'), { rv: 'kosher', pub: false, kosherPub: false, kosherFrom: '', rvNote: 'x' })));
+await check('given “Delete recipes”, they can delete one', assertSucceeds(updateDoc(doc(XP, 'recipes', 'r-xp'), { deleted: true, deletedAt: 4, updated: 4 })));
+await check("…but not edit the recipe itself without “Edit recipes directly”", assertFails(updateDoc(doc(XP, 'recipes', 'r-xp2'), { t: 'Changed' })));
+await check('given “Approve people who ask to join”, they can approve someone as a customer', assertSucceeds(updateDoc(doc(XP, 'users', 'jn'), { status: 'approved', decided: 5, role: 'public' })));
+await check("…but never as an employee", assertFails(updateDoc(doc(XP, 'users', 'c9'), { role: 'employee' })));
+await check('given “Customer portal settings”, they can change them', assertSucceeds(setDoc(doc(XP, 'meta', 'public'), { allow: {}, cats: {} })));
+await check("an employee without these privileges can't do any of it", assertFails(updateDoc(doc(E9, 'recipes', 'r-xp2'), { pub: true })));
+await check("…nor approve people", assertFails(updateDoc(doc(E9, 'users', 'jn'), { status: 'denied' })));
+
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(`::notice::Rule checks: ${pass} passed, ${fail} failed`);
