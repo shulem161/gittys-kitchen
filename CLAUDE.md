@@ -28,10 +28,17 @@ Family cookbook web app for Shulem Schlesinger (admin). Live at https://shulem16
 and suggested changes, `editOf` = recipe id) · `photos/{id}` (base64 JPEG `img` + `thumb`, status).
 Admin = whoever owns `names/shulem schlesinger`. Notifications: ntfy.sh topic in `NTFY_TOPIC`.
 
-## Releasing a change
-1. Edit `index.html`, with a new `UPDATES` entry and `feat()` switch for the update. 2. Bump `WEB_VERSION` in index.html,
-`"web"` in version.json and `CACHE` in sw.js together. 3. `node tests/run-all.js` must pass. 4. Commit and push to `main`.
-5. Tell the owner it's waiting for his approval in Inboxes → App & web updates.
+## Releasing a change — only four times a day (owner's rule, after GitHub suspended his account)
+NEVER push to `main` yourself. `main` publishes the site, deploys the rules and runs data changes; to keep GitHub
+activity low, it only moves at about 6 am, 12 noon, 6 pm and 12 midnight New York time, when the owner's scheduled task
+"Publish Gitty's Kitchen updates" runs the tests and fast-forwards `main` to `next`.
+1. Work on branch `next` (create it from `origin/main` if it doesn't exist). Edit `index.html`, with a new `UPDATES` entry and
+`feat()` switch for the update. 2. Bump `WEB_VERSION` in index.html, `"web"` in version.json and `CACHE` in sw.js together.
+3. `node tests/run-all.js` must pass. 4. Commit and push to `next` only — one push per finished piece of work, not per step.
+5. Tell the owner it goes live at the next time slot, then waits for his approval in Inboxes → App & web updates.
+Keep GitHub activity low: don't trigger extra workflow runs, avoid empty commits, and run the rules test (workflow_dispatch
+on `next`) only when firestore.rules changed. If the owner explicitly asks for something to go live right away, ask him to
+confirm that he wants to skip the time slots before pushing to `main`.
 The APK only needs rebuilding for native changes; its signing key is NOT in this repo (the owner has it
 in Gittys-Kitchen-backup.zip). Never commit keys or the Firebase service account.
 
