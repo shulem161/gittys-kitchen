@@ -1,6 +1,6 @@
 {
-  "web": "4.38",
+  "web": "4.39",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Split screen on the website; linked notes in Fix it."
+  "notes": "Split screen fills the whole screen, with a Close button on each side."
 }

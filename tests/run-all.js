@@ -992,7 +992,13 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       await A.click('#split-btn'); await A.waitForTimeout(600);
       const panes = await A.locator('.split-pane').evaluateAll(f => f.map(x => x.getAttribute('src')));
       ok('split screen is off until turned on in Website settings; then a button at the top opens two pages side by side', offAtFirst && btn && panes.length === 2 && /pane=1#r-challah$/.test(panes[0]) && /pane=1#categories$/.test(panes[1]), [offAtFirst, btn, panes]);
-      await A.click('#split-close'); await A.waitForTimeout(400);
+      const fit = await A.evaluate(() => { const r = document.querySelector('.split').getBoundingClientRect(), hd = document.querySelector('header.bar'), ft = document.querySelector('body>footer');
+        return Math.abs(r.bottom - innerHeight) < 2 && r.top < 6 && getComputedStyle(hd).display === 'none' && getComputedStyle(ft).display === 'none'; });
+      const fr = A.frameLocator('#split-b'); await fr.locator('#split-btn').waitFor({state: 'visible'});
+      const closeTxt = await fr.locator('#split-btn').textContent();
+      await fr.locator('#split-btn').click(); await A.waitForTimeout(500);
+      const closed = !(await A.evaluate(() => document.body.classList.contains('split-on'))) && /#categories$/.test(A.url());
+      ok('split screen fills the whole screen with no top line of its own; each side has a Close button that keeps that side\'s page', fit && /Close split screen/.test(closeTxt) && closed, [fit, closeTxt, closed, A.url()]);
       await A.goto(F + '#settings-look'); await A.waitForTimeout(300); await A.uncheck('#pref-split'); await A.waitForTimeout(200); }
     // Notes that mention another recipe's number
     { const [ca, cb] = await A.evaluate(async () => { const a = RECIPES.find(r => r.id === 'r-challah'), b = RECIPES.find(r => r.id === 'r-bobbys-challah');

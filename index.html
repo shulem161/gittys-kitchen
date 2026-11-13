@@ -89,9 +89,11 @@ button{font:inherit;color:inherit}
 .split-top{white-space:nowrap}
 .ln-notes ul{margin:4px 0 0;padding-left:18px;display:grid;gap:4px}
 body.split-on main,body.split-on .wrap{max-width:none}body.split-on .tabbar,body.split-on .ractions{display:none}
-.split-bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 16px}.split-bar .btn{margin-left:auto}
-.split{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 8px 8px;height:calc(100vh - 140px)}
-.split-pane{width:100%;height:100%;border:1px solid var(--line);border-radius:12px;background:var(--paper)}
+body.split-on>header.bar,body.split-on>footer,body.split-on>.updbar,body.split-on>.offbar,body.split-on .pvbar{display:none!important}
+body.split-on{padding:0!important;overflow:hidden}
+.split{position:fixed;inset:0;z-index:50;display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--bg,#EEF1F6);
+  padding:max(4px,env(safe-area-inset-top,0px)) max(4px,env(safe-area-inset-right,0px)) 0 max(4px,env(safe-area-inset-left,0px));height:100vh;height:100dvh;box-sizing:border-box}
+.split-pane{width:100%;height:100%;border:1px solid var(--line);border-bottom:0;border-radius:12px 12px 0 0;background:var(--paper);display:block}
 body.in-pane .updbar,body.in-pane .pvbar{display:none!important}
 .ed-fix{border:1px dashed var(--accent);background:var(--accent-soft);display:grid;gap:6px;margin-top:14px}.ed-fix ul{margin:4px 0 0;padding-left:20px}.ed-fix-check{color:#8a4b00}.bin-who{font-size:14px;color:var(--ink)}.bin-who i{color:var(--muted)}
 .g-ask{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end;font-size:14px;font-weight:600}
@@ -1341,7 +1343,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.38";
+const WEB_VERSION = "4.39";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1373,7 +1375,10 @@ const SPLIT_PANE = new URLSearchParams(location.search).has("pane");   // inside
 const splitAvail = () => feat("split") && !appBuild && !SPLIT_PANE;            // the website only
 const splitOn = () => { try{ return localStorage.getItem("gk-splitmode")==="1"; }catch(e){ return false; } };   // off unless turned on in Website settings
 const maySplit = () => splitAvail() && splitOn();
-function renderSplitBtn(){ const b=document.getElementById("split-btn"); if(!b) return; b.hidden = !(maySplit() && state==="approved");
+function renderSplitBtn(){ const b=document.getElementById("split-btn"); if(!b) return;
+  if(SPLIT_PANE){ const inSplit = window.parent!==window;
+    b.hidden=!inSplit; b.textContent="✕ Close split screen"; b.title="Close split screen"; b.onclick=()=>{ try{ window.parent.postMessage({gk:"closeSplit", h:location.hash}, "*"); }catch(e){} }; return; }
+  b.hidden = !(maySplit() && state==="approved");
   b.onclick=()=>{ const h=location.hash.slice(1); if(h.startsWith("split~")){ document.getElementById("split-close")?.click(); return; } location.hash="split~"+(h||"")+"~"; }; }
 const appBuild = (()=>{ const m=navigator.userAgent.match(/GittysKitchenApp\/(\d+)/); return m ? +m[1] : 0; })();
 let update = null;            // {web, apk, apkUrl, notes}
@@ -1385,7 +1390,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
-  ["split","4.38","2026-11-12","Split screen on the website (optional)","On the website (not the phone app) there's a new “Split screen mode” switch in Website settings, off at first. Turned on, a “⧉ Split screen” button at the top opens two full copies of Gitty's Kitchen side by side, so you can see and use two recipes at once.", false],
+  ["split","4.38","2026-11-12","Split screen on the website (optional)","On the website (not the phone app) there's a new “Split screen mode” switch in Website settings, off at first. Turned on, a “⧉ Split screen” button at the top opens two full copies of Gitty's Kitchen side by side, filling the whole screen, so you can see and use two recipes at once. Each side has a “✕ Close split screen” button at its top.", false],
   ["linknotes","4.38","2026-11-12","Notes that mention another recipe","When a “Needs changes” note mentions another recipe's number (like “same as 102017”), or another recipe's note mentions this one, the recipe shows it, and “Fix it” uses those notes too.", false, "team"],
   ["rvedit","4.37","2026-11-12","Edit button in the inbox box","The blue inbox box (on a recipe and in the inbox lists) has an Edit button next to the inbox buttons — or Request a change for those who can't edit directly — so you can fix a recipe right there.", false, "team"],
   ["aifix","4.37","2026-11-12","“Fix it” fixes the recipe with AI","Tapping “Fix it” on a recipe that needs changes opens it with the AI already applying what the note asks. It shows every change in green (added) and red (taken out), and what it had to guess, so you can check it; Undo puts it back. Nothing is saved until you save.", false, "team"],
@@ -4011,9 +4016,11 @@ const fixHref = (id, note) => `#edit-${esc(id)}${note&&feat("aifix")&&can("ai")&
 function splitPage(a, b){
   const src = h => location.pathname + "?pane=1" + (h ? "#"+encodeURIComponent(h) : "");
   document.body.classList.add("split-on");
-  app.innerHTML=`<div class="split-bar"><b>⧉ Split screen</b><span class="hint">Each side works on its own: open recipes, search, cook.</span><button type="button" class="btn sm" id="split-close">Close split screen</button></div>
-    <div class="split"><iframe class="split-pane" id="split-a" title="Left side" src="${src(a)}"></iframe><iframe class="split-pane" id="split-b" title="Right side" src="${src(b||"categories")}"></iframe></div>`;
-  document.getElementById("split-close").onclick=()=>{ let h=""; try{ h=document.getElementById("split-a").contentWindow.location.hash; }catch(e){} document.body.classList.remove("split-on"); location.hash = h || (a?"#"+a:""); };
+  app.innerHTML=`<div class="split"><iframe class="split-pane" id="split-a" title="Left side" src="${src(a)}"></iframe><iframe class="split-pane" id="split-b" title="Right side" src="${src(b||"categories")}"></iframe></div>`;
+  // No bar of its own: each side has a “✕ Close split screen” button in its top line; closing keeps the page of the side you closed from
+  window.onmessage = e => { const d=e.data; if(!d || d.gk!=="closeSplit" || !document.body.classList.contains("split-on")) return;
+    if(![...document.querySelectorAll(".split-pane")].some(f=>f.contentWindow===e.source)) return;   // only from one of our two sides
+    window.onmessage=null; document.body.classList.remove("split-on"); const h=String(d.h||""); location.hash = /^#[^<>"']*$/.test(h) && h.length>1 ? h : (a?"#"+a:""); };
 }
 // Notes that link recipes by number: this recipe's note mentions another (“same as 102017”), or another's note mentions this one
 function linkedNotes(r){
