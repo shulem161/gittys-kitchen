@@ -906,10 +906,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*25 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 25));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*26 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 26));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 25, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 26, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -917,7 +917,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.click('[data-updtab=wait]'); await A.waitForTimeout(200);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /24/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /25/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -991,14 +991,21 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       const btn = await A.locator('#split-btn').isVisible();
       await A.click('#split-btn'); await A.waitForTimeout(600);
       const panes = await A.locator('.split-pane').evaluateAll(f => f.map(x => x.getAttribute('src')));
-      ok('split screen is off until turned on in Website settings; then a button at the top opens two pages side by side', offAtFirst && btn && panes.length === 2 && /pane=1#r-challah$/.test(panes[0]) && /pane=1#categories$/.test(panes[1]), [offAtFirst, btn, panes]);
+      ok('split screen is off until turned on in Website settings; then a button at the top opens two pages side by side', offAtFirst && btn && panes.length === 2 && /pane=1&y=\d+#r-challah$/.test(panes[0]) && /pane=1$/.test(panes[1]), [offAtFirst, btn, panes]);
       const fit = await A.evaluate(() => { const r = document.querySelector('.split').getBoundingClientRect(), hd = document.querySelector('header.bar'), ft = document.querySelector('body>footer');
         return Math.abs(r.bottom - innerHeight) < 2 && r.top < 6 && getComputedStyle(hd).display === 'none' && getComputedStyle(ft).display === 'none'; });
       const fr = A.frameLocator('#split-b'); await fr.locator('#split-btn').waitFor({state: 'visible'});
       const closeTxt = await fr.locator('#split-btn').textContent();
       await fr.locator('#split-btn').click(); await A.waitForTimeout(500);
-      const closed = !(await A.evaluate(() => document.body.classList.contains('split-on'))) && /#categories$/.test(A.url());
+      const closed = !(await A.evaluate(() => document.body.classList.contains('split-on'))) && !/#split/.test(A.url());
       ok('split screen fills the whole screen with no top line of its own; each side has a Close button that keeps that side\'s page', fit && /Close split screen/.test(closeTxt) && closed, [fit, closeTxt, closed, A.url()]);
+      { await A.goto(F + '#categories'); await A.waitForTimeout(400); await A.fill('#q', 'chocolate'); await A.waitForTimeout(300);
+        await A.evaluate(() => window.scrollTo(0, 300)); await A.waitForTimeout(200); const y0 = await A.evaluate(() => scrollY);
+        await A.click('#split-btn'); await A.waitForTimeout(1500);
+        const L = A.frameLocator('#split-a'), lq = await L.locator('#q').inputValue();
+        const ly = await (A.frames().find(f => /pane=1&y=/.test(f.url()))?.evaluate(() => scrollY) ?? -1), rs = await A.locator('#split-b').getAttribute('src');
+        ok('split screen: the left side stays where you were (same page, search and scroll spot) and the right side opens Home', lq === 'chocolate' && y0 > 0 && Math.abs(ly - y0) < 10 && /pane=1$/.test(rs), [lq, y0, ly, rs]);
+        await L.locator('#split-btn').click(); await A.waitForTimeout(400); await A.fill('#q', ''); }
       await A.goto(F + '#settings-look'); await A.waitForTimeout(300); await A.uncheck('#pref-split'); await A.waitForTimeout(200); }
     // Notes that mention another recipe's number
     { const [ca, cb] = await A.evaluate(async () => { const a = RECIPES.find(r => r.id === 'r-challah'), b = RECIPES.find(r => r.id === 'r-bobbys-challah');

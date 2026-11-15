@@ -1,6 +1,6 @@
 {
-  "web": "4.39",
+  "web": "4.40",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Split screen fills the whole screen, with a Close button on each side."
+  "notes": "Split screen: left side stays where you were, right side opens Home."
 }

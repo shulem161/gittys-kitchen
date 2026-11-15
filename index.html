@@ -1343,7 +1343,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.39";
+const WEB_VERSION = "4.40";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1372,6 +1372,8 @@ async function notifyRequest(title, message){
 }
 const SITE = "https://shulem161.github.io/gittys-kitchen/";
 const SPLIT_PANE = new URLSearchParams(location.search).has("pane");   // inside one half of the split screen
+let paneRestore = SPLIT_PANE ? (P => P.has("y")||P.has("q") ? {y:+P.get("y")||0, q:P.get("q")||""} : null)(new URLSearchParams(location.search)) : null;   // the left side: where you were
+let splitFrom = null;   // set when you tap Split screen: scroll spot and search, carried to the left side
 const splitAvail = () => feat("split") && !appBuild && !SPLIT_PANE;            // the website only
 const splitOn = () => { try{ return localStorage.getItem("gk-splitmode")==="1"; }catch(e){ return false; } };   // off unless turned on in Website settings
 const maySplit = () => splitAvail() && splitOn();
@@ -1379,7 +1381,7 @@ function renderSplitBtn(){ const b=document.getElementById("split-btn"); if(!b) 
   if(SPLIT_PANE){ const inSplit = window.parent!==window;
     b.hidden=!inSplit; b.textContent="✕ Close split screen"; b.title="Close split screen"; b.onclick=()=>{ try{ window.parent.postMessage({gk:"closeSplit", h:location.hash}, "*"); }catch(e){} }; return; }
   b.hidden = !(maySplit() && state==="approved");
-  b.onclick=()=>{ const h=location.hash.slice(1); if(h.startsWith("split~")){ document.getElementById("split-close")?.click(); return; } location.hash="split~"+(h||"")+"~"; }; }
+  b.onclick=()=>{ const h=location.hash.slice(1); if(h.startsWith("split~")){ document.getElementById("split-close")?.click(); return; } if(feat("splithome")) splitFrom={y:Math.round(window.scrollY||0), q:q.value||""}; location.hash="split~"+(h||"")+"~"; }; }
 const appBuild = (()=>{ const m=navigator.userAgent.match(/GittysKitchenApp\/(\d+)/); return m ? +m[1] : 0; })();
 let update = null;            // {web, apk, apkUrl, notes}
 // Owner's view: every new version of the site goes first to /preview/, which only the owner can open.
@@ -1390,6 +1392,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["splithome","4.40","2026-11-15","Split screen: left side stays where you were, right side opens Home","When you open split screen, the left side keeps the page you were on, scrolled to the same spot and with your search still typed in, and the right side opens on the Home screen (it used to open on Categories).", false],
   ["split","4.38","2026-11-12","Split screen on the website (optional)","On the website (not the phone app) there's a new “Split screen mode” switch in Website settings, off at first. Turned on, a “⧉ Split screen” button at the top opens two full copies of Gitty's Kitchen side by side, filling the whole screen, so you can see and use two recipes at once. Each side has a “✕ Close split screen” button at its top.", false],
   ["linknotes","4.38","2026-11-12","Notes that mention another recipe","When a “Needs changes” note mentions another recipe's number (like “same as 102017”), or another recipe's note mentions this one, the recipe shows it, and “Fix it” uses those notes too.", false, "team"],
   ["rvedit","4.37","2026-11-12","Edit button in the inbox box","The blue inbox box (on a recipe and in the inbox lists) has an Edit button next to the inbox buttons — or Request a change for those who can't edit directly — so you can fix a recipe right there.", false, "team"],
@@ -4014,9 +4017,10 @@ let edFixNote = null;   // “Fix it”: the note to apply with AI when the edit
 const fixHref = (id, note) => `#edit-${esc(id)}${note&&feat("aifix")&&can("ai")&&!offline?"~fix":""}`;
 // Split screen (website only): two full copies of Gitty's Kitchen side by side, each its own page
 function splitPage(a, b){
-  const src = h => location.pathname + "?pane=1" + (h ? "#"+encodeURIComponent(h) : "");
+  const src = (h, from) => location.pathname + "?pane=1" + (from ? "&y="+from.y+(from.q?"&q="+encodeURIComponent(from.q):"") : "") + (h ? "#"+encodeURIComponent(h) : "");
+  const from = splitFrom; splitFrom = null;
   document.body.classList.add("split-on");
-  app.innerHTML=`<div class="split"><iframe class="split-pane" id="split-a" title="Left side" src="${src(a)}"></iframe><iframe class="split-pane" id="split-b" title="Right side" src="${src(b||"categories")}"></iframe></div>`;
+  app.innerHTML=`<div class="split"><iframe class="split-pane" id="split-a" title="Left side" src="${src(a, from)}"></iframe><iframe class="split-pane" id="split-b" title="Right side" src="${src(b || (feat("splithome") ? "" : "categories"))}"></iframe></div>`;
   // No bar of its own: each side has a “✕ Close split screen” button in its top line; closing keeps the page of the side you closed from
   window.onmessage = e => { const d=e.data; if(!d || d.gk!=="closeSplit" || !document.body.classList.contains("split-on")) return;
     if(![...document.querySelectorAll(".split-pane")].some(f=>f.contentWindow===e.source)) return;   // only from one of our two sides
@@ -6836,7 +6840,11 @@ window.addEventListener("hashchange", ()=>{ const h=location.hash;
 function navBack(){ if(navStack.length>1){ navGoingBack=true; history.back(); } else location.hash=""; }
 function setBack(){ const b=document.getElementById("navback"); if(b) b.hidden = !location.hash || location.hash==="#" || state!=="approved"; }
 document.getElementById("navback").onclick=navBack;
-function route(){ setBack(); if(guideOn && location.hash.slice(1)!==guideOn.r.id) closeGuide(true); document.body.classList.remove("on-recipe"); routePage(); setNav(); tickTimers(); }
+function route(){ setBack(); if(guideOn && location.hash.slice(1)!==guideOn.r.id) closeGuide(true); document.body.classList.remove("on-recipe"); routePage(); setNav(); tickTimers(); restorePane(); }
+// Split screen, left side: put back the search and the scroll spot you had before splitting (once, after the page is drawn)
+function restorePane(){ if(!paneRestore || state!=="approved") return; const R=paneRestore; paneRestore=null;
+  if(R.q){ q.value=R.q; q.dispatchEvent(new Event("input",{bubbles:true})); }
+  if(R.y>0){ let n=0; const go=()=>{ window.scrollTo(0,R.y); if(Math.abs(window.scrollY-R.y)>4 && ++n<20) setTimeout(go,150); }; setTimeout(go,60); } }
 
 function routePage(){
   closeMenu(); stopRecipePhotos();
