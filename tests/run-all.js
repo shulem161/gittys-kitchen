@@ -906,10 +906,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*26 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 26));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*30 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 30));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 26, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 30, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -917,7 +917,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.click('[data-updtab=wait]'); await A.waitForTimeout(200);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /25/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /29/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1160,7 +1160,12 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       await A.goto(F + '#proof'); await A.waitForTimeout(600); }
     await A.locator('#rv-list li', {hasText: 'Croissants'}).locator('[data-rv=ok]').click(); await A.waitForTimeout(700);
     const vnA = await V.evaluate(() => myName());
-    ok('moving it up for someone who asked puts it on their name, not yours', await A.evaluate(n => { const r = RECIPES.find(x => x.id === 'r-croissants'), e = r.rvLog[r.rvLog.length - 1]; return r.rv === 'approve' && e.by === n && !r.rvUids.includes(me); }, vnA));
+    ok('moving it up for someone who asked puts it on their name, not yours', await A.evaluate(n => { const r = RECIPES.find(x => x.id === 'r-croissants'), e = r.rvLog[r.rvLog.length - 1]; return r.rv === 'approve' && e.by === n && e.tappedBy === myName(); }, vnA));
+    ok('…but whoever tapped is noted too, so they can’t approve it as well (update movecredit)', await A.evaluate(() => RECIPES.find(x => x.id === 'r-croissants').rvUids.includes(me)));
+    await A.goto(F + '#approve'); await A.waitForTimeout(600);
+    ok('…the For approval inbox says someone else has to do it', /someone else has to do the next step/.test(await A.locator('#rv-list li', {hasText: 'Croissants'}).innerText()) && (await A.locator('#rv-list li', {hasText: 'Croissants'}).locator('[data-rv=approve]').count()) === 0);
+    // someone else proofread it (so the owner can go on with the steps below)
+    await A.evaluate(async () => { const r = RECIPES.find(x => x.id === 'r-croissants'); await db.collection('recipes').doc('r-croissants').update({rvUids: r.rvUids.filter(u => u !== me)}); }); await A.waitForTimeout(500);
     await A.goto(F + '#approve'); await A.waitForTimeout(600); await A.locator('#rv-list li', {hasText: 'Croissants'}).locator('[data-rv=approve]').click(); await A.waitForTimeout(700);
     await A.goto(F + '#release'); await A.waitForTimeout(600);
     ok('the same person can’t move it two steps', /someone else has to do the next step/.test(await A.locator('#rv-list li', {hasText: 'Croissants'}).innerText()) && (await A.locator('#rv-list li', {hasText: 'Croissants'}).locator('[data-rv=pub]').count()) === 0);
@@ -1261,6 +1266,22 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('the back button goes back one screen at a time', b1 === '#c-bread' && await A.evaluate(() => location.hash) === '#categories', b1);
     await A.setViewportSize({width: 390, height: 844}); await A.goto(F + '#r-croissants'); await A.waitForTimeout(700);
     ok('…and fits on a phone', await A.locator('#navback').isVisible() && await A.evaluate(() => document.documentElement.scrollWidth) <= 390); await A.setViewportSize({width: 1100, height: 900});
+
+    // Delete my profile happens all at once (update safedelete); removed members can ask to join again (update rejoin)
+    await A.evaluate(async () => { const s = await db.collection('meta').doc('features').get(); const on = Object.assign({}, (s.exists && s.data().on) || {}, {rejoin: true, safedelete: true}); await db.collection('meta').doc('features').set({on, by: 'Test', at: Date.now()}); });
+    { const RD = await page(); await join(RD, 'Dina Delete', 'secret77'); await RD.waitForTimeout(500);
+      const rdUid = await RD.evaluate(() => me);
+      await A.evaluate(async uid => { await db.collection('users').doc(uid).update({status: 'approved', role: 'public'}); }, rdUid); await RD.waitForTimeout(900);
+      await RD.goto(F + '#account'); await RD.waitForTimeout(700); await RD.click('#prof-del'); await RD.click('#pd-yes'); await RD.waitForTimeout(1000);
+      ok('Delete my profile takes away the name and the profile together', await A.evaluate(async uid => !(await db.collection('users').doc(uid).get()).exists && !(await db.collection('names').doc('dina delete').get()).exists, rdUid));
+      await RD.close();
+      const RK = await page(); await join(RK, 'Rafi Rejoin', 'secret77'); await RK.waitForTimeout(500);
+      const rkUid = await RK.evaluate(() => me);
+      await A.evaluate(async uid => { await removeMember({uid, name: 'Rafi Rejoin'}); }, rkUid); await RK.waitForTimeout(1200);
+      ok('a removed member sees “Ask to join again”', /Profile removed/.test(await RK.locator('#app').innerText()) && (await RK.locator('#rj-nm').count()) === 1, await RK.locator('#app').innerText());
+      await RK.fill('#rj-nm', 'Rafi Rejoin'); await RK.click('#authform .primary'); await RK.waitForTimeout(1200);
+      ok('…which sends a new request that waits for approval', /Waiting for approval/.test(await RK.locator('#app').innerText()) && await A.evaluate(async uid => { const u = await db.collection('users').doc(uid).get(), n = await db.collection('names').doc('rafi rejoin').get(); return u.exists && u.data().status === 'pending' && !u.data().role && n.exists && n.data().uid === uid; }, rkUid));
+      await RK.close(); }
 
     // Search
     await V.goto(F); await V.waitForTimeout(300); await V.fill('#q', 'challah'); await V.waitForTimeout(300);

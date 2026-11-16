@@ -1,6 +1,6 @@
 {
-  "web": "4.40",
+  "web": "4.41",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Split screen: left side stays where you were, right side opens Home."
+  "notes": "Fixes from the weekly check-up: rejoining after removal, safer Delete my profile, three-person rule, private phone notices."
 }

@@ -65,6 +65,11 @@ service cloud.firestore {
       let s = get(/databases/$(database)/documents/submissions/$(request.resource.data.mergedBy)).data;
       return s.get('dropOf', '') == rid && s.get('stage', '') == 'release' && s.get('status', '') == 'pending';
     }
+    // An app update the owner approved for everyone or for the team (meta/features.on)
+    function featOn(k) {
+      let f = /databases/$(database)/documents/meta/features;
+      return exists(f) && get(f).data.get('on', {}).get(k, false) in [true, 'team'];
+    }
     // Recipe inboxes: three different people. Whoever proofread can't approve; neither of them can release.
     // Ordinary edits never move a recipe between inboxes
     function noRvChange() {
@@ -78,8 +83,8 @@ service cloud.firestore {
       let pubSame = request.resource.data.get('pub', null) == resource.data.get('pub', null);
       let before = resource.data.get('rvUids', []);
       let after = request.resource.data.get('rvUids', []);
-      // the person moving it is written down (or it goes on the name of whoever asked)
-      let noted = request.auth.uid in after || resource.data.get('rvAsk', []).size() > 0;
+      // the person moving it is written down (before update "movecredit", it could go only on the name of whoever asked)
+      let noted = request.auth.uid in after || (resource.data.get('rvAsk', []).size() > 0 && !featOn('movecredit'));
       return (pubSame
           && ((was == now && after == before)                                              // a note, nothing moves
               || (now == 'proof' && was in ['', 'proof', 'approve', 'release'] && after.size() == 0)   // back to the start
@@ -184,9 +189,10 @@ service cloud.firestore {
       allow write: if isOwner() && request.resource.data.keys().hasOnly(['approve', 'by', 'at', 'live', 'liveAt'])
         && request.resource.data.approve is string;
     }
-    // Owner's view: which new features are switched on for everyone. Everyone reads it; only the owner switches.
+    // Owner's view: which new features are switched on for everyone. Everyone reads it (also a removed member,
+    // for "Ask to join again"); only the owner switches.
     match /meta/features {
-      allow get: if approvedMember();
+      allow get: if signedIn();
       allow write: if isOwner() && request.resource.data.keys().hasOnly(['on', 'by', 'at']) && request.resource.data.on is map;
     }
     // History: each saved version of a recipe, kept for the team. Written once, never changed.
@@ -290,7 +296,8 @@ service cloud.firestore {
       allow update: if isTeam() && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rvAsk'])
         // edited, or undone by whoever moved it: back one step, or back to Need to proofread
         || (((resource.data.get('rv', '') in ['approve', 'release'] && request.resource.data.get('rv', '') == 'proof' && request.resource.data.get('rvUids', []).size() == 0)
-             || (resource.data.get('rv', '') == 'release' && request.resource.data.get('rv', '') == 'approve'))
+             || (resource.data.get('rv', '') == 'release' && request.resource.data.get('rv', '') == 'approve'
+                 && resource.data.get('rvUids', []).hasAll(request.resource.data.get('rvUids', []))))
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog']))
         || (resource.data.get('rv', '') == '' && request.resource.data.get('rv', '') == 'proof'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog'])));
@@ -340,6 +347,20 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['uids']) && request.resource.data.uids is list;
     }
 
+    // Who handled a member recipe (uids) is never wiped out: moving it on adds the mover, going back to
+    // Need to proofread starts over, and undoing a move takes off only the person undoing it, one step back.
+    function subUidsOk() {
+      let ou = resource.data.get('uids', []);
+      let nu = request.resource.data.get('uids', []);
+      let os = resource.data.get('stage', 'approve');
+      let ns = request.resource.data.get('stage', 'approve');
+      return (nu == ou && (ns == os || ns == 'proof' || (os == 'release' && ns == 'approve')))
+        || (ns == 'proof' && nu.size() == 0)
+        || (nu == ou.concat([request.auth.uid]) && !(request.auth.uid in ou)
+            && ((os == 'proof' && ns == 'approve') || (os == 'approve' && ns == 'release')))
+        || (request.auth.uid in ou && nu == ou.removeAll([request.auth.uid])
+            && ((os == 'release' && ns == 'approve') || (os == 'approve' && ns == 'proof')));
+    }
     // Recipes sent in by members. Only the admin sees all of them and decides.
     match /submissions/{id} {
       allow create: if (can('suggest') || extra('edit') || isAdmin())
@@ -351,7 +372,8 @@ service cloud.firestore {
         && (request.resource.data.get('stage', '') != 'release' || resource.data.get('stage', '') == 'release'
             || !(request.auth.uid in resource.data.get('uids', [])))
         && (request.resource.data.status != 'approved' || resource.data.status == 'approved'
-            || !(request.auth.uid in resource.data.get('uids', [])));
+            || !(request.auth.uid in resource.data.get('uids', [])))
+        && (isAdmin() || subUidsOk());
       allow delete: if extra('review')
         || (signedIn() && resource.data.uid == request.auth.uid && resource.data.status == 'pending');
     }

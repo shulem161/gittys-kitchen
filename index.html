@@ -1343,7 +1343,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.40";
+const WEB_VERSION = "4.41";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1355,6 +1355,7 @@ function notifyTopic(topic, title, message, hash, tags){
   const q = new URLSearchParams({title, click: "https://shulem161.github.io/gittys-kitchen/"+(hash||""), tags: tags||"bell", priority: "4"});
   return fetch("https://ntfy.sh/"+topic+"?"+q.toString(), {method:"POST", body: message}).catch(()=>{});
 }
+const noticeText = t => feat("quietnotice") ? "Tap to read it in Gitty's Kitchen." : String(t||"").slice(0,180);   // notice channels aren't private
 async function notifyPeople(uids, title, message, hash, tags){
   if(!db || offline) return;
   const list=[...new Set(uids)].filter(u=>u && u!==me && u!==adminUid);   // the owner already hears through the main topic
@@ -1392,6 +1393,10 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["rejoin","4.41","2026-11-16","Removed members can ask to join again","Someone whose profile was removed (by you, or by tapping Delete my profile) used to be stuck: the app said they could sign up again, but their email was “already taken” and signing in just showed “Profile removed”. Now that screen has an “Ask to join again” button. It sends a new join request with the sign-in they already have, and it waits for your approval like any new member.", false],
+  ["safedelete","4.41","2026-11-16","Delete my profile happens all at once, or says it couldn't","Delete my profile now takes away the name and the profile together, in one save. If the connection drops, it says “Couldn't delete” instead of signing out as if it worked. Before, it could leave the profile behind with the name free, so someone new could take that name and get in with the old approval.", false],
+  ["movecredit","4.41","2026-11-16","Whoever taps Approve can't also Release","When someone moves a recipe up because a colleague asked, the asker still gets the credit, but the person who tapped is now also noted, so they can't take the next step themselves. This keeps the “three different people” rule. (The database checks this too, once this update is approved for everyone or the team.)", false],
+  ["quietnotice","4.41","2026-11-16","Phone notices don't show private messages","Phone notices about team messages, proofreading notes and feedback now say who it's from and “Tap to read it in Gitty's Kitchen”, instead of showing the message itself. Phone notice channels can be followed by anyone who knows their name, so this keeps the messages private.", false],
   ["splithome","4.40","2026-11-15","Split screen: left side stays where you were, right side opens Home","When you open split screen, the left side keeps the page you were on, scrolled to the same spot and with your search still typed in, and the right side opens on the Home screen (it used to open on Categories).", false],
   ["split","4.38","2026-11-12","Split screen on the website (optional)","On the website (not the phone app) there's a new “Split screen mode” switch in Website settings, off at first. Turned on, a “⧉ Split screen” button at the top opens two full copies of Gitty's Kitchen side by side, filling the whole screen, so you can see and use two recipes at once. Each side has a “✕ Close split screen” button at its top.", false],
   ["linknotes","4.38","2026-11-12","Notes that mention another recipe","When a “Needs changes” note mentions another recipe's number (like “same as 102017”), or another recipe's note mentions this one, the recipe shows it, and “Fix it” uses those notes too.", false, "team"],
@@ -1701,6 +1706,18 @@ async function removeMember(m){
 }
 async function deleteMe(){
   const u=auth.currentUser, name=myName();
+  if(feat("safedelete")){   // name and profile go together, or nothing changes and they're told
+    pendingCreate=true;
+    try{
+      const nref=db.collection("names").doc(nameKey(name)), n=await nref.get(), b=db.batch();
+      if(n.exists && n.data().uid===u.uid) b.delete(nref);
+      b.delete(db.collection("users").doc(u.uid)); await b.commit();
+    }catch(e){ pendingCreate=false; toast("Couldn't delete your profile. Check your connection and try again."); return; }
+    try{ await u.delete(); }catch(e){}   // needs a recent sign-in; if it stays, "Ask to join again" works with it
+    pendingCreate=false;
+    store("gk-cache",null); location.hash=""; try{ await auth.signOut(); }catch(e){}
+    return;
+  }
   try{
     await db.collection("names").doc(nameKey(name)).delete();
     pendingCreate=true;
@@ -1726,6 +1743,30 @@ async function renameMe(newName){
   catch(e){ await db.collection("names").doc(key).delete().catch(()=>{}); throw e; }
   if(oldKey!==ADMIN_KEY) await db.collection("names").doc(oldKey).delete().catch(()=>{});
   if(!isAdmin()) notifyAdmin(`${old} is now ${name}`, `${old} changed their name to ${name}. They sign in with the new name.`, "#admin", "pencil2");
+}
+// Profile removed: ask to join again with the sign-in they already have (a new request, waiting for approval)
+async function rejoin(name){
+  const u=auth.currentUser; if(!u) throw {code:"gk/noname"};
+  const key=nameKey(name);
+  if(key===ADMIN_KEY) throw {code:"gk/taken"};
+  const nref=db.collection("names").doc(key), taken=await nref.get();
+  if(taken.exists && taken.data().uid!==u.uid) throw {code:"gk/taken"};
+  try{ await u.reload(); }catch(e){}
+  const v=auth.currentUser||u, ok=!!v.emailVerified;
+  if(ok){ try{ await v.getIdToken(true); }catch(e){} }
+  pendingCreate=true;
+  try{
+    if(!taken.exists){ try{ await nref.set({uid:v.uid, email:""}); }catch(e){ throw {code:"gk/taken"}; } }
+    try{ await db.collection("users").doc(v.uid).set({name, status: ok ? "pending" : "unverified", created: Date.now(), favs: [], email: v.email}); }
+    catch(e){ if(!taken.exists) await nref.delete().catch(()=>{}); throw e; }
+  } finally { pendingCreate=false; }
+  if(ok) notifyAdmin(`${name} asked to join again`, "Tap to open Approve members in Gitty's Kitchen.", "#admin", "wave");
+  else await sendConfirm();
+}
+let rejoinFeat=false;   // a removed member can't read the update switches, so they're fetched once here
+function loadRejoinFeat(){
+  if(rejoinFeat || !db) return; rejoinFeat=true;
+  db.collection("meta").doc("features").get().then(s=>{ if(s.exists && s.data().on) FEAT=s.data().on; if(state==="removed") route(); }).catch(()=>{});
 }
 /* ---------- password reset codes ----------
    Firebase can't change someone else's password from the app, so a code lets the person make a fresh
@@ -2281,7 +2322,23 @@ function gate(msg){
       <p class="hint">Let ${A} know you signed up so they can approve you sooner.</p>
       <p class="switch"><button type="button" class="link" data-signout>Sign out</button></p>`); return; }
   if(state==="denied"){ shell(`<h2>Request not approved</h2><p class="sub">${A} hasn't approved access for ${esc(myName())}. If you think this is a mistake, contact ${A}.</p><button class="btn" type="button" data-signout style="padding:12px">Sign out</button>`); return; }
-  if(state==="removed"){ shell(`<h2>Profile removed</h2><p class="sub">This profile is no longer on the member list. You can sign up again, and ${A} will be asked to approve it.</p><button class="primary" type="button" data-signout>Back to sign in</button>`); return; }
+  if(state==="removed"){
+    const cu=auth&&auth.currentUser;
+    if(cu && realEmail(cu.email)) loadRejoinFeat();
+    if(feat("rejoin") && cu && realEmail(cu.email)){
+      const F=shell(`<h2>Profile removed</h2><p class="sub">This profile is no longer on the member list. You can ask to join again with the same sign-in (${esc(cu.email)}), and ${A} will be asked to approve it.</p>
+        <div class="field"><label for="rj-nm">Your full name</label><input id="rj-nm" type="text" autocomplete="name" maxlength="40" value="${esc(authDraft.nm||"")}"></div>
+        ${msg?`<p class="err" role="alert">${esc(msg)}</p>`:""}
+        <button class="primary" type="submit">Ask to join again</button>
+        <p class="switch"><button type="button" class="link" data-signout>Sign out</button></p>`);
+      F.onsubmit=async e=>{ e.preventDefault(); const btn=F.querySelector(".primary"); if(btn.disabled) return;
+        const name=cleanName(F.querySelector("#rj-nm").value); authDraft={nm:name};
+        if(name.length<2) return gate("Enter your full name.");
+        if(/[\/]/.test(name)) return gate("Names can't include a slash (/).");
+        btn.disabled=true; btn.textContent="Sending…";
+        try{ await rejoin(name); authDraft={}; }catch(err){ gate(errText(err)); } };
+      return; }
+    shell(`<h2>Profile removed</h2><p class="sub">This profile is no longer on the member list. You can sign up again, and ${A} will be asked to approve it.</p><button class="primary" type="button" data-signout>Back to sign in</button>`); return; }
   authScreen(msg);
 }
 function authScreen(msg){
@@ -3675,8 +3732,8 @@ async function markProof(t, ok, note){
   const text = (ok ? "✓ Looks good" : "✗ Needs changes") + (note ? ": "+note : "");
   upd.msgs=[...(t.msgs||[]), {by:me, name:myName(), text, at:now}].slice(-200);
   await db.collection("threads").doc(t.id).update(upd); Object.assign(t, upd);
-  if(adminUid && t.members.includes(adminUid) && adminUid!==me) notifyAdmin(`${myName()} proofread ${t.rtitle}`, text, "#team-"+t.id, ok?"white_check_mark":"pencil2");
-  notifyPeople(t.members, `${myName()} proofread ${t.rtitle}`, text, "#team-"+t.id, ok?"white_check_mark":"pencil2");
+  if(adminUid && t.members.includes(adminUid) && adminUid!==me) notifyAdmin(`${myName()} proofread ${t.rtitle}`, feat("quietnotice") ? noticeText(text) : text, "#team-"+t.id, ok?"white_check_mark":"pencil2");
+  notifyPeople(t.members, `${myName()} proofread ${t.rtitle}`, feat("quietnotice") ? noticeText(text) : text, "#team-"+t.id, ok?"white_check_mark":"pencil2");
 }
 function threadTitle(t){ return t.kind==="proof" ? `Proofread: ${t.rtitle}` : t.subject || (t.rtitle ? `About ${t.rtitle}` : "Message"); }
 function threadWho(t){ const others=Object.entries(t.names||{}).filter(([u])=>u!==me).map(([,n])=>n);
@@ -3697,8 +3754,8 @@ async function startThread(to, text, r, kind){
     msgs:[{by:me, name:myName(), text, at:now}], updated:now, lastBy:me, readAt:{[me]:now}, done:false, created:now, ...(kind==="proof"?{kind:"proof", checks:{}}:{})};
   await ref.set(t); THREADS.unshift(Object.assign({id:ref.id}, t));
   const ttl = kind==="proof" ? `${myName()} asks you to proofread ${t.rtitle}` : `${myName()}: ${r?"about "+t.rtitle:"team message"}`;
-  if(adminUid && membersList.includes(adminUid) && adminUid!==me) notifyAdmin(ttl, text.slice(0,180), "#team-"+ref.id, kind==="proof"?"pencil2":"speech_balloon");
-  notifyPeople(membersList, ttl, text.slice(0,180), "#team-"+ref.id, kind==="proof"?"pencil2":"speech_balloon");
+  if(adminUid && membersList.includes(adminUid) && adminUid!==me) notifyAdmin(ttl, noticeText(text), "#team-"+ref.id, kind==="proof"?"pencil2":"speech_balloon");
+  notifyPeople(membersList, ttl, noticeText(text), "#team-"+ref.id, kind==="proof"?"pencil2":"speech_balloon");
   return ref.id;
 }
 async function replyThread(t, text){
@@ -3706,8 +3763,8 @@ async function replyThread(t, text){
   const now=Date.now(), msgs=[...(t.msgs||[]), {by:me, name:myName(), text, at:now}].slice(-200), readAt=Object.assign({}, t.readAt||{}, {[me]:now});
   await db.collection("threads").doc(t.id).update({msgs, updated:now, lastBy:me, readAt, done:false});
   Object.assign(t, {msgs, updated:now, lastBy:me, readAt, done:false});
-  if(adminUid && t.members.includes(adminUid) && adminUid!==me) notifyAdmin(`${myName()} replied`, text.slice(0,180), "#team-"+t.id, "speech_balloon");
-  notifyPeople(t.members, `${myName()} replied`, text.slice(0,180), "#team-"+t.id, "speech_balloon");
+  if(adminUid && t.members.includes(adminUid) && adminUid!==me) notifyAdmin(`${myName()} replied`, noticeText(text), "#team-"+t.id, "speech_balloon");
+  notifyPeople(t.members, `${myName()} replied`, noticeText(text), "#team-"+t.id, "speech_balloon");
 }
 function toSelect(id, dflt){
   const others=(TEAM.length?TEAM:[]).filter(x=>x.uid!==me), owner=others.find(x=>x.role==="owner");
@@ -4403,7 +4460,8 @@ function rvMove(r, to, extra, msg){
   const credit = feat("askcredit") && asked.length && to!=="proof";   // the move goes on the name of whoever asked
   const entry = credit ? {from:r.rv, to:to||"done", by:asked.map(a=>a.name).join(", "), uid:asked[0].uid, at:now, tappedBy:myName(), tappedUid:me, credited:asked.map(a=>({uid:a.uid, name:a.name})), ...(extra&&extra.pub!==undefined?{pub:extra.pub}:{})}
     : {from:r.rv, to:to||"done", by:myName(), uid:me, at:now, ...(asked.length?{asked:asked.map(a=>({uid:a.uid, name:a.name}))}:{}), ...(extra&&extra.pub!==undefined?{pub:extra.pub}:{})};
-  const uids = to==="proof" ? [] : credit ? [...new Set([...(r.rvUids||[]), ...asked.map(a=>a.uid)])] : [...new Set([...(r.rvUids||[]), me, ...asked.map(a=>a.uid)])];
+  // movecredit: whoever tapped is noted too (the asker keeps the credit), so they can't take the next step themselves
+  const uids = to==="proof" ? [] : credit ? [...new Set([...(r.rvUids||[]), ...asked.map(a=>a.uid), ...(feat("movecredit")?[me]:[])])] : [...new Set([...(r.rvUids||[]), me, ...asked.map(a=>a.uid)])];
   return setRv(r, Object.assign({rv:to, rvBy:myName(), rvAt:now, rvUids:uids, rvAsk:[], rvLog:[...(r.rvLog||[]), entry].slice(-30)}, extra||{}), msg);
 }
 const RV_STEP = {kosher:"🚫 Put in Not kosher", "kosher-ok":"✓ Checked: kosher, taken out of Not kosher", approve:"Proofread ✓ → For approval", release:"Approved → Ready to release", done:"Released", proof:"Put in Need to proofread"};
@@ -4784,7 +4842,7 @@ function recipeInbox(stage){
     on("fix", ()=>{ acts.innerHTML=`<form class="ib-fix"><label>What needs to change? <span class="hint">It stays here until someone fixes it.</span></label><textarea rows="2" maxlength="600"></textarea><div class="row"><button type="submit" class="btn solid">Save</button><button type="button" class="btn" data-ib="cancel">Cancel</button></div></form>`;
       const f=acts.querySelector("form"); f.querySelector("textarea").focus(); on("cancel", ()=>recipeInbox(stage));
       f.onsubmit=async e=>{ e.preventDefault(); const note=f.querySelector("textarea").value.trim(); if(!note){ toast("Write what needs to change."); return; }
-        if(await upd(s, {proofNote:note, proofNoteBy:myName(), proofNoteAt:Date.now()}, "Marked: needs changes")) notifyWatchers("watch-proof", `${s.t} needs changes`, `${myName()}: ${note}`, "#proof", "pencil2"); }; });
+        if(await upd(s, {proofNote:note, proofNoteBy:myName(), proofNoteAt:Date.now()}, "Marked: needs changes")) notifyWatchers("watch-proof", `${s.t} needs changes`, feat("quietnotice") ? `${myName()} wrote what needs to change. ${noticeText("")}` : `${myName()}: ${note}`, "#proof", "pencil2"); }; });
     on("approve", async()=>{ if(await upd(s, logged("release", {stage:"release", approvedBy:myName(), approvedUid:me, approvedAt:Date.now()}), "Approved – ready to release")) notifyWatchers("watch-release", `Ready to release`, `“${s.t}” was approved by ${myName()}.`, "#release", "white_check_mark"); });
     on("back", ()=>upd(s, Object.assign(logged("proof", {stage:"proof", proofUid:"", approvedUid:"", proofBy:"", approvedBy:""}), {uids:[]}), "Sent back to proofread"));
     on("undo", ()=>{ const e=subLast(s); if(!e) return; const to=e.from;
@@ -5591,7 +5649,7 @@ function feedbackPage(recipeId){
     const btn=F.querySelector(".primary"); btn.disabled=true; btn.textContent="Sending…";
     try{
       await db.collection("feedback").doc("f-"+newId()).set({uid:me, byName:myName(), kind, text, recipeId:rec?rec.id:"", recipeTitle:rec?rec.t.replace(/^Untitled: /,""):"", status:"new", reply:"", created:Date.now()});
-      if(!isAdmin()) notifyAdmin(`${FB_KINDS[kind]} from ${myName()}`, text.slice(0,180), "#inbox", "speech_balloon");
+      if(!isAdmin()) notifyAdmin(`${FB_KINDS[kind]} from ${myName()}`, noticeText(text), "#inbox", "speech_balloon");
       toast("Sent. Thank you!"); F.reset(); location.hash = "feedback";
     }catch(x){ btn.disabled=false; btn.textContent="Send"; err.textContent="Couldn't send. Check your internet connection and try again."; err.hidden=false; }
   };
