@@ -149,7 +149,7 @@ await check("public member can't list all recipes", assertFails(fs.getDocs(fs.co
 await check("employee can't edit recipes", assertFails(updateDoc(doc(EMP, 'recipes', 'r-pub'), { t: 'X' })));
 await check('admin can edit recipes', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-pub'), { t: 'Shown!' })));
 await check('admin can hide a recipe from the public', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-pub'), { pub: false })));
-const sub = uid => ({ uid, status: 'pending', t: 'Idea', c: 'Cakes' });
+const sub = uid => ({ uid, status: 'pending', stage: 'proof', t: 'Idea', c: 'Cakes' });
 await check('employee can suggest a recipe', assertSucceeds(setDoc(doc(EMP, 'submissions', 's1'), sub('emp'))));
 // Per-person employee permissions
 await check('employee can request', assertSucceeds(setDoc(doc(EMP, 'requests', 'q8'), rq('emp'))));
@@ -327,6 +327,7 @@ await check('putting a public recipe in Private makes it team only', assertSucce
 await check("…it can't stay public while private", assertFails(updateDoc(doc(ADM, 'recipes', 'r-pv3'), { pub: true })));
 await check('the owner can make an exception', assertSucceeds(updateDoc(doc(OWN, 'recipes', 'r-pv2'), { pub: true, priv: false, privEx: { by: 'Owner', at: 1 } })));
 // New recipes: the first inbox (4.49)
+await check("a new recipe that doesn't say its first inbox is refused (it would skip Need to proofread)", assertFails(setDoc(doc(EMP, 'submissions', 's-nostage'), { uid: 'emp', status: 'pending', t: 'X', c: 'Cakes' })));
 await check("an employee without “Choose the first inbox” can't start a new recipe in Yoely", assertFails(setDoc(doc(EMP, 'submissions', 's-yo1'), { uid: 'emp', status: 'pending', stage: 'yoely', t: 'X', c: 'Cakes' })));
 await check("…nor skip ahead to For approval", assertFails(setDoc(doc(EMP, 'submissions', 's-yo2'), { uid: 'emp', status: 'pending', stage: 'approve', t: 'X', c: 'Cakes' })));
 await check('…but can send it to Need to proofread', assertSucceeds(setDoc(doc(EMP, 'submissions', 's-yo3'), { uid: 'emp', status: 'pending', stage: 'proof', t: 'X', c: 'Cakes' })));
