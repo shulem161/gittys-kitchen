@@ -1352,10 +1352,15 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.43";
+const WEB_VERSION = "4.44";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
+// plainadmin: the main channel's name is in the page, so its notices say only what's new and where
+const NOTE_WHERE = [[/^#admin-approval/,"Needs admin approval"],[/^#admin/,"Approve members"],[/^#team-/,"Team messages"],[/^#requests/,"Recipe requests"],[/^#inbox/,"Suggestions & comments"],[/^#proof/,"Need to proofread"],[/^#approve/,"For approval"],[/^#release/,"Ready to release"],[/^#yoely/,"Yoely"],[/^#kosher/,"Not kosher"],[/^#public/,"Customer portal settings"],[/^#updates/,"App & web updates"]];
+const plainNote = hash => { const w=(NOTE_WHERE.find(([re])=>re.test(hash||""))||[])[1];
+  return ["Gitty's Kitchen", w ? `Something new in ${w}. Tap to open.` : /^#[a-z0-9-]+$/i.test(hash||"") && hash.length>1 ? "Something new about a recipe. Tap to open." : "Something new is waiting. Tap to open."]; };
 function notifyAdmin(title, message, hash, tags){
+  if(feat("plainadmin") && hash!=="") [title, message] = plainNote(hash);
   const q = new URLSearchParams({title, click: "https://shulem161.github.io/gittys-kitchen/"+(hash||""), tags: tags||"bell", priority: "4"});
   return fetch("https://ntfy.sh/"+NTFY_TOPIC+"?"+q.toString(), {method:"POST", body: message}).catch(()=>{});
 }
@@ -1402,6 +1407,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["plainadmin","4.44","2026-11-15","Admin notices without names","Notices on the main admin channel now say only what's new and where, for example “Something new in Approve members. Tap to open.”, with no names, recipe titles or messages. That channel's name is in the website's code, so anyone could follow it. Approve it for everyone: notices from customers change only once they have this update.", false],
   ["yoely","4.43","2026-11-15","The Yoely inbox","A new inbox called Yoely, before the three steps. Nothing goes there by itself: an admin, or an employee you allow in Inbox settings, puts a recipe there from its ⋮ menu (or from the Yoely page). When it's cleared, it skips Need to proofread and goes straight to For approval. Whoever cleared it counts as the first of the three people, so they can't approve or release it too.", false, "team"],
   ["approvepick","4.42","2026-11-15","Approve, then choose who gets it","In App & web updates, each waiting update has one “Approve” button. Tap it and choose: Admins only, Admins and employees, or Everyone. “Approve all” asks the same way. (Before, the three choices were all showing at once.)", false, "admin"],
   ["quickreply","4.42","2026-11-15","Quick replies for requests and messages","In Recipe requests and in Suggestions & comments, a few ready-made answers (“Added it, thanks!”, “We don't have that one yet”…) you tap to fill in the reply. You can still change it before you save.", false, "team"],
