@@ -481,16 +481,13 @@ await check("…but can't delete it forever", assertFails(setDoc(doc(XP, 'recipe
 await check('an admin (here the owner) can delete one forever, keeping its inbox steps as they were', assertSucceeds(setDoc(doc(OWN, 'recipes', 'r-xp2'), { rv: 'kosher', rvNote: 'x', deleted: true, purged: true, code: '', updated: 7 })));
 
 // Weekly check-up fixes (4.41)
-// "movecredit": whoever taps to move a recipe up for someone who asked is noted too, so they can't take the next step
+// Moving a recipe up for someone who asked: it goes on the asker's name; the asker can't take the next step, whoever tapped can
 await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
   await setDoc(doc(d, 'recipes', 'r-ask1'), { c: 'Cakes', t: 'Ask one', pub: false, rv: 'approve', rvUids: ['pr1'], rvAsk: [{ uid: 'emp', name: 'Emp', at: 1 }], s: [] });
   await setDoc(doc(d, 'recipes', 'r-ask2'), { c: 'Cakes', t: 'Ask two', pub: false, rv: 'approve', rvUids: ['pr1'], rvAsk: [{ uid: 'emp', name: 'Emp', at: 1 }], s: [] });
   await setDoc(doc(d, 'recipes', 'r-back'), { c: 'Cakes', t: 'Back', pub: false, rv: 'release', rvUids: ['pr1', 'pr2'], s: [] }); });
-await check('before update movecredit, moving up for someone who asked can leave the tapper out', assertSucceeds(updateDoc(doc(PR2, 'recipes', 'r-ask1'), { rv: 'release', rvUids: ['pr1', 'emp'], rvAsk: [], rvLog: [] })));
-await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'meta', 'features'), { on: { nk: true, movecredit: true }, by: 'Owner', at: 2 }); });
-await check('with movecredit approved, the tapper must be noted', assertFails(updateDoc(doc(PR2, 'recipes', 'r-ask2'), { rv: 'release', rvUids: ['pr1', 'emp'], rvAsk: [], rvLog: [] })));
-await check('…and noted it works', assertSucceeds(updateDoc(doc(PR2, 'recipes', 'r-ask2'), { rv: 'release', rvUids: ['pr1', 'emp', 'pr2'], rvAsk: [], rvLog: [] })));
-await check('…so they can\'t release it too', assertFails(updateDoc(doc(PR2, 'recipes', 'r-ask2'), { rv: '', pub: true })));
+await check('moving up for someone who asked goes on their name, leaving the tapper out', assertSucceeds(updateDoc(doc(PR2, 'recipes', 'r-ask1'), { rv: 'release', rvUids: ['pr1', 'emp'], rvAsk: [], rvLog: [] })));
+await check('…so whoever tapped may also take the next step', assertSucceeds(updateDoc(doc(PR2, 'recipes', 'r-ask1'), { rv: '', pub: true })));
 await check("moving a recipe back a step can't wipe out who moved it", assertFails(updateDoc(doc(EMP, 'recipes', 'r-back'), { rv: 'approve', rvUids: [] })));
 await check('…undoing the last step still works', assertSucceeds(updateDoc(doc(PR2, 'recipes', 'r-back'), { rv: 'approve', rvUids: ['pr1'] })));
 // Member recipes: who handled one is never wiped out

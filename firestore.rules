@@ -65,11 +65,6 @@ service cloud.firestore {
       let s = get(/databases/$(database)/documents/submissions/$(request.resource.data.mergedBy)).data;
       return s.get('dropOf', '') == rid && s.get('stage', '') == 'release' && s.get('status', '') == 'pending';
     }
-    // An app update the owner approved for everyone or for the team (meta/features.on)
-    function featOn(k) {
-      let f = /databases/$(database)/documents/meta/features;
-      return exists(f) && get(f).data.get('on', {}).get(k, false) in [true, 'team'];
-    }
     // Recipe inboxes: three different people. Whoever proofread can't approve; neither of them can release.
     // Ordinary edits never move a recipe between inboxes
     function noRvChange() {
@@ -83,8 +78,8 @@ service cloud.firestore {
       let pubSame = request.resource.data.get('pub', null) == resource.data.get('pub', null);
       let before = resource.data.get('rvUids', []);
       let after = request.resource.data.get('rvUids', []);
-      // the person moving it is written down (before update "movecredit", it could go only on the name of whoever asked)
-      let noted = request.auth.uid in after || (resource.data.get('rvAsk', []).size() > 0 && !featOn('movecredit'));
+      // the person moving it is written down, or it goes on the name of whoever asked (they can't take the next step; whoever tapped can)
+      let noted = request.auth.uid in after || resource.data.get('rvAsk', []).size() > 0;
       return (pubSame
           && ((was == now && after == before)                                              // a note, nothing moves
               || (now == 'proof' && was in ['', 'proof', 'approve', 'release'] && after.size() == 0)   // back to the start

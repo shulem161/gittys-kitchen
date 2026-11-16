@@ -1387,7 +1387,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.46";
+const WEB_VERSION = "4.47";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1453,7 +1453,6 @@ const UPDATES = [
   ["sharerecipe","4.42","2026-11-15","Send this recipe","A “Send this recipe” item in a recipe's ⋮ menu sends its ingredients and steps as text through WhatsApp, Messages or email (or copies it). It shows only for people who can download recipes, and never when screenshots are blocked.", false],
   ["rejoin","4.41","2026-11-16","Removed members can ask to join again","Someone whose profile was removed (by you, or by tapping Delete my profile) used to be stuck: the app said they could sign up again, but their email was “already taken” and signing in just showed “Profile removed”. Now that screen has an “Ask to join again” button. It sends a new join request with the sign-in they already have, and it waits for your approval like any new member.", false],
   ["safedelete","4.41","2026-11-16","Delete my profile happens all at once, or says it couldn't","Delete my profile now takes away the name and the profile together, in one save. If the connection drops, it says “Couldn't delete” instead of signing out as if it worked. Before, it could leave the profile behind with the name free, so someone new could take that name and get in with the old approval.", false],
-  ["movecredit","4.41","2026-11-16","Whoever taps Approve can't also Release","When someone moves a recipe up because a colleague asked, the asker still gets the credit, but the person who tapped is now also noted, so they can't take the next step themselves. This keeps the “three different people” rule. (The database checks this too, once this update is approved for everyone or the team.)", false],
   ["quietnotice","4.41","2026-11-16","Phone notices don't show private messages","Phone notices about team messages, proofreading notes and feedback now say who it's from and “Tap to read it in Gitty's Kitchen”, instead of showing the message itself. Phone notice channels can be followed by anyone who knows their name, so this keeps the messages private.", false],
   ["splithome","4.40","2026-11-15","Split screen: left side stays where you were, right side opens Home","When you open split screen, the left side keeps the page you were on, scrolled to the same spot and with your search still typed in, and the right side opens on the Home screen (it used to open on Categories).", false],
   ["split","4.38","2026-11-12","Split screen on the website (optional)","On the website (not the phone app) there's a new “Split screen mode” switch in Website settings, off at first. Turned on, a “⧉ Split screen” button at the top opens two full copies of Gitty's Kitchen side by side, filling the whole screen, so you can see and use two recipes at once. Each side has a “✕ Close split screen” button at its top.", false],
@@ -4705,8 +4704,8 @@ function rvMove(r, to, extra, msg){
   const credit = feat("askcredit") && asked.length && to!=="proof";   // the move goes on the name of whoever asked
   const entry = credit ? {from:r.rv, to:to||"done", by:asked.map(a=>a.name).join(", "), uid:asked[0].uid, at:now, tappedBy:myName(), tappedUid:me, credited:asked.map(a=>({uid:a.uid, name:a.name})), ...(extra&&extra.pub!==undefined?{pub:extra.pub}:{})}
     : {from:r.rv, to:to||"done", by:myName(), uid:me, at:now, ...(asked.length?{asked:asked.map(a=>({uid:a.uid, name:a.name}))}:{}), ...(extra&&extra.pub!==undefined?{pub:extra.pub}:{})};
-  // movecredit: whoever tapped is noted too (the asker keeps the credit), so they can't take the next step themselves
-  const uids = to==="proof" ? [] : credit ? [...new Set([...(r.rvUids||[]), ...asked.map(a=>a.uid), ...(feat("movecredit")?[me]:[])])] : [...new Set([...(r.rvUids||[]), me, ...asked.map(a=>a.uid)])];
+  // the move goes on the asker's name, and the asker is the one who can't take the next step (whoever tapped stays free)
+  const uids = to==="proof" ? [] : credit ? [...new Set([...(r.rvUids||[]), ...asked.map(a=>a.uid)])] : [...new Set([...(r.rvUids||[]), me, ...asked.map(a=>a.uid)])];
   return setRv(r, Object.assign({rv:to, rvBy:myName(), rvAt:now, rvUids:uids, rvAsk:[], rvLog:[...(r.rvLog||[]), entry].slice(-30)}, extra||{}), msg);
 }
 const RV_STEP = {yoely:"📥 Put in Yoely", out:"Taken out of Yoely", kosher:"🚫 Put in Not kosher", "kosher-ok":"✓ Checked: kosher, taken out of Not kosher", approve:"Proofread ✓ → For approval", release:"Approved → Ready to release", done:"Released", proof:"Put in Need to proofread"};

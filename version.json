@@ -1,6 +1,6 @@
 {
-  "web": "4.46",
+  "web": "4.47",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Declined inbox; Activity shows everything done to a recipe."
+  "notes": "Moving a recipe up for someone who asked: the asker gets the credit and the lock."
 }
