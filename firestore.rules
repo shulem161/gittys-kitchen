@@ -109,6 +109,11 @@ service cloud.firestore {
         && resource.data.get('rv', '') in ['approve', 'release'] && request.resource.data.get('rv', '') == 'proof'
         && request.resource.data.get('rvUids', []).size() == 0;
     }
+    // Is this person on a watch list (meta/watch-proof, meta/reqwatch, meta/ratewatch)? Customers may notify them.
+    function onWatch(w, uid) {
+      let d = /databases/$(database)/documents/meta/$(w);
+      return exists(d) && uid in get(d).data.get('uids', []);
+    }
     // Admins may manage employees and public members, but never the owner or another admin.
     function canManage(uid) {
       return isOwner()
@@ -430,9 +435,9 @@ service cloud.firestore {
     }
 
     // Menus: the person who made one changes it; people it's shared with can read it.
-    // Phone notices: each person's own private ntfy topic. Members may read it to send them a notice.
+    // Phone notices: each person's own private ntfy topic. The team may read it to send them a notice; customers only for people on a watch list.
     match /notify/{uid} {
-      allow get: if approvedMember();
+      allow get: if isTeam() || (approvedMember() && (onWatch('watch-proof', uid) || onWatch('reqwatch', uid) || onWatch('ratewatch', uid)));
       allow create, update: if signedIn() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['topic'])
         && request.resource.data.topic is string

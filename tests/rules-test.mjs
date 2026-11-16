@@ -223,11 +223,15 @@ await check('…and switches their name to email sign-in', assertSucceeds(setDoc
 // Phone notices and who hears about recipe requests
 await check('a member can turn on their own phone notices', assertSucceeds(setDoc(doc(EMP, 'notify', 'emp'), { topic: 'gk-0123456789abcdef0123' })));
 await check("…not for someone else", assertFails(setDoc(doc(EMP, 'notify', 'adm'), { topic: 'gk-0123456789abcdef0123' })));
-await check('a customer can read it to send a notice', assertSucceeds(getDoc(doc(PUB, 'notify', 'emp'))));
+await check("a customer can't read a team member's notice channel", assertFails(getDoc(doc(PUB, 'notify', 'emp'))));
+await check('…the team can, to send them a notice', assertSucceeds(getDoc(doc(ADM, 'notify', 'emp'))));
 await check('the member can turn it off', assertSucceeds(deleteDoc(doc(EMP, 'notify', 'emp'))));
 await check('admins set who hears about requests', assertSucceeds(setDoc(doc(ADM, 'meta', 'reqwatch'), { uids: ['adm', 'emp'] })));
 await check("employees can't", assertFails(setDoc(doc(EMP, 'meta', 'reqwatch'), { uids: ['emp'] })));
 await check('customers can read it', assertSucceeds(getDoc(doc(PUB, 'meta', 'reqwatch'))));
+await setDoc(doc(EMP, 'notify', 'emp'), { topic: 'gk-0123456789abcdef0123' });
+await check('…and may read the notice channel of someone who hears about requests', assertSucceeds(getDoc(doc(PUB, 'notify', 'emp'))));
+await deleteDoc(doc(EMP, 'notify', 'emp'));
 // Log in as: employees allowed to may look in as customers only
 await setDoc(doc(PUB, 'plans', 'pub'), { days: {} });
 await check("an employee can't look at a customer's profile unless allowed", assertFails(getDoc(doc(as('ed'), 'users', 'pub'))));

@@ -1,6 +1,6 @@
 {
-  "web": "4.41",
+  "web": "4.42",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Fixes from the weekly check-up: rejoining after removal, safer Delete my profile, three-person rule, private phone notices."
+  "notes": "Share (PDF, text, link), Recently opened, Quick replies; Approve then choose who gets it."
 }

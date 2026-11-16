@@ -906,27 +906,34 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*30 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 30));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*34 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 34));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 30, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 34, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
     ok("…only the owner has it", (await V.locator('#set-upds').count()) === 0 && !/App & web updates/.test(await V.evaluate(() => { openMenu(); const x = document.querySelector('.menu').textContent; closeMenu(); return x; })));
     await A.click('[data-updtab=wait]'); await A.waitForTimeout(200);
+    await A.locator('#set-upds [data-updpick=tabsearch]').click(); await A.waitForTimeout(200);
+    const updPickTxt = await A.locator('#set-upds li', {hasText: 'Search bar under the categories'}).locator('.upd-acts').innerText();
+    ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /29/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /33/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
     await A.click('[data-updtab=wait]'); await A.waitForTimeout(200);
-    { const btns = await A.locator('#set-upds [data-upd=relstate]').allInnerTexts();
+    { const first = await A.locator('#set-upds li', {hasText: 'Recently released'}).locator('.upd-acts button').allInnerTexts();
+      await A.locator('#set-upds [data-updpick=relstate]').click(); await A.waitForTimeout(200);
+      const btns = await A.locator('#set-upds [data-upd=relstate]').allInnerTexts();
       await A.locator('#set-upds [data-upd=relstate][data-set=team]').click(); await A.waitForTimeout(800);
-      ok('an update can be approved for admins and employees only', btns.join('|') === 'Admins only|Admins and employees|Decline' && await V.evaluate(() => feat('relstate')) && await PU.evaluate(() => !feat('relstate')), btns);
+      ok('an update can be approved for admins and employees only', first.join('|') === 'Approve|Decline' && btns.join('|') === 'Admins only|Admins and employees' && await V.evaluate(() => feat('relstate')) && await PU.evaluate(() => !feat('relstate')), btns);
+      await A.locator('#set-upds [data-updpick=actas]').click(); await A.waitForTimeout(200);
       const nkB = await A.locator('#set-upds [data-upd=actas]').allInnerTexts();
-      ok('…and one that only matters to admins offers just admins', nkB.join('|') === 'Approve (admins)|Decline', nkB);
+      ok('…and one that only matters to admins offers just admins', nkB.join('|') === 'Admins only', nkB);
+      await A.locator('#set-upds li', {hasText: 'Log in as'}).first().locator('[data-updcancel]').click().catch(() => {}); await A.waitForTimeout(200);
       await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
       ok('…Approved says who has it, and it can be changed', /Approved for admins and employees/.test(await A.locator('#set-upds li', {hasText: 'Recently released'}).innerText()) && (await A.locator('#set-upds [data-upd=relstate][data-set=admin]').count()) === 1);
       await A.click('[data-updtab=wait]'); await A.waitForTimeout(200); }
@@ -937,7 +944,9 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('…it waits in Declined, where it can be brought back', /Browse the cookbook/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-upd=cbbrowse][data-set=wait]').count()) === 1);
     await A.locator('#set-upds [data-upd=cbbrowse][data-set=wait]').click(); await A.waitForTimeout(800);
     ok('…bringing it back puts it in To approve, so the owner sees it again', await A.evaluate(() => feat('cbbrowse') && !featOn('cbbrowse')) && await V.evaluate(() => !feat('cbbrowse')));
-    await A.click('[data-updtab=wait]'); await A.waitForTimeout(200); await A.click('[data-updall]'); await A.waitForTimeout(800);
+    await A.click('[data-updtab=wait]'); await A.waitForTimeout(200); await A.click('[data-updall]'); await A.waitForTimeout(200);
+    ok('“Approve all” asks who gets them too', (await A.locator('[data-updallto]').count()) === 3);
+    await A.click('[data-updallto=all]'); await A.waitForTimeout(800);
     ok('“Approve all” approves every waiting update', await A.evaluate(() => UPDATES.every(([k]) => featOn(k))) && /Nothing to approve/.test(await A.locator('#set-upds').innerText()));
     { const s = await A.evaluate(() => { const x = subs.find(s => s.status === 'approved' && s.releasedAs !== 'private' && s.recipeId && RECIPES.some(r => r.id === s.recipeId)); return x ? {t: x.t, rid: x.recipeId} : null; });
       if (s) { await A.evaluate(async rid => { await db.collection('recipes').doc(rid).update({pub: false}); }, s.rid); await A.waitForTimeout(600); }
@@ -1007,6 +1016,35 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
         ok('split screen: the left side stays where you were (same page, search and scroll spot) and the right side opens Home', lq === 'chocolate' && y0 > 0 && Math.abs(ly - y0) < 10 && /pane=1$/.test(rs), [lq, y0, ly, rs]);
         await L.locator('#split-btn').click(); await A.waitForTimeout(400); await A.fill('#q', ''); }
       await A.goto(F + '#settings-look'); await A.waitForTimeout(300); await A.uncheck('#pref-split'); await A.waitForTimeout(200); }
+    // Ideas from the weekly check-up (4.42): Share, Recently opened, Quick replies
+    { await A.goto(F + '#r-challah'); await A.waitForTimeout(500);
+      const shareBtn = await A.locator('#share-btn').count();
+      const txt = await A.evaluate(() => recipeShareText(RECIPES.find(r => r.id === 'r-challah')));
+      const pubDefault = await A.evaluate(() => { const was = PUB.allow; PUB.allow = {}; const off = pubOn('share') === false && pubOn('suggest') === true; PUB.allow = {share: true}; const on = pubOn('share'); PUB.allow = was; return off && on; });
+      ok('“Send this recipe” is in the ⋮ menu and sends the whole recipe as text; customers only get it once switched on', shareBtn === 1 && /INGREDIENTS/.test(txt) && /\n• /.test(txt) && /\n1\. /.test(txt) && /From Gitty's Kitchen$/.test(txt) && pubDefault, [shareBtn, txt.slice(0, 120), pubDefault]);
+      await A.goto(F + '#portal'); await A.waitForTimeout(300);
+      await A.goto(F); await A.waitForTimeout(500);
+      ok('the home page shows Recently opened', /Recently opened/.test(await A.locator('.home').last().innerText()) && (await A.locator('.home .grid a[href="#r-challah"]').count()) >= 1);
+      await A.evaluate(async () => { await db.collection('feedback').doc().set({uid: me, byName: 'Quick Tester', kind: 'idea', text: 'Add soups', status: 'new', reply: '', created: Date.now()}); }); await A.waitForTimeout(500);
+      await A.goto(F + '#inbox'); await A.waitForTimeout(600);
+      const it = A.locator('.fb-item', {hasText: 'Add soups'}); await it.locator('[data-qr]').first().click();
+      ok('quick replies fill in the reply', (await it.locator('.fb-reply-in').inputValue()) === 'Thanks, great idea!');
+      // Share: PDF, text only, or a link; a link opens the sign-up page first and lands on the recipe once approved
+      await A.goto(F + '#r-challah'); await A.waitForTimeout(500); await A.click('#share-btn'); await A.waitForTimeout(300);
+      const opts = await A.locator('#sharepick [data-sh]').evaluateAll(b => b.map(x => x.dataset.sh).join(','));
+      ok('Share sits with Download and offers PDF, text only and a link', opts === 'pdf,text,link' && await A.evaluate(() => /\?shared=1#r-challah$/.test(shareLink(RECIPES.find(r => r.id === 'r-challah')))), opts);
+      await A.click('#sh-cancel');
+      const pubId = await A.evaluate(() => RECIPES.find(r => pubVisible(r) && !r.rv).id);
+      const S = await ctx.newPage(); S.on('pageerror', e => errors.push(e.message)); await S.goto(F.replace(/#.*$/, '') + '?shared=1#' + pubId); await S.waitForTimeout(600);
+      const sh2 = await S.locator('h2').first().innerText(), shNote = await S.locator('.shared-note').count();
+      await S.fill('#nm', 'Shared Sam'); await S.fill('#em', mailOf('Shared Sam')); await S.fill('#pw', 'sam1234'); await S.fill('#pw2', 'sam1234'); await S.click('#fake-robot').catch(() => {}); await S.click('.primary'); await S.waitForTimeout(700);
+      if (await S.locator('#ev-check').count()) { await S.evaluate(() => __fakeVerify()); await S.click('#ev-check'); await S.waitForTimeout(700); }
+      await A.goto(F + '#admin'); await A.waitForTimeout(600); await A.locator('.mrow', {hasText: 'Shared Sam'}).locator('[data-act=approve]').click(); await A.waitForTimeout(1500);
+      ok('a shared link without an account opens “Ask to join”, then goes to the recipe once approved', sh2 === 'Ask to join' && shNote === 1 && S.url().endsWith('#' + pubId) && (await S.locator('.rhead h1').count()) === 1, [sh2, shNote, S.url(), (await S.locator('#app').innerText()).slice(0, 200)]);
+      const teamId = await A.evaluate(() => (RECIPES.find(r => !pubVisible(r)) || {}).id);
+      await S.goto(F.replace(/#.*$/, '') + '?shared=1#' + teamId); await S.waitForTimeout(1500);
+      ok('a customer who opens a link to a team-only recipe is told they don\'t have access', !!teamId && /You don't have access to this recipe/.test(await S.locator('#app').innerText()), [teamId, (await S.locator('#app').innerText()).slice(0, 120)]);
+      await S.close(); }
     // Notes that mention another recipe's number
     { const [ca, cb] = await A.evaluate(async () => { const a = RECIPES.find(r => r.id === 'r-challah'), b = RECIPES.find(r => r.id === 'r-bobbys-challah');
         await db.collection('recipes').doc(a.id).update({rv: 'proof', rvNote: 'Say what size pan'}); await db.collection('recipes').doc(b.id).update({rv: 'proof', rvNote: 'same as ' + a.code}); return [a.code, b.code]; });

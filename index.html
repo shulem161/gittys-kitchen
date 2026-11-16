@@ -87,6 +87,10 @@ button{font:inherit;color:inherit}
 .search{flex:1;min-width:0;max-width:380px;margin-left:auto;position:relative}
 .cb-open-btn{margin-top:8px}
 .split-top{white-space:nowrap}
+.sh-opt{display:grid!important;grid-template-columns:auto 1fr;gap:2px 8px;text-align:left;justify-content:start;padding:10px 12px}.sh-opt span{grid-column:2;font-size:13px;color:var(--muted);font-weight:400}
+.shared-note{background:var(--accent-soft);border-radius:10px;padding:10px 12px;margin:0 0 10px}
+.qr-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.qr-row .qr{font-size:13px}
+.rq-acts .qr-row{flex-basis:100%}
 .ln-notes ul{margin:4px 0 0;padding-left:18px;display:grid;gap:4px}
 body.split-on main,body.split-on .wrap{max-width:none}body.split-on .tabbar,body.split-on .ractions{display:none}
 body.split-on>header.bar,body.split-on>footer,body.split-on>.updbar,body.split-on>.offbar,body.split-on .pvbar{display:none!important}
@@ -1310,7 +1314,11 @@ const isAdmin = () => viewingAs() ? viewingAs()==="admin" : realAdmin();
 const isPublic = () => !!profile && myRole()==="public";
 const ROLE_LABEL = {owner:"Owner", admin:"Admin", employee:"Employee", public:"Public"};
 // What public members may do; the owner and admins change this in Customer portal settings (meta/public)
-const PUB_ALLOW = [["suggest","Suggest changes and send new recipes"],["photos","Send photos of dishes"],["requests","Request recipes"],["ai","AI tools: menu ideas and scanning recipes"],["feedback","Send suggestions and comments"]];
+const PUB_BASE = [["suggest","Suggest changes and send new recipes"],["photos","Send photos of dishes"],["requests","Request recipes"],["ai","AI tools: menu ideas and scanning recipes"],["feedback","Send suggestions and comments"]];
+const pubAllow = () => feat("sharerecipe") ? [...PUB_BASE, ["share","Send recipes to others (WhatsApp, text, email)"]] : PUB_BASE;
+const PUB_OFF = ["share"];   // off for customers until switched on in Customer portal settings
+const pubOn = k => PUB_OFF.includes(k) ? PUB.allow[k]===true : PUB.allow[k]!==false;
+
 let PUB = {allow:{}, cats:{}};
 // Employees: each person has their own permissions (users/{uid}.perms). The everyday ones are on unless switched off;
 // the extras are off unless granted. Public members all share the Customer portal settings. Admins can do everything.
@@ -1328,7 +1336,7 @@ const may = k => { if(isAdmin()) return true; if(!profile) return false;
   if(k==="editdirect" && !feat("empedit")) return false;
   if(EMP_EXTRA.includes(k) && (!feat("empextra") || isPublic())) return false;
   if(k==="edit") return !isPublic() && feat("empedit") && may("editdirect");   // admins, and employees given “Edit recipes directly”
-  if(isPublic()) return !isExtra(k) && PUB.allow[k]!==false;
+  if(isPublic()) return !isExtra(k) && pubOn(k);
   return viewingAs()==="employee" ? (VIEW_WHO ? permOf({perms:VIEW_WHO.perms||{}}, k) : empDefault(k)) : permOf(profile, k); };
 const can = may;
 const mayPublish = () => may("edit") || may("review") || may("moverec");
@@ -1343,7 +1351,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.41";
+const WEB_VERSION = "4.42";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 function notifyAdmin(title, message, hash, tags){
@@ -1393,6 +1401,10 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["approvepick","4.42","2026-11-15","Approve, then choose who gets it","In App & web updates, each waiting update has one “Approve” button. Tap it and choose: Admins only, Admins and employees, or Everyone. “Approve all” asks the same way. (Before, the three choices were all showing at once.)", false, "admin"],
+  ["quickreply","4.42","2026-11-15","Quick replies for requests and messages","In Recipe requests and in Suggestions & comments, a few ready-made answers (“Added it, thanks!”, “We don't have that one yet”…) you tap to fill in the reply. You can still change it before you save.", false, "team"],
+  ["recentopen","4.42","2026-11-15","Recently opened on the home page","The home page shows the last few recipes you opened on this phone or computer, so you can get back to yesterday's recipe in one tap.", false],
+  ["sharerecipe","4.42","2026-11-15","Send this recipe","A “Send this recipe” item in a recipe's ⋮ menu sends its ingredients and steps as text through WhatsApp, Messages or email (or copies it). It shows only for people who can download recipes, and never when screenshots are blocked.", false],
   ["rejoin","4.41","2026-11-16","Removed members can ask to join again","Someone whose profile was removed (by you, or by tapping Delete my profile) used to be stuck: the app said they could sign up again, but their email was “already taken” and signing in just showed “Profile removed”. Now that screen has an “Ask to join again” button. It sends a new join request with the sign-in they already have, and it waits for your approval like any new member.", false],
   ["safedelete","4.41","2026-11-16","Delete my profile happens all at once, or says it couldn't","Delete my profile now takes away the name and the profile together, in one save. If the connection drops, it says “Couldn't delete” instead of signing out as if it worked. Before, it could leave the profile behind with the name free, so someone new could take that name and get in with the old approval.", false],
   ["movecredit","4.41","2026-11-16","Whoever taps Approve can't also Release","When someone moves a recipe up because a colleague asked, the asker still gets the credit, but the person who tapped is now also noted, so they can't take the next step themselves. This keeps the “three different people” rule. (The database checks this too, once this update is approved for everyone or the team.)", false],
@@ -1955,6 +1967,8 @@ function home(){
   ${adminBanner()}
   ${dupBanner()}
   <section class="wrap home">
+    ${(op => feat("recentopen") && op.length ? `<div class="section-head"><h2>Recently opened</h2><p>On this ${matchMedia("(pointer:coarse)").matches?"device":"computer"}</p></div>
+    <div class="grid">${op.slice(0,4).map(card).join("")}</div>` : "")(pv()?[]:openedList())}
     ${nw.length?`<div class="section-head"><h2>New this week</h2><p><a class="link" href="#recent">See all ${nw.length}</a></p></div>
     <div class="grid">${nw.slice(0,4).map(card).join("")}</div>`:""}
     ${f.length?`<div class="section-head"><h2>Your favorites</h2><p><a class="link" href="#favorites">See all ${f.length}</a></p></div>
@@ -2105,7 +2119,61 @@ function buildParts(r){
   return parts;
 }
 
+// “Send this recipe”: the whole recipe as plain text for WhatsApp, Messages or email
+function recipeShareText(r){
+  const out=[unbracket(r.t).replace(/^Untitled: /,"")], sv=servesText(r,1); if(sv) out.push(sv);
+  let n=0;
+  recipeLines(r.s||[]).forEach(l=>{ if(l.k==="h"){ out.push("", l.t.toUpperCase()); n=0; } else out.push(l.k==="i" ? "• "+l.t : `${++n}. ${l.t}`); });
+  out.push("", "From Gitty's Kitchen"); return out.join("\n");
+}
+// Share: as a PDF (the chosen design), as text only (ingredients and how to make it), or as a link to the recipe.
+// A link opens the recipe for members; anyone else is asked to create an account first and lands on it once approved.
+const shareLink = r => SITE + "?shared=1#" + r.id;
+function sharePick(r, btn){
+  const old=document.getElementById("sharepick"); if(old){ old.remove(); return; }
+  const box=document.createElement("div"); box.id="sharepick"; box.className="dlpick";
+  box.innerHTML=`<fieldset><legend>Share “${esc(unbracket(r.t).replace(/^Untitled: /,""))}”</legend>
+    <button type="button" class="btn sh-opt" data-sh="pdf">📄 <b>PDF</b><span>The recipe page, in your download design</span></button>
+    <button type="button" class="btn sh-opt" data-sh="text">📝 <b>Text only</b><span>The ingredients and how to make it, as a message</span></button>
+    <button type="button" class="btn sh-opt" data-sh="link">🔗 <b>Link</b><span>Opens it in Gitty's Kitchen. Someone without an account signs up first${pubVisible(r)?"":"; customers can't see this one, it's team only"}.</span></button></fieldset>
+    <div class="row"><button type="button" class="btn" id="sh-cancel">Cancel</button></div>`;
+  setRecipeMenu(false);
+  (document.querySelector(".rhead") || btn.parentElement).after(box);
+  box.querySelector("#sh-cancel").onclick=()=>box.remove();
+  const title=unbracket(r.t).replace(/^Untitled: /,"");
+  const send = async (data, fallback) => { if(navigator.share && (!data.files || (navigator.canShare && navigator.canShare(data)))){ try{ await navigator.share(data); }catch(e){} return; } await fallback(); };
+  box.querySelectorAll("[data-sh]").forEach(b=>b.onclick=async()=>{ const k=b.dataset.sh; b.disabled=true;
+    try{
+      if(k==="text"){ const text=recipeShareText(r); await send({title, text}, ()=>copyText(text)); }
+      if(k==="link"){ const url=shareLink(r); await send({title, text:`A recipe from Gitty's Kitchen: ${title}`, url}, ()=>copyText(url)); }
+      if(k==="pdf"){ b.querySelector("span").textContent="Preparing…";
+        const bytes=await makeRecipePdf(r, pdfStyleKey()), name=fileName("Gittys Kitchen - "+title);
+        let file=null; try{ file=new File([bytes], name, {type:"application/pdf"}); }catch(e){}
+        await send(file?{title, files:[file]}:{files:null}, async()=>toast(await saveBytes(bytes, name)+". Send it from there.")); }
+      box.remove();
+    }catch(e){ b.disabled=false; toast("Couldn't share. Try again."); } });
+  box.scrollIntoView({block:"nearest"});
+}
+// Someone opened a shared link without being signed in: remember the recipe, and go there once they're in
+const SHARED_TO = (()=>{ try{ const P=new URLSearchParams(location.search); if(!P.has("shared")) return null;
+  const h=location.hash.slice(1); history.replaceState(null, "", location.pathname+location.hash); return h||null; }catch(e){ return null; } })();
+if(SHARED_TO) store("gk-after", {h:SHARED_TO, at:Date.now()});
+let sharedWant = SHARED_TO, sharedTries = 0;   // the recipe a shared link pointed to (to say so if this person can't see it)
+function goAfterSignIn(){ const af=store("gk-after"); if(!af) return false; store("gk-after", null);
+  if(!af.h || Date.now()-(af.at||0) > 30*864e5) return false;
+  sharedWant=af.h; sharedTries=0; if(location.hash.slice(1)===af.h) return false;
+  location.hash=af.h; return true; }
+// A shared link to a recipe this person can't see (for example a team-only recipe and a customer account)
+function noAccessPage(){
+  app.innerHTML=`<section class="wrap"><div class="panel-a" style="margin-top:28px;text-align:center;padding:28px 18px">
+    <div style="font-size:40px" aria-hidden="true">🔒</div><h2>You don't have access to this recipe</h2>
+    <p class="hint">The link you opened is for a recipe your account can't see. If you think you should have it, ask ${esc(ADMIN_NAME)}.</p>
+    <p><a class="btn solid" href="#">Go to the cookbook</a></p></div></section>`;
+}
+// Recently opened (on this device, per person)
+const openedList = () => (store(uk("opened"))||[]).map(id=>RECIPES.find(r=>r.id===id)).filter(Boolean);
 function recipe(r){
+  if(feat("recentopen") && !pv()){ const L=(store(uk("opened"))||[]).filter(x=>x!==r.id); L.unshift(r.id); store(uk("opened"), L.slice(0,12)); }
   const saved = store(uk(r.id)) || {i:[],s:[]};
   const sx = scaleNow[r.id] || 1, inList = gStore().items.some(i=>i.id===r.id);
   const isFav = favs().includes(r.id);
@@ -2169,6 +2237,7 @@ function recipe(r){
         <a class="btn" href="#timers-${r.id}">${TIMER_IC.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Set a timer</a>
         <button class="btn fav" id="fav" aria-pressed="${isFav}">${HEART}${isFav?"Saved to favorites":"Save to favorites"}</button>
         <button class="btn" id="wake" aria-pressed="${!!wakeLock}">${wakeLock?"Screen stays on":"Keep screen on"}</button>
+        ${feat("sharerecipe")&&may("share")&&!capOn()&&!pv()?`<button class="btn" id="share-btn" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 15V4M7 9l5-5 5 5M5 14v6h14v-6"/></svg>Share</button>`:""}
         <button class="btn" id="dl" type="button"${isPublic()?" hidden":""}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download</button>
         <button class="btn" id="reset">Clear checkmarks</button>
       </div>
@@ -2223,6 +2292,7 @@ function recipe(r){
   document.getElementById("reset").onclick=()=>{store(uk(r.id),{i:[],s:[]});recipe(r)};
   app.querySelectorAll("[data-sx]").forEach(b=>b.onclick=()=>{ const y=window.scrollY; scaleNow[r.id]=+b.dataset.sx; recipe(r); window.scrollTo(0,y); });
   document.getElementById("groc").onclick=()=>{ const y=window.scrollY; const added=groceryToggle(r,sx); toast(added?"Added to the grocery list":"Taken off the grocery list"); recipe(r); window.scrollTo(0,y); };
+  const shb=document.getElementById("share-btn"); if(shb) shb.onclick=()=>sharePick(r, shb);
   document.getElementById("wake").onclick=async e=>{
     const b=e.currentTarget;
     if(wakeLock){ wakeByUser=false; await wakeLock.release().catch(()=>{}); wakeLock=null; b.setAttribute("aria-pressed","false"); b.textContent="Keep screen on"; return; }
@@ -2275,6 +2345,7 @@ function recipe(r){
 /* ---------- sign-in and waiting screens ---------- */
 const CHEF = '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14a5 5 0 1 1 3.5-8.6A5 5 0 0 1 22 7a4.5 4.5 0 1 1 1 8.9V25H9z"/><path d="M9 21h14"/></svg>';
 let authMode = "signin", authDraft = {};
+if(SHARED_TO) authMode = "create";   // a shared link: most people who get one don't have an account yet
 // "I'm not a robot" (Google reCAPTCHA). Turned on once the owner adds a site key here.
 const RECAPTCHA_KEY = "6LdpgQcuAAAAALwdaXoSDL5gH2SEhuan0xmz48RX";   // site key (public by design)
 let robotId=null, robotTok="", robotDown=false;
@@ -2343,6 +2414,7 @@ function gate(msg){
 }
 function authScreen(msg){
   let inner;
+  const sharedNote = store("gk-after") ? `<p class="hint shared-note">📬 Someone sent you a recipe from Gitty's Kitchen. ${authMode==="create"?"Create an account to see it, or sign in if you already have one.":"Sign in to see it."} It opens by itself once you're in.</p>` : "";
   if(authMode==="create"){
     inner = `<h2>Ask to join</h2>
       <p class="sub">Create a profile. ${esc(ADMIN_NAME)} approves every new member.</p>
@@ -2379,7 +2451,7 @@ function authScreen(msg){
       <p class="switch">New here? <button type="button" class="link" data-mode="create">Ask to join</button></p>
       <p class="switch"><button type="button" class="link" data-mode="forgot">Forgot your password?</button></p>`;
   }
-  const F = shell(inner);
+  const F = shell(sharedNote + inner);
   const nm=F.querySelector("#nm"), pw=F.querySelector("#pw");
   if(nm){ (nm.value ? (F.querySelector("#code")||pw) : nm).focus(); }
   const fe=F.querySelector("#fe-send");
@@ -2465,7 +2537,7 @@ function adminPage(){
   const order = {owner:0, admin:1, employee:2, public:3};
   const permRow = (m,[k,l]) => `<label class="pub-row"><input type="checkbox" data-pk="${k}" data-pu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span>${esc(l)}${(m.perms||{})[k]!==undefined?' <small class="perm-own">only for this person</small>':""}</span></label>`;
   const permsBox = m => `<div class="permbox" data-pbox="${esc(m.uid)}"><p class="hint">What ${esc(m.name)} may do. Starts from <a class="link" href="#employees">Employee settings</a>; changes here are only for this person.</p>
-    <div class="perm-h">Everyday</div>${PUB_ALLOW.map(x=>permRow(m,x)).join("")}
+    <div class="perm-h">Everyday</div>${pubAllow().map(x=>permRow(m,x)).join("")}
     <div class="perm-h">Extra</div>${extraPerms().map(x=>permRow(m,x)).join("")}
     ${Object.keys(m.perms||{}).length?`<button type="button" class="link" data-preset="${esc(m.uid)}" style="margin-top:6px;font-size:13px">Use Employee settings for everything</button>`:""}</div>`;
   app.innerHTML = `<section class="wrap admin">
@@ -2529,7 +2601,7 @@ function fitPermBox(){
 }
 addEventListener("resize", ()=>{ if(document.querySelector(".perms-wrap")) fitPermBox(); });
 addEventListener("load", ()=>{ if(document.querySelector(".perms-wrap")) fitPermBox(); });
-const ALL_PERMS = () => [...PUB_ALLOW, ...extraPerms().filter(([k])=>!isInboxPerm(k))];
+const ALL_PERMS = () => [...pubAllow(), ...extraPerms().filter(([k])=>!isInboxPerm(k))];
 const PERM_SHORT = {suggest:"Suggest", photos:"Photos", requests:"Ask for recipes", ai:"AI tools", feedback:"Comments", edit:"Edit directly", proofread:"1. Proofread", review:"2. Approve", release:"3. Release", answer:"Answer requests", inbox:"Comments inbox", viewas:"Log in as customer", ratings:"Likes"};
 // One tick per person and permission (Employee settings, Inbox settings)
 function wirePermTable(redraw){
@@ -2540,7 +2612,7 @@ function wirePermTable(redraw){
 }
 function employeesPage(){
   const emps = members.filter(m=>m.status==="approved" && roleOf(m)==="employee").sort((a,b)=>byName(a.name,b.name)), own = emps.filter(m=>Object.keys(m.perms||{}).length);
-  const perms=[["Everyday",PUB_ALLOW],["Extra",extraPerms().filter(([k])=>!isInboxPerm(k))]];
+  const perms=[["Everyday",pubAllow()],["Extra",extraPerms().filter(([k])=>!isInboxPerm(k))]];
   app.innerHTML = `<section class="wrap admin">
     <div class="section-head" style="margin-top:28px"><h2>Employee settings</h2><p>What employees may do</p></div>
     <div class="panel-a"><p class="hint">Tick what each employee may do. <b>All employees</b> is the starting point for everyone; a <span class="perm-dot">●</span> marks a person's own setting${feat("alldot")?", and by All employees it means someone is set differently":""}. Who may use each inbox is in <a class="link" href="#inbox-settings">Inbox settings</a>.</p>
@@ -2574,7 +2646,7 @@ function publicPage(){
     ${goliveHTML()}
     <div class="panel-a"><h3>What public members may do</h3>
       <p class="hint">Public members can always read the recipes you let them see, and use favorites, the grocery list, timers, the calculator and their Today list.</p>
-      <div class="pub-allow">${PUB_ALLOW.map(([k,l])=>`<label class="pub-row"><input type="checkbox" data-pa="${k}" ${PUB.allow[k]!==false?"checked":""}><span>${esc(l)}</span></label>`).join("")}</div>
+      <div class="pub-allow">${pubAllow().map(([k,l])=>`<label class="pub-row"><input type="checkbox" data-pa="${k}" ${pubOn(k)?"checked":""}><span>${esc(l)}</span></label>`).join("")}</div>
     </div>
     <div class="panel-a"><h3>Which recipes they see</h3>
       <p class="hint">Tick the recipes public members may see. Open a category to choose recipe by recipe, or use Show all / Hide all for the whole category. A category is open to them as long as at least one of its recipes is ticked. New recipes follow their category's last Show all / Hide all.</p>
@@ -3052,13 +3124,13 @@ function updatesPage(){
       <button type="button" role="tab" data-updtab="done" aria-selected="${tab==="done"}">Approved <span class="count">${done.length}</span></button>
       <button type="button" role="tab" data-updtab="no" aria-selected="${tab==="no"}">Declined <span class="count">${no.length}</span></button></div>
     <div class="panel-a set-upds" id="set-upds" role="tabpanel">
-      ${tab==="wait"&&wait.length>1?`<div class="row" style="margin-bottom:8px"><button type="button" class="btn sm" data-updall>Approve all ${wait.length}</button></div>`:""}
+      ${tab==="wait"&&wait.length>1?`<div class="row" id="upd-allrow" style="margin-bottom:8px"><button type="button" class="btn sm" data-updall>Approve all ${wait.length}</button></div>`:""}
       ${list.length?`<ul class="upd-list">${list.map(([k,v,d,title,about])=>{ const on=featOn(k), dec=featDeclined(k);
         return `<li class="${on?"on":dec?"no":"wait"}"><div><b>${esc(title)}</b><small>Version ${esc(v)} · ${fmtDate(new Date(d+"T12:00").getTime())}</small><p>${esc(about)}</p>
           <span class="upd-state">${on?(feat("updaud")?`✓ Approved for ${AUD_LABEL[featLevel(k)]}`:"✓ Approved – everyone has it"):dec?"✗ Declined – taken off the app and the website for everyone":"⏳ Only you see it until you approve it"}</span></div>
           <span class="upd-acts">${on?`${feat("updaud")?levelBtns(k, featLevel(k)):""}<button type="button" class="btn sm" data-upd="${k}" data-set="wait">Take back</button>`
             : dec?`<button type="button" class="btn sm" data-upd="${k}" data-set="wait">Bring it back</button>`
-            : `${feat("updaud")?levelBtns(k, ""):`<button type="button" class="btn sm solid" data-upd="${k}" data-set="all">Approve</button>`}<button type="button" class="btn sm danger-btn" data-upd="${k}" data-set="no">Decline</button>`}</span></li>`; }).join("")}</ul>`
+            : `${feat("updaud")&&feat("approvepick")?`<button type="button" class="btn sm solid" data-updpick="${k}">Approve</button>`:feat("updaud")?levelBtns(k, ""):`<button type="button" class="btn sm solid" data-upd="${k}" data-set="all">Approve</button>`}<button type="button" class="btn sm danger-btn" data-upd="${k}" data-set="no">Decline</button>`}</span></li>`; }).join("")}</ul>`
         : `<p class="hint mempty">${tab==="wait"?"Nothing to approve. Everything is live for everyone.":tab==="done"?"Nothing approved yet.":"Nothing declined."}</p>`}
     </div>
   </section>`;
@@ -3069,7 +3141,22 @@ function updatesPage(){
   const MSG={all:"Approved – everyone has it now", team:"Approved – admins and employees have it now", admin:"Approved – admins have it now", wait:"It's in To approve – only you see it now", no:"Declined – it's taken off the app and the website for everyone"};
   app.querySelectorAll("[data-upd]").forEach(b=>b.onclick=async()=>{ const on=cur(), s=b.dataset.set; on[b.dataset.upd] = s==="all" ? true : s==="no" ? "declined" : s==="wait" ? false : s; b.disabled=true;
     if(await save(on)) toast(MSG[s]); });
-  const all=app.querySelector("[data-updall]"); if(all) all.onclick=async()=>{ const on=cur(); wait.forEach(([k])=>{ const m=featMax(k); on[k] = m==="all" ? true : m; }); if(await save(on)) toast("All approved, each for everyone it can matter to"); };
+  // Approve, then choose who gets it
+  const LAB3 = {admin:"Admins only", team:"Admins and employees", all:"Everyone"}, RANK = {admin:1, team:2, all:3};
+  app.querySelectorAll("[data-updpick]").forEach(b=>b.onclick=()=>{ const k=b.dataset.updpick, acts=b.closest(".upd-acts");
+    const levels = {admin:["admin"], team:["admin","team"], all:["admin","team","all"]}[featMax(k)];
+    acts.innerHTML=`<span class="upd-for">Who gets it?</span>${levels.map(l=>`<button type="button" class="btn sm${l===levels[levels.length-1]?" solid":""}" data-upd="${k}" data-set="${l}">${LAB3[l]}</button>`).join("")}<button type="button" class="btn sm" data-updcancel>Cancel</button>`;
+    acts.querySelectorAll("[data-upd]").forEach(x=>x.onclick=async()=>{ const on=cur(), s=x.dataset.set; on[k] = s==="all" ? true : s; x.disabled=true; if(await save(on)) toast(MSG[s]); });
+    acts.querySelector("[data-updcancel]").onclick=()=>{ const y=window.scrollY; updatesPage(); window.scrollTo(0,y); }; });
+  const all=app.querySelector("[data-updall]");
+  if(all && feat("updaud") && feat("approvepick")) all.onclick=()=>{ const row=document.getElementById("upd-allrow");
+    row.innerHTML=`<span class="upd-for">Approve all ${wait.length} for:</span>${["admin","team","all"].map(l=>`<button type="button" class="btn sm${l==="all"?" solid":""}" data-updallto="${l}">${LAB3[l]}</button>`).join("")}<button type="button" class="btn sm" data-updcancel>Cancel</button>
+      <p class="hint" style="flex-basis:100%;margin:4px 0 0">An update made only for admins (or only for the team) never goes further than that.</p>`;
+    row.querySelectorAll("[data-updallto]").forEach(x=>x.onclick=async()=>{ const to=x.dataset.updallto, on=cur(); x.disabled=true;
+      wait.forEach(([k])=>{ const m=featMax(k), l = RANK[m] < RANK[to] ? m : to; on[k] = l==="all" ? true : l; });
+      if(await save(on)) toast(`All approved for ${AUD_LABEL[to]}`); });
+    row.querySelector("[data-updcancel]").onclick=()=>updatesPage(); };
+  else if(all) all.onclick=async()=>{ const on=cur(); wait.forEach(([k])=>{ const m=featMax(k); on[k] = m==="all" ? true : m; }); if(await save(on)) toast("All approved, each for everyone it can matter to"); };
 }
 // While the phone keyboard is open, the bars fixed to the bottom of the screen hide, so only the keyboard comes up
 (function(){
@@ -5663,7 +5750,7 @@ function inboxPage(){
         <div class="fb-top"><b>${FB_KINDS[f.kind]||"Message"}</b><span class="hint"> from ${esc(f.byName||"a member")} · ${fmtDate(f.created)}</span>${f.recipeId?` <a class="link" href="#${esc(f.recipeId)}">${esc(f.recipeTitle||"recipe")}</a>`:""}</div>
         <p class="fb-text">${esc(f.text)}</p>
         <div class="fb-admin">
-          <textarea class="fb-reply-in" rows="2" maxlength="1000" placeholder="Reply (optional): ${esc((f.byName||"").split(" ")[0])} will see this" aria-label="Reply">${esc(f.reply||"")}</textarea>
+          ${feat("quickreply")?quickReplies(FB_QUICK):""}<textarea class="fb-reply-in" rows="2" maxlength="1000" placeholder="Reply (optional): ${esc((f.byName||"").split(" ")[0])} will see this" aria-label="Reply">${esc(f.reply||"")}</textarea>
           <div class="fb-row"><select class="fb-status" aria-label="Status">${Object.entries(FB_STATUS).map(([k,v])=>`<option value="${k}" ${k===(f.status||"new")?"selected":""}>${v}</option>`).join("")}</select>
             <button type="button" class="btn solid" data-fbsave>Save</button><button type="button" class="btn" data-fbdel>Delete</button></div>
         </div></li>`).join("")}</ul></div>`; }).join("")
@@ -6320,6 +6407,13 @@ ${menuCatalog(RECIPES)}`];
 }
 const mineHTML = () => requests.length?`<div class="panel-a"><h3>Your requests</h3><ul class="rq-list">${requests.map(reqItem).join("")}</ul></div>`:"";
 const RQ_STATUS = {open:"Waiting", done:"Added", closed:"Answered"};
+// Quick replies: tap one to fill in the reply (you can still change it before saving)
+const RQ_QUICK = ["Added it, thanks!", "We don't have that one yet.", "Coming soon.", "Can you tell us a bit more about it?"];
+const FB_QUICK = ["Thanks, great idea!", "Done – it's in the app now.", "We'll look into it.", "Thanks for letting us know."];
+const quickReplies = list => `<div class="qr-row" role="group" aria-label="Quick replies">${list.map(t=>`<button type="button" class="btn sm qr" data-qr="${esc(t)}">${esc(t)}</button>`).join("")}</div>`;
+document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest("[data-qr]"); if(!b) return;
+  const box=b.closest("li"), inp=box && box.querySelector(".fb-reply-in, .rq-reply"); if(!inp) return;
+  inp.value=b.dataset.qr; inp.focus(); });
 function reqItem(q){
   const rec = q.recipeId && RECIPES.find(r=>r.id===q.recipeId);
   return `<li class="rq-item">
@@ -6330,7 +6424,7 @@ function reqItem(q){
       ${q.reply?`<div class="fb-reply"><b>${esc(ADMIN_NAME)}:</b> ${esc(q.reply)}</div>`:""}
       ${may("answer")&&q.status==="open"?`<div class="rq-acts">
         <a class="btn sm solid" href="#new" data-rqnew="${esc(q.id)}">Add the recipe</a>
-        <input class="rq-reply" data-rqid="${esc(q.id)}" type="text" maxlength="300" placeholder="Reply (optional)">
+        ${feat("quickreply")?quickReplies(RQ_QUICK):""}<input class="rq-reply" data-rqid="${esc(q.id)}" type="text" maxlength="300" placeholder="Reply (optional)">
         <select class="rq-link" data-rqid="${esc(q.id)}"><option value="">Link a recipe (optional)</option>${RECIPES.slice().sort((a,b)=>byName(a.t,b.t)).map(r=>`<option value="${r.id}">${esc(r.t)}</option>`).join("")}</select>
         <button type="button" class="btn sm" data-rqdone="${esc(q.id)}">Mark answered</button></div>`:""}
       ${may("answer")?`<button type="button" class="link rq-del" data-rqdel="${esc(q.id)}">Delete</button>`:""}
@@ -6908,6 +7002,7 @@ function routePage(){
   closeMenu(); stopRecipePhotos();
   if(state!=="approved"){ document.body.classList.add("out"); gate(); return; }
   document.body.classList.remove("out");
+  if(goAfterSignIn()) return;
   if(IS_PREVIEW && !realOwner()){ ownerOnlyPage(); return; }
   renderPreviewBar();
   const h = decodeURIComponent(location.hash.slice(1));
@@ -6962,6 +7057,10 @@ function routePage(){
   if(h==="menu"){ q.value=""; menuPage(); window.scrollTo(0,0); return; }
   const r = findAny(h);
   if(r){ q.value=""; recipe(r); window.scrollTo(0,0); return; }
+  if(sharedWant && h===sharedWant){ q.value="";
+    if(!recipesOnline && !offline && sharedTries++ < 12){ app.innerHTML=`<section class="wrap"><p class="hint" style="margin-top:28px"><span class="spin" aria-hidden="true"></span> Opening the recipe…</p></section>`; setTimeout(()=>{ if(location.hash.slice(1)===h) route(); }, 700); return; }
+    noAccessPage(); window.scrollTo(0,0); return; }
+
   if(h.includes("--")){ const [ch,sh]=h.split("--"); const c2=CATS.find(x=>slug(x)===ch);
     if(c2){ const s2=sectionsOf(RECIPES.filter(r=>r.c===c2)).find(x=>secSlug(x)===sh); if(s2){ q.value=""; sectionPage(c2,s2); window.scrollTo(0,0); return; } } }
   const c = CATS.find(x=>slug(x)===h);
