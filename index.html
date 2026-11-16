@@ -90,6 +90,7 @@ button{font:inherit;color:inherit}
 .sh-opt{display:grid!important;grid-template-columns:auto 1fr;gap:2px 8px;text-align:left;justify-content:start;padding:10px 12px}.sh-opt span{grid-column:2;font-size:13px;color:var(--muted);font-weight:400}
 .shared-note{background:var(--accent-soft);border-radius:10px;padding:10px 12px;margin:0 0 10px}
 .send-to{display:flex;align-items:center;gap:8px;font-weight:600}.send-to select{min-height:40px}
+.newcat{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;margin-left:6px}.newcat input{min-width:150px}
 .qr-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.qr-row .qr{font-size:13px}
 .rq-acts .qr-row{flex-basis:100%}
 .ln-notes ul{margin:4px 0 0;padding-left:18px;display:grid;gap:4px}
@@ -1388,7 +1389,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.49";
+const WEB_VERSION = "4.50";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1443,6 +1444,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["addcat","4.50","2026-11-16","Add a new category from the dropdowns","The category dropdowns for moving a recipe (one, or several at once) and for recipes found by the scanner now end with “+ Add a new category…”. Type the name and it's chosen right away; the new category shows in the cookbook once a recipe is in it, with its own item-number digits. (The recipe editor already had this.)", false, "team"],
   ["scanto","4.49","2026-11-16","Choose the first inbox for a new recipe","When you scan or add a new recipe, choose where it goes first: Need to proofread, Yoely, or Not kosher. Admins always have the choice; you can give it to an employee in Employee settings (“Choose the first inbox”). Everyone else's new recipes go to Need to proofread as before. Recipes waiting in Yoely or Not kosher this way aren't in the cookbook yet, and they show in those inboxes.", false, "team"],
   ["nkyoely","4.48","2026-11-16","Not kosher, then choose: Yoely or Need to proofread","The Not kosher inbox comes first, before Yoely. When a recipe is approved out of Not kosher (or fixed), you choose where it goes next: to Yoely, or to Need to proofread.", false, "team"],
   ["declinedbox","4.46","2026-11-15","Declined inbox","A new inbox, Declined, with every recipe and suggested change that was declined: who sent it, who declined it and when, and its item number (kept taken for a year). From there it can be sent back to Need to proofread.", false, "team"],
@@ -3673,19 +3675,42 @@ async function moveRecipes(ids, cat, sec){
 function moveCatOptions(cur){ return [...new Set([...CATS, ...ORDER])].sort(byName).map(c=>`<option ${c===cur?"selected":""}>${esc(c)}</option>`).join(""); }
 function moveSecField(id, cat){ const secs=sectionsOf(RECIPES.filter(r=>r.c==="Pesach"));
   return `<label class="mv-sec" ${cat==="Pesach"?"":"hidden"}>Section <input id="${id}" list="${id}-l" type="text" maxlength="40" placeholder="e.g. Kugel"><datalist id="${id}-l">${secs.map(s=>`<option value="${esc(s)}">`).join("")}</datalist></label>`; }
+// addcat: “+ Add a new category…” at the end of a category dropdown; typing a name adds it and chooses it
+const addCatOpt = () => feat("addcat") ? `<option value="__new">+ Add a new category…</option>` : "";
+function wireNewCat(sel){
+  if(!sel || !feat("addcat")) return;
+  let last = sel.value==="__new" ? (sel.options[0]||{}).value : sel.value;
+  sel.addEventListener("change", e=>{
+    if(sel.value!=="__new"){ last=sel.value; return; }
+    e.stopImmediatePropagation(); sel.value=last;
+    let box=sel.parentElement.querySelector(".newcat"); if(box){ box.querySelector("input").focus(); return; }
+    box=document.createElement("span"); box.className="newcat";
+    box.innerHTML=`<input type="text" maxlength="30" placeholder="New category name" aria-label="New category name"><button type="button" class="btn sm solid" data-nc="add">Add</button><button type="button" class="btn sm" data-nc="no">Cancel</button>`;
+    sel.after(box); const inp=box.querySelector("input"); inp.focus();
+    box.querySelector('[data-nc="no"]').onclick=()=>box.remove();
+    const add=()=>{ let n=inp.value.trim().replace(/\s+/g," ").replace(/[\/]/g,""); if(n.length<2){ toast("Type a name for the new category"); inp.focus(); return; }
+      n=n[0].toUpperCase()+n.slice(1);
+      const have=[...sel.options].find(o=>o.value!=="__new" && o.value.toLowerCase()===n.toLowerCase());
+      if(!have) sel.insertBefore(new Option(n, n), sel.querySelector('option[value="__new"]'));
+      sel.value = have ? have.value : n; last=sel.value; box.remove(); sel.dispatchEvent(new Event("change"));
+      toast(have ? `${sel.value} is already a category – it's chosen` : `New category “${n}” – it shows in the cookbook once a recipe is in it`); };
+    box.querySelector('[data-nc="add"]').onclick=add; inp.onkeydown=ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); add(); } };
+  });
+}
 // Move several at once: #move-<category slug>
 function movePage(c){
   const list=sortList(RECIPES.filter(r=>r.c===c), "code");
   app.innerHTML = `<section class="wrap tools-page">
     <a class="back" href="#${slug(c)}">← ${esc(c)}</a>
     <div class="section-head"><h2>Move recipes</h2><p>From ${esc(c)} · ${list.length} ${list.length===1?"recipe":"recipes"}</p></div>
-    <div class="panel-a mv-bar"><div class="pl-add-row"><label>Move to <select id="mv-cat">${moveCatOptions(c)}</select></label>${moveSecField("mv-sec", c)}
+    <div class="panel-a mv-bar"><div class="pl-add-row"><label>Move to <select id="mv-cat">${moveCatOptions(c)}${addCatOpt()}</select></label>${moveSecField("mv-sec", c)}
       <button type="button" class="btn solid" id="mv-go" disabled>Move</button></div>
       <p class="hint" id="mv-n">Tick the recipes to move. They get a new code in their new category.</p></div>
     <div class="panel-a"><label class="pub-row"><input type="checkbox" id="mv-all"><span><b>All in ${esc(c)}</b></span></label>
       <div class="mv-list">${list.map(r=>`<label class="pub-rec"><input type="checkbox" data-mv="${esc(r.id)}"><span>${noChip(r)} ${esc(r.t.replace(/^Untitled:\s*/,""))}${r.sec?` <small>${esc(r.sec)}</small>`:""}</span></label>`).join("")}</div></div>
   </section>`;
   const sel=()=>[...app.querySelectorAll("[data-mv]:checked")].map(x=>x.dataset.mv), go=document.getElementById("mv-go"), cs=document.getElementById("mv-cat");
+  wireNewCat(cs);
   const upd=()=>{ const n=sel().length; go.disabled=!n; go.textContent=n?`Move ${n}`:"Move"; document.getElementById("mv-n").textContent = n ? `${n} ${n===1?"recipe":"recipes"} will move to ${cs.value}.` : "Tick the recipes to move. They get a new code in their new category."; };
   app.querySelectorAll("[data-mv]").forEach(x=>x.onchange=upd);
   document.getElementById("mv-all").onchange=e=>{ app.querySelectorAll("[data-mv]").forEach(x=>x.checked=e.target.checked); upd(); };
@@ -3700,11 +3725,12 @@ function moveBox(r, btn){
   const box=document.createElement("div"); box.id="mvbox"; box.className="dlpick";
   const ask=!isAdmin();
   box.innerHTML=`<b>${ask?"Ask to move":"Move"} “${esc(r.t.replace(/^Untitled: /,""))}” to another category</b>
-    <div class="pl-add-row" style="margin-top:8px"><label>Category <select id="mv1-cat">${moveCatOptions(r.c)}</select></label>${moveSecField("mv1-sec", r.c)}
+    <div class="pl-add-row" style="margin-top:8px"><label>Category <select id="mv1-cat">${moveCatOptions(r.c)}${addCatOpt()}</select></label>${moveSecField("mv1-sec", r.c)}
     <button type="button" class="btn solid" id="mv1-go">${ask?"Send request":"Move"}</button><button type="button" class="btn" id="mv1-no">Cancel</button></div>
     <p class="hint">${ask?"An admin decides. If it's moved, it gets a new code in its new category.":`It gets a new code in its new category (now ${esc(codeOf(r)||"none")}).`}</p>`;
   btn.closest(".tools").after(box);
   const cs=document.getElementById("mv1-cat"); if(r.sec) document.getElementById("mv1-sec").value=r.sec;
+  wireNewCat(cs);
   cs.onchange=()=>{ box.querySelector(".mv-sec").hidden = cs.value!=="Pesach"; };
   document.getElementById("mv1-no").onclick=()=>box.remove();
   document.getElementById("mv1-go").onclick=async e=>{ e.target.disabled=true;
@@ -5906,12 +5932,13 @@ function importList(drafts, cat){
         <label class="imp-pick"><input type="checkbox" ${have.has(norm(d.t))?"":"checked"} aria-label="Keep ${esc(d.t)}"></label>
         <div class="imp-body"><b>${esc(d.t)}</b>${have.has(norm(d.t))?`<span class="pill wait dup">Already in the cookbook</span>`:""}<span class="hint">${d.by?"From "+esc(d.by)+" · ":""}${nIng(d)} ingredients · ${nSteps(d)} steps</span>
           <details><summary>Preview</summary><div class="pv">${previewHTML({s:d.s.map(([ing,h,items])=>({k:ing?"ing":"step",h,items}))})}</div></details></div>
-        <select class="imp-cat" aria-label="Category for ${esc(d.t)}">${catOpts(d.c)}</select>
+        <select class="imp-cat" aria-label="Category for ${esc(d.t)}">${catOpts(d.c)}${addCatOpt()}</select>
       </li>`).join("")}</ul>
       <p class="err" id="imp-err" role="alert" hidden></p>
       <div class="ed-actions">${sendToHTML("imp-sendto")}<button class="primary" id="imp-go" type="button">${maySendTo()&&sendTargets().length>1?"Send these":"Send these to be proofread"}</button></div>
     </div></section>`;
   document.getElementById("imp-back").onclick=()=>{ scanPage(cat); window.scrollTo(0,0); };
+  app.querySelectorAll(".imp-cat").forEach(wireNewCat);
   document.getElementById("imp-go").onclick=async e=>{
     const btn=e.currentTarget, rows=[...app.querySelectorAll(".imp")].filter(li=>li.querySelector("input").checked);
     const err=document.getElementById("imp-err"), to=sendToOf("imp-sendto");
