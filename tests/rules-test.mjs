@@ -313,6 +313,16 @@ await check('a third person releases it', assertSucceeds(updateDoc(doc(ADM, 'rec
 await check('a recipe in For approval can\'t be put in Yoely', assertFails(updateDoc(doc(ADM, 'recipes', 'r-edb'), { rv: 'yoely', yoelyFrom: 'approve', rvUids: [] })));
 await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'recipes', 'r-nky'), { c: 'Cakes', t: 'NK to Yoely', pub: false, rv: 'kosher', kosherFrom: '', kosherPub: true, rvUids: [], s: [] }); });
 await check('out of Not kosher, an admin can send it on to Yoely', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-nky'), { rv: 'yoely', yoelyFrom: '', kosherFrom: '', kosherPub: null, pub: true, rvNote: '', rvNoteBy: '', rvUids: [], rvAsk: [], rvBy: 'Adm', rvAt: 1, rvLog: [] })));
+// New recipes: the first inbox (4.49)
+await check("an employee without “Choose the first inbox” can't start a new recipe in Yoely", assertFails(setDoc(doc(EMP, 'submissions', 's-yo1'), { uid: 'emp', status: 'pending', stage: 'yoely', t: 'X', c: 'Cakes' })));
+await check("…nor skip ahead to For approval", assertFails(setDoc(doc(EMP, 'submissions', 's-yo2'), { uid: 'emp', status: 'pending', stage: 'approve', t: 'X', c: 'Cakes' })));
+await check('…but can send it to Need to proofread', assertSucceeds(setDoc(doc(EMP, 'submissions', 's-yo3'), { uid: 'emp', status: 'pending', stage: 'proof', t: 'X', c: 'Cakes' })));
+await check('an admin can start one in Yoely', assertSucceeds(setDoc(doc(ADM, 'submissions', 's-yo4'), { uid: 'adm', status: 'pending', stage: 'yoely', t: 'X', c: 'Cakes' })));
+await check('…someone with the Yoely inbox sees it', assertSucceeds(getDoc(doc(YO, 'submissions', 's-yo4'))));
+await check('…and clears it straight to For approval, written down', assertSucceeds(updateDoc(doc(YO, 'submissions', 's-yo4'), { stage: 'approve', uids: ['yo1'], proofBy: 'Yo', proofUid: 'yo1', proofAt: 1 })));
+await check("…but can't clear it without being written down", assertFails(updateDoc(doc(YO, 'submissions', 's-yo3'), { stage: 'approve', uids: [] })));
+await check('an admin can start one in Not kosher', assertSucceeds(setDoc(doc(ADM, 'submissions', 's-nk1'), { uid: 'adm', status: 'pending', stage: 'kosher', t: 'X', c: 'Cakes', uids: [] })));
+await check('…and send it on to Yoely', assertSucceeds(updateDoc(doc(ADM, 'submissions', 's-nk1'), { stage: 'yoely' })));
 await check('an admin can put it in Yoely and take it out again', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-yo'), { rv: 'yoely', yoelyFrom: '', rvUids: [] }))
   .then(() => assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-yo'), { rv: '', yoelyFrom: '', rvUids: [] }))));
 await check('an admin can put a recipe in Not kosher', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-nk'), { rv: 'kosher', kosherFrom: '', kosherPub: true, pub: false, rvNote: 'x', rvNoteBy: 'Adm', rvBy: 'Adm', rvAt: 1, rvUids: [], rvAsk: [], rvLog: [] })));

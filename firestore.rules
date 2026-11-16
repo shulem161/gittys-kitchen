@@ -374,10 +374,10 @@ service cloud.firestore {
       let nu = request.resource.data.get('uids', []);
       let os = resource.data.get('stage', 'approve');
       let ns = request.resource.data.get('stage', 'approve');
-      return (nu == ou && (ns == os || ns == 'proof' || (os == 'release' && ns == 'approve')))
+      return (nu == ou && (ns == os || ns == 'proof' || (os == 'release' && ns == 'approve') || (os == 'kosher' && ns == 'yoely')))
         || (ns == 'proof' && nu.size() == 0)
         || (nu == ou.concat([request.auth.uid]) && !(request.auth.uid in ou)
-            && ((os == 'proof' && ns == 'approve') || (os == 'approve' && ns == 'release')))
+            && ((os in ['proof', 'yoely'] && ns == 'approve') || (os == 'approve' && ns == 'release')))
         || (request.auth.uid in ou && nu == ou.removeAll([request.auth.uid])
             && ((os == 'release' && ns == 'approve') || (os == 'approve' && ns == 'proof')));
     }
@@ -394,12 +394,15 @@ service cloud.firestore {
 
     // Recipes sent in by members. Only the admin sees all of them and decides.
     match /submissions/{id} {
-      allow create: if (can('suggest') || extra('edit') || isAdmin())
-        && (request.resource.data.uid == request.auth.uid || (isAdmin() && canManage(request.resource.data.uid)))
-        && request.resource.data.status == 'pending';
-      allow read: if extra('review') || extra('proofread') || extra('release') || (signedIn() && resource.data.uid == request.auth.uid);
+      // a new one starts in Need to proofread; admins and employees given "Choose the first inbox" may start it in Yoely or Not kosher
+      allow create: if request.resource.data.status == 'pending'
+        && (request.resource.data.get('stage', '') == 'proof' || (request.resource.data.get('stage', '') in ['yoely', 'kosher'] && extra('scanto')))
+        && (can('suggest') || extra('edit') || isAdmin())
+        && (request.resource.data.uid == request.auth.uid || (isAdmin() && canManage(request.resource.data.uid)));
+      allow read: if extra('review') || extra('proofread') || extra('release') || extra('yoely') || extra('kosher') || (signedIn() && resource.data.uid == request.auth.uid);
       // three different people: whoever proofread can't approve; neither of them can release
-      allow update: if (extra('review') || extra('proofread') || extra('release'))
+      allow update: if (extra('review') || extra('proofread') || extra('release')
+          || (resource.data.get('stage', '') == 'yoely' && extra('yoely')) || (resource.data.get('stage', '') == 'kosher' && extra('kosher')))
         && (request.resource.data.get('stage', '') != 'release' || resource.data.get('stage', '') == 'release'
             || !(request.auth.uid in resource.data.get('uids', [])))
         && (request.resource.data.status != 'approved' || resource.data.status == 'approved'

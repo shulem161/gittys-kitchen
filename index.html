@@ -89,6 +89,7 @@ button{font:inherit;color:inherit}
 .split-top{white-space:nowrap}
 .sh-opt{display:grid!important;grid-template-columns:auto 1fr;gap:2px 8px;text-align:left;justify-content:start;padding:10px 12px}.sh-opt span{grid-column:2;font-size:13px;color:var(--muted);font-weight:400}
 .shared-note{background:var(--accent-soft);border-radius:10px;padding:10px 12px;margin:0 0 10px}
+.send-to{display:flex;align-items:center;gap:8px;font-weight:600}.send-to select{min-height:40px}
 .qr-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.qr-row .qr{font-size:13px}
 .rq-acts .qr-row{flex-basis:100%}
 .ln-notes ul{margin:4px 0 0;padding-left:18px;display:grid;gap:4px}
@@ -1360,10 +1361,10 @@ let PUB = {allow:{}, cats:{}};
 // the extras are off unless granted. Public members all share the Customer portal settings. Admins can do everything.
 const EXTRA_PERMS = [["editdirect","Edit recipes directly, without sending a request (not delete, move or make public)"],
   ["del","Delete recipes (and the Duplicate recipes page)"],["moverec","Move recipes to another category, and OK move requests"],["pub","Make recipes public or team only, and OK go-public requests"],
-  ["kosher","The Not kosher inbox"],["members","Approve or deny people who ask to join"],["activity","See Activity: who added, changed or moved what"],["portal","Customer portal settings: what customers can see and do"],["proofread","Proofread recipes (the Need to proofread inbox)"],["review","Approve recipes and photos (the For approval inbox)"],["release","Release approved recipes, to the public or for the team only (the Ready to release inbox)"],["answer","Recipe requests: see them, answer them, and get a notice for new ones"],["inbox","Read and answer suggestions & comments"],["viewas","Log in as a customer, to see exactly what they see"],["ratings","Likes and dislikes: see them, and get a notice for each one"],["yoely","The Yoely inbox: put recipes in it and clear them (cleared, they go straight to For approval)"]];
+  ["kosher","The Not kosher inbox"],["members","Approve or deny people who ask to join"],["activity","See Activity: who added, changed or moved what"],["portal","Customer portal settings: what customers can see and do"],["proofread","Proofread recipes (the Need to proofread inbox)"],["review","Approve recipes and photos (the For approval inbox)"],["release","Release approved recipes, to the public or for the team only (the Ready to release inbox)"],["answer","Recipe requests: see them, answer them, and get a notice for new ones"],["inbox","Read and answer suggestions & comments"],["viewas","Log in as a customer, to see exactly what they see"],["ratings","Likes and dislikes: see them, and get a notice for each one"],["yoely","The Yoely inbox: put recipes in it and clear them (cleared, they go straight to For approval)"],["scanto","Choose the first inbox for a new recipe they scan or add: Need to proofread, Yoely or Not kosher"]];
 const isExtra = k => EXTRA_PERMS.some(x=>x[0]===k);
 const EMP_EXTRA = ["del","moverec","pub","kosher","members","activity","portal"];
-const extraPerms = () => EXTRA_PERMS.filter(([k])=>(k!=="editdirect" || feat("empedit")) && (!EMP_EXTRA.includes(k) || feat("empextra")));
+const extraPerms = () => EXTRA_PERMS.filter(([k])=>(k!=="editdirect" || feat("empedit")) && (k!=="scanto" || feat("scanto")) && (!EMP_EXTRA.includes(k) || feat("empextra")));
 // Employee settings (meta/employees) apply to every employee; a person's own Permissions override them.
 let EMP = {allow:{}};
 const empDefault = k => EMP.allow[k]!==undefined ? EMP.allow[k]===true : !isExtra(k);
@@ -1387,7 +1388,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.48";
+const WEB_VERSION = "4.49";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1442,6 +1443,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["scanto","4.49","2026-11-16","Choose the first inbox for a new recipe","When you scan or add a new recipe, choose where it goes first: Need to proofread, Yoely, or Not kosher. Admins always have the choice; you can give it to an employee in Employee settings (“Choose the first inbox”). Everyone else's new recipes go to Need to proofread as before. Recipes waiting in Yoely or Not kosher this way aren't in the cookbook yet, and they show in those inboxes.", false, "team"],
   ["nkyoely","4.48","2026-11-16","Not kosher, then choose: Yoely or Need to proofread","The Not kosher inbox comes first, before Yoely. When a recipe is approved out of Not kosher (or fixed), you choose where it goes next: to Yoely, or to Need to proofread.", false, "team"],
   ["declinedbox","4.46","2026-11-15","Declined inbox","A new inbox, Declined, with every recipe and suggested change that was declined: who sent it, who declined it and when, and its item number (kept taken for a year). From there it can be sent back to Need to proofread.", false, "team"],
   ["actmore","4.46","2026-11-15","Activity shows everything done to a recipe","Activity now shows much more than added and changed: sent to Need to proofread, change requested, proofread, approved, released, moved back, declined, merged, deleted, restored, moved to another category, Not kosher and Yoely. The “What” filter picks any one of them, and the charts show each in its own colour.", false, "team"],
@@ -2954,8 +2956,8 @@ function activityAll(){
     if(r.deleted || r.deletedAt) push(r.mergedBy?"merged":"deleted", r.deletedBy, r.deletedAt, r.t, r.id, codeOf(r), r.mergedBy?{note:"merged into another recipe"}:null);
     if(r.restoredAt) push("restored", r.restoredBy, r.restoredAt, r.t, r.id, codeOf(r)); }
   for(const x of subs){
-    push(x.editOf?"request":"proof", x.byName, x.created, x.t, x.editOf||x.recipeId||"", x.code||"", {note:x.editOf?"":"new recipe", sub:true});
-    for(const e of x.log||[]){ const k=stepKind(e); if(k && k!=="proof") push(k, e.by, e.at, x.t, x.recipeId||x.editOf||"", x.code||"", {note:stepNote(e), sub:true}); else if(k==="proof" && (e.back||e.undo)) push("back", e.by, e.at, x.t, x.recipeId||"", x.code||"", {sub:true}); }
+    push(x.editOf?"request":x.sentTo==="yoely"?"yoely":x.sentTo==="kosher"?"kosher":"proof", x.byName, x.created, x.t, x.editOf||x.recipeId||"", x.code||"", {note:x.editOf?"":x.sentTo?"put in":"new recipe", sub:true});
+    for(const e of x.log||[]){ if(e.from==="kosher"){ push("kosher", e.by, e.at, x.t, "", x.code||"", {note:"taken out", sub:true}); continue; } const k=stepKind(e); if(k && k!=="proof") push(k, e.by, e.at, x.t, x.recipeId||x.editOf||"", x.code||"", {note:stepNote(e), sub:true}); else if(k==="proof" && (e.back||e.undo)) push("back", e.by, e.at, x.t, x.recipeId||"", x.code||"", {sub:true}); }
     if(x.status==="rejected") push("declined", x.declinedBy, x.decided, x.t, x.editOf||"", x.code||"", {sub:true, note:x.editOf?"suggested change":"new recipe"});
     if(x.status==="approved" && x.decided) push("released", x.releasedBy, x.decided, x.t, x.recipeId||"", x.code||"", {sub:true, note:x.releasedAs==="private"?"for the team only":"to the public"}); }
   return out.sort((a,b)=>b.at-a.at);
@@ -4421,7 +4423,7 @@ function editor(r, cat, sub, draft){
             <div class="row"><button type="button" class="btn solid" id="ed-ai-add">Add it</button></div></div>`:""}</div>`}
         <p class="err" id="ed-err" role="alert" hidden></p>
         <div class="ed-actions">
-          <button class="primary" type="submit">${sub?"Save changes":suggest?(editOf?"Send the request":"Send to be proofread"):isNew?"Add recipe":"Save changes"}</button>
+          ${suggest&&!editOf&&!sub?sendToHTML("ed-sendto"):""}<button class="primary" type="submit">${sub?"Save changes":suggest?(editOf?"Send the request":maySendTo()&&sendTargets().length>1?"Send":"Send to be proofread"):isNew?"Add recipe":"Save changes"}</button>
           ${isNew||suggest||!isAdmin()?"":`<button type="button" class="btn danger-btn" id="ed-del">Delete recipe</button>`}
         </div>
         <div id="ed-confirm"></div>
@@ -4566,11 +4568,13 @@ function editor(r, cat, sub, draft){
         btn0.disabled=true; btn0.textContent="Sending…";
         const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s, ord:0});
         try{
-          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves||"",sec:d.sec,s:d.s, uid:actUid(), byName:actName(), status:"pending", stage:"proof", created:Date.now(), revs:[{by:actName(), uid:actUid(), at:Date.now(), s:d.s, t:d.t}], editOf, ...(rqDraft&&rqDraft.id?{rq:rqDraft.id}:{}), ...(draft&&draft.dropOf?{dropOf:draft.dropOf}:{})});
+          const to = editOf ? "proof" : sendToOf("ed-sendto");
+          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves||"",sec:d.sec,s:d.s, uid:actUid(), byName:actName(), status:"pending", stage:to, ...(to!=="proof"?{sentTo:to}:{}), created:Date.now(), revs:[{by:actName(), uid:actUid(), at:Date.now(), s:d.s, t:d.t}], editOf, ...(rqDraft&&rqDraft.id?{rq:rqDraft.id}:{}), ...(draft&&draft.dropOf?{dropOf:draft.dropOf}:{})});
           if(draft && draft.fromSub) db.collection("submissions").doc(draft.fromSub).delete().catch(()=>{});
           { const eb = isTeam() && target ? editedBack(target, Date.now()) : null; if(eb) await db.collection("recipes").doc(target.id).update(eb).catch(()=>{}); }
-          notifyWatchers("watch-proof", editOf ? `${myName()} requested a change` : `New recipe from ${myName()}`, `“${editOf&&target?target.t:t}” needs to be proofread.`, "#proof", editOf?"pencil2":"cookie");
-          toast("Sent. It will be proofread, approved and released."); location.hash = may("proofread") ? "proof" : "mine";
+          if(to!=="proof"){ sentNotice(to, 1, myName()); toast(`Sent to ${INBOX_NAME[to]}.`); location.hash = to; }
+          else { notifyWatchers("watch-proof", editOf ? `${myName()} requested a change` : `New recipe from ${myName()}`, `“${editOf&&target?target.t:t}” needs to be proofread.`, "#proof", editOf?"pencil2":"cookie");
+          toast("Sent. It will be proofread, approved and released."); location.hash = may("proofread") ? "proof" : "mine"; }
         }catch(e){ btn0.disabled=false; btn0.textContent="Send for approval"; fail("Couldn't send. Check your internet connection and try again."); }
         return;
       }
@@ -4613,7 +4617,7 @@ const rvIn = st => !recipesOnline ? [] : st==="kosher" ? NK : RECIPES.filter(r=>
 const nkHidden = () => feat("nk") && feat("nkhide");
 const INBOXES = [["proof","Need to proofread","proofread"],["approve","For approval","review"],["release","Ready to release","release"]];
 const mayInboxes = () => may("proofread") || may("review") || may("release");
-const inboxCount = st => st==="yoely" ? (mayYoely() ? rvIn("yoely").length : 0) : st==="kosher" ? (mayNK() ? rvIn("kosher").length : 0) : st==="proof" ? (may("proofread") ? inStage("proof").length + rvIn("proof").length : 0)
+const inboxCount = st => st==="yoely" ? (mayYoely() ? rvIn("yoely").length + (feat("scanto")?inStage("yoely").length:0) : 0) : st==="kosher" ? (mayNK() ? rvIn("kosher").length + (feat("scanto")?inStage("kosher").length:0) : 0) : st==="proof" ? (may("proofread") ? inStage("proof").length + rvIn("proof").length : 0)
   : st==="approve" ? (may("review") ? inStage("approve").length + rvIn("approve").length : 0)
   : st==="admin" ? (isAdmin() ? pendingPhotos.length + openMoves() + openGolive() + openDeletes() : (may("moverec")?openMoves():0) + (may("pub")?openGolive():0))
   : (may("release") ? inStage("release").length + rvIn("release").length : 0);
@@ -4621,6 +4625,42 @@ const INBOX_NAME = {yoely:"Yoely", kosher:"Not kosher", proof:"Need to proofread
 // Yoely: an inbox before the three steps. Nothing goes there by itself; admins and employees allowed to use it put a recipe there.
 // Cleared, it skips Need to proofread and goes straight to For approval; whoever cleared it counts as the first of the three people.
 const mayYoely = () => feat("yoely") && (isAdmin() || may("yoely"));
+// scanto: a new recipe's first inbox, chosen when it's sent (admins, and employees given “Choose the first inbox”)
+const maySendTo = () => feat("scanto") && (isAdmin() || may("scanto"));
+const sendTargets = () => [["proof","Need to proofread"], ...(feat("yoely")?[["yoely","Yoely"]]:[]), ...(feat("nk")?[["kosher","Not kosher"]]:[])];
+const sendToHTML = id => !maySendTo() || sendTargets().length<2 ? "" : `<label class="send-to">Send to <select id="${id}">${sendTargets().map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join("")}</select></label>`;
+const sendToOf = id => { const v=(document.getElementById(id)||{}).value; return maySendTo() && sendTargets().some(([k])=>k===v) ? v : "proof"; };
+const sentNotice = (to, n, who) => to==="yoely" ? notifyWatchers("watch-yoely", `${n} new ${n===1?"recipe":"recipes"} in Yoely`, `From ${who}. Waiting in Yoely.`, "#yoely", "inbox_tray")
+  : to==="kosher" ? notifyAdmin(`${n} new ${n===1?"recipe":"recipes"} in Not kosher`, `From ${who}. Waiting in Not kosher.`, "#kosher", "no_entry_sign") : null;
+// Who sees every sent-in recipe: the inboxes' people, and (scanto) those working in Yoely or Not kosher
+const maySubsAll = () => mayInboxes() || (feat("scanto") && (mayYoely() || mayNK()));
+// New recipes waiting in Yoely or Not kosher (not in the cookbook yet)
+function subPanel(st){
+  if(!feat("scanto")) return "";
+  const L=inStage(st); if(!L.length) return "";
+  const btns = x => st==="yoely" ? `<button type="button" class="btn sm solid" data-sx="yoOk" data-sid="${esc(x.id)}">✓ Cleared – send to For approval</button>`
+    : `<button type="button" class="btn sm solid" data-sx="nkProof" data-sid="${esc(x.id)}">✓ Kosher – send to Need to proofread</button>${feat("yoely")?`<button type="button" class="btn sm solid" data-sx="nkYo" data-sid="${esc(x.id)}">✓ Kosher – send to Yoely</button>`:""}`;
+  return `<div class="panel-a rv-panel"><h3>New recipes, not in the cookbook yet <span class="count">${L.length}</span></h3>
+    <ul class="rv-list">${L.map(x=>`<li><div class="rv-top">${x.code&&feat("subcode")?`<span class="nochip" title="Item number">${esc(x.code)}</span> `:""}<b>${esc(x.t)}</b><span class="hint">${esc(x.c||"")} · from ${esc(x.byName||"a member")} · ${fmtDate(x.created)}</span></div>
+      <details class="rv-log"><summary>See the recipe</summary><div class="pv">${previewHTML(x)}</div></details>
+      <div class="row rv-acts">${btns(x)}${mayInboxes()?`<a class="btn sm" href="#review-${esc(x.id)}">Edit</a>`:""}<button type="button" class="btn sm" data-sx="decline" data-sid="${esc(x.id)}">Decline</button></div></li>`).join("")}</ul></div>`;
+}
+function wireSubPanel(after){
+  app.querySelectorAll("[data-sx]").forEach(b=>b.onclick=async()=>{ const x=subs.find(z=>z.id===b.dataset.sid); if(!x) return; const k=b.dataset.sx, now=Date.now(), from=stageOf(x);
+    if(k==="decline" && !b.dataset.sure){ b.dataset.sure="1"; b.textContent="Tap again to decline"; b.classList.add("warn"); return; }
+    const log=to=>[...(x.log||[]), {from, to, by:myName(), uid:me, at:now}].slice(-30);
+    const data = k==="yoOk" ? {stage:"approve", uids:[...(x.uids||[]).filter(u=>u!==me), me], proofBy:myName(), proofUid:me, proofAt:now, log:log("approve")}
+      : k==="nkProof" ? {stage:"proof", log:log("proof")} : k==="nkYo" ? {stage:"yoely", log:log("yoely")}
+      : {status:"rejected", decided:now, declinedBy:myName(), declinedUid:me};
+    b.disabled=true;
+    try{ await db.collection("submissions").doc(x.id).update(data); Object.assign(x, data);
+      if(k==="decline") touchHold(x.code);
+      if(k==="yoOk") notifyWatchers("watch-approve", `Ready for approval`, `“${x.t}” was cleared in Yoely.`, "#approve", "white_check_mark");
+      if(k==="nkProof") notifyWatchers("watch-proof", `A new recipe needs to be proofread`, `“${x.t}” came out of Not kosher.`, "#proof", "pencil2");
+      if(k==="nkYo") sentNotice("yoely", 1, myName());
+      toast({yoOk:"Cleared – now in For approval. Two other people approve and release it.", nkProof:"Sent to Need to proofread", nkYo:"Sent to Yoely", decline:"Declined"}[k]); renderAcct(); after(); }
+    catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); } });
+}
 const yoelyCanPut = r => mayYoely() && recipesOnline && !offline && (!r.rv || r.rv==="proof");
 async function yoelyPut(r){
   const now=Date.now();
@@ -4637,13 +4677,14 @@ function yoelyPage(){
     <p class="hint" style="margin:-4px 0 12px">Nothing comes here by itself. Put a recipe here from its ⋮ menu, or find it below. When it's cleared it skips Need to proofread and goes straight to For approval. Whoever clears it counts as the first of the three people, so two other people approve and release it.</p>
     <div class="panel-a"><label for="yo-q"><b>Put a recipe in Yoely</b></label>
       <input type="search" id="yo-q" placeholder="Type a recipe name or code…" autocomplete="off" style="width:100%;margin-top:6px"><div class="pre-sugg" id="yo-s"></div></div>
+    ${subPanel("yoely")}
     ${rl.length?`<div class="panel-a rv-panel"><ul class="rv-list">${rl.map(r=>`<li><div class="rv-top"><a class="link" href="#${esc(r.id)}">${noChip(r)} ${esc(r.t.replace(/^Untitled: /,""))}</a><span class="hint">${esc(r.c)} · put here by ${esc(r.rvBy||"")} · ${fmtDate(r.rvAt)}</span></div>
       ${r.rvNote?`<div class="ib-note"><b>📝 Note:</b> ${esc(r.rvNote)} (${esc(r.rvNoteBy||"")})</div>`:""}
       <div class="row rv-acts">${rvButtons(r)}${rvEditBtn(r)}</div></li>`).join("")}</ul></div>`
-    :`<div class="panel-a"><p class="hint mempty">Nothing in Yoely.</p></div>`}
+    :inStage("yoely").length&&feat("scanto")?"":`<div class="panel-a"><p class="hint mempty">Nothing in Yoely.</p></div>`}
   </section>`;
   const keepY=()=>{ const y=window.scrollY; yoelyPage(); window.scrollTo(0,y); };
-  wireRv(app, keepY);
+  wireRv(app, keepY); wireSubPanel(keepY);
   const q=document.getElementById("yo-q"), sg=document.getElementById("yo-s");
   q.oninput=()=>{ const s=q.value.trim().toLowerCase(); if(!s){ sg.innerHTML=""; return; }
     const hits=RECIPES.filter(r=>yoelyCanPut(r) && (r.t.toLowerCase().includes(s) || (codeOf(r)||"").startsWith(s))).slice(0,8);
@@ -4676,13 +4717,14 @@ function kosherPage(){
     <p class="hint" style="margin:-4px 0 12px">Nothing comes here by itself. Put a recipe here from its ⋮ menu, or find it below. ${nkHidden()?"While it's here it's hidden from the cookbook. Approve it and it's back in the cookbook and goes on to Need to proofread.":"Customers don't see a recipe while it's here."}</p>
     <div class="panel-a"><label for="nk-q"><b>Put a recipe in Not kosher</b></label>
       <input type="search" id="nk-q" placeholder="Type a recipe name or code…" autocomplete="off" style="width:100%;margin-top:6px"><div class="pre-sugg" id="nk-s"></div></div>
+    ${subPanel("kosher")}
     ${rl.length?`<div class="panel-a rv-panel"><ul class="rv-list">${rl.map(r=>`<li><div class="rv-top"><a class="link" href="#${esc(r.id)}">${noChip(r)} ${esc(r.t.replace(/^Untitled: /,""))}</a><span class="hint">${esc(r.c)} · put here by ${esc(r.rvNoteBy||r.rvBy||"")} · ${fmtDate(r.rvAt)}</span></div>
       ${r.rvNote?`<div class="ib-note"><b>🚫 Why:</b> ${esc(r.rvNote)} <a class="link" href="${fixHref(r.id, r.rvNote)}">Fix it</a></div>`:""}
       <div class="row rv-acts">${rvButtons(r)}</div></li>`).join("")}</ul></div>`
-    :`<div class="panel-a"><p class="hint mempty">Nothing in Not kosher.</p></div>`}
+    :inStage("kosher").length&&feat("scanto")?"":`<div class="panel-a"><p class="hint mempty">Nothing in Not kosher.</p></div>`}
   </section>`;
   const keepY=()=>{ const y=window.scrollY; kosherPage(); window.scrollTo(0,y); };
-  wireRv(app, keepY);
+  wireRv(app, keepY); wireSubPanel(keepY);
   const q=document.getElementById("nk-q"), sg=document.getElementById("nk-s");
   q.oninput=()=>{ const s=q.value.trim().toLowerCase(); if(!s){ sg.innerHTML=""; return; }
     const hits=RECIPES.filter(r=>r.rv!=="kosher" && (r.t.toLowerCase().includes(s) || (codeOf(r)||"").startsWith(s))).slice(0,8);
@@ -4797,11 +4839,11 @@ function wireRv(root, after){
 const inboxTotal = () => INBOXES.reduce((n,[st])=>n+inboxCount(st), 0) + inboxCount("admin") + inboxCount("kosher") + inboxCount("yoely");
 function watchSubs(){
   if(unsubSubs || !db || !me) return;
-  const q = mayInboxes() ? db.collection("submissions") : db.collection("submissions").where("uid","==",who());
+  const q = maySubsAll() ? db.collection("submissions") : db.collection("submissions").where("uid","==",who());
   unsubSubs = q.onSnapshot(s=>{
     subs = s.docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(b.created||0)-(a.created||0));
     renderAcct(); if(feat("subcode")){ watchHolds(); setTimeout(codeSubs, 300); }
-    const h=location.hash; if(["#review","#mine","#proof","#approve","#release","#declined"].includes(h) && !document.querySelector(".editor, textarea:focus")) route();
+    const h=location.hash; if(["#review","#mine","#proof","#approve","#release","#declined","#yoely","#kosher"].includes(h) && !document.querySelector(".editor, textarea:focus")) route();
   }, ()=>{});
 }
 function newRecipeId(t){
@@ -5144,7 +5186,7 @@ function declinedPage(){
 }
 function minePage(){
   const label = s => s.status==="approved" ? `<span class="pill ok">In the cookbook</span>` : s.status==="rejected" ? `<span class="pill no">Not approved</span>`
-    : `<span class="pill wait">${s.proofNote&&stageOf(s)==="proof"?"Being fixed":({proof:"Being proofread",approve:"Waiting for approval",release:"Approved, about to be released"})[stageOf(s)]}</span>`;
+    : `<span class="pill wait">${s.proofNote&&stageOf(s)==="proof"?"Being fixed":({proof:"Being proofread",yoely:"In Yoely",kosher:"Being checked in Not kosher",approve:"Waiting for approval",release:"Approved, about to be released"})[stageOf(s)]}</span>`;
   app.innerHTML = `<section class="wrap admin">
     <div class="section-head" style="margin-top:28px"><h2>My recipes</h2><p>${offline?"":`<a class="link" href="#new">+ Add a recipe</a>`}</p></div>
     <div class="panel-a">${subs.length?`<ul class="mlist">${subs.map(s=>`<li class="mrow"><div class="mwho"><b>${esc(s.t)}</b><span>${s.editOf?"Changes · ":"New recipe · "}${s.code&&feat("subcode")?"No. "+esc(s.code)+" · ":""}${esc(s.c)} · sent ${fmtDate(s.created)}</span></div>
@@ -5867,12 +5909,12 @@ function importList(drafts, cat){
         <select class="imp-cat" aria-label="Category for ${esc(d.t)}">${catOpts(d.c)}</select>
       </li>`).join("")}</ul>
       <p class="err" id="imp-err" role="alert" hidden></p>
-      <div><button class="primary" id="imp-go" type="button">Send these to be proofread</button></div>
+      <div class="ed-actions">${sendToHTML("imp-sendto")}<button class="primary" id="imp-go" type="button">${maySendTo()&&sendTargets().length>1?"Send these":"Send these to be proofread"}</button></div>
     </div></section>`;
   document.getElementById("imp-back").onclick=()=>{ scanPage(cat); window.scrollTo(0,0); };
   document.getElementById("imp-go").onclick=async e=>{
     const btn=e.currentTarget, rows=[...app.querySelectorAll(".imp")].filter(li=>li.querySelector("input").checked);
-    const err=document.getElementById("imp-err");
+    const err=document.getElementById("imp-err"), to=sendToOf("imp-sendto");
     if(!rows.length){ err.textContent="Tick at least one recipe."; err.hidden=false; return; }
     btn.disabled=true; let done=0;
     try{
@@ -5880,12 +5922,13 @@ function importList(drafts, cat){
         const d=Object.assign({}, drafts[+li.dataset.i], {c: li.querySelector(".imp-cat").value});
         btn.textContent=`Sending… ${done+1} of ${rows.length}`;
         { const doc=toDoc(Object.assign({}, d, {ord:0}));
-          await db.collection("submissions").doc("s-"+newId()).set({c:doc.c,t:doc.t,by:doc.by,n:doc.n,s:doc.s, uid:actUid(), byName:actName(), status:"pending", stage:"proof", created:Date.now(), editOf:""}); }
+          await db.collection("submissions").doc("s-"+newId()).set({c:doc.c,t:doc.t,by:doc.by,n:doc.n,s:doc.s, uid:actUid(), byName:actName(), status:"pending", stage:to, ...(to!=="proof"?{sentTo:to}:{}), created:Date.now(), editOf:""}); }
         done++;
       }
-      notifyWatchers("watch-proof", `${done} new ${done===1?"recipe":"recipes"} from ${myName()}`, `Waiting to be proofread.`, "#proof", "cookie");
+      if(to!=="proof"){ sentNotice(to, done, myName()); toast(`${done} ${done===1?"recipe":"recipes"} sent to ${INBOX_NAME[to]}`); location.hash = to; }
+      else { notifyWatchers("watch-proof", `${done} new ${done===1?"recipe":"recipes"} from ${myName()}`, `Waiting to be proofread.`, "#proof", "cookie");
       toast(`${done} ${done===1?"recipe":"recipes"} sent to be proofread`);
-      location.hash = may("proofread") ? "proof" : "mine";
+      location.hash = may("proofread") ? "proof" : "mine"; }
     }catch(x){ btn.disabled=false; btn.textContent=may("edit")?"Add these recipes":"Send these for approval"; err.textContent=`Stopped after ${done} of ${rows.length}. Check your internet connection and try again.`; err.hidden=false; }
   };
 }
