@@ -1387,7 +1387,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.47";
+const WEB_VERSION = "4.48";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1442,6 +1442,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["nkyoely","4.48","2026-11-16","Not kosher, then choose: Yoely or Need to proofread","The Not kosher inbox comes first, before Yoely. When a recipe is approved out of Not kosher (or fixed), you choose where it goes next: to Yoely, or to Need to proofread.", false, "team"],
   ["declinedbox","4.46","2026-11-15","Declined inbox","A new inbox, Declined, with every recipe and suggested change that was declined: who sent it, who declined it and when, and its item number (kept taken for a year). From there it can be sent back to Need to proofread.", false, "team"],
   ["actmore","4.46","2026-11-15","Activity shows everything done to a recipe","Activity now shows much more than added and changed: sent to Need to proofread, change requested, proofread, approved, released, moved back, declined, merged, deleted, restored, moved to another category, Not kosher and Yoely. The “What” filter picks any one of them, and the charts show each in its own colour.", false, "team"],
   ["subcode","4.45","2026-11-15","New recipes get their item number right away","A new recipe gets its item number as soon as it's sent to Need to proofread, so you can see it and talk about it by number in every inbox. It still shows in the cookbook only once it's released. If it's declined (or withdrawn), its number stays taken for a year, like a deleted recipe's, so it's never mixed up with another one.", false, "team"],
@@ -4150,8 +4151,9 @@ function openMenu(confirming){
   ].filter(Boolean);
   const manageN = (isAdmin()?mp:0);
   const inboxes = [realOwner()&&!viewingAs() ? item("#updates","App &amp; web updates", updWaiting()?updWaiting()+" to approve":"", updWaiting()) : "",
-    mayYoely()&&recipesOnline ? item("#yoely","Yoely", inboxCount("yoely")?inboxCount("yoely")+" waiting":"", inboxCount("yoely")) : "",
-    mayNK()&&recipesOnline ? item("#kosher","Not kosher", inboxCount("kosher")?inboxCount("kosher")+" waiting":"", inboxCount("kosher")) : "", ...INBOXES.filter(([,,p])=>may(p)).map(([st,l])=>item("#"+st, l, inboxCount(st)?inboxCount(st)+" waiting":"", inboxCount(st))),
+    ...(()=>{ const yo = mayYoely()&&recipesOnline ? item("#yoely","Yoely", inboxCount("yoely")?inboxCount("yoely")+" waiting":"", inboxCount("yoely")) : "",
+      nk = mayNK()&&recipesOnline ? item("#kosher","Not kosher", inboxCount("kosher")?inboxCount("kosher")+" waiting":"", inboxCount("kosher")) : "";
+      return feat("nkyoely") ? [nk, yo] : [yo, nk]; })(), ...INBOXES.filter(([,,p])=>may(p)).map(([st,l])=>item("#"+st, l, inboxCount(st)?inboxCount(st)+" waiting":"", inboxCount(st))),
     mayDeclined() ? item("#declined","Declined", declinedList().length?declinedList().length+" in all":"", 0) : "",
     isAdmin()||may("moverec")||may("pub") ? item("#admin-approval","Needs admin approval", inboxCount("admin")?inboxCount("admin")+" waiting":"", inboxCount("admin")) : "",
     !offline&&may("answer") ? item("#requests","Recipe requests", openRequests()?openRequests()+" waiting":"", openRequests()) : "",
@@ -4690,7 +4692,8 @@ function kosherPage(){
 // The row of inboxes at the top of each inbox page; Not kosher (admins) comes before the three steps
 function inboxSteps(stage){
   const nk=mayNK(), yo=mayYoely();
-  return `<ol class="ib-steps${nk&&yo?" with-nk with-yo":nk||yo?" with-nk":""}">${yo?`<li class="nk${stage==="yoely"?" on":""}"><a href="#yoely"><b>📥</b> Yoely${inboxCount("yoely")?` <span class="count">${inboxCount("yoely")}</span>`:""}</a></li>`:""}${nk?`<li class="nk${stage==="kosher"?" on":""}"><a href="#kosher"><b>🚫</b> Not kosher${inboxCount("kosher")?` <span class="count">${inboxCount("kosher")}</span>`:""}</a></li>`:""}${INBOXES.map(([st,l,p],i)=>`<li class="${st===stage?"on":""}">${may(p)?`<a href="#${st}">`:"<span>"}<b>${i+1}</b> ${l}${inboxCount(st)?` <span class="count">${inboxCount(st)}</span>`:""}${may(p)?"</a>":"</span>"}</li>`).join("")}</ol>`;
+  const yoLi = yo?`<li class="nk${stage==="yoely"?" on":""}"><a href="#yoely"><b>📥</b> Yoely${inboxCount("yoely")?` <span class="count">${inboxCount("yoely")}</span>`:""}</a></li>`:"", nkFirst = feat("nkyoely");
+  return `<ol class="ib-steps${nk&&yo?" with-nk with-yo":nk||yo?" with-nk":""}">${nkFirst?"":yoLi}${nk?`<li class="nk${stage==="kosher"?" on":""}"><a href="#kosher"><b>🚫</b> Not kosher${inboxCount("kosher")?` <span class="count">${inboxCount("kosher")}</span>`:""}</a></li>`:""}${nkFirst?yoLi:""}${INBOXES.map(([st,l,p],i)=>`<li class="${st===stage?"on":""}">${may(p)?`<a href="#${st}">`:"<span>"}<b>${i+1}</b> ${l}${inboxCount(st)?` <span class="count">${inboxCount(st)}</span>`:""}${may(p)?"</a>":"</span>"}</li>`).join("")}</ol>`;
 }
 // Move a cookbook recipe through the inboxes
 async function setRv(r, data, msg){
@@ -4709,7 +4712,7 @@ function rvMove(r, to, extra, msg){
   return setRv(r, Object.assign({rv:to, rvBy:myName(), rvAt:now, rvUids:uids, rvAsk:[], rvLog:[...(r.rvLog||[]), entry].slice(-30)}, extra||{}), msg);
 }
 const RV_STEP = {yoely:"📥 Put in Yoely", out:"Taken out of Yoely", kosher:"🚫 Put in Not kosher", "kosher-ok":"✓ Checked: kosher, taken out of Not kosher", approve:"Proofread ✓ → For approval", release:"Approved → Ready to release", done:"Released", proof:"Put in Need to proofread"};
-const rvLogHTML = log => log.slice().reverse().map(e=>`<li><b>${e.from==="yoely"&&e.back?"↩ Taken out of Yoely"+(e.to==="proof"?", back to Need to proofread":""):e.edited?"✎ Edited – back to "+(INBOX_NAME[e.to]||e.to):e.undo?"↩ Undone – back to "+(INBOX_NAME[e.to]||e.to):e.back?"↩ Moved back to "+(INBOX_NAME[e.to]||e.to):e.kosherOk?"✓ Approved out of Not kosher → Need to proofread":e.from==="yoely"&&e.to==="approve"?"📥 Cleared in Yoely → For approval":RV_STEP[e.to]||e.to}${e.to==="done"?(e.pub===false?" for the team only":" to the public"):""}</b> · moved up by ${esc(e.by)}${(e.asked||[]).length?`, asked by ${e.asked.map(a=>esc(a.name)).join(", ")}`:""} · ${fmtDate(e.at)}</li>`).join("");
+const rvLogHTML = log => log.slice().reverse().map(e=>`<li><b>${e.from==="yoely"&&e.back?"↩ Taken out of Yoely"+(e.to==="proof"?", back to Need to proofread":""):e.edited?"✎ Edited – back to "+(INBOX_NAME[e.to]||e.to):e.undo?"↩ Undone – back to "+(INBOX_NAME[e.to]||e.to):e.back?"↩ Moved back to "+(INBOX_NAME[e.to]||e.to):e.kosherOk?"✓ Approved out of Not kosher → "+(INBOX_NAME[e.to]||"Need to proofread"):e.from==="kosher"&&e.to==="yoely"?"Out of Not kosher → Yoely":e.from==="yoely"&&e.to==="approve"?"📥 Cleared in Yoely → For approval":RV_STEP[e.to]||e.to}${e.to==="done"?(e.pub===false?" for the team only":" to the public"):""}</b> · moved up by ${esc(e.by)}${(e.asked||[]).length?`, asked by ${e.asked.map(a=>esc(a.name)).join(", ")}`:""} · ${fmtDate(e.at)}</li>`).join("");
 // Everything one person moved up (or asked to move up), newest first
 const movedUp = () => { const u=who(), out=[];
   RECIPES.forEach(r=>(r.rvLog||[]).forEach(e=>{ if(e.to!=="proof" && e.to!=="kosher" && e.to!=="kosher-ok" && e.to!=="yoely" && !e.back && (e.uid===u || (e.asked||[]).some(a=>a.uid===u) || (e.credited||[]).some(a=>a.uid===u))) out.push({rid:r.id, t:r.t.replace(/^Untitled: /,""), e}); }));
@@ -4734,6 +4737,11 @@ const rvActs = {
     const ok = await setRv(r, {rv:"proof", pub:r.kosherPub!==false, kosherPub:null, kosherFrom:"", rvNote:"", rvNoteBy:"", rvUids:[], rvAsk:[], rvBy:myName(), rvAt:now,
       rvLog:[...(r.rvLog||[]), {from:"kosher", to:"proof", by:myName(), uid:me, at:now, kosherOk:true}].slice(-30)}, "Approved – back in the cookbook, and now in Need to proofread");
     if(ok) notifyWatchers("watch-proof", `A recipe is out of Not kosher`, `“${r.t}” is in Need to proofread.`, "#"+r.id, "pencil2"); return ok; },
+  // nkyoely: out of Not kosher, on to Yoely instead of Need to proofread
+  nkYo: async r => { const now=Date.now();
+    const ok = await setRv(r, Object.assign({rv:"yoely", yoelyFrom:"", kosherPub:null, kosherFrom:"", rvNote:"", rvNoteBy:"", rvUids:[], rvAsk:[], rvBy:myName(), rvAt:now,
+      rvLog:[...(r.rvLog||[]), {from:"kosher", to:"yoely", by:myName(), uid:me, at:now, ...(nkHidden()?{kosherOk:true}:{})}].slice(-30)}, nkHidden()?{pub:r.kosherPub!==false}:{}), nkHidden()?"Approved – back in the cookbook, and now in Yoely":"Sent to Yoely");
+    if(ok) notifyWatchers("watch-yoely", `A recipe is in Yoely`, `“${r.t}” came out of Not kosher and is waiting in Yoely.`, "#yoely", "inbox_tray"); return ok; },
   ok: r => rvMove(r, "approve", {rvNote:"", rvNoteBy:""}, "Proofread ✓ – now in For approval"),
   // Yoely: cleared goes straight to For approval (whoever clears it is written down, so they can't do the next step); taken out goes back where it was
   yoOk: async r => { const ok = await rvMove(r, "approve", {yoelyFrom:"", rvNote:"", rvNoteBy:""}, "Cleared – now in For approval. Two other people approve and release it.");
@@ -4767,8 +4775,9 @@ function rvButtons(r){
   const st=r.rv; if(!st) return "";
   const undo = feat("moveback") && lastMove(r) ? `<button type="button" class="btn sm" data-rv="undo" data-rid="${esc(r.id)}">↩ Undo – move it back to ${INBOX_NAME[lastMove(r).from]}</button>` : "";
   if(st==="yoely") return !mayYoely() ? "" : `<button type="button" class="btn sm solid" data-rv="yoOk" data-rid="${esc(r.id)}">✓ Cleared – send to For approval</button><button type="button" class="btn sm" data-rv="yoOut" data-rid="${esc(r.id)}">Take it out of Yoely</button>`;
-  if(st==="kosher") return !(isAdmin()||may("kosher")) ? "" : nkHidden() ? `<button type="button" class="btn sm solid" data-rv="nkOk" data-rid="${esc(r.id)}">✓ Approve – back in the cookbook, on to Need to proofread</button><a class="btn sm" href="#edit-${esc(r.id)}">Fix it</a>`
-    : `<button type="button" class="btn sm solid" data-rv="nkFix" data-rid="${esc(r.id)}">Fixed – send to Need to proofread</button><button type="button" class="btn sm" data-rv="nkOut" data-rid="${esc(r.id)}">✓ It's kosher – take it out</button>`;
+  const nkYo = feat("nkyoely") && feat("yoely") ? `<button type="button" class="btn sm solid" data-rv="nkYo" data-rid="${esc(r.id)}">${nkHidden()?"✓ Approve – back in the cookbook, on to Yoely":"Fixed – send to Yoely"}</button>` : "";
+  if(st==="kosher") return !(isAdmin()||may("kosher")) ? "" : nkHidden() ? `<button type="button" class="btn sm solid" data-rv="nkOk" data-rid="${esc(r.id)}">✓ Approve – back in the cookbook, on to Need to proofread</button>${nkYo}<a class="btn sm" href="#edit-${esc(r.id)}">Fix it</a>`
+    : `<button type="button" class="btn sm solid" data-rv="nkFix" data-rid="${esc(r.id)}">Fixed – send to Need to proofread</button>${nkYo}<button type="button" class="btn sm" data-rv="nkOut" data-rid="${esc(r.id)}">✓ It's kosher – take it out</button>`;
   if(rvLocked(r) && ((st==="approve" && may("review")) || (st==="release" && may("release")))) return `<span class="hint lock">🔒 You moved this one up already, so someone else has to do the next step.</span>${undo}`;
   if((r.rvAsk||[]).some(a=>a.uid===me) && !((st==="proof"&&may("proofread"))||(st==="approve"&&may("review"))||(st==="release"&&may("release")))) return `<span class="hint lock">You asked to move it up. You count as moving it, so you can't do the step after.${undo?"</span>"+undo+"<span hidden>":""}</span>`;
   if(st==="proof" && may("proofread")) return `<button type="button" class="btn sm solid" data-rv="ok" data-rid="${esc(r.id)}">✓ Proofread – send to For approval</button><button type="button" class="btn sm" data-rv="fix" data-rid="${esc(r.id)}">✗ Needs changes</button>`;

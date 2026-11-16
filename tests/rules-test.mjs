@@ -311,6 +311,8 @@ await check('someone else approves it', assertSucceeds(updateDoc(doc(PR2, 'recip
 await check("…and the one who cleared it can't release it either", assertFails(updateDoc(doc(YO, 'recipes', 'r-yo'), { rv: '', pub: true })));
 await check('a third person releases it', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-yo'), { rv: '', pub: true })));
 await check('a recipe in For approval can\'t be put in Yoely', assertFails(updateDoc(doc(ADM, 'recipes', 'r-edb'), { rv: 'yoely', yoelyFrom: 'approve', rvUids: [] })));
+await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'recipes', 'r-nky'), { c: 'Cakes', t: 'NK to Yoely', pub: false, rv: 'kosher', kosherFrom: '', kosherPub: true, rvUids: [], s: [] }); });
+await check('out of Not kosher, an admin can send it on to Yoely', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-nky'), { rv: 'yoely', yoelyFrom: '', kosherFrom: '', kosherPub: null, pub: true, rvNote: '', rvNoteBy: '', rvUids: [], rvAsk: [], rvBy: 'Adm', rvAt: 1, rvLog: [] })));
 await check('an admin can put it in Yoely and take it out again', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-yo'), { rv: 'yoely', yoelyFrom: '', rvUids: [] }))
   .then(() => assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-yo'), { rv: '', yoelyFrom: '', rvUids: [] }))));
 await check('an admin can put a recipe in Not kosher', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-nk'), { rv: 'kosher', kosherFrom: '', kosherPub: true, pub: false, rvNote: 'x', rvNoteBy: 'Adm', rvBy: 'Adm', rvAt: 1, rvUids: [], rvAsk: [], rvLog: [] })));

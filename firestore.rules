@@ -95,7 +95,7 @@ service cloud.firestore {
     function kosherMove() {
       return resource != null
         && (request.resource.data.get('rv', '') == 'kosher' || resource.data.get('rv', '') == 'kosher')
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub', 'kosherFrom', 'kosherPub'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub', 'kosherFrom', 'kosherPub', 'yoelyFrom'])
         && isAdmin();
     }
     // Yoely: an inbox before the three steps (admins, and employees given the Yoely inbox).
@@ -340,7 +340,7 @@ service cloud.firestore {
         || kosherMove()
         || yoelyMove()
         || (resource != null && (resource.data.get('rv', '') == 'kosher' || request.resource.data.get('rv', '') == 'kosher')
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'pub', 'kosherPub', 'kosherFrom'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'pub', 'kosherPub', 'kosherFrom', 'yoelyFrom'])
             && extra('kosher'))
         // Recipe inboxes: proofreaders, approvers and releasers move a recipe along (rv), one step at a time;
         // releasers choose public or team only
