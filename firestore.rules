@@ -103,6 +103,20 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub', 'kosherFrom', 'kosherPub'])
         && isAdmin();
     }
+    // Yoely: an inbox before the three steps (admins, and employees given the Yoely inbox).
+    // In from nowhere or Need to proofread; cleared, straight to For approval with whoever cleared it written down
+    // (so they can't approve or release it too); taken out, back where it was.
+    function yoelyMove() {
+      let was = resource.data.get('rv', '');
+      let now = request.resource.data.get('rv', '');
+      let after = request.resource.data.get('rvUids', []);
+      return resource != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'yoelyFrom'])
+        && ((was in ['', 'proof'] && now == 'yoely' && after.size() == 0 && request.resource.data.get('yoelyFrom', '') == was)
+            || (was == 'yoely' && now == 'approve' && request.auth.uid in after)
+            || (was == 'yoely' && now == resource.data.get('yoelyFrom', '') && after.size() == 0))
+        && extra('yoely');
+    }
     // An edit to a recipe in For approval or Ready to release sends it back to Need to proofread, in the same save
     function editedBack() {
       return resource != null
@@ -314,6 +328,7 @@ service cloud.firestore {
             && mergeDrops(id) && extra('release'))
         || ((noRvChange() || editedBack()) && publishOk())
         || kosherMove()
+        || yoelyMove()
         // Recipe inboxes: proofreaders, approvers and releasers move a recipe along (rv), one step at a time;
         // releasers choose public or team only
         || (resource != null
@@ -347,8 +362,8 @@ service cloud.firestore {
 
     // Who hears about each recipe inbox (admins, and employees allowed to work in it).
     match /meta/{w} {
-      allow get: if approvedMember() && w in ['watch-proof', 'watch-approve', 'watch-release'];
-      allow write: if isAdmin() && w in ['watch-proof', 'watch-approve', 'watch-release']
+      allow get: if approvedMember() && w in ['watch-proof', 'watch-approve', 'watch-release', 'watch-yoely'];
+      allow write: if isAdmin() && w in ['watch-proof', 'watch-approve', 'watch-release', 'watch-yoely']
         && request.resource.data.keys().hasOnly(['uids']) && request.resource.data.uids is list;
     }
 

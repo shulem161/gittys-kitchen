@@ -290,6 +290,23 @@ await check("a proofreader can't jump it to Ready to release", assertFails(updat
 await check("moving it on can't wipe out who moved it before", assertFails(updateDoc(doc(PR1, 'recipes', 'r-skip3'), { rv: 'release', rvUids: [] })));
 await check("…nor leave out who is moving it", assertFails(updateDoc(doc(PR1, 'recipes', 'r-skip3'), { rv: 'release', rvUids: ['pr2'] })));
 await check('moving it on the right way still works', assertSucceeds(updateDoc(doc(PR1, 'recipes', 'r-skip3'), { rv: 'release', rvUids: ['pr2', 'pr1'] })));
+// Yoely inbox (4.43)
+await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
+  await setDoc(doc(d, 'recipes', 'r-yo'), { c: 'Cakes', t: 'Yoely cake', pub: true, rv: '', s: [] });
+  await setDoc(doc(d, 'users', 'yo1'), { name: 'Yo One', status: 'approved', role: 'employee', perms: { yoely: true, review: true, release: true }, created: 1, favs: [] }); });
+const YO = as('yo1');
+await check("an employee without the Yoely inbox can't put a recipe in it", assertFails(updateDoc(doc(EMP, 'recipes', 'r-yo'), { rv: 'yoely', yoelyFrom: '', rvUids: [] })));
+await check('one with it can', assertSucceeds(updateDoc(doc(YO, 'recipes', 'r-yo'), { rv: 'yoely', yoelyFrom: '', rvUids: [], rvAsk: [], rvBy: 'Yo', rvAt: 1, rvLog: [] })));
+await check("clearing it can't skip For approval", assertFails(updateDoc(doc(YO, 'recipes', 'r-yo'), { rv: 'release', rvUids: ['yo1'] })));
+await check("…and must write down who cleared it", assertFails(updateDoc(doc(YO, 'recipes', 'r-yo'), { rv: 'approve', rvUids: [] })));
+await check('cleared, it goes straight to For approval', assertSucceeds(updateDoc(doc(YO, 'recipes', 'r-yo'), { rv: 'approve', rvUids: ['yo1'], yoelyFrom: '' })));
+await check("…and whoever cleared it can't approve it too", assertFails(updateDoc(doc(YO, 'recipes', 'r-yo'), { rv: 'release', rvUids: ['yo1'] })));
+await check('someone else approves it', assertSucceeds(updateDoc(doc(PR2, 'recipes', 'r-yo'), { rv: 'release', rvUids: ['yo1', 'pr2'] })));
+await check("…and the one who cleared it can't release it either", assertFails(updateDoc(doc(YO, 'recipes', 'r-yo'), { rv: '', pub: true })));
+await check('a third person releases it', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-yo'), { rv: '', pub: true })));
+await check('a recipe in For approval can\'t be put in Yoely', assertFails(updateDoc(doc(ADM, 'recipes', 'r-edb'), { rv: 'yoely', yoelyFrom: 'approve', rvUids: [] })));
+await check('an admin can put it in Yoely and take it out again', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-yo'), { rv: 'yoely', yoelyFrom: '', rvUids: [] }))
+  .then(() => assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-yo'), { rv: '', yoelyFrom: '', rvUids: [] }))));
 await check('an admin can put a recipe in Not kosher', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-nk'), { rv: 'kosher', kosherFrom: '', kosherPub: true, pub: false, rvNote: 'x', rvNoteBy: 'Adm', rvBy: 'Adm', rvAt: 1, rvUids: [], rvAsk: [], rvLog: [] })));
 await check("…an employee can't take it out", assertFails(updateDoc(doc(PR1, 'recipes', 'r-nk'), { rv: 'proof', rvUids: [] })));
 await check('…an admin can', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-nk'), { rv: 'proof', pub: true, kosherPub: null, kosherFrom: '', rvNote: '', rvNoteBy: '', rvUids: [], rvAsk: [], rvLog: [] })));
