@@ -1389,7 +1389,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.51";
+const WEB_VERSION = "4.52";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1445,7 +1445,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
   ["fixlink","4.51","2026-11-16","“Fix it” on the recipe page too, only for people who can edit","The “Fix it” link next to a “Needs changes” note now also shows on the recipe page itself, not only in the inbox. It shows only for people who can change the recipe itself (admins, and employees given “Edit recipes directly”); everyone else doesn't see it, in the inboxes either.", false, "team"],
-  ["addcat","4.50","2026-11-16","Add a new category from the dropdowns","The category dropdowns for moving a recipe (one, or several at once) and for recipes found by the scanner now end with “+ Add a new category…”. Type the name and it's chosen right away; the new category shows in the cookbook once a recipe is in it, with its own item-number digits. (The recipe editor already had this.)", false, "team"],
+  ["addcat","4.50","2026-11-16","Add a new category","In the menu, right after “Add a recipe”, there's “Add a category” (admins, and employees allowed to move recipes): type a name and it's in the cookbook straight away, with its own item-number digits, ready for recipes. Also, the category dropdowns for moving a recipe (one, or several at once) and for recipes found by the scanner now end with “+ Add a new category…”. Type the name and it's chosen right away; the new category shows in the cookbook once a recipe is in it, with its own item-number digits. (The recipe editor already had this.)", false, "team"],
   ["scanto","4.49","2026-11-16","Choose the first inbox for a new recipe","When you scan or add a new recipe, choose where it goes first: Need to proofread, Yoely, or Not kosher. Admins always have the choice; you can give it to an employee in Employee settings (“Choose the first inbox”). Everyone else's new recipes go to Need to proofread as before. Recipes waiting in Yoely or Not kosher this way aren't in the cookbook yet, and they show in those inboxes.", false, "team"],
   ["nkyoely","4.48","2026-11-16","Not kosher, then choose: Yoely or Need to proofread","The Not kosher inbox comes first, before Yoely. When a recipe is approved out of Not kosher (or fixed), you choose where it goes next: to Yoely, or to Need to proofread.", false, "team"],
   ["declinedbox","4.46","2026-11-15","Declined inbox","A new inbox, Declined, with every recipe and suggested change that was declined: who sent it, who declined it and when, and its item number (kept taken for a year). From there it can be sent back to Need to proofread.", false, "team"],
@@ -3698,6 +3698,27 @@ function wireNewCat(sel){
     box.querySelector('[data-nc="add"]').onclick=add; inp.onkeydown=ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); add(); } };
   });
 }
+// Add a category (menu, right after “Add a recipe”): it's in the cookbook straight away, empty, with its own item-number digits
+const mayAddCat = () => feat("addcat") && (isAdmin() || may("moverec")) && recipesOnline && !offline;
+function newCatPage(){
+  app.innerHTML=`<section class="wrap tools-page"><div class="section-head" style="margin-top:28px"><h2>Add a category</h2><p>${CATS.length} categories now</p></div>
+    <form class="panel-a" id="nc-form"><div class="field"><label for="nc-name">Name of the new category</label><input id="nc-name" type="text" maxlength="30" placeholder="e.g. Salads" autocomplete="off"></div>
+      <p class="hint">It shows in the cookbook straight away and gets its own item-number digits. Then add recipes to it, or move recipes into it.</p>
+      <p class="err" id="nc-err" role="alert" hidden></p>
+      <div class="ed-actions"><button class="primary" type="submit">Add category</button><a class="btn" href="#categories">Cancel</a></div></form></section>`;
+  const F=document.getElementById("nc-form"), inp=document.getElementById("nc-name"), err=document.getElementById("nc-err"); inp.focus();
+  F.onsubmit=async e=>{ e.preventDefault();
+    let n=inp.value.trim().replace(/\s+/g," ").replace(/[\/]/g,""); if(n.length<2){ err.textContent="Type a name (at least 2 letters)."; err.hidden=false; return; }
+    n=n[0].toUpperCase()+n.slice(1);
+    const have=[...new Set([...CATS, ...ORDER])].find(c=>c.toLowerCase()===n.toLowerCase());
+    if(have && CATS.includes(have)){ toast(`${have} is already a category`); location.hash=slug(have); return; }
+    const btn=F.querySelector(".primary"); btn.disabled=true;
+    const map=JSON.parse(JSON.stringify(CODEMAP)); const name=have||n;
+    if(!isPesach(name)) codeLetter(name, map);
+    map.added=[...new Set([...(map.added||[]), name])];
+    try{ await db.collection("meta").doc("codes").set(map); CODEMAP=map; store("gk-codemap", CODEMAP); setRecipes(RAW_RECIPES); toast(`Category “${name}” added`); location.hash=slug(name); }
+    catch(x){ btn.disabled=false; err.textContent="Couldn't save. Check your connection."; err.hidden=false; } };
+}
 // Move several at once: #move-<category slug>
 function movePage(c){
   const list=sortList(RECIPES.filter(r=>r.c===c), "code");
@@ -4190,7 +4211,7 @@ function openMenu(confirming){
     may("ratings") ? item("#ratings","Likes &amp; dislikes") : ""].filter(Boolean);
   const inboxN = inboxTotal() + (may("answer")?openRequests():0) + (may("inbox")?newFeedback():0) + (viewingAs()?0:updWaiting());
   const recipes = [
-    !offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit")) ? item("#new","Add a recipe")+(can("ai")?item("#scan","Scan a recipe"):"") : "",
+    !offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit")) ? item("#new","Add a recipe")+(mayAddCat()?item("#newcat","Add a category"):"")+(can("ai")?item("#scan","Scan a recipe"):"") : "",
     offline||!can("requests")||may("answer") ? "" : item("#requests","Request a recipe"),
     may("edit")||(!can("suggest")&&!subs.length) ? "" : item("#mine","My recipes", subs.length||""),
     item("#favorites","My favorites", favs().length||""),
@@ -4252,7 +4273,7 @@ function setRecipes(list){
   const hide = feat("nk") && feat("nkhide");
   NK = feat("nk") ? sortRecipes(list.filter(r=>r.rv==="kosher")) : [];
   RECIPES = sortRecipes(hide ? list.filter(r=>r.rv!=="kosher") : list);
-  CATS = [...new Set([...ORDER.filter(c=>RECIPES.some(r=>r.c===c) || ALWAYS_SHOW.includes(c)), ...RECIPES.map(r=>r.c)])].sort(byName);
+  CATS = [...new Set([...ORDER.filter(c=>RECIPES.some(r=>r.c===c) || ALWAYS_SHOW.includes(c)), ...RECIPES.map(r=>r.c), ...(feat("addcat")&&!isPublic()?(CODEMAP.added||[]):[])])].sort(byName);
 }
 (function(){ const c=store("gk-recipes"); if(c && c.length) setRecipes(c); })();
 function watchRecipes(){
@@ -4262,7 +4283,8 @@ function watchRecipes(){
     if(l!==siteLook){ siteLook=l; store("gk-sitelook", l); applyLook(); }
   }, ()=>{});
   if(!unsubCodes) unsubCodes = db.collection("meta").doc("codes").onSnapshot(s=>{
-    if(!s.exists) return; const d=s.data(); CODEMAP={cats:d.cats||{}, secs:d.secs||{}}; store("gk-codemap", CODEMAP);
+    if(!s.exists) return; const d=s.data(); CODEMAP={cats:d.cats||{}, secs:d.secs||{}, ...(d.added?{added:d.added}:{})}; store("gk-codemap", CODEMAP);
+    if(feat("addcat")) setRecipes(RAW_RECIPES);
     if(state==="approved" && !document.querySelector(".editor, .prof-head, .prof-page, .settings, #rqform, .tools-page, #td-new:focus")) route();
   }, ()=>{});
   if(!unsubEmp) unsubEmp = db.collection("meta").doc("employees").onSnapshot(s=>{
@@ -7303,6 +7325,7 @@ function routePage(){
   if(h.startsWith("compare~") && isTeam()){ const [,a,b2]=h.split("~"); q.value=""; comparePage(a||"", b2||""); window.scrollTo(0,0); return; }
   document.body.classList.remove("split-on"); renderSplitBtn();
   if(h.startsWith("split~") && maySplit()){ const [,a,b2]=h.split("~"); q.value=""; splitPage(a||"", b2||""); return; }
+  if(h==="newcat" && mayAddCat()){ q.value=""; newCatPage(); window.scrollTo(0,0); return; }
   if(h==="declined" && mayDeclined()){ q.value=""; declinedPage(); window.scrollTo(0,0); return; }
   if(h==="yoely" && mayYoely()){ q.value=""; yoelyPage(); window.scrollTo(0,0); return; }
   if(h==="kosher" && mayNK()){ q.value=""; kosherPage(); window.scrollTo(0,0); return; }

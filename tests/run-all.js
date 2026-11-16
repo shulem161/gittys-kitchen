@@ -1113,7 +1113,12 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       await A.fill('.newcat input', 'breakfast'); await A.click('.newcat [data-nc=add]'); await A.waitForTimeout(200);
       const v = await A.locator('#mv1-cat').inputValue();
       ok('the move dropdown can add a new category, which is then chosen', boxShown && stillOld && v === 'Breakfast', [boxShown, stillOld, v]);
-      await A.click('#mv1-no'); await A.waitForTimeout(200); }
+      await A.click('#mv1-no'); await A.waitForTimeout(200);
+      const menu = await A.evaluate(() => { openMenu(); const x = [...document.querySelectorAll('.menu a')].map(a => a.textContent.trim().split('\n')[0].trim()); closeMenu(); return x; });
+      const i = menu.findIndex(t => /^Add a recipe/.test(t));
+      await A.goto(F + '#newcat'); await A.waitForTimeout(300); await A.fill('#nc-name', 'salads'); await A.click('#nc-form .primary'); await A.waitForTimeout(700);
+      const added = await A.evaluate(() => CATS.includes('Salads') && !!CODEMAP.cats.Salads && location.hash === '#' + slug('Salads'));
+      ok('“Add a category” comes right after “Add a recipe” in the menu, and the new category is in the cookbook straight away', i >= 0 && /^Add a category/.test(menu[i + 1] || '') && added, [menu.slice(Math.max(0, i - 1), i + 3), added]); }
     // “Fix it” on the recipe page too, only for people who can edit the recipe
     { await A.evaluate(async () => { await db.collection('recipes').doc('r-challah').update({rv: 'proof', rvNote: 'Say the pan size', rvNoteBy: 'Tester'}); }); await A.waitForTimeout(600);
       await A.goto(F + '#r-challah'); await A.waitForTimeout(500);

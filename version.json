@@ -1,6 +1,6 @@
 {
-  "web": "4.51",
+  "web": "4.52",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Fix it on the recipe page too, only for people who can edit."
+  "notes": "Add a category, right after Add a recipe."
 }
