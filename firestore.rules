@@ -312,29 +312,24 @@ service cloud.firestore {
         || (approvedMember() && (myRole() != 'public' || resource.data.get('pub', false) == true));
       // Only admins move recipes to another category; employees ask (golive, kind "move").
       // anyone on the team can ask for a recipe to be moved up, or put a hidden one into Need to proofread
-      allow update: if isTeam() && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rvAsk'])
+      // (Cheap checks come first and the costly role lookups last: Firebase stops checking after 1,000 steps per save.)
+      allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rvAsk'])
         // edited, or undone by whoever moved it: back one step, or back to Need to proofread
         || (((resource.data.get('rv', '') in ['approve', 'release'] && request.resource.data.get('rv', '') == 'proof' && request.resource.data.get('rvUids', []).size() == 0)
              || (resource.data.get('rv', '') == 'release' && request.resource.data.get('rv', '') == 'approve'
                  && resource.data.get('rvUids', []).hasAll(request.resource.data.get('rvUids', []))))
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog']))
         || (resource.data.get('rv', '') == '' && request.resource.data.get('rv', '') == 'proof'
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog'])));
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog'])))
+        && isTeam();
       // Merging: whoever releases the merged recipe deletes the one that was merged into it (and nothing else).
       // Checked first, and only for that change, to stay within the rules' limit on document lookups.
+      // Then the one-job privileges (each only when the save touches just its own fields), then the general cases.
       allow write: if (resource != null && resource.data.get('deleted', false) == false
             && request.resource.data.get('deleted', false) == true
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'deletedAt', 'deletedBy', 'updated', 'mergedBy'])
             && mergeDrops(id) && extra('release'))
-        || ((noRvChange() || editedBack()) && publishOk())
-        || kosherMove()
-        || yoelyMove()
-        // Recipe inboxes: proofreaders, approvers and releasers move a recipe along (rv), one step at a time;
-        // releasers choose public or team only
-        || (resource != null
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub'])
-            && rvSteps())
-        // Employees given "Edit recipes directly": the recipe itself only, never where it is, who sees it or whether it's deleted
+        // Employees given "Delete recipes": delete one (it goes to the Recycle bin)
         || (resource != null && request.resource.data.get('deleted', false) == true && resource.data.get('deleted', false) == false
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'deletedAt', 'deletedBy', 'updated']) && extra('del'))
         // Recycle bin: employees allowed to delete may also restore (with a new number if the old one was taken)
@@ -342,11 +337,21 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'restoredAt', 'restoredBy', 'updated', 'code', 'oldCodes']) && extra('del'))
         || (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['c', 'sec', 'code', 'oldCodes', 'history', 'updated']) && extra('moverec'))
         || (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pub', 'updated']) && extra('pub'))
+        // Employees given "Edit recipes directly": the recipe itself only, never where it is, who sees it or whether it's deleted
+        || (resource != null && resource.data.get('deleted', false) == false
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['t', 'by', 'n', 'pre', 'kind', 'time', 'serves', 's', 'history', 'updated'])
+            && extra('editdirect'))
+        || ((noRvChange() || editedBack()) && publishOk())
+        || kosherMove()
+        || yoelyMove()
         || (resource != null && (resource.data.get('rv', '') == 'kosher' || request.resource.data.get('rv', '') == 'kosher')
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'pub', 'kosherPub', 'kosherFrom'])
             && extra('kosher'))
-        || (resource != null && resource.data.get('deleted', false) == false && extra('editdirect')
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['t', 'by', 'n', 'pre', 'kind', 'time', 'serves', 's', 'history', 'updated']));
+        // Recipe inboxes: proofreaders, approvers and releasers move a recipe along (rv), one step at a time;
+        // releasers choose public or team only
+        || (resource != null
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub'])
+            && rvSteps());
     }
 
     // Employees asking for a recipe to be shown to public members. Admins decide.
