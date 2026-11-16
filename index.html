@@ -767,6 +767,10 @@ body.guiding{overflow:hidden}
 .act-name{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .act-track{display:flex;height:16px;border-radius:4px;background:var(--bg);overflow:hidden}
 .act-track i,.act-key i{display:block;height:100%}
+.act-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}.act-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:5px 11px;font:inherit;font-size:13px;cursor:pointer}
+.act-chip i{width:10px;height:10px;border-radius:50%;background:var(--c)}.act-chip b{color:var(--muted);font-weight:600}.act-chip.on{border-color:var(--c);box-shadow:inset 0 0 0 1px var(--c)}
+.act-tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--c);color:var(--c);margin-left:4px;white-space:nowrap}
+.act-key{flex-wrap:wrap}
 i.added,span.added{background:#C2581A}i.changed,span.changed{background:var(--accent)}
 .act-n{font-size:13px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
 .act-key{display:flex;gap:14px;font-size:12.5px;color:var(--muted);margin:10px 0 0}.act-key span{display:flex;gap:6px;align-items:center}.act-key i{width:12px;height:12px;border-radius:3px}
@@ -1383,7 +1387,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.45";
+const WEB_VERSION = "4.46";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1438,6 +1442,8 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["declinedbox","4.46","2026-11-15","Declined inbox","A new inbox, Declined, with every recipe and suggested change that was declined: who sent it, who declined it and when, and its item number (kept taken for a year). From there it can be sent back to Need to proofread.", false, "team"],
+  ["actmore","4.46","2026-11-15","Activity shows everything done to a recipe","Activity now shows much more than added and changed: sent to Need to proofread, change requested, proofread, approved, released, moved back, declined, merged, deleted, restored, moved to another category, Not kosher and Yoely. The “What” filter picks any one of them, and the charts show each in its own colour.", false, "team"],
   ["subcode","4.45","2026-11-15","New recipes get their item number right away","A new recipe gets its item number as soon as it's sent to Need to proofread, so you can see it and talk about it by number in every inbox. It still shows in the cookbook only once it's released. If it's declined (or withdrawn), its number stays taken for a year, like a deleted recipe's, so it's never mixed up with another one.", false, "team"],
   ["plainadmin","4.44","2026-11-15","Admin notices without names","Notices on the main admin channel now say only what's new and where, for example “Something new in Approve members. Tap to open.”, with no names, recipe titles or messages. That channel's name is in the website's code, so anyone could follow it. Approve it for everyone: notices from customers change only once they have this update.", false],
   ["yoely","4.43","2026-11-15","The Yoely inbox","A new inbox called Yoely, before the three steps. Nothing goes there by itself: an admin, or an employee you allow in Inbox settings, puts a recipe there from its ⋮ menu (or from the Yoely page). When it's cleared, it skips Need to proofread and goes straight to For approval. Whoever cleared it counts as the first of the three people, so they can't approve or release it too.", false, "team"],
@@ -2931,7 +2937,80 @@ function activityItems(){
   for(const r of RECIPES) for(const h of r.history||[]) if(h && h.at) out.push({r, a:h.a==="added"?"added":"changed", by:h.by||"a member", at:+h.at});
   return out.sort((x,y)=>y.at-x.at);
 }
+// actmore: every kind of thing done to a recipe, from its history, its inbox moves, the Recycle bin and the inboxes' sent-in recipes
+const ACT_KINDS = [["proof","Sent to Need to proofread","#6F83B8"],["request","Change requested","#9B7CB5"],["added","Added","#C2581A"],["changed","Changed","#2C5A9A"],
+  ["proofread","Proofread ✓","#3E9EA0"],["approved","Approved","#C08A2E"],["released","Released","#1F7A4D"],["back","Moved back","#8A8F98"],["declined","Declined","#B4413A"],
+  ["merged","Merged","#7A4FB5"],["deleted","Deleted","#7E2B2B"],["restored","Restored","#3E8E5E"],["moved","Moved to another category","#B5651D"],["kosher","Not kosher","#A0522D"],["yoely","Yoely","#5B6CC2"]];
+const ACT_COLOR = Object.fromEntries(ACT_KINDS.map(([k,,c])=>[k,c])), ACT_LABEL = Object.fromEntries(ACT_KINDS.map(([k,l])=>[k,l]));
+function activityAll(){
+  const out=[], push=(kind, by, at, t, rid, code, extra) => { if(at) out.push(Object.assign({kind, by:by||"someone", at:+at, t:String(t||"").replace(/^Untitled: /,""), rid:rid||"", code:code||""}, extra||{})); };
+  const stepKind = e => e.undo||e.back ? (e.from==="yoely"&&e.to!=="approve" ? "yoely" : "back") : e.to==="proof" ? "proof" : e.to==="approve" ? (e.from==="yoely"?"yoely":"proofread")
+    : e.to==="release" ? "approved" : e.to==="done" ? "released" : e.to==="kosher"||e.to==="kosher-ok" ? "kosher" : e.to==="yoely"||e.to==="out" ? "yoely" : "";
+  const stepNote = e => e.to==="done" ? (e.pub===false?"for the team only":"to the public") : e.to==="kosher" ? "put in" : e.to==="kosher-ok"||(e.from==="kosher"&&e.kosherOk) ? "taken out" : e.to==="yoely" ? "put in" : e.from==="yoely" ? (e.to==="approve"?"cleared":"taken out") : e.back||e.undo ? "to "+(INBOX_NAME[e.to]||"the cookbook") : "";
+  const recs = [...RECIPES, ...(NK||[]), ...(BIN||[])], seen=new Set();
+  for(const r of recs){ if(seen.has(r.id)) continue; seen.add(r.id);
+    for(const h of r.history||[]) if(h && h.at) push(h.a==="added"?"added":h.a==="moved"?"moved":"changed", h.by, h.at, r.t, r.id, codeOf(r), h.a==="moved"&&h.from?{note:"from "+h.from}:null);
+    for(const e of r.rvLog||[]){ const k=stepKind(e); if(k) push(k, e.by, e.at, r.t, r.id, codeOf(r), {note:stepNote(e)}); }
+    if(r.deleted || r.deletedAt) push(r.mergedBy?"merged":"deleted", r.deletedBy, r.deletedAt, r.t, r.id, codeOf(r), r.mergedBy?{note:"merged into another recipe"}:null);
+    if(r.restoredAt) push("restored", r.restoredBy, r.restoredAt, r.t, r.id, codeOf(r)); }
+  for(const x of subs){
+    push(x.editOf?"request":"proof", x.byName, x.created, x.t, x.editOf||x.recipeId||"", x.code||"", {note:x.editOf?"":"new recipe", sub:true});
+    for(const e of x.log||[]){ const k=stepKind(e); if(k && k!=="proof") push(k, e.by, e.at, x.t, x.recipeId||x.editOf||"", x.code||"", {note:stepNote(e), sub:true}); else if(k==="proof" && (e.back||e.undo)) push("back", e.by, e.at, x.t, x.recipeId||"", x.code||"", {sub:true}); }
+    if(x.status==="rejected") push("declined", x.declinedBy, x.decided, x.t, x.editOf||"", x.code||"", {sub:true, note:x.editOf?"suggested change":"new recipe"});
+    if(x.status==="approved" && x.decided) push("released", x.releasedBy, x.decided, x.t, x.recipeId||"", x.code||"", {sub:true, note:x.releasedAs==="private"?"for the team only":"to the public"}); }
+  return out.sort((a,b)=>b.at-a.at);
+}
+function activityPage2(){
+  const all=activityAll(), since = actFilter.days ? Date.now()-actFilter.days*864e5 : 0;
+  const people=[...new Set(all.map(x=>x.by))].sort(byName);
+  const inTime=all.filter(x=>x.at>=since && (!actFilter.who||x.by===actFilter.who));
+  const list=inTime.filter(x=>!actFilter.kind||x.kind===actFilter.kind);
+  const count=k=>inTime.filter(x=>x.kind===k).length, kinds=ACT_KINDS.filter(([k])=>list.some(x=>x.kind===k));
+  const per={}; list.forEach(x=>{ (per[x.by]=per[x.by]||{n:0})[x.kind]=(per[x.by][x.kind]||0)+1; per[x.by].n++; });
+  const rows=Object.entries(per).sort((a,b)=>b[1].n-a[1].n), maxP=Math.max(1,...rows.map(([,v])=>v.n));
+  const span = actFilter.days || Math.max(30, Math.ceil((Date.now()-(all.length?all[all.length-1].at:Date.now()))/864e5)+1);
+  const step = span<=31 ? 1 : 7, nb=Math.min(60, Math.ceil(span/step)), day0=new Date(); day0.setHours(0,0,0,0);
+  const bins=Array.from({length:nb},(_,i)=>({start: day0.getTime()-(nb-1-i)*step*864e5, n:0}));
+  list.forEach(x=>{ const i=nb-1-Math.floor((day0.getTime()+864e5-1-x.at)/(step*864e5)); if(bins[i]){ bins[i][x.kind]=(bins[i][x.kind]||0)+1; bins[i].n++; } });
+  const maxB=Math.max(1,...bins.map(b=>b.n));
+  const fmtD = ms => new Date(ms).toLocaleDateString(undefined,{month:"short",day:"numeric"});
+  const verb = x => ({proof:"sent to Need to proofread", request:"asked for a change to", added:"added", changed:"changed", proofread:"proofread", approved:"approved", released:"released",
+    back:"moved back", declined:"declined", merged:"merged away", deleted:"deleted", restored:"restored from the Recycle bin", moved:"moved to another category", kosher:x.note==="taken out"?"took out of Not kosher":"put in Not kosher", yoely:x.note==="cleared"?"cleared in Yoely":x.note==="taken out"?"took out of Yoely":"put in Yoely"})[x.kind];
+  const extraNote = x => ["released","back","moved"].includes(x.kind) && x.note ? " "+x.note : x.kind==="proof"&&x.note ? " (new recipe)" : x.kind==="declined"&&x.note ? ` (${x.note})` : "";
+  let lastDay="", feed="";
+  for(const x of list.slice(0,400)){ const d=new Date(x.at).toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+    if(d!==lastDay){ feed+=`${lastDay?"</ul>":""}<h4 class="act-day">${esc(d)}</h4><ul class="act-feed">`; lastDay=d; }
+    const link = x.rid && findAny(x.rid) ? `<a class="link" href="#${esc(x.rid)}">${esc(x.t)}</a>` : `<b>${esc(x.t)}</b>`;
+    feed+=`<li data-kind="${x.kind}"><span class="act-dot" style="background:${ACT_COLOR[x.kind]}"></span><span class="act-time">${new Date(x.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}</span><span><b>${esc(x.by)}</b> ${verb(x)} ${link}${esc(extraNote(x))} ${x.code?`<small>${esc(x.code)}</small>`:""} <span class="act-tag" style="--c:${ACT_COLOR[x.kind]}">${esc(ACT_LABEL[x.kind])}</span></span></li>`; }
+  if(feed) feed+="</ul>";
+  app.innerHTML = `<section class="wrap admin tools-page">
+    <div class="section-head" style="margin-top:28px"><h2>Activity</h2><p>Everything done to the recipes, and by whom</p></div>
+    <div class="panel-a act-filters">
+      <label>Who <select id="act-who"><option value="">Everyone</option>${people.map(p=>`<option ${p===actFilter.who?"selected":""}>${esc(p)}</option>`).join("")}</select></label>
+      <label>When <select id="act-days">${[[7,"Last 7 days"],[30,"Last 30 days"],[90,"Last 3 months"],[365,"Last year"],[0,"All time"]].map(([v,l])=>`<option value="${v}" ${v===actFilter.days?"selected":""}>${l}</option>`).join("")}</select></label>
+      <label>What <select id="act-kind"><option value="">Everything (${inTime.length})</option>${ACT_KINDS.map(([k,l])=>`<option value="${k}" ${actFilter.kind===k?"selected":""}>${esc(l)} (${count(k)})</option>`).join("")}</select></label>
+    </div>
+    <div class="act-chips">${ACT_KINDS.filter(([k])=>count(k)).map(([k,l,c])=>`<button type="button" class="act-chip${actFilter.kind===k?" on":""}" data-actkind="${k}" style="--c:${c}"><i></i>${esc(l)} <b>${count(k)}</b></button>`).join("")}</div>
+    <div class="act-charts">
+      <div class="panel-a"><h3>Who did what</h3>
+        ${rows.length?`<div class="act-bars">${rows.map(([p,v])=>`<button type="button" class="act-bar" data-actwho="${esc(p)}" title="Show only ${esc(p)}"><span class="act-name">${esc(p)}</span><span class="act-track">${kinds.map(([k,,c])=>v[k]?`<i style="width:${v[k]/maxP*100}%;background:${c}" title="${esc(ACT_LABEL[k])}: ${v[k]}"></i>`:"").join("")}</span><span class="act-n">${v.n}</span></button>`).join("")}</div>`:`<p class="hint">Nothing in this time.</p>`}
+        <p class="act-key">${kinds.map(([k,l,c])=>`<span><i style="background:${c}"></i>${esc(l)}</span>`).join("")}</p></div>
+      <div class="panel-a"><h3>${step===1?"Per day":"Per week"}</h3>
+        <div class="act-cols" role="img" aria-label="${list.length} actions over time">${bins.map(b=>`<div class="act-col" title="${fmtD(b.start)}${step>1?" week":""}: ${b.n}${kinds.filter(([k])=>b[k]).map(([k,l])=>` · ${l} ${b[k]}`).join("")}">${kinds.map(([k,,c])=>b[k]?`<span style="height:${b[k]/maxB*100}%;background:${c}"></span>`:"").join("")}</div>`).join("")}</div>
+        <div class="act-axis"><span>${fmtD(bins[0].start)}</span><span>Today</span></div></div>
+    </div>
+    <div class="panel-a"><h3>Everything${actFilter.kind?": "+esc(ACT_LABEL[actFilter.kind]):""} <span class="count">${list.length}</span></h3>${feed||`<p class="hint">Nothing in this time.</p>`}${list.length>400?`<p class="hint">Showing the newest 400.</p>`:""}
+      <p class="hint" style="margin-top:12px">Who restored or declined something is kept from now on. Each recipe keeps its last 12 edits and 30 inbox moves.</p></div>
+  </section>`;
+  const set=(k,v)=>{ actFilter[k]=v; activityPage(); };
+  document.getElementById("act-who").onchange=e=>set("who", e.target.value);
+  document.getElementById("act-days").onchange=e=>set("days", +e.target.value);
+  document.getElementById("act-kind").onchange=e=>set("kind", e.target.value);
+  app.querySelectorAll("[data-actkind]").forEach(b=>b.onclick=()=>set("kind", actFilter.kind===b.dataset.actkind?"":b.dataset.actkind));
+  app.querySelectorAll("[data-actwho]").forEach(b=>b.onclick=()=>set("who", actFilter.who===b.dataset.actwho?"":b.dataset.actwho));
+}
 function activityPage(){
+  if(feat("actmore")) return activityPage2();
   const all=activityItems(), since = actFilter.days ? Date.now()-actFilter.days*864e5 : 0;
   const people=[...new Set(all.map(x=>x.by))].sort(byName);
   const list=all.filter(x=>x.at>=since && (!actFilter.who||x.by===actFilter.who) && (!actFilter.kind||x.a===actFilter.kind));
@@ -3259,7 +3338,7 @@ function binPage(){
         BIN=BIN.filter(x=>x.id!==r.id); toast(`“${r.t}” was deleted forever`); renderAcct(); binPage(); }catch(e){ toast("Couldn't delete. Check your connection."); } }; });
   app.querySelectorAll("[data-restore]").forEach(b=>b.onclick=async()=>{ const r=BIN.find(x=>x.id===b.dataset.restore); if(!r) return; b.disabled=true;
     // if its number went to another recipe meanwhile, it gets a new one
-    const taken = r.code && RECIPES.some(x=>x.code===r.code), upd={deleted:false, restoredAt:Date.now(), updated:Date.now()};
+    const taken = r.code && RECIPES.some(x=>x.code===r.code), upd={deleted:false, restoredAt:Date.now(), updated:Date.now(), ...(feat("actmore")?{restoredBy:myName()}:{})};
     if(taken){ upd.code=nextCode(r.c, r.sec||""); upd.oldCodes=freeCode(r, upd.code); }
     try{ await db.collection("recipes").doc(r.id).update(upd); saveVersion(Object.assign({}, r, {code:upd.code||r.code}), "Restored from the recycle bin");
       toast(`“${r.t}” is back in the cookbook${taken?" with a new number, "+upd.code:""}`); location.hash=r.id; }
@@ -4074,6 +4153,7 @@ function openMenu(confirming){
   const inboxes = [realOwner()&&!viewingAs() ? item("#updates","App &amp; web updates", updWaiting()?updWaiting()+" to approve":"", updWaiting()) : "",
     mayYoely()&&recipesOnline ? item("#yoely","Yoely", inboxCount("yoely")?inboxCount("yoely")+" waiting":"", inboxCount("yoely")) : "",
     mayNK()&&recipesOnline ? item("#kosher","Not kosher", inboxCount("kosher")?inboxCount("kosher")+" waiting":"", inboxCount("kosher")) : "", ...INBOXES.filter(([,,p])=>may(p)).map(([st,l])=>item("#"+st, l, inboxCount(st)?inboxCount(st)+" waiting":"", inboxCount(st))),
+    mayDeclined() ? item("#declined","Declined", declinedList().length?declinedList().length+" in all":"", 0) : "",
     isAdmin()||may("moverec")||may("pub") ? item("#admin-approval","Needs admin approval", inboxCount("admin")?inboxCount("admin")+" waiting":"", inboxCount("admin")) : "",
     !offline&&may("answer") ? item("#requests","Recipe requests", openRequests()?openRequests()+" waiting":"", openRequests()) : "",
     may("inbox") ? item("#inbox","Suggestions &amp; comments", newFeedback()?newFeedback()+" new":"", newFeedback()) : "",
@@ -4713,7 +4793,7 @@ function watchSubs(){
   unsubSubs = q.onSnapshot(s=>{
     subs = s.docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(b.created||0)-(a.created||0));
     renderAcct(); if(feat("subcode")){ watchHolds(); setTimeout(codeSubs, 300); }
-    const h=location.hash; if(["#review","#mine","#proof","#approve","#release"].includes(h) && !document.querySelector(".editor, textarea:focus")) route();
+    const h=location.hash; if(["#review","#mine","#proof","#approve","#release","#declined"].includes(h) && !document.querySelector(".editor, textarea:focus")) route();
   }, ()=>{});
 }
 function newRecipeId(t){
@@ -5025,8 +5105,34 @@ function recipeInbox(stage){
     on("pub", async e=>{ e.target.disabled=true; try{ await approveSub(s, true); }catch(err){ e.target.disabled=false; toast("Couldn't release. Check your connection."); } });
     on("priv", async e=>{ e.target.disabled=true; try{ await approveSub(s, false); }catch(err){ e.target.disabled=false; toast("Couldn't release. Check your connection."); } });
     on("ask-reject", ()=>{ acts.innerHTML=`<span class="hint">Decline “${esc(s.t)}”?</span><button type="button" class="btn warn" data-ib="reject">Decline</button><button type="button" class="btn" data-ib="cancel">Cancel</button>`;
-      on("cancel", ()=>recipeInbox(stage)); on("reject", async()=>{ if(await upd(s, {status:"rejected", decided:Date.now()}, s.code&&feat("subcode")?`Recipe declined. Its number ${s.code} stays taken for a year.`:"Recipe declined")) touchHold(s.code); }); });
+      on("cancel", ()=>recipeInbox(stage)); on("reject", async()=>{ if(await upd(s, {status:"rejected", decided:Date.now(), declinedBy:myName(), declinedUid:me}, s.code&&feat("subcode")?`Recipe declined. Its number ${s.code} stays taken for a year.`:"Recipe declined")) touchHold(s.code); }); });
   });
+}
+// Declined: every recipe and suggested change that was declined (from the inboxes), newest first
+const mayDeclined = () => feat("declinedbox") && mayInboxes();
+const declinedList = () => subs.filter(x=>x.status==="rejected").sort((a,b)=>(b.decided||0)-(a.decided||0));
+function declinedPage(){
+  const L=declinedList();
+  app.innerHTML=`<section class="wrap admin inbox">
+    <div class="section-head" style="margin-top:28px"><h2>Declined</h2><p>${L.length} ${L.length===1?"recipe":"recipes"}</p></div>
+    <p class="hint" style="margin:-4px 0 12px">Every recipe and suggested change that was declined lands here. A new recipe's item number stays taken for a year after it was declined. Send one back to Need to proofread to give it another go.</p>
+    ${L.length?`<div class="panel-a rv-panel"><ul class="rv-list">${L.map(x=>`<li data-dec="${esc(x.id)}"><div class="rv-top">${x.code&&feat("subcode")?`<span class="nochip" title="Item number">${esc(x.code)}</span> `:""}<b>${esc(x.t)}</b>
+        <span class="hint">${x.editOf?`Suggested change to <a class="link" href="#${esc(x.editOf)}">${esc((findAny(x.editOf)||{t:x.t}).t.replace(/^Untitled: /,""))}</a>`:"New recipe"} · ${esc(x.c||"")} · from ${esc(x.byName||"a member")}, sent ${fmtDate(x.created)}</span>
+        <span class="hint">✗ Declined${x.declinedBy?" by "+esc(x.declinedBy):""}${x.decided?" · "+fmtDate(x.decided):""}${x.code&&!x.editOf&&x.decided?` · number taken until ${fmtDate(x.decided+CODE_HOLD)}`:""}</span></div>
+      <details class="rv-log"><summary>See the recipe</summary><div class="pv">${previewHTML(x)}</div></details>
+      <div class="row rv-acts"><button type="button" class="btn sm" data-reopen="${esc(x.id)}">↩ Send back to Need to proofread</button>${may("review")?`<button type="button" class="btn sm danger-btn" data-decdel="${esc(x.id)}">Delete</button>`:""}</div></li>`).join("")}</ul></div>`
+    :`<div class="panel-a"><p class="hint mempty">Nothing declined.</p></div>`}
+  </section>`;
+  const again=()=>{ const y=window.scrollY; declinedPage(); window.scrollTo(0,y); };
+  app.querySelectorAll("[data-reopen]").forEach(b=>b.onclick=async()=>{ const x=subs.find(z=>z.id===b.dataset.reopen); if(!x) return; b.disabled=true;
+    const data={status:"pending", stage:"proof", decided:null, proofUid:"", proofBy:"", approvedUid:"", approvedBy:"", proofNote:"", proofNoteBy:"", uids:[], log:[...(x.log||[]), {from:"declined", to:"proof", by:myName(), uid:me, at:Date.now(), back:true}].slice(-30)};
+    try{ await db.collection("submissions").doc(x.id).update(data); Object.assign(x, data); touchHold(x.code); toast("Sent back to Need to proofread");
+      notifyWatchers("watch-proof", `A declined recipe is back`, `“${x.t}” needs to be proofread.`, "#proof", "pencil2"); renderAcct(); again(); }
+    catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); } });
+  app.querySelectorAll("[data-decdel]").forEach(b=>b.onclick=()=>{ const box=b.parentElement, x=subs.find(z=>z.id===b.dataset.decdel); if(!x) return;
+    box.innerHTML=`<span class="hint">Delete “${esc(x.t)}” for good?${x.code?" Its number stays taken for a year.":""}</span><button type="button" class="btn sm warn" data-yes>Delete</button><button type="button" class="btn sm" data-no>Cancel</button>`;
+    box.querySelector("[data-no]").onclick=again;
+    box.querySelector("[data-yes]").onclick=async()=>{ try{ await db.collection("submissions").doc(x.id).delete(); touchHold(x.code); subs=subs.filter(z=>z.id!==x.id); toast("Deleted"); renderAcct(); again(); }catch(e){ toast("Couldn't delete. Check your connection."); } }; });
 }
 function minePage(){
   const label = s => s.status==="approved" ? `<span class="pill ok">In the cookbook</span>` : s.status==="rejected" ? `<span class="pill no">Not approved</span>`
@@ -7118,6 +7224,7 @@ function routePage(){
   if(h.startsWith("compare~") && isTeam()){ const [,a,b2]=h.split("~"); q.value=""; comparePage(a||"", b2||""); window.scrollTo(0,0); return; }
   document.body.classList.remove("split-on"); renderSplitBtn();
   if(h.startsWith("split~") && maySplit()){ const [,a,b2]=h.split("~"); q.value=""; splitPage(a||"", b2||""); return; }
+  if(h==="declined" && mayDeclined()){ q.value=""; declinedPage(); window.scrollTo(0,0); return; }
   if(h==="yoely" && mayYoely()){ q.value=""; yoelyPage(); window.scrollTo(0,0); return; }
   if(h==="kosher" && mayNK()){ q.value=""; kosherPage(); window.scrollTo(0,0); return; }
   if(h==="admin-approval" && (isAdmin()||may("moverec")||may("pub"))){ q.value=""; adminApprovalPage(); window.scrollTo(0,0); return; }
