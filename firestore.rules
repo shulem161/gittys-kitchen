@@ -95,8 +95,18 @@ service cloud.firestore {
     function kosherMove() {
       return resource != null
         && (request.resource.data.get('rv', '') == 'kosher' || resource.data.get('rv', '') == 'kosher')
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub', 'kosherFrom', 'kosherPub', 'yoelyFrom'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub', 'kosherFrom', 'kosherPub', 'yoelyFrom', 'priv'])
         && isAdmin();
+    }
+    // Private (the Yoely inbox): a recipe that went through it is marked priv and stays in the family.
+    // Nobody can make it public or take the mark off, except the owner (his exception). Cheap checks first.
+    function privOk() {
+      let np = request.resource.data.get('priv', false) == true;
+      let op = resource != null && resource.data.get('priv', false) == true;
+      return ((!np || request.resource.data.get('pub', false) != true
+                || (op && resource.data.get('pub', false) == true))
+              && (np || !op))
+        || isOwner();
     }
     // Yoely: an inbox before the three steps (admins, and employees given the Yoely inbox).
     // In from nowhere or Need to proofread; cleared, straight to For approval with whoever cleared it written down
@@ -106,7 +116,8 @@ service cloud.firestore {
       let now = request.resource.data.get('rv', '');
       let after = request.resource.data.get('rvUids', []);
       return resource != null
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'yoelyFrom'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'yoelyFrom', 'priv', 'pub'])
+        && (request.resource.data.get('pub', null) == resource.data.get('pub', null) || request.resource.data.get('pub', true) == false)
         && ((was in ['', 'proof'] && now == 'yoely' && after.size() == 0 && request.resource.data.get('yoelyFrom', '') == was)
             || (was == 'yoely' && now == 'approve' && request.auth.uid in after)
             || (was == 'yoely' && now == resource.data.get('yoelyFrom', '') && after.size() == 0))
@@ -320,7 +331,8 @@ service cloud.firestore {
       // Merging: whoever releases the merged recipe deletes the one that was merged into it (and nothing else).
       // Checked first, and only for that change, to stay within the rules' limit on document lookups.
       // Then the one-job privileges (each only when the save touches just its own fields), then the general cases.
-      allow write: if (resource != null && resource.data.get('deleted', false) == false
+      allow write: if privOk() && (
+           (resource != null && resource.data.get('deleted', false) == false
             && request.resource.data.get('deleted', false) == true
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'deletedAt', 'deletedBy', 'updated', 'mergedBy'])
             && mergeDrops(id) && extra('release'))
@@ -340,13 +352,13 @@ service cloud.firestore {
         || kosherMove()
         || yoelyMove()
         || (resource != null && (resource.data.get('rv', '') == 'kosher' || request.resource.data.get('rv', '') == 'kosher')
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'pub', 'kosherPub', 'kosherFrom', 'yoelyFrom'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'pub', 'kosherPub', 'kosherFrom', 'yoelyFrom', 'priv'])
             && extra('kosher'))
         // Recipe inboxes: proofreaders, approvers and releasers move a recipe along (rv), one step at a time;
         // releasers choose public or team only
         || (resource != null
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub'])
-            && rvSteps());
+            && rvSteps()));
     }
 
     // Employees asking for a recipe to be shown to public members. Admins decide.

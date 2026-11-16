@@ -313,6 +313,19 @@ await check('a third person releases it', assertSucceeds(updateDoc(doc(ADM, 'rec
 await check('a recipe in For approval can\'t be put in Yoely', assertFails(updateDoc(doc(ADM, 'recipes', 'r-edb'), { rv: 'yoely', yoelyFrom: 'approve', rvUids: [] })));
 await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'recipes', 'r-nky'), { c: 'Cakes', t: 'NK to Yoely', pub: false, rv: 'kosher', kosherFrom: '', kosherPub: true, rvUids: [], s: [] }); });
 await check('out of Not kosher, an admin can send it on to Yoely', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-nky'), { rv: 'yoely', yoelyFrom: '', kosherFrom: '', kosherPub: null, pub: true, rvNote: '', rvNoteBy: '', rvUids: [], rvAsk: [], rvBy: 'Adm', rvAt: 1, rvLog: [] })));
+// Private (4.53): a recipe marked priv stays in the family; only the owner makes an exception
+await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
+  await setDoc(doc(d, 'recipes', 'r-pv'), { c: 'Cakes', t: 'Private cake', pub: false, priv: true, rv: 'release', rvUids: ['pr1', 'yo1'], s: [] });
+  await setDoc(doc(d, 'recipes', 'r-pv2'), { c: 'Cakes', t: 'Private two', pub: false, priv: true, rv: '', s: [] });
+  await setDoc(doc(d, 'recipes', 'r-pv3'), { c: 'Cakes', t: 'Going private', pub: true, rv: '', s: [] }); });
+await check("a private recipe can't be released to the public", assertFails(updateDoc(doc(ADM, 'recipes', 'r-pv'), { rv: '', pub: true })));
+await check('…only for the team', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-pv'), { rv: '', pub: false })));
+await check("an admin can't make it public another way", assertFails(updateDoc(doc(ADM, 'recipes', 'r-pv2'), { pub: true })));
+await check("…nor take off the private mark", assertFails(updateDoc(doc(ADM, 'recipes', 'r-pv2'), { priv: false })));
+await check('an admin can still edit it', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-pv2'), { t: 'Private cake two' })));
+await check('putting a public recipe in Private makes it team only', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-pv3'), { rv: 'yoely', yoelyFrom: '', priv: true, pub: false, rvUids: [] })));
+await check("…it can't stay public while private", assertFails(updateDoc(doc(ADM, 'recipes', 'r-pv3'), { pub: true })));
+await check('the owner can make an exception', assertSucceeds(updateDoc(doc(OWN, 'recipes', 'r-pv2'), { pub: true, priv: false, privEx: { by: 'Owner', at: 1 } })));
 // New recipes: the first inbox (4.49)
 await check("an employee without “Choose the first inbox” can't start a new recipe in Yoely", assertFails(setDoc(doc(EMP, 'submissions', 's-yo1'), { uid: 'emp', status: 'pending', stage: 'yoely', t: 'X', c: 'Cakes' })));
 await check("…nor skip ahead to For approval", assertFails(setDoc(doc(EMP, 'submissions', 's-yo2'), { uid: 'emp', status: 'pending', stage: 'approve', t: 'X', c: 'Cakes' })));
