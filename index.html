@@ -1221,14 +1221,45 @@ const hasSections = c => !!(CODEMAP.secs[c] && Object.keys(CODEMAP.secs[c]).leng
 // What a category's (or a section's) codes start with, as shown on its tile
 const catPrefix = c => isPesach(c) ? "2" : CODEMAP.cats[c] ? "1"+num2(CODEMAP.cats[c]) : "";
 const secPrefix = (c, s) => { const sl=CODEMAP.secs[c]&&CODEMAP.secs[c][s]; if(!sl) return ""; return isPesach(c) ? "2"+num2(sl) : CODEMAP.cats[c] ? "1"+num2(CODEMAP.cats[c])+num2(sl) : ""; };
+// What a new code in category c (and section s) starts with (gives the category or section a number if it has none yet)
+function codePre(c, s){
+  if(isPesach(c)) return "2" + secLetter(c, s || "Family recipes");
+  let pre = "1" + codeLetter(c); if(hasSections(c) || s) pre += secLetter(c, s || "Family recipes"); return pre;
+}
+// subcode: numbers given to new recipes waiting in the inboxes (codeholds/{code}: {sid, at}); kept while it waits, then a year
+let HOLDS = new Map(), unsubHolds = null;
+function watchHolds(){
+  if(unsubHolds || !db || !isTeam() || !feat("subcode")) return;
+  unsubHolds = db.collection("codeholds").onSnapshot(q=>{ HOLDS = new Map(q.docs.map(d=>[d.id, d.data()])); setTimeout(codeSubs, 300); }, ()=>{});
+}
+const codeHeld = code => { const h=HOLDS.get(code); return !!h && (Date.now()-(h.at||0) < CODE_HOLD || subs.some(x=>x.id===h.sid && x.status==="pending")); };
+const codeFits = (code, c, s) => !!code && code.slice(0,-3)===codePre(c, s||"");
+const touchHold = code => { if(code && db) db.collection("codeholds").doc(code).update({at:Date.now()}).catch(()=>{}); };
+// Give every new recipe waiting in the inboxes its number (done by whoever on the team has the app open)
+let codingSubs = false;
+async function codeSubs(){
+  if(codingSubs || !feat("subcode") || !mayInboxes() || offline || !recipesOnline || !db) return;
+  const todo = subs.filter(x=>x.status==="pending" && !x.editOf && !x.code && x.c);
+  if(!todo.length) return;
+  codingSubs = true;
+  try{
+    for(const x of todo){
+      for(let tries=0; tries<8; tries++){
+        const code = nextCode(x.c, x.sec||"");
+        try{ await db.collection("codeholds").doc(code).set({sid:x.id, at:Date.now(), by:myName(), code}); }catch(e){ continue; }   // someone else took it a moment ago
+        const now = await db.collection("submissions").doc(x.id).get().catch(()=>null);
+        if(now && now.exists && now.data().status==="pending" && !now.data().code){ await db.collection("submissions").doc(x.id).update({code}).catch(()=>{}); x.code=code; }
+        break;
+      }
+    }
+  } finally { codingSubs = false; }
+}
 // Next free code for a recipe in category c (and section s). Saves new numbers to meta/codes.
 function nextCode(c, s){
   const before = JSON.stringify(CODEMAP);
-  let pre;
-  if(isPesach(c)) pre = "2" + secLetter(c, s || "Family recipes");
-  else { pre = "1" + codeLetter(c); if(hasSections(c) || s) pre += secLetter(c, s || "Family recipes"); }
+  const pre = codePre(c, s);
   let n = 1; const fmt = x => String(x).padStart(3,"0");
-  while(n<999 && usedCodes.has(pre+fmt(n))) n++;
+  while(n<999 && (usedCodes.has(pre+fmt(n)) || (feat("subcode") && codeHeld(pre+fmt(n))))) n++;
   const code = pre + fmt(n);
   usedCodes.add(code);
   if(JSON.stringify(CODEMAP)!==before && db && mayPublish()){ store("gk-codemap", CODEMAP); db.collection("meta").doc("codes").set(CODEMAP).catch(()=>{}); }
@@ -1352,7 +1383,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.44";
+const WEB_VERSION = "4.45";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1407,6 +1438,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["subcode","4.45","2026-11-15","New recipes get their item number right away","A new recipe gets its item number as soon as it's sent to Need to proofread, so you can see it and talk about it by number in every inbox. It still shows in the cookbook only once it's released. If it's declined (or withdrawn), its number stays taken for a year, like a deleted recipe's, so it's never mixed up with another one.", false, "team"],
   ["plainadmin","4.44","2026-11-15","Admin notices without names","Notices on the main admin channel now say only what's new and where, for example “Something new in Approve members. Tap to open.”, with no names, recipe titles or messages. That channel's name is in the website's code, so anyone could follow it. Approve it for everyone: notices from customers change only once they have this update.", false],
   ["yoely","4.43","2026-11-15","The Yoely inbox","A new inbox called Yoely, before the three steps. Nothing goes there by itself: an admin, or an employee you allow in Inbox settings, puts a recipe there from its ⋮ menu (or from the Yoely page). When it's cleared, it skips Need to proofread and goes straight to For approval. Whoever cleared it counts as the first of the three people, so they can't approve or release it too.", false, "team"],
   ["approvepick","4.42","2026-11-15","Approve, then choose who gets it","In App & web updates, each waiting update has one “Approve” button. Tap it and choose: Admins only, Admins and employees, or Everyone. “Approve all” asks the same way. (Before, the three choices were all showing at once.)", false, "admin"],
@@ -1591,6 +1623,7 @@ function boot(){
     stopTeam();
     if(unsubDupes){unsubDupes();unsubDupes=null;DUP_IGNORE=new Set()}
     if(unsubSubs){unsubSubs();unsubSubs=null;subs=[]}
+    if(unsubHolds){unsubHolds();unsubHolds=null;HOLDS=new Map()}
     if(unsubPendingPhotos){unsubPendingPhotos();unsubPendingPhotos=null;pendingPhotos=[]}
     if(unsubFeedback){unsubFeedback();unsubFeedback=null;feedback=[]}
     if(unsubRequests){unsubRequests();unsubRequests=null;requests=[]}
@@ -4440,7 +4473,9 @@ function editor(r, cat, sub, draft){
         const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s});
         const back = feat("moveback") && stageOf(sub)!=="proof" ? {stage:"proof", proofUid:"", proofBy:"", approvedUid:"", approvedBy:"", uids:[], log:[...(sub.log||[]), {from:stageOf(sub), to:"proof", by:myName(), uid:me, at:Date.now(), back:true, edited:true}].slice(-30)} : {};
         const revs = [...subRevs(sub), {by:myName(), uid:me, at:Date.now(), s:d.s, t:d.t}].slice(-15);
-        try{ await db.collection("submissions").doc(sub.id).update(Object.assign({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves,sec:d.sec,s:d.s, fixedBy:myName(), fixedAt:Date.now(), revs}, back));
+        const recode = feat("subcode") && sub.code && !sub.editOf && !codeFits(sub.code, d.c, d.sec||"") ? {code:""} : {};
+        try{ await db.collection("submissions").doc(sub.id).update(Object.assign({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves,sec:d.sec,s:d.s, fixedBy:myName(), fixedAt:Date.now(), revs}, back, recode));
+          if(recode.code==="") touchHold(sub.code);
           if(back.stage) notifyWatchers("watch-proof", `${sub.t} was edited`, `${myName()} edited it, so it needs to be proofread again.`, "#proof", "pencil2");
           toast(back.stage?"Saved. It was edited, so it goes back to Need to proofread.":"Saved"); location.hash=back.stage||stageOf(sub); }
         catch(e){ btn0.disabled=false; btn0.textContent="Save changes"; fail("Couldn't save. Check your internet connection and try again."); }
@@ -4677,7 +4712,7 @@ function watchSubs(){
   const q = mayInboxes() ? db.collection("submissions") : db.collection("submissions").where("uid","==",who());
   unsubSubs = q.onSnapshot(s=>{
     subs = s.docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(b.created||0)-(a.created||0));
-    renderAcct();
+    renderAcct(); if(feat("subcode")){ watchHolds(); setTimeout(codeSubs, 300); }
     const h=location.hash; if(["#review","#mine","#proof","#approve","#release"].includes(h) && !document.querySelector(".editor, textarea:focus")) route();
   }, ()=>{});
 }
@@ -4691,7 +4726,9 @@ async function approveSub(sub, pub){
   const rec = fromDoc(tgt ? tgt.id : newRecipeId(sub.t), sub); rec.ord = tgt ? (tgt.ord||0) : Date.now(); rec.pub = pub===undefined ? (tgt ? tgt.pub : undefined) : !!pub;
   if(rec.pre===undefined) rec.pre = tgt ? (tgt.pre||[]) : [];
   if(!rec.sec && tgt) rec.sec = tgt.sec||"";
-  rec.code = (tgt && tgt.code && tgt.c===rec.c) ? tgt.code : nextCode(rec.c, rec.sec||"");
+  const ownCode = feat("subcode") && !tgt && sub.code && codeFits(sub.code, rec.c, rec.sec||"") && !usedCodes.has(sub.code) ? sub.code : "";
+  rec.code = (tgt && tgt.code && tgt.c===rec.c) ? tgt.code : ownCode || nextCode(rec.c, rec.sec||"");
+  if(sub.code && sub.code!==rec.code) touchHold(sub.code);   // its number wasn't used (moved category): kept for a year
   withHistory(rec, tgt, tgt?"changed":"added", sub.byName);
   await db.collection("recipes").doc(rec.id).set(Object.assign(toDoc(rec), tgt && tgt.code && tgt.code!==rec.code ? {oldCodes:freeCode(tgt, rec.code)} : {}), {merge:true});
   if(tgt && !(await db.collection("versions").where("rid","==",tgt.id).get().then(q=>q.size).catch(()=>1))) await saveVersion(tgt, "Before this history was kept", {by:"", uid:""});
@@ -4951,7 +4988,7 @@ function recipeInbox(stage){
           <div class="row rv-acts">${rvButtons(r)}${rvEditBtn(r)}</div></li>`).join("")}</ul>
         ${rl.length>40?`<button type="button" class="btn" id="rv-more">Show all ${rl.length}</button>`:""}</div>`; })()}
     ${list.length ? list.map(s=>`<article class="panel-a sub-card" data-id="${esc(s.id)}">
-        <div class="sub-head"><span class="chip">${esc(s.c)}</span><span class="hint">From ${esc(s.byName||"a member")} · ${fmtDate(s.created)}${s.proofBy?` · proofread by ${esc(s.proofBy)}`:""}${s.approvedBy?` · approved by ${esc(s.approvedBy)}`:""}${s.fixedBy?` · fixed by ${esc(s.fixedBy)}`:""}</span></div>
+        <div class="sub-head">${s.code&&feat("subcode")?`<span class="nochip" title="Item number">${esc(s.code)}</span>`:""}<span class="chip">${esc(s.c)}</span><span class="hint">From ${esc(s.byName||"a member")} · ${fmtDate(s.created)}${s.proofBy?` · proofread by ${esc(s.proofBy)}`:""}${s.approvedBy?` · approved by ${esc(s.approvedBy)}`:""}${s.fixedBy?` · fixed by ${esc(s.fixedBy)}`:""}</span></div>
         ${(s.log||[]).length?`<details class="rv-log"><summary>Who moved it</summary><ul>${rvLogHTML(s.log)}</ul></details>`:""}
         ${s.proofNote&&stage==="proof"?`<div class="ib-note"><b>✗ Needs changes</b> (${esc(s.proofNoteBy||"proofreader")}): ${esc(s.proofNote)}<br><small>Tap Edit to fix it, then mark it ✓ Looks good.</small></div>`:""}
         ${s.editOf?`<p class="edit-of">Changes to <a class="link" href="#${esc(s.editOf)}">${esc((RECIPES.find(x=>x.id===s.editOf)||{t:s.t}).t)}</a> (opens the current version)</p>`:`<p class="edit-of">New recipe</p>`}
@@ -4988,7 +5025,7 @@ function recipeInbox(stage){
     on("pub", async e=>{ e.target.disabled=true; try{ await approveSub(s, true); }catch(err){ e.target.disabled=false; toast("Couldn't release. Check your connection."); } });
     on("priv", async e=>{ e.target.disabled=true; try{ await approveSub(s, false); }catch(err){ e.target.disabled=false; toast("Couldn't release. Check your connection."); } });
     on("ask-reject", ()=>{ acts.innerHTML=`<span class="hint">Decline “${esc(s.t)}”?</span><button type="button" class="btn warn" data-ib="reject">Decline</button><button type="button" class="btn" data-ib="cancel">Cancel</button>`;
-      on("cancel", ()=>recipeInbox(stage)); on("reject", ()=>upd(s, {status:"rejected", decided:Date.now()}, "Recipe declined")); });
+      on("cancel", ()=>recipeInbox(stage)); on("reject", async()=>{ if(await upd(s, {status:"rejected", decided:Date.now()}, s.code&&feat("subcode")?`Recipe declined. Its number ${s.code} stays taken for a year.`:"Recipe declined")) touchHold(s.code); }); });
   });
 }
 function minePage(){
@@ -4996,7 +5033,7 @@ function minePage(){
     : `<span class="pill wait">${s.proofNote&&stageOf(s)==="proof"?"Being fixed":({proof:"Being proofread",approve:"Waiting for approval",release:"Approved, about to be released"})[stageOf(s)]}</span>`;
   app.innerHTML = `<section class="wrap admin">
     <div class="section-head" style="margin-top:28px"><h2>My recipes</h2><p>${offline?"":`<a class="link" href="#new">+ Add a recipe</a>`}</p></div>
-    <div class="panel-a">${subs.length?`<ul class="mlist">${subs.map(s=>`<li class="mrow"><div class="mwho"><b>${esc(s.t)}</b><span>${s.editOf?"Changes · ":"New recipe · "}${esc(s.c)} · sent ${fmtDate(s.created)}</span></div>
+    <div class="panel-a">${subs.length?`<ul class="mlist">${subs.map(s=>`<li class="mrow"><div class="mwho"><b>${esc(s.t)}</b><span>${s.editOf?"Changes · ":"New recipe · "}${s.code&&feat("subcode")?"No. "+esc(s.code)+" · ":""}${esc(s.c)} · sent ${fmtDate(s.created)}</span></div>
       <div class="macts">${label(s)}${s.status==="approved"&&s.recipeId&&RECIPES.some(r=>r.id===s.recipeId)?`<a class="btn" href="#${esc(s.recipeId)}">Open</a>`:""}
       ${s.status==="pending"?`<button type="button" class="btn" data-withdraw="${esc(s.id)}">Withdraw</button>`:""}</div></li>`).join("")}</ul>`
       :`<p class="hint mempty">You haven't added any recipes yet. Tap “+ Add a recipe” to share one. ${esc(ADMIN_NAME)} approves each recipe before everyone can see it.</p>`}</div>

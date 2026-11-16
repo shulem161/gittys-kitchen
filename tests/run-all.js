@@ -906,10 +906,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*36 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 36));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*37 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 37));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 36, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 37, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -920,7 +920,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /35/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /36/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1048,6 +1048,18 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     { const before = notes.length; await A.evaluate(() => notifyAdmin('Pat asked to join', 'secret text', '#admin', 'wave')); await A.waitForTimeout(300);
       const plain = await A.evaluate(() => plainNote('#admin')[1]);
       ok('admin notices say only what is new and where, with no names', notes[before] === "Gitty's Kitchen" && plain === 'Something new in Approve members. Tap to open.', [notes.slice(before), plain]); }
+    // New recipes get their item number as soon as they're sent to Need to proofread
+    { const sid = 's-codetest';
+      await A.evaluate(async id => { await db.collection('submissions').doc(id).set({c: 'Cakes', t: 'Number Test Cake', by: '', n: '', pre: [], kind: '', time: '', serves: '', sec: '', s: toDoc({c: 'Cakes', t: 'Number Test Cake', s: [[1, '', ['1 cup flour']], [0, '', ['Mix']]]}).s, uid: me, byName: myName(), status: 'pending', stage: 'proof', created: Date.now(), revs: []}); }, sid);
+      await A.waitForTimeout(1500);
+      const got = await A.evaluate(id => { const x = subs.find(s => s.id === id); return x && x.code; }, sid);
+      const fits = await A.evaluate(c => codeFits(c, 'Cakes', '') && !RECIPES.some(r => r.code === c) && !RECIPES.some(r => r.t === 'Number Test Cake'), got || '');
+      await A.goto(F + '#proof'); await A.waitForTimeout(500);
+      const shown = got ? await A.locator('.sub-card', {hasText: 'Number Test Cake'}).locator('.nochip').innerText().catch(() => '') : '';
+      await A.locator('.sub-card', {hasText: 'Number Test Cake'}).locator('[data-ib=ask-reject]').click().catch(() => {}); await A.waitForTimeout(200);
+      await A.locator('.sub-card', {hasText: 'Number Test Cake'}).locator('[data-ib=reject]').click().catch(() => {}); await A.waitForTimeout(700);
+      const keptAfterDecline = await A.evaluate(c => codeHeld(c) && nextCode('Cakes', '') !== c, got || '');
+      ok('a new recipe gets its item number as soon as it is in Need to proofread (not in the cookbook yet), and a declined one keeps it taken', !!got && fits && shown === got && keptAfterDecline, [got, fits, shown, keptAfterDecline]); }
     // The Yoely inbox: cleared, a recipe skips Need to proofread and goes straight to For approval
     { const yid = await A.evaluate(() => RECIPES.find(r => !r.rv && r.id !== 'r-challah').id);
       await A.goto(F + '#' + yid); await A.waitForTimeout(500); await A.click('#yo-btn'); await A.waitForTimeout(700);

@@ -1,6 +1,6 @@
 {
-  "web": "4.44",
+  "web": "4.45",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Admin notices without names."
+  "notes": "New recipes get their item number right away."
 }

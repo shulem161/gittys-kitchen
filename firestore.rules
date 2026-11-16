@@ -381,6 +381,17 @@ service cloud.firestore {
         || (request.auth.uid in ou && nu == ou.removeAll([request.auth.uid])
             && ((os == 'release' && ns == 'approve') || (os == 'approve' && ns == 'proof')));
     }
+    // Item numbers given to new recipes waiting in the inboxes, so no number is given twice and a declined one stays taken a year.
+    // The team reads them; people who work in the inboxes take a number (never one already taken) and update when it was last used.
+    match /codeholds/{code} {
+      allow read: if isTeam();
+      allow create: if (extra('proofread') || extra('review') || extra('release'))
+        && request.resource.data.keys().hasOnly(['sid', 'at', 'by', 'code'])
+        && request.resource.data.code == code && request.resource.data.sid is string && request.resource.data.at is int;
+      allow update: if (extra('proofread') || extra('review') || extra('release'))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['at']) && request.resource.data.at is int;
+    }
+
     // Recipes sent in by members. Only the admin sees all of them and decides.
     match /submissions/{id} {
       allow create: if (can('suggest') || extra('edit') || isAdmin())

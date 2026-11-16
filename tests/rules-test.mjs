@@ -290,6 +290,12 @@ await check("a proofreader can't jump it to Ready to release", assertFails(updat
 await check("moving it on can't wipe out who moved it before", assertFails(updateDoc(doc(PR1, 'recipes', 'r-skip3'), { rv: 'release', rvUids: [] })));
 await check("…nor leave out who is moving it", assertFails(updateDoc(doc(PR1, 'recipes', 'r-skip3'), { rv: 'release', rvUids: ['pr2'] })));
 await check('moving it on the right way still works', assertSucceeds(updateDoc(doc(PR1, 'recipes', 'r-skip3'), { rv: 'release', rvUids: ['pr2', 'pr1'] })));
+// Item numbers for new recipes in the inboxes (4.45)
+await check('someone who proofreads can take a number for a new recipe', assertSucceeds(setDoc(doc(PR1, 'codeholds', '102901'), { sid: 's-x', at: 1, by: 'Pr', code: '102901' })));
+await check("…a number already taken can't be taken again", assertFails(setDoc(doc(PR2, 'codeholds', '102901'), { sid: 's-y', at: 2, by: 'Pr2', code: '102901' })));
+await check('…but its time can be updated (declined: kept a year)', assertSucceeds(updateDoc(doc(PR2, 'codeholds', '102901'), { at: 3 })));
+await check("an employee who doesn't work in the inboxes can't take one", assertFails(setDoc(doc(EMP, 'codeholds', '102902'), { sid: 's-z', at: 1, by: 'E', code: '102902' })));
+await check("customers can't see them", assertFails(getDoc(doc(PUB, 'codeholds', '102901'))));
 // Yoely inbox (4.43)
 await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
   await setDoc(doc(d, 'recipes', 'r-yo'), { c: 'Cakes', t: 'Yoely cake', pub: true, rv: '', s: [] });
