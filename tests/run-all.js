@@ -938,10 +938,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*46 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 46));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*47 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 47));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 46, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 47, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -952,7 +952,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /45/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /46/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1134,6 +1134,17 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
         const h = heldCodes([{code: '109001', deleted: true, deletedAt: old}, {code: '109003', oldCodes: [{code: '109002', at: old}]}]);
         return ['109001', '109002', '109003'].every(c => h.has(c)); });
       ok('an item number is never given to another recipe, even years after it was deleted or moved', r); }
+    // Adding a recipe that's already in the cookbook: both side by side, then choose
+    { const ex = await A.evaluate(() => { const r = RECIPES.find(x => x.id === 'r-challah'); return {t: r.t, ing: r.s.filter(x => x[0]).flatMap(x => x[2]).join('\n'), st: r.s.filter(x => !x[0]).flatMap(x => x[2]).join('\n')}; });
+      await A.goto(F + '#new'); await A.waitForTimeout(400); await A.fill('#ed-t', 'My Challah Copy');
+      await A.locator('.sec-items').nth(0).fill(ex.ing); await A.locator('.sec-items').nth(1).fill(ex.st);
+      await A.locator('#edform .primary').click(); await A.waitForTimeout(500);
+      const shown = await A.locator('#ed-likes').innerText().catch(() => '');
+      const notSent = await A.evaluate(() => !subs.some(s => s.t === 'My Challah Copy'));
+      await A.click('#dup-send'); await A.waitForTimeout(900);
+      const sent = await A.evaluate(() => subs.some(s => s.t === 'My Challah Copy'));
+      ok('adding a recipe that looks like one in the cookbook shows both side by side first; it is sent only if you choose to', /already in the cookbook/i.test(shown) && new RegExp(ex.t).test(shown) && notSent && sent, [shown.slice(0, 160), notSent, sent]);
+      await A.evaluate(async () => { const x = subs.find(s => s.t === 'My Challah Copy'); if (x) await db.collection('submissions').doc(x.id).delete(); }); await A.waitForTimeout(300); }
     // Not kosher comes before Yoely; out of Not kosher you choose Yoely or Need to proofread
     { const nid = await A.evaluate(() => RECIPES.find(r => !r.rv && r.id !== 'r-challah' && r.id !== 'r-croissants').id);
       await A.evaluate(async id => { await nkPut(RECIPES.find(r => r.id === id), 'test'); }, nid); await A.waitForTimeout(600);

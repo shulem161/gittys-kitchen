@@ -91,6 +91,7 @@ button{font:inherit;color:inherit}
 .shared-note{background:var(--accent-soft);border-radius:10px;padding:10px 12px;margin:0 0 10px}
 .send-to{display:flex;align-items:center;gap:8px;font-weight:600}.send-to select{min-height:40px}
 .newcat{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;margin-left:6px}.newcat input{min-width:150px}
+.like-wrap{margin-top:14px;display:grid;gap:10px}.like-wrap h3{margin:0}.like-box .pv{max-height:340px;overflow:auto;font-size:14px}.imp-like{flex-basis:100%;margin-top:8px;display:grid;gap:8px}
 .qr-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.qr-row .qr{font-size:13px}
 .rq-acts .qr-row{flex-basis:100%}
 .ln-notes ul{margin:4px 0 0;padding-left:18px;display:grid;gap:4px}
@@ -1399,7 +1400,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.56";
+const WEB_VERSION = "4.57";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1454,6 +1455,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["dupcheck","4.57","2026-11-17","Already in the cookbook? See both side by side first","When you add or scan a new recipe that looks like one already in the cookbook (the same name, or mostly the same ingredients and steps), you see the two side by side before it's sent, and choose: send it anyway, or don't send it. When the scanner finds several recipes, each look-alike has a “Compare side by side” button, and isn't ticked until you decide.", false, "team"],
   ["menuphoto","4.56","2026-11-17","Teach the AI a good menu from a photo","On Menu ideas, the team (admins and employees) has “📷 Teach the AI a good menu”: take a picture of a menu you like – from a simcha, a restaurant or a magazine. The AI reads the dishes, you check them, and it's kept as a good menu. The AI uses these as ideas when it makes new menus. They show in Likes & dislikes too. (Only the dishes are kept, not the photo.)", false, "team"],
   ["undomove","4.55","2026-11-17","Undo the last move to another category","Moved a recipe to the wrong category? Right after moving (one recipe, or several at once) the notice has an “↩ Undo” button. Later, the recipe page shows “↩ Undo the last move – back to …” for the last move. It goes back to its old category with its old item number. For admins, and employees allowed to move recipes.", false, "team"],
   ["codeforever","4.54","2026-11-16","An item number belongs to one recipe for good","Once an item number is given to a recipe, it's never given to another recipe: not after a year, not ever. That goes for recipes that are deleted (even forever), merged away, moved to another category (the old number), declined or withdrawn.", false],
@@ -2924,6 +2926,24 @@ function dupDiff(a,b,ing){
   return {onlyA:A.filter(l=>!nb.has(norm(l))), onlyB:B.filter(l=>!na.has(norm(l))), same:A.filter(l=>nb.has(norm(l))).length};
 }
 let dupMin = 0.9;
+// dupcheck: a recipe about to be added that looks like one already in the cookbook (same name, or ≥ 80% alike)
+const normT = t => String(t||"").toLowerCase().replace(/^untitled:\s*/,"").replace(/[^a-z0-9]+/g,"");
+function lookAlikes(draft){
+  if(!feat("dupcheck") || !recipesOnline) return [];
+  const dv=dupVector(draft), nt=normT(draft.t), out=[];
+  for(const r of RECIPES){ const same = nt && normT(r.t)===nt, sim = dv.v.size>=4 ? dupSim(dv, dupVector(r)) : 0;
+    if(same || sim>=0.8) out.push({r, sim, same}); }
+  return out.sort((a,b)=>(b.same-a.same)||(b.sim-a.sim)).slice(0,3);
+}
+const pvOf = x => ({s:(x.s||[]).map(([ing,h,items])=>({k:ing?"ing":"step",h,items:items||[]}))});
+function sideBySide(draft, like){
+  const r=like.r;
+  return `<div class="panel-a like-box"><div class="dup-pct"><b>${like.same&&like.sim<0.8?"Same name":Math.floor(like.sim*100)+"% alike"}</b></div>
+    <div class="dup-pair"><div class="dup-side"><span class="hint">Already in the cookbook</span><a class="dup-t" href="#${esc(r.id)}" target="_blank" rel="noopener">${esc(r.t.replace(/^Untitled: /,""))}</a>
+      <div class="rc-meta">${noChip(r)}<span class="chip">${esc(r.sec||r.c)}</span></div><div class="pv">${previewHTML(pvOf(r))}</div></div>
+    <div class="dup-side"><span class="hint">What you're adding</span><b class="dup-t">${esc(String(draft.t||"").replace(/^Untitled: /,""))}</b>
+      <div class="rc-meta"><span class="chip">${esc(draft.c||"")}</span></div><div class="pv">${previewHTML(pvOf(draft))}</div></div></div></div>`;
+}
 function dupesPage(){
   const list=findDupes(dupMin), hidden=_dupMemo ? _dupMemo.pairs.filter(p=>p.s>=dupMin && DUP_IGNORE.has(dupKey(p.a.id,p.b.id))).length : 0;
   const side = r => `<div class="dup-side"><a class="dup-t" href="#${r.id}">${esc(r.t.replace(/^Untitled: /,""))}</a>
@@ -4666,6 +4686,17 @@ function editor(r, cat, sub, draft){
         catch(e){ btn0.disabled=false; btn0.textContent="Save changes"; fail("Couldn't save. Check your internet connection and try again."); }
         return;
       }
+      if(suggest && !editOf && feat("dupcheck") && F.dataset.dupOk!=="1"){
+        const likes=lookAlikes({t, c, s});
+        if(likes.length){ const box=document.getElementById("ed-confirm");
+          box.innerHTML=`<div class="like-wrap" id="ed-likes"><h3>This looks like ${likes.length===1?"a recipe":"recipes"} already in the cookbook</h3>
+            <p class="hint">Look at them side by side, then choose.</p>${likes.map(l=>sideBySide({t, c, s}, l)).join("")}
+            <div class="ed-actions"><button type="button" class="btn solid" id="dup-send">Send it anyway</button><button type="button" class="btn" id="dup-no">Don't send it</button></div></div>`;
+          box.scrollIntoView({block:"start"});
+          box.querySelector("#dup-send").onclick=()=>{ F.dataset.dupOk="1"; box.innerHTML=""; F.requestSubmit ? F.requestSubmit() : F.querySelector(".primary").click(); };
+          box.querySelector("#dup-no").onclick=()=>{ box.innerHTML=""; toast("Not sent. You can change it, or leave it."); };
+          return; }
+      }
       if(suggest){
         btn0.disabled=true; btn0.textContent="Sending…";
         const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s, ord:0});
@@ -6008,17 +6039,24 @@ function importList(drafts, cat){
     <div class="panel-a scan">
       <h2>${drafts.length} recipes found</h2>
       <p class="sub">Untick any you don't want and check the categories. ${may("edit")?"They'll be added to the cookbook.":"Each one goes to "+esc(ADMIN_NAME)+" for approval, who can also fix anything."}</p>
-      <ul class="imp-list">${drafts.map((d,i)=>`<li class="imp" data-i="${i}">
-        <label class="imp-pick"><input type="checkbox" ${have.has(norm(d.t))?"":"checked"} aria-label="Keep ${esc(d.t)}"></label>
-        <div class="imp-body"><b>${esc(d.t)}</b>${have.has(norm(d.t))?`<span class="pill wait dup">Already in the cookbook</span>`:""}<span class="hint">${d.by?"From "+esc(d.by)+" · ":""}${nIng(d)} ingredients · ${nSteps(d)} steps</span>
+      <ul class="imp-list">${drafts.map((d,i)=>{ const lk=lookAlikes(d); d._likes=lk; const dup=have.has(norm(d.t))||lk.length; return `<li class="imp" data-i="${i}">
+        <label class="imp-pick"><input type="checkbox" ${dup?"":"checked"} aria-label="Keep ${esc(d.t)}"></label>
+        <div class="imp-body"><b>${esc(d.t)}</b>${lk.length?`<span class="pill wait dup">Looks like ${esc(lk[0].r.t.replace(/^Untitled: /,""))}${lk[0].sim>=0.8?` (${Math.floor(lk[0].sim*100)}%)`:""}</span><button type="button" class="btn sm" data-likecmp="${i}">Compare side by side</button>`:have.has(norm(d.t))?`<span class="pill wait dup">Already in the cookbook</span>`:""}<span class="hint">${d.by?"From "+esc(d.by)+" · ":""}${nIng(d)} ingredients · ${nSteps(d)} steps</span>
           <details><summary>Preview</summary><div class="pv">${previewHTML({s:d.s.map(([ing,h,items])=>({k:ing?"ing":"step",h,items}))})}</div></details></div>
         <select class="imp-cat" aria-label="Category for ${esc(d.t)}">${catOpts(d.c)}${addCatOpt()}</select>
-      </li>`).join("")}</ul>
+        <div class="imp-like" hidden></div>
+      </li>`; }).join("")}</ul>
       <p class="err" id="imp-err" role="alert" hidden></p>
       <div class="ed-actions">${sendToHTML("imp-sendto")}<button class="primary" id="imp-go" type="button">${maySendTo()&&sendTargets().length>1?"Send these":"Send these to be proofread"}</button></div>
     </div></section>`;
   document.getElementById("imp-back").onclick=()=>{ scanPage(cat); window.scrollTo(0,0); };
   app.querySelectorAll(".imp-cat").forEach(wireNewCat);
+  app.querySelectorAll("[data-likecmp]").forEach(b=>b.onclick=()=>{ const li=b.closest(".imp"), d=drafts[+b.dataset.likecmp], box=li.querySelector(".imp-like");
+    if(!box.hidden){ box.hidden=true; return; }
+    box.innerHTML=`${(d._likes||[]).map(l=>sideBySide(d, l)).join("")}<div class="ed-actions"><button type="button" class="btn solid" data-likeyes>Still send it</button><button type="button" class="btn" data-likeno>Don't send it</button></div>`;
+    box.hidden=false;
+    box.querySelector("[data-likeyes]").onclick=()=>{ li.querySelector(".imp-pick input").checked=true; box.hidden=true; toast("Ticked: it will be sent"); };
+    box.querySelector("[data-likeno]").onclick=()=>{ li.querySelector(".imp-pick input").checked=false; box.hidden=true; toast("Unticked: it won't be sent"); }; });
   document.getElementById("imp-go").onclick=async e=>{
     const btn=e.currentTarget, rows=[...app.querySelectorAll(".imp")].filter(li=>li.querySelector("input").checked);
     const err=document.getElementById("imp-err"), to=sendToOf("imp-sendto");
