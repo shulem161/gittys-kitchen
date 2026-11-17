@@ -123,6 +123,16 @@ service cloud.firestore {
             || (was == 'yoely' && now == resource.data.get('yoelyFrom', '') && after.size() == 0))
         && extra('yoely');
     }
+    // Manage → Move between inboxes (admins): among Need to proofread, Private and Not kosher, both ways.
+    // Not one of the three steps: nobody is written down (rvUids empty); the reason goes in the log.
+    function inboxMoveOk() {
+      let was = resource.data.get('rv', '');
+      let now = request.resource.data.get('rv', '');
+      return resource != null && was in ['proof', 'yoely', 'kosher'] && now in ['proof', 'yoely', 'kosher'] && was != now
+        && request.resource.data.get('rvUids', []).size() == 0
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'kosherFrom', 'kosherPub', 'pub', 'yoelyFrom', 'priv'])
+        && isAdmin();
+    }
     // An edit to a recipe in For approval or Ready to release sends it back to Need to proofread, in the same save
     function editedBack() {
       return resource != null
@@ -356,6 +366,7 @@ service cloud.firestore {
         || ((noRvChange() || editedBack()) && publishOk())
         || kosherMove()
         || yoelyMove()
+        || inboxMoveOk()
         || (resource != null && (resource.data.get('rv', '') == 'kosher' || request.resource.data.get('rv', '') == 'kosher')
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'pub', 'kosherPub', 'kosherFrom', 'yoelyFrom', 'priv'])
             && extra('kosher'))
@@ -407,6 +418,19 @@ service cloud.firestore {
         && request.resource.data.code == code && request.resource.data.sid is string && request.resource.data.at is int;
       allow update: if (extra('proofread') || extra('review') || extra('release'))
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['at']) && request.resource.data.at is int;
+    }
+
+    // Activity log: a short line for things that leave no other trace (a photo added or approved, a menu made).
+    // Each person writes only their own lines; admins and employees allowed to see Activity read them; nobody changes them.
+    match /activity/{id} {
+      allow read: if isAdmin() || extra('activity');
+      allow create: if approvedMember()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['kind', 'by', 'uid', 't', 'rid', 'at'])
+        && request.resource.data.kind in ['photo', 'photook', 'menu']
+        && request.resource.data.t is string && request.resource.data.t.size() <= 120
+        && request.resource.data.at is int;
+      allow delete: if isAdmin();
     }
 
     // Recipes sent in by members. Only the admin sees all of them and decides.
