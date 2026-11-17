@@ -780,7 +780,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // A freed code waits a year before a new recipe gets it
     ok('a deleted or moved recipe\'s code is kept unused for a year, then free again', await A.evaluate(() => { const d = Date.now(), y = 864e5;
       const h = heldCodes([{code: '199001', deleted: true, deletedAt: d - 400 * y}, {code: '199002', deleted: true, deletedAt: d - 30 * y}, {code: '199004', oldCodes: [{code: '199003', at: d - 2 * y}, {code: '199005', at: d - 366 * y}]}]);
-      return !h.has('199001') && h.has('199002') && h.has('199003') && h.has('199004') && !h.has('199005'); }));
+      return feat('codeforever') ? ['199001', '199002', '199003', '199004', '199005'].every(c => h.has(c)) : !h.has('199001') && h.has('199002') && h.has('199003') && h.has('199004') && !h.has('199005'); }));
     // Moving recipes to another category
     const oldCode = await A.evaluate(() => RECIPES.find(x => x.id === 'r-croissants').code);
     await A.goto(F + '#r-croissants'); await A.waitForTimeout(300); await A.click('#mv-btn'); await A.selectOption('#mv1-cat', 'Cakes'); await A.click('#mv1-go'); await A.waitForTimeout(800);
@@ -906,10 +906,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*43 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 43));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*44 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 44));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 43, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 44, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -920,7 +920,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /42/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /43/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1097,6 +1097,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       await A.click('#privex-btn'); await A.waitForTimeout(200); await A.click('#privex-yes'); await A.waitForTimeout(600);
       const ex = await A.evaluate(id => { const r = findAny(id); return r.pub === true && !r.priv; }, pid);
       ok('Yoely is now “Private”: a recipe that goes through it stays team only, with no “Release to the public”, no Share and no go-public; only the owner can make an exception', marked && noPub && /Private/.test(badge) && noShare && noGo3 && ex, [marked, noPub, badge, noShare, noGo3, ex]); }
+    // An item number belongs to one recipe for good
+    { const r = await A.evaluate(() => { const old = Date.now() - 3 * 365 * 864e5;
+        const h = heldCodes([{code: '109001', deleted: true, deletedAt: old}, {code: '109003', oldCodes: [{code: '109002', at: old}]}]);
+        return ['109001', '109002', '109003'].every(c => h.has(c)); });
+      ok('an item number is never given to another recipe, even years after it was deleted or moved', r); }
     // Not kosher comes before Yoely; out of Not kosher you choose Yoely or Need to proofread
     { const nid = await A.evaluate(() => RECIPES.find(r => !r.rv && r.id !== 'r-challah' && r.id !== 'r-croissants').id);
       await A.evaluate(async id => { await nkPut(RECIPES.find(r => r.id === id), 'test'); }, nid); await A.waitForTimeout(600);
