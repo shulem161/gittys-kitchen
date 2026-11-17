@@ -1,6 +1,6 @@
 {
-  "web": "4.54",
+  "web": "4.55",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "An item number belongs to one recipe for good."
+  "notes": "Undo the last move to another category."
 }

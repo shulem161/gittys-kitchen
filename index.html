@@ -803,6 +803,7 @@ i.added,span.added{background:#C2581A}i.changed,span.changed{background:var(--ac
 .mempty{margin:6px 0 2px}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:var(--ink);color:var(--paper);padding:11px 18px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:.2s;z-index:20;max-width:calc(100% - 32px)}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.act.show{pointer-events:auto}.toast-undo{margin-left:12px;background:none;border:1px solid currentColor;color:inherit;border-radius:999px;padding:3px 10px;font:inherit;font-size:13px;cursor:pointer}
 @media (prefers-reduced-motion:reduce){.spin{animation:none}}
 
 /* update notice */
@@ -1395,7 +1396,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.54";
+const WEB_VERSION = "4.55";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1450,6 +1451,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["undomove","4.55","2026-11-17","Undo the last move to another category","Moved a recipe to the wrong category? Right after moving (one recipe, or several at once) the notice has an “↩ Undo” button. Later, the recipe page shows “↩ Undo the last move – back to …” for the last move. It goes back to its old category with its old item number. For admins, and employees allowed to move recipes.", false, "team"],
   ["codeforever","4.54","2026-11-16","An item number belongs to one recipe for good","Once an item number is given to a recipe, it's never given to another recipe: not after a year, not ever. That goes for recipes that are deleted (even forever), merged away, moved to another category (the old number), declined or withdrawn.", false],
   ["private","4.53","2026-11-16","Yoely is now “Private”: those recipes stay in the family","The Yoely inbox is called Private. Every recipe that goes through it is marked 🔒 Private and stays team only: its inboxes never offer “Release to the public”, the public switches and “Send through the 3 steps to go public” skip it, and it can't be shared outside the app. Only you, the owner, can make an exception, from the recipe's ⋮ menu (“Make public anyway”). The database enforces this too.", false, "team"],
   ["fixlink","4.51","2026-11-16","“Fix it” on the recipe page too, only for people who can edit","The “Fix it” link next to a “Needs changes” note now also shows on the recipe page itself, not only in the inbox. It shows only for people who can change the recipe itself (admins, and employees given “Edit recipes directly”); everyone else doesn't see it, in the inboxes either.", false, "team"],
@@ -2288,6 +2290,7 @@ function recipe(r){
         ${isTeam()&&feat("history")&&!offline?`<a class="btn" href="#history-${esc(r.id)}">🕘 History – who changed what</a>`:""}
         ${isTeam()&&!offline?`<button class="btn" id="askteam-btn" type="button">${TOOL_IC.ask.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Ask the team about this</button>`:""}
         ${(isAdmin()||may("moverec"))&&recipesOnline&&!offline?`<button class="btn" id="mv-btn" type="button">Move to another category</button>`:""}
+        ${undoableMove(r)?`<button class="btn" id="unmv-btn" type="button">↩ Undo the last move – back to ${esc(undoableMove(r).from)}</button>`:""}
         ${myRole()==="employee"&&!may("moverec")&&recipesOnline&&!offline?(myMoveAsk(r.id)?`<span class="btn pub-state" aria-disabled="true">Asked to move to ${esc(myMoveAsk(r.id).to)} ✓</span>`:`<button class="btn" id="mv-btn" type="button">Ask to move to another category</button>`):""}
         ${isPriv(r)&&realOwner()&&!viewingAs()&&recipesOnline&&!offline&&!r.rv&&!pubVisible(r)?`<button class="btn" id="privex-btn" type="button">🌐 Make public anyway (an exception to Private)</button>`:""}
         ${isTeam()&&!isPublic()&&recipesOnline&&!offline&&!r.rv&&!pubVisible(r)&&!isPriv(r)?`<button class="btn" id="go3-btn" type="button">🌐 Send through the 3 steps to go public</button>`:""}
@@ -2391,6 +2394,8 @@ function recipe(r){
     toast(on ? "Screen stays on while you cook. Tap a step when it's done." : "Tap a step when it's done.");
   };
   const mvb=document.getElementById("mv-btn"); if(mvb) mvb.onclick=e=>moveBox(r, e.currentTarget);
+  const umb=document.getElementById("unmv-btn"); if(umb) umb.onclick=async()=>{ umb.disabled=true;
+    try{ if(await undoMove(r)) toast(`Undone – back in ${r.c}${r.sec?" · "+r.sec:""} as ${codeOf(r)}`); recipe(r); }catch(x){ umb.disabled=false; toast("Couldn't undo. Check your connection."); } };
   rateBox(r);
   const rvb=app.querySelector(".rv-bar"); if(rvb) wireRv(rvb, ()=>recipe(r));
   const atb=document.getElementById("askteam-btn"); if(atb) atb.onclick=e=>askTeamBox(r, e.currentTarget);
@@ -2771,7 +2776,7 @@ function copyText(s){
 function toast(t){
   let el=document.getElementById("toast");
   if(!el){ el=document.createElement("div"); el.id="toast"; el.className="toast"; el.setAttribute("role","status"); document.body.appendChild(el); }
-  el.textContent=t; el.classList.add("show"); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove("show"),2600);
+  el.textContent=t; el.classList.remove("act"); el.classList.add("show"); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove("show"),2600);
 }
 
 /* ---------- account menu ---------- */
@@ -3684,10 +3689,32 @@ async function moveRecipes(ids, cat, sec){
   sec = cat==="Pesach" ? (sec||"").trim() : "";
   let n=0;
   for(const id of ids){ const r=RECIPES.find(x=>x.id===id); if(!r || (r.c===cat && (r.sec||"")===sec)) continue;
-    const code=nextCode(cat, sec), history=[...(r.history||[]), {a:"moved", by:myName(), at:Date.now(), from:r.c+(r.sec?" · "+r.sec:"")}].slice(-12), oldCodes=freeCode(r, code);
+    const code=nextCode(cat, sec), history=[...(r.history||[]), Object.assign({a:"moved", by:myName(), at:Date.now(), from:r.c+(r.sec?" · "+r.sec:"")}, feat("undomove")?{fromC:r.c, fromSec:r.sec||"", fromCode:r.code||"", to:cat, toSec:sec}:{})].slice(-12), oldCodes=freeCode(r, code);
     await db.collection("recipes").doc(id).update({c:cat, sec, code, oldCodes, history, updated:Date.now()});
     Object.assign(r, {c:cat, sec, code, oldCodes, history}); n++; }
   return n;
+}
+// undomove: undo the last move to another category – back to its old category, with its old item number
+const mayMove = () => (isAdmin()||may("moverec")) && recipesOnline && !offline;
+const undoableMove = r => { if(!feat("undomove") || !r || !mayMove()) return null;
+  const e=[...(r.history||[])].reverse().find(h=>h && h.a==="moved");
+  return e && e.fromC && !e.undo && e.to===r.c && (e.toSec||"")===(r.sec||"") ? e : null; };
+async function undoMove(r){
+  const e=undoableMove(r); if(!e) return false;
+  const back=e.fromCode && !RECIPES.some(x=>x.id!==r.id && x.code===e.fromCode) ? e.fromCode : nextCode(e.fromC, e.fromSec||"");
+  const now=Date.now(), oldCodes=freeCode(r, back).filter(o=>o.code!==back),
+    history=[...(r.history||[]), {a:"moved", by:myName(), at:now, from:r.c+(r.sec?" · "+r.sec:""), undo:true}].slice(-12);
+  const upd={c:e.fromC, sec:e.fromSec||"", code:back, oldCodes, history, updated:now};
+  await db.collection("recipes").doc(r.id).update(upd); Object.assign(r, upd); usedCodes.add(back);
+  return true;
+}
+async function undoMoves(ids){ let n=0; for(const id of ids){ const r=RECIPES.find(x=>x.id===id); if(r && await undoMove(r)) n++; } return n; }
+// A notice with an Undo button that stays a little longer
+function toastUndo(t, fn){
+  toast(t); const el=document.getElementById("toast"); if(!feat("undomove")) return;
+  const b=document.createElement("button"); b.type="button"; b.className="toast-undo"; b.textContent="↩ Undo";
+  b.onclick=async()=>{ b.disabled=true; try{ await fn(); }catch(x){ toast("Couldn't undo. Check your connection."); } };
+  el.appendChild(b); el.classList.add("act"); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove("show","act"),8000);
 }
 function moveCatOptions(cur){ return [...new Set([...CATS, ...ORDER])].sort(byName).map(c=>`<option ${c===cur?"selected":""}>${esc(c)}</option>`).join(""); }
 function moveSecField(id, cat){ const secs=sectionsOf(RECIPES.filter(r=>r.c==="Pesach"));
@@ -3754,7 +3781,9 @@ function movePage(c){
   document.getElementById("mv-all").onchange=e=>{ app.querySelectorAll("[data-mv]").forEach(x=>x.checked=e.target.checked); upd(); };
   cs.onchange=()=>{ app.querySelector(".mv-sec").hidden = cs.value!=="Pesach"; upd(); };
   go.onclick=async()=>{ const ids=sel(); if(!ids.length) return; go.disabled=true; go.textContent="Moving…";
-    try{ const n=await moveRecipes(ids, cs.value, (document.getElementById("mv-sec")||{}).value); toast(`${n} ${n===1?"recipe":"recipes"} moved to ${cs.value}`); location.hash=slug(cs.value); }
+    try{ const from=c, n=await moveRecipes(ids, cs.value, (document.getElementById("mv-sec")||{}).value);
+      toastUndo(`${n} ${n===1?"recipe":"recipes"} moved to ${cs.value}`, async()=>{ const k=await undoMoves(ids); toast(`Undone – ${k} ${k===1?"recipe":"recipes"} back in ${from}`); location.hash=slug(from); });
+      location.hash=slug(cs.value); }
     catch(e){ toast("Couldn't move. Check your connection."); go.disabled=false; upd(); } };
 }
 // Move one: on the recipe page
@@ -3777,7 +3806,9 @@ function moveBox(r, btn){
       try{ await requestMove(r, to, sec); box.remove(); toast("Sent to the admins"); recipe(r); }catch(err){ e.target.disabled=false; toast("Couldn't send. Check your connection."); }
       return; }
     try{ const n=await moveRecipes([r.id], cs.value, (document.getElementById("mv1-sec")||{}).value);
-      toast(n?`Moved to ${cs.value}${r.sec?" · "+r.sec:""} as ${codeOf(r)}`:"It's already there"); box.remove(); recipe(r); }
+      if(n) toastUndo(`Moved to ${cs.value}${r.sec?" · "+r.sec:""} as ${codeOf(r)}`, async()=>{ if(await undoMove(r)){ toast(`Undone – back in ${r.c}${r.sec?" · "+r.sec:""} as ${codeOf(r)}`); if(location.hash==="#"+r.id) recipe(r); } });
+      else toast("It's already there");
+      box.remove(); recipe(r); }
     catch(err){ e.target.disabled=false; toast("Couldn't move. Check your connection."); } };
 }
 

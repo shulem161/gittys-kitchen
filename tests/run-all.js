@@ -800,6 +800,24 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.locator('[data-mvq][data-mvok="1"]').first().click(); await A.waitForTimeout(1200);
     ok('…and moving it moves the recipe', await V.evaluate(() => RECIPES.find(x => x.id === 'r-croissants').c) === 'Cakes');
     await A.goto(F + '#r-croissants'); await A.waitForTimeout(300); await A.click('#mv-btn'); await A.selectOption('#mv1-cat', 'Bread'); await A.click('#mv1-go'); await A.waitForTimeout(800);
+    // Undo the last move (undomove)
+    { const cakesCode = await A.evaluate(() => { const r = RECIPES.find(x => x.id === 'r-croissants'); return [...r.history].reverse().find(h => h.a === 'moved').fromCode; });
+      await A.goto(F + '#r-croissants'); await A.waitForTimeout(300);
+      ok('the recipe page offers to undo the last move', /Undo the last move – back to Cakes/.test(await A.locator('#unmv-btn').innerText().catch(() => '')));
+      await A.click('#unmv-btn'); await A.waitForTimeout(800);
+      const u = await A.evaluate(() => { const r = RECIPES.find(x => x.id === 'r-croissants'); return [r.c, r.code, !!document.getElementById('unmv-btn')]; });
+      ok('…which moves it back, with its old item number', u[0] === 'Cakes' && u[1] === cakesCode && !u[2], [u, cakesCode]);
+      await A.click('#mv-btn'); await A.selectOption('#mv1-cat', 'Bread'); await A.click('#mv1-go'); await A.waitForTimeout(800);
+      ok('right after a move the notice has an Undo button', await A.locator('#toast .toast-undo').isVisible());
+      await A.click('#toast .toast-undo'); await A.waitForTimeout(800);
+      ok('…which moves it back too', await A.evaluate(c => { const r = RECIPES.find(x => x.id === 'r-croissants'); return r.c === 'Cakes' && r.code === c; }, cakesCode));
+      await A.goto(F + '#move-cakes'); await A.waitForTimeout(400);
+      await A.locator('[data-mv="r-croissants"]').check(); await A.selectOption('#mv-cat', 'Bread'); await A.click('#mv-go'); await A.waitForTimeout(1000);
+      await A.click('#toast .toast-undo'); await A.waitForTimeout(1000);
+      ok('…also after moving several at once', await A.evaluate(() => RECIPES.find(x => x.id === 'r-croissants').c) === 'Cakes');
+      await A.goto(F + '#r-croissants'); await A.waitForTimeout(300); await A.click('#mv-btn'); await A.selectOption('#mv1-cat', 'Bread'); await A.click('#mv1-go'); await A.waitForTimeout(800);
+      await V.goto(F + '#r-croissants'); await V.waitForTimeout(400);
+      ok("employees who can't move recipes can't undo a move", (await V.locator('#unmv-btn').count()) === 0); }
 
     // See it as… (owner)
     await A.evaluate(async () => { await db.collection('recipes').doc('r-challah').update({pub: false}); });
@@ -906,10 +924,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*44 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 44));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*45 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 45));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 44, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 45, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -920,7 +938,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /43/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /44/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
