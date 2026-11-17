@@ -331,7 +331,9 @@ await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(),
 await check('an admin can move a recipe from Need to proofread to Private, with nobody written down', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-im'), { rv: 'yoely', yoelyFrom: 'proof', priv: true, pub: false, rvUids: [], rvLog: [{ moved: true, reason: 'family recipe' }] })));
 await check('…and on to Not kosher', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-im'), { rv: 'kosher', kosherFrom: 'yoely', kosherPub: false, rvNote: 'check', rvUids: [] })));
 await check("an employee can't move it between inboxes that way", assertFails(updateDoc(doc(PR1, 'recipes', 'r-im'), { rv: 'proof', rvUids: [] })));
-await check("…and it can't jump to For approval that way", assertFails(updateDoc(doc(ADM, 'recipes', 'r-im'), { rv: 'approve', rvUids: [] })));
+await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'recipes', 'r-im2'), { c: 'Cakes', t: 'Inbox move two', pub: false, rv: 'yoely', rvUids: [], s: [] }); });
+await check("…and a move between inboxes can't jump a recipe to For approval", assertFails(updateDoc(doc(ADM, 'recipes', 'r-im2'), { rv: 'approve', rvUids: [] })));
+await check('…but it can go from Private back to Need to proofread', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-im2'), { rv: 'proof', rvUids: [], yoelyFrom: '' })));
 await check('a member can log their own photo in Activity', assertSucceeds(setDoc(doc(EMP, 'activity', 'a1'), { kind: 'photo', by: 'Emp', uid: 'emp', t: 'Cake', rid: 'r-pub', at: 1 })));
 await check("…not in someone else's name", assertFails(setDoc(doc(EMP, 'activity', 'a2'), { kind: 'photo', by: 'Adm', uid: 'adm', t: 'Cake', rid: '', at: 1 })));
 await check("…nor change it later", assertFails(updateDoc(doc(EMP, 'activity', 'a1'), { t: 'Other' })));
