@@ -1,6 +1,6 @@
 {
-  "web": "4.58",
+  "web": "4.59",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Move between inboxes; Activity shows everything, tidier."
+  "notes": "Activity for each recipe, in its ⋮ menu."
 }

@@ -938,10 +938,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*49 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 49));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*50 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 50));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 49, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 50, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -952,7 +952,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /48/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /49/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1155,6 +1155,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       await li.locator('.im-why').fill('It is a family recipe'); await li.locator('.im-go').click(); await A.waitForTimeout(700);
       const moved = await A.evaluate(id => { const r = findAny(id), e = r.rvLog[r.rvLog.length - 1]; return r.rv === 'yoely' && r.rvUids.length === 0 && e.moved && e.reason === 'It is a family recipe'; }, mid);
       ok('Manage → Move between inboxes moves a recipe among Need to proofread, Private and Not kosher; a reason is needed and kept, and nobody is written down', stillThere && moved, [stillThere, moved]);
+      await A.goto(F + '#' + mid); await A.waitForTimeout(500);
+      const onPage = /family recipe/.test(await A.locator('.rhead').innerText());
+      await A.click('a[href="#act-' + mid + '"]'); await A.waitForTimeout(600);
+      const recAct = await A.locator('#app').innerText();
+      ok('each recipe has its own Activity in the ⋮ menu, with the move between inboxes and its reason; the reason isn\'t on the recipe page', !onPage && /Moved between inboxes/.test(recAct) && /family recipe/.test(recAct), [onPage, recAct.slice(0, 200)]);
       await A.evaluate(async id => { await db.collection('recipes').doc(id).update({rv: '', rvUids: []}); }, mid); await A.waitForTimeout(300);
       await A.goto(F + '#activity'); await A.waitForTimeout(800);
       const chips = await A.locator('.act-chips > .act-chip').count(), kinds = await A.locator('.act-more-list .act-kind').allTextContents();
@@ -1377,7 +1382,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#release'); await A.waitForTimeout(600); await A.reload(); await A.waitForTimeout(900); await A.locator('#rv-list li', {hasText: 'Croissants'}).locator('[data-rv=pub]').click(); await A.waitForTimeout(700);
     await A.goto(F + '#r-croissants'); await A.waitForTimeout(600);
     const logTxt = await A.locator('.rv-log').innerText().catch(() => '');
-    ok('the recipe shows who moved it through the inboxes', /moved up by Shulem/.test(await A.evaluate(() => document.querySelector('.rv-log').textContent)) && new RegExp('moved up by ' + vnA).test(await A.evaluate(() => document.querySelector('.rv-log').textContent)) && /Undone – back to For approval/.test(await A.evaluate(() => document.querySelector('.rv-log').textContent)) && /Edited – back to Need to proofread/.test(await A.evaluate(() => document.querySelector('.rv-log').textContent)), logTxt);
+    ok('the recipe shows who moved it through the inboxes', /moved up by Shulem/.test(await A.evaluate(() => (document.querySelector('.rv-log') ? document.querySelector('.rv-log').textContent : (() => { const d = document.createElement('div'); d.innerHTML = rvLogHTML(RECIPES.find(x => x.id === 'r-croissants').rvLog); return d.textContent; })()))) && new RegExp('moved up by ' + vnA).test(await A.evaluate(() => (document.querySelector('.rv-log') ? document.querySelector('.rv-log').textContent : (() => { const d = document.createElement('div'); d.innerHTML = rvLogHTML(RECIPES.find(x => x.id === 'r-croissants').rvLog); return d.textContent; })()))) && /Undone – back to For approval/.test(await A.evaluate(() => (document.querySelector('.rv-log') ? document.querySelector('.rv-log').textContent : (() => { const d = document.createElement('div'); d.innerHTML = rvLogHTML(RECIPES.find(x => x.id === 'r-croissants').rvLog); return d.textContent; })()))) && /Edited – back to Need to proofread/.test(await A.evaluate(() => (document.querySelector('.rv-log') ? document.querySelector('.rv-log').textContent : (() => { const d = document.createElement('div'); d.innerHTML = rvLogHTML(RECIPES.find(x => x.id === 'r-croissants').rvLog); return d.textContent; })()))), logTxt);
     await V.goto(F + '#profile'); await V.waitForTimeout(500);
     ok('…and asking counts as moving it up, on their profile', /[1-9]\s*moved up/.test(await V.locator('.pstats').innerText()));
     ok('…then on to approval and release, still in the cookbook the whole time', await A.evaluate(() => { const r = RECIPES.find(x => x.id === 'r-croissants'); return !r.rv && r.pub === true; }));

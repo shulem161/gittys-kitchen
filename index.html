@@ -1408,7 +1408,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.58";
+const WEB_VERSION = "4.59";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1463,6 +1463,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["recact","4.59","2026-11-17","Activity for each recipe, in its ⋮ menu","Each recipe's ⋮ menu has “Activity”: everything done to that recipe, newest first, and by whom: added, edited, every move from inbox to inbox (with the reason, when there is one), released, moved category, deleted, photos, likes, requests and messages about it. Only admins and employees allowed to see Activity have it. The list of inbox moves no longer shows on the recipe page itself, so reasons stay out of sight.", false, "team"],
   ["actall","4.58","2026-11-17","Activity: everything the app does, tidier","Activity now also shows recipe requests and answers, suggestions & comments, people asking to join and being approved, likes and dislikes, team messages, requests to move or show a recipe, photos added and approved, menus made, and moves between inboxes. The most-used kinds are buttons at the top; every kind, with its colour and count, is in one “All kinds” dropdown, so the page stays neat. Photos and menus show from today on.", false, "team"],
   ["inboxmove","4.58","2026-11-17","Move a recipe between Need to proofread, Private and Not kosher","Manage → Move between inboxes: admins can move any recipe among Need to proofread, Private and Not kosher, both ways. You must write why; the reason is kept with the recipe (in “Who moved it through the inboxes” and in Activity), so it can be traced. A move like this doesn't count as one of the three steps, so it doesn't lock you out of the next step.", false, "admin"],
   ["dupcheck","4.57","2026-11-17","Already in the cookbook? See both side by side first","When you add or scan a new recipe that looks like one already in the cookbook (the same name, or mostly the same ingredients and steps), you see the two side by side before it's sent, and choose: send it anyway, or don't send it. When the scanner finds several recipes, each look-alike has a “Compare side by side” button, and isn't ticked until you decide.", false, "team"],
@@ -2287,7 +2288,7 @@ function recipe(r){
       ${!isPublic()&&(r.rv||subs.some(s=>s.status==="pending"&&s.editOf===r.id))?`<div class="rv-bar">${r.rv?`<span>📥 In <b>${INBOX_NAME[r.rv]}</b></span>`:""}${subs.filter(s=>s.status==="pending"&&s.editOf===r.id).map(s=>`<span>📝 Suggested changes in <b>${INBOX_NAME[stageOf(s)]}</b></span>`).join("")}
         ${r.rv==="kosher"&&nkHidden()?`<div class="ib-note">🚫 Hidden from the cookbook while it's in Not kosher.</div>`:""}${r.rv==="kosher"&&r.rvNote?`<div class="ib-note"><b>🚫 Why:</b> ${esc(r.rvNote)} (${esc(r.rvNoteBy||"")})</div>`:""}${r.rv==="proof"&&r.rvNote?`<div class="ib-note"><b>✗ Needs changes</b> (${esc(r.rvNoteBy||"")}): ${esc(r.rvNote)}${feat("fixlink")&&mayFix(r)?` <a class="link" href="${fixHref(r.id, r.rvNote)}">Fix it</a>`:""}</div>${linkedNotesHTML(r)}`:""}${(r.rvAsk||[]).length?`<span class="hint">Asked to move up: ${r.rvAsk.map(a=>esc(a.name)).join(", ")}</span>`:""}<div class="row rv-acts">${rvButtons(r)}${rvEditBtn(r)}</div></div>`:""}
       ${!isPublic()&&subs.some(s=>s.status==="pending"&&s.dropOf===r.id)?`<div class="rv-bar"><span>🔀 Merged into <a class="link" href="#${esc(subs.find(s=>s.status==="pending"&&s.dropOf===r.id).editOf)}">${esc(subs.find(s=>s.status==="pending"&&s.dropOf===r.id).t)}</a>. This recipe is deleted automatically when the merged one is released.</span></div>`:""}
-      ${!isPublic()&&(r.rvLog||[]).length?`<details class="rv-log"><summary>Who moved it through the inboxes</summary><ul>${rvLogHTML(r.rvLog)}</ul></details>`:""}
+      ${!isPublic()&&!feat("recact")&&(r.rvLog||[]).length?`<details class="rv-log"><summary>Who moved it through the inboxes</summary><ul>${rvLogHTML(r.rvLog)}</ul></details>`:""}
       ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}
       <div class="facts">
         ${t.length?`<div class="fact hot">Oven <b>${t.join(" → ")}</b></div>`:""}
@@ -2303,6 +2304,7 @@ function recipe(r){
         ${isTeam()&&!offline&&!r.rv?`<button class="btn" id="proof-btn" type="button">✓ Ask someone to proofread</button>`:""}
         ${isTeam()?`<a class="btn" href="#compare~${esc(r.id)}~">⇄ Compare with another recipe</a>`:""}
         ${maySplit()?`<a class="btn" href="#split~${esc(r.id)}~">⧉ Split screen – see another recipe beside this one</a>`:""}
+        ${mayRecAct()?`<a class="btn" href="#act-${esc(r.id)}">📋 Activity – everything done to this recipe</a>`:""}
         ${isTeam()&&feat("history")&&!offline?`<a class="btn" href="#history-${esc(r.id)}">🕘 History – who changed what</a>`:""}
         ${isTeam()&&!offline?`<button class="btn" id="askteam-btn" type="button">${TOOL_IC.ask.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Ask the team about this</button>`:""}
         ${(isAdmin()||may("moverec"))&&recipesOnline&&!offline?`<button class="btn" id="mv-btn" type="button">Move to another category</button>`:""}
@@ -3011,10 +3013,11 @@ const actKinds = () => ACT_KINDS.filter(([k])=>feat("actall") || !ACT_NEW.includ
 function logAct(kind, t, rid){ if(!feat("actall") || !db || offline || !me || pv()) return;
   db.collection("activity").doc().set({kind, by:myName(), uid:me, t:String(t||"").slice(0,120), rid:rid||"", at:Date.now()}).catch(()=>{}); }
 let ACT_LOG = null, ACT_RATINGS = null;
+function actRedraw(){ const h=location.hash; if(h==="#activity") activityPage(); else if(h.startsWith("#act-") && typeof recipeActPage==="function") recipeActPage(h.slice(5)); }
 function loadActExtra(){
   if(!feat("actall") || !db || offline || ACT_LOG) return; ACT_LOG = []; ACT_RATINGS = [];
-  db.collection("activity").get().then(q=>{ ACT_LOG=q.docs.map(d=>d.data()); if(location.hash==="#activity") activityPage(); }).catch(()=>{});
-  if(isAdmin()||may("ratings")) db.collection("ratings").get().then(q=>{ ACT_RATINGS=q.docs.map(d=>d.data()); if(location.hash==="#activity") activityPage(); }).catch(()=>{});
+  db.collection("activity").get().then(q=>{ ACT_LOG=q.docs.map(d=>d.data()); actRedraw(); }).catch(()=>{});
+  if(isAdmin()||may("ratings")) db.collection("ratings").get().then(q=>{ ACT_RATINGS=q.docs.map(d=>d.data()); actRedraw(); }).catch(()=>{});
 }
 function activityAll(){
   const out=[], push=(kind, by, at, t, rid, code, extra) => { if(at) out.push(Object.assign({kind, by:by||"someone", at:+at, t:String(t||"").replace(/^Untitled: /,""), rid:rid||"", code:code||""}, extra||{})); };
@@ -3043,6 +3046,23 @@ function activityAll(){
     for(const d of ACT_LOG||[]){ const r=d.rid?findAny(d.rid):null; push(d.kind, d.by, d.at, d.t, d.rid||"", r?codeOf(r):""); }
   }
   return out.sort((a,b)=>b.at-a.at);
+}
+// recact: one recipe's Activity (⋮ menu): everything done to it, by whom, with reasons
+const mayRecAct = () => feat("recact") && (isAdmin() || may("activity")) && !offline && recipesOnline;
+function recipeActPage(id){
+  loadActExtra();
+  const r=findAny(id) || (BIN||[]).find(x=>x.id===id); if(!r){ home(); return; }
+  const LBL=Object.fromEntries(actKinds().map(([k,l])=>[k,l]));
+  const L=activityAll().filter(x=>x.rid===id && LBL[x.kind]);
+  let last="", rows="";
+  for(const x of L){ const d=new Date(x.at).toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+    if(d!==last){ rows+=`${last?"</ul>":""}<h4 class="act-day">${esc(d)}</h4><ul class="act-feed">`; last=d; }
+    rows+=`<li><span class="act-dot" style="background:${ACT_COLOR[x.kind]}"></span><span class="act-time">${new Date(x.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}</span><span><span class="act-tag" style="--c:${ACT_COLOR[x.kind]}">${esc(LBL[x.kind])}</span> by <b>${esc(x.by)}</b>${x.note?` · ${esc(x.note)}`:""}${x.sub?` <small>(while waiting in the inboxes)</small>`:""}</span></li>`; }
+  if(rows) rows+="</ul>";
+  app.innerHTML=`<section class="wrap tools-page"><a class="back" href="#${esc(id)}">← ${esc(r.t.replace(/^Untitled: /,""))}</a>
+    <div class="section-head"><h2>Activity</h2><p>${noChip(r)} ${esc(r.t.replace(/^Untitled: /,""))} · ${L.length} ${L.length===1?"thing":"things"}</p></div>
+    <div class="panel-a">${rows||`<p class="hint">Nothing recorded for this recipe yet.</p>`}
+      <p class="hint" style="margin-top:12px">Newest first. Moves between inboxes show the reason that was written.${isTeam()&&feat("history")?` To see each saved version of the recipe itself, open <a class="link" href="#history-${esc(id)}">History</a>.`:""}</p></div></section>`;
 }
 function activityPage2(){
   loadActExtra();
@@ -4905,7 +4925,7 @@ function inboxMovePage(){
       <div class="row im-row"><label>Move to <select class="im-to">${boxes.filter(b=>b!==st).map(b=>`<option value="${b}">${esc(INBOX_NAME[b])}</option>`).join("")}</select></label>
         <input class="im-why" type="text" maxlength="300" placeholder="Why? (needed – it's kept so it can be traced)"><button type="button" class="btn sm solid im-go">Move</button></div></li>`).join("")}</ul>`:`<p class="hint">Nothing here.</p>`}</div>`; };
   app.innerHTML=`<section class="wrap admin tools-page"><div class="section-head" style="margin-top:28px"><h2>Move between inboxes</h2><p>${items.length} ${items.length===1?"recipe":"recipes"}</p></div>
-    <p class="hint" style="margin:-4px 0 12px">Move a recipe among ${boxes.map(b=>INBOX_NAME[b]).join(", ")}. Write why: the reason is kept with the recipe and in Activity. This isn't one of the three steps, so nobody is written down as having moved it up.</p>
+    <p class="hint" style="margin:-4px 0 12px">Move a recipe among ${boxes.map(b=>INBOX_NAME[b]).join(", ")}. Write why: the reason is kept in the recipe's Activity (⋮ menu) and in Activity. This isn't one of the three steps, so nobody is written down as having moved it up.</p>
     ${boxes.map(box).join("")}</section>`;
   app.querySelectorAll("[data-im]").forEach(li=>{ const [kind,id]=li.dataset.im.split(":"); const go=li.querySelector(".im-go"), why=li.querySelector(".im-why");
     go.onclick=async()=>{ const reason=why.value.trim(), to=li.querySelector(".im-to").value;
@@ -4976,7 +4996,7 @@ function rvMove(r, to, extra, msg){
   return setRv(r, Object.assign({rv:to, rvBy:myName(), rvAt:now, rvUids:uids, rvAsk:[], rvLog:[...(r.rvLog||[]), entry].slice(-30)}, extra||{}), msg);
 }
 const RV_STEP = {get yoely(){ return "📥 Put in "+YO(); }, get out(){ return "Taken out of "+YO(); }, kosher:"🚫 Put in Not kosher", "kosher-ok":"✓ Checked: kosher, taken out of Not kosher", approve:"Proofread ✓ → For approval", release:"Approved → Ready to release", done:"Released", proof:"Put in Need to proofread"};
-const rvLogHTML = log => log.slice().reverse().map(e=>e.moved ? `<li><b>⇄ Moved from ${esc(INBOX_NAME[e.from]||e.from||"the cookbook")} to ${esc(INBOX_NAME[e.to]||e.to)}</b> by ${esc(e.by)} · ${fmtDate(e.at)}${e.reason?`<br><small>Why: ${esc(e.reason)}</small>`:""}</li>` : `<li><b>${e.from==="yoely"&&e.back?"↩ Taken out of "+YO()+""+(e.to==="proof"?", back to Need to proofread":""):e.edited?"✎ Edited – back to "+(INBOX_NAME[e.to]||e.to):e.undo?"↩ Undone – back to "+(INBOX_NAME[e.to]||e.to):e.back?"↩ Moved back to "+(INBOX_NAME[e.to]||e.to):e.kosherOk?"✓ Approved out of Not kosher → "+(INBOX_NAME[e.to]||"Need to proofread"):e.from==="kosher"&&e.to==="yoely"?"Out of Not kosher → "+YO()+"":e.from==="yoely"&&e.to==="approve"?"📥 Cleared in "+YO()+" → For approval":RV_STEP[e.to]||e.to}${e.to==="done"?(e.pub===false?" for the team only":" to the public"):""}</b> · moved up by ${esc(e.by)}${(e.asked||[]).length?`, asked by ${e.asked.map(a=>esc(a.name)).join(", ")}`:""} · ${fmtDate(e.at)}</li>`).join("");
+const rvLogHTML = log => log.slice().reverse().map(e=>e.moved ? `<li><b>⇄ Moved from ${esc(INBOX_NAME[e.from]||e.from||"the cookbook")} to ${esc(INBOX_NAME[e.to]||e.to)}</b> by ${esc(e.by)} · ${fmtDate(e.at)}${e.reason&&!feat("recact")?`<br><small>Why: ${esc(e.reason)}</small>`:""}</li>` : `<li><b>${e.from==="yoely"&&e.back?"↩ Taken out of "+YO()+""+(e.to==="proof"?", back to Need to proofread":""):e.edited?"✎ Edited – back to "+(INBOX_NAME[e.to]||e.to):e.undo?"↩ Undone – back to "+(INBOX_NAME[e.to]||e.to):e.back?"↩ Moved back to "+(INBOX_NAME[e.to]||e.to):e.kosherOk?"✓ Approved out of Not kosher → "+(INBOX_NAME[e.to]||"Need to proofread"):e.from==="kosher"&&e.to==="yoely"?"Out of Not kosher → "+YO()+"":e.from==="yoely"&&e.to==="approve"?"📥 Cleared in "+YO()+" → For approval":RV_STEP[e.to]||e.to}${e.to==="done"?(e.pub===false?" for the team only":" to the public"):""}</b> · moved up by ${esc(e.by)}${(e.asked||[]).length?`, asked by ${e.asked.map(a=>esc(a.name)).join(", ")}`:""} · ${fmtDate(e.at)}</li>`).join("");
 // Everything one person moved up (or asked to move up), newest first
 const movedUp = () => { const u=who(), out=[];
   RECIPES.forEach(r=>(r.rvLog||[]).forEach(e=>{ if(e.to!=="proof" && e.to!=="kosher" && e.to!=="kosher-ok" && e.to!=="yoely" && !e.back && (e.uid===u || (e.asked||[]).some(a=>a.uid===u) || (e.credited||[]).some(a=>a.uid===u))) out.push({rid:r.id, t:r.t.replace(/^Untitled: /,""), e}); }));
@@ -7568,6 +7588,7 @@ function routePage(){
   if(h.startsWith("compare~") && isTeam()){ const [,a,b2]=h.split("~"); q.value=""; comparePage(a||"", b2||""); window.scrollTo(0,0); return; }
   document.body.classList.remove("split-on"); renderSplitBtn();
   if(h.startsWith("split~") && maySplit()){ const [,a,b2]=h.split("~"); q.value=""; splitPage(a||"", b2||""); return; }
+  if(h.startsWith("act-") && mayRecAct()){ q.value=""; recipeActPage(h.slice(4)); window.scrollTo(0,0); return; }
   if(h==="inboxmove" && mayInboxMove()){ q.value=""; inboxMovePage(); window.scrollTo(0,0); return; }
   if(h==="newcat" && mayAddCat()){ q.value=""; newCatPage(); window.scrollTo(0,0); return; }
   if(h==="declined" && mayDeclined()){ q.value=""; declinedPage(); window.scrollTo(0,0); return; }
