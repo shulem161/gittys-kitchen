@@ -234,16 +234,21 @@ service cloud.firestore {
       allow create: if approvedMember() && request.resource.data.uid == request.auth.uid
         && ((request.resource.data.v == 0 && request.resource.data.keys().hasOnly(['uid', 'at', 'request', 'courses', 'title', 'picks', 'v']))
             || (request.resource.data.v == 1 && request.resource.data.get('src', '') == 'own' && id.matches('own-.*')
+                && request.resource.data.keys().hasOnly(['uid', 'at', 'request', 'title', 'picks', 'v', 'src']))
+            // a good menu the team photographed (menuphoto): it counts as liked
+            || (request.resource.data.v == 1 && request.resource.data.get('src', '') == 'photo' && id.matches('photo-.*') && isTeam()
                 && request.resource.data.keys().hasOnly(['uid', 'at', 'request', 'title', 'picks', 'v', 'src'])))
         && request.resource.data.request is string && request.resource.data.request.size() <= 300
         && request.resource.data.picks is list && request.resource.data.picks.size() <= 12;
       allow update: if approvedMember() && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid
-        && ((resource.data.get('src', '') != 'own'
+        && ((!(resource.data.get('src', '') in ['own', 'photo'])
              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['v', 'reason', 'text', 'ratedAt'])
              && request.resource.data.v in [1, -1] && request.resource.data.get('text', '') is string && request.resource.data.get('text', '').size() <= 300)
           || (resource.data.get('src', '') == 'own'
              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'request', 'picks', 'at'])
              && request.resource.data.request.size() <= 300 && request.resource.data.picks is list && request.resource.data.picks.size() <= 12));
+      // a photographed menu can be taken back by whoever kept it, or an admin
+      allow delete: if resource.data.get('src', '') == 'photo' && isTeam() && (resource.data.uid == request.auth.uid || isAdmin());
     }
     // Who sees the names on AI menus (Inbox settings). Admins choose.
     match /meta/menunames {

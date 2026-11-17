@@ -390,6 +390,20 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       ok('a menu someone makes themselves teaches the AI too', /PUT TOGETHER THEMSELVES/.test(ownLearn) && /Hand-made Friday/.test(ownLearn));
       await A.evaluate(async () => { await db.collection('menus').doc('mtest-learn').delete(); delete MENUS['mtest-learn']; }); await A.waitForTimeout(300);
       ok('…and the AI learns from it for the next menus', /DISLIKED/.test(lessons) && /dishes don't go together/.test(lessons) && /Challah is not a main/.test(lessons));
+      // menuphoto: the team photographs a good menu, the AI reads it, and it's kept for the AI to learn from
+      await A.evaluate(() => { askReader = async () => ({response: {text: () => JSON.stringify({title: 'Sheva Brachos dinner', occasion: 'Wedding', courses: [{course: 'Opening', name: 'Challah'}, {course: 'Main dish', name: 'Roast beef'}, {course: 'Dessert', name: 'Sorbet'}]})}}); });
+      await A.goto(F + '#menu'); await A.waitForTimeout(400);
+      await A.setInputFiles('#mp-file', require('path').join(__dirname, 'sample-dish.jpg')); await A.waitForTimeout(1500);
+      const mpRows = await A.locator('#mp-form .mp-row').count();
+      ok('the team can photograph a menu and the AI reads its dishes', mpRows === 3, mpRows);
+      await A.locator('#mp-form .mp-row').nth(2).locator('[data-mprm]').click();
+      await A.click('#mp-form [type=submit]'); await A.waitForTimeout(800);
+      const mpDoc = await A.evaluate(() => db.collection('menuideas').get().then(s => s.docs.map(d => d.data()).find(d => d.src === 'photo')));
+      ok('…checked and kept as a good menu', !!mpDoc && mpDoc.v === 1 && mpDoc.picks.length === 2 && mpDoc.picks[0].rid === 'r-challah' && mpDoc.request === 'Wedding', mpDoc);
+      ok('…which the AI uses as ideas', /GOOD MENUS FROM REAL MENUS/.test(await A.evaluate(() => menuLessons())) && /Sheva Brachos dinner/.test(await A.evaluate(() => menuLessons())));
+      ok('…and it shows on the page, with Remove', /Sheva Brachos dinner/.test(await A.locator('#mp-list').innerText()) && (await A.locator('#mp-list [data-mpdel]').count()) === 1);
+      await A.click('#mp-list [data-mpdel]'); await A.waitForTimeout(800);
+      ok('…and can be removed', !(await A.evaluate(() => db.collection('menuideas').get().then(s => s.docs.some(d => d.data().src === 'photo')))));
       await A.evaluate(() => { askReader = window.__ar; });
       await A.goto(F + '#ratings'); await A.waitForTimeout(800);
       const named = /Shulem/.test(await A.locator('#mn-ideas').innerText().catch(() => ''));
@@ -924,10 +938,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*45 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 45));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*46 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 46));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 45, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 46, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -938,7 +952,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /44/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /45/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);

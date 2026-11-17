@@ -657,6 +657,9 @@ body.guiding{overflow:hidden}
 @media (max-width:560px){.ib-steps.with-nk{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){.ib-steps.with-yo{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .ai-add{display:grid;gap:6px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}.ai-add label{display:grid;gap:2px}.ai-add label span{font-size:14px;color:var(--muted)}.ai-add textarea{width:100%;box-sizing:border-box}
+.mp-pick{display:inline-flex;cursor:pointer;margin-top:4px}.mp-form{margin-top:12px;display:grid;gap:10px}.mp-img{max-width:100%;max-height:260px;border-radius:12px;object-fit:contain;justify-self:start}
+.mp-dishes{margin:0;padding-left:22px;display:grid;gap:6px}.mp-row{display:flex;gap:6px;align-items:center}.mp-row input{font:inherit;padding:7px 10px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink);min-width:0}
+.mp-course{flex:0 1 32%}.mp-dish{flex:1 1 auto}
 .mn-names-l{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-weight:600}.mn-names-l select{font:inherit;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink)}
 .mn-rate{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 4px;padding:10px 12px;border-radius:12px;background:var(--accent-soft)}
 .mn-rate .btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:700}.mn-why{display:grid;gap:8px;width:100%}.mn-reasons{display:grid;gap:4px}.mn-why textarea{width:100%;box-sizing:border-box}
@@ -1396,7 +1399,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.55";
+const WEB_VERSION = "4.56";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1451,6 +1454,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["menuphoto","4.56","2026-11-17","Teach the AI a good menu from a photo","On Menu ideas, the team (admins and employees) has “📷 Teach the AI a good menu”: take a picture of a menu you like – from a simcha, a restaurant or a magazine. The AI reads the dishes, you check them, and it's kept as a good menu. The AI uses these as ideas when it makes new menus. They show in Likes & dislikes too. (Only the dishes are kept, not the photo.)", false, "team"],
   ["undomove","4.55","2026-11-17","Undo the last move to another category","Moved a recipe to the wrong category? Right after moving (one recipe, or several at once) the notice has an “↩ Undo” button. Later, the recipe page shows “↩ Undo the last move – back to …” for the last move. It goes back to its old category with its old item number. For admins, and employees allowed to move recipes.", false, "team"],
   ["codeforever","4.54","2026-11-16","An item number belongs to one recipe for good","Once an item number is given to a recipe, it's never given to another recipe: not after a year, not ever. That goes for recipes that are deleted (even forever), merged away, moved to another category (the old number), declined or withdrawn.", false],
   ["private","4.53","2026-11-16","Yoely is now “Private”: those recipes stay in the family","The Yoely inbox is called Private. Every recipe that goes through it is marked 🔒 Private and stays team only: its inboxes never offer “Release to the public”, the public switches and “Send through the 3 steps to go public” skip it, and it can't be shared outside the app. Only you, the owner, can make an exception, from the recipe's ⋮ menu (“Make public anyway”). The database enforces this too.", false, "team"],
@@ -3932,7 +3936,7 @@ async function rateBox(r){
 function menuIdeasHTML(L){
   L=[...L];
   const nameOf = u => seeMenuNames() ? (((members||[]).find(m=>m.uid===u)||{}).name || "Someone") : "Someone";
-  const own=L.filter(x=>x.src==="own"); L=L.filter(x=>x.src!=="own");
+  const own=L.filter(x=>x.src==="own"), photos=L.filter(x=>x.src==="photo"); L=L.filter(x=>x.src!=="own"&&x.src!=="photo");
   const up=L.filter(x=>x.v===1), down=L.filter(x=>x.v===-1);
   const why=MENU_REASONS.map(([k,l])=>[l, down.filter(x=>x.reason===k).length]).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]);
   const row=x=>`<li><div class="rate-top"><b>${x.v===1?"👍":x.v===-1?"👎":"·"} ${esc(x.title||"Menu")}</b><span class="hint">${seeMenuNames()?esc(nameOf(x.uid))+" · ":""}${fmtDate(x.at)}</span></div>
@@ -3942,7 +3946,9 @@ function menuIdeasHTML(L){
     ${why.length?`<ul class="rate-reasons">${why.map(([l,n])=>`<li><span>${esc(l)}</span><b>${n}</b></li>`).join("")}</ul>`:""}
     ${L.length?`<ul class="rate-list">${L.slice(0,40).map(row).join("")}</ul>`:`<p class="hint mempty">No AI menus yet.</p>`}
     ${own.length?`<h3 style="margin-top:14px">Menus people made themselves <span class="count">${own.length}</span></h3><p class="hint">The AI learns from these too.</p>
-      <ul class="rate-list">${own.slice(0,30).map(x=>`<li><div class="rate-top"><b>🧑‍🍳 ${esc(x.title||"Menu")}</b><span class="hint">${seeMenuNames()?esc(nameOf(x.uid))+" · ":""}${fmtDate(x.at)}</span></div><span class="hint">${esc((x.picks||[]).map(c=>c.name).filter(Boolean).join(", "))}</span></li>`).join("")}</ul>`:""}</div>`;
+      <ul class="rate-list">${own.slice(0,30).map(x=>`<li><div class="rate-top"><b>🧑‍🍳 ${esc(x.title||"Menu")}</b><span class="hint">${seeMenuNames()?esc(nameOf(x.uid))+" · ":""}${fmtDate(x.at)}</span></div><span class="hint">${esc((x.picks||[]).map(c=>c.name).filter(Boolean).join(", "))}</span></li>`).join("")}</ul>`:""}
+    ${feat("menuphoto")&&photos.length?`<h3 style="margin-top:14px">Good menus from photos <span class="count">${photos.length}</span></h3><p class="hint">Menus the team photographed. The AI uses them as ideas.</p>
+      <ul class="rate-list">${photos.slice(0,30).map(x=>`<li><div class="rate-top"><b>📷 ${esc(x.title||"Menu")}</b><span class="hint">${seeMenuNames()?esc(nameOf(x.uid))+" · ":""}${fmtDate(x.at)}</span></div><span class="hint">${x.request?esc(x.request)+" · ":""}${esc((x.picks||[]).map(c=>c.name).filter(Boolean).join(", "))}</span></li>`).join("")}</ul>`:""}</div>`;
 }
 async function ratingsPage(){
   app.innerHTML=`<section class="wrap tools-page"><div class="section-head" style="margin-top:28px"><h2>Likes &amp; dislikes</h2><p>Loading…</p></div></section>`;
@@ -6550,12 +6556,66 @@ async function menuLessons(){   // what everyone thought of earlier AI menus, fo
     const L=s.docs.map(d=>d.data()).filter(x=>x.v===1||x.v===-1).sort((a,b)=>(b.ratedAt||b.at||0)-(a.ratedAt||a.at||0)), mine=L.filter(x=>x.uid===who()), rest=L.filter(x=>x.uid!==who());
     const pick=(f,n)=>[...mine.filter(f), ...rest.filter(f)].slice(0,n);
     const dishes=x=>(x.picks||[]).map(c=>c.name).filter(Boolean).join(", ");
-    const good=pick(x=>x.v===1&&x.src!=="own",10), bad=pick(x=>x.v===-1,12), own=pick(x=>x.src==="own",10); if(!good.length && !bad.length && !own.length) return "";
+    const good=pick(x=>x.v===1&&x.src!=="own"&&x.src!=="photo",10), bad=pick(x=>x.v===-1,12), own=pick(x=>x.src==="own",10), photo=feat("menuphoto")?pick(x=>x.src==="photo",12):[]; if(!good.length && !bad.length && !own.length && !photo.length) return "";
     return `\nWHAT THE FAMILY THOUGHT OF EARLIER MENUS (learn from it; the first ones are from the person asking now):
 ${good.length?"LIKED:\n"+good.map(x=>`- "${x.request||"a menu"}": ${dishes(x)}`).join("\n"):""}
-${own.length?"MENUS PEOPLE PUT TOGETHER THEMSELVES (they chose these dishes):\n"+own.map(x=>`- "${x.title||"a menu"}": ${dishes(x)}`).join("\n")+"\n":""}${bad.length?"DISLIKED:\n"+bad.map(x=>`- "${x.request||"a menu"}": ${dishes(x)} (because: ${menuReasonText(x.reason)}${x.text?" – "+String(x.text).slice(0,120):""})`).join("\n"):""}
+${photo.length?"GOOD MENUS FROM REAL MENUS THE FAMILY LIKED (this kind of menu is good; use them as ideas for which dishes go together):\n"+photo.map(x=>`- "${x.title||"a menu"}"${x.request?" ("+x.request+")":""}: ${(x.picks||[]).map(c=>(c.course?c.course+": ":"")+c.name).filter(Boolean).join(", ")}`).join("\n")+"\n":""}${own.length?"MENUS PEOPLE PUT TOGETHER THEMSELVES (they chose these dishes):\n"+own.map(x=>`- "${x.title||"a menu"}": ${dishes(x)}`).join("\n")+"\n":""}${bad.length?"DISLIKED:\n"+bad.map(x=>`- "${x.request||"a menu"}": ${dishes(x)} (because: ${menuReasonText(x.reason)}${x.text?" – "+String(x.text).slice(0,120):""})`).join("\n"):""}
 Make menus more like the liked ones, and avoid what made people dislike the others.\n`;
   }catch(e){ return ""; }
+}
+// menuphoto: the team photographs a menu they like; the AI reads its dishes and keeps it as a good menu (menuideas, src photo)
+const mayMenuPhoto = () => feat("menuphoto") && isTeam() && !offline && !!db && !viewingAs();
+const menuPhotoPrompt = () => `This is a photo of a menu (from a simcha, a restaurant, a caterer or a magazine). Read every dish on it.
+Return ONLY JSON: {"title": "short name for this menu, e.g. Sheva Brachos dinner", "occasion": "the occasion or kind of meal if you can tell, else empty", "courses": [{"course": "the course it is under (e.g. Opening, Soup, Main dish, Side dish, Dessert)", "name": "the dish, as written, in English"}]}
+Keep the menu's order. At most 12 dishes. If the photo isn't a menu, return {"title": "", "courses": []}.`;
+const mpRid = name => { const k=String(name||"").toLowerCase().replace(/[^a-z0-9]/g,""); const r=k&&RECIPES.find(x=>x.t.replace(/^Untitled:\s*/,"").toLowerCase().replace(/[^a-z0-9]/g,"")===k); return r?r.id:""; };
+async function drawMenuPhotos(){
+  const box=document.getElementById("mp-list"); if(!box) return;
+  let L=[]; try{ L=(await db.collection("menuideas").get()).docs.map(d=>Object.assign({id:d.id}, d.data())).filter(x=>x.src==="photo").sort((a,b)=>(b.at||0)-(a.at||0)); }catch(e){}
+  if(!document.body.contains(box)) return;
+  box.innerHTML = L.length ? `<h3 style="margin-top:14px">Good menus from photos <span class="count">${L.length}</span></h3><ul class="rate-list">${L.slice(0,40).map(x=>`<li><div class="rate-top"><b>📷 ${esc(x.title||"Menu")}</b><span class="hint">${fmtDate(x.at)}${(x.uid===me||isAdmin())?` <button type="button" class="btn sm" data-mpdel="${esc(x.id)}">Remove</button>`:""}</span></div>
+    <span class="hint">${x.request?esc(x.request)+" · ":""}${esc((x.picks||[]).map(c=>c.name).filter(Boolean).join(", "))}</span></li>`).join("")}</ul>` : "";
+  box.querySelectorAll("[data-mpdel]").forEach(b=>b.onclick=async()=>{ b.disabled=true; try{ await db.collection("menuideas").doc(b.dataset.mpdel).delete(); toast("Removed – the AI won't use it"); drawMenuPhotos(); }catch(e){ b.disabled=false; toast("Couldn't remove. Check your connection."); } });
+}
+function wireMenuPhoto(){
+  const inp=document.getElementById("mp-file"), out=document.getElementById("mp-out"); if(!inp) return;
+  drawMenuPhotos();
+  inp.onchange=async()=>{ const file=inp.files&&inp.files[0]; inp.value=""; if(!file) return;
+    out.innerHTML=`<p class="hint"><span class="spin" aria-hidden="true"></span> Reading the menu…</p>`;
+    let j=null, preview="";
+    try{ const f=await readFileForAI(file); preview=f.preview||"";
+      const res=await askReader([menuPhotoPrompt(), f.part]);
+      j=JSON.parse(res.response.text().trim().replace(/^```(?:json)?\s*/,"").replace(/```$/,"")); }
+    catch(e){ out.innerHTML=`<p class="err">Couldn't read the menu. Try a clearer photo, or check your connection.</p>`; return; }
+    const courses=(j&&Array.isArray(j.courses)?j.courses:[]).filter(c=>c&&c.name).slice(0,12);
+    if(!courses.length){ out.innerHTML=`<p class="err">No dishes found. Is it a photo of a menu? Try again, closer and in good light.</p>`; return; }
+    editMenuPhoto({title:String(j.title||"").slice(0,80), occasion:String(j.occasion||"").slice(0,200), courses, preview});
+  };
+}
+function editMenuPhoto(m){
+  const out=document.getElementById("mp-out"); if(!out) return;
+  const row=c=>`<li class="mp-row"><input class="mp-course" type="text" maxlength="40" value="${esc(c.course||"")}" placeholder="Course" aria-label="Course"><input class="mp-dish" type="text" maxlength="80" value="${esc(c.name||"")}" placeholder="Dish" aria-label="Dish"><button type="button" class="btn sm" data-mprm aria-label="Remove this dish">✕</button></li>`;
+  out.innerHTML=`<form class="mp-form" id="mp-form">${m.preview?`<img class="mp-img" src="${m.preview}" alt="The menu photo">`:""}
+    <div class="field"><label for="mp-title">Name of the menu</label><input id="mp-title" type="text" maxlength="80" value="${esc(m.title)}" placeholder="e.g. Sheva Brachos dinner"></div>
+    <div class="field"><label for="mp-occ">Occasion (optional)</label><input id="mp-occ" type="text" maxlength="200" value="${esc(m.occasion)}" placeholder="e.g. Shabbos, wedding, weekday"></div>
+    <p class="hint">Check the dishes the AI read. Fix or remove any it got wrong.</p>
+    <ol class="mp-dishes">${m.courses.map(row).join("")}</ol>
+    <button type="button" class="btn sm" id="mp-add">+ Add a dish</button>
+    <p class="err" id="mp-err" role="alert" hidden></p>
+    <div class="row"><button type="submit" class="btn solid">✓ Keep as a good menu</button><button type="button" class="btn" id="mp-no">Cancel</button></div></form>`;
+  const F=document.getElementById("mp-form"), list=F.querySelector(".mp-dishes");
+  const wireRm=()=>list.querySelectorAll("[data-mprm]").forEach(b=>b.onclick=()=>b.closest("li").remove());
+  wireRm();
+  F.querySelector("#mp-add").onclick=()=>{ if(list.children.length>=12){ toast("At most 12 dishes"); return; } list.insertAdjacentHTML("beforeend", row({})); wireRm(); list.lastElementChild.querySelector(".mp-dish").focus(); };
+  F.querySelector("#mp-no").onclick=()=>{ out.innerHTML=""; };
+  F.onsubmit=async e=>{ e.preventDefault(); const err=F.querySelector("#mp-err"); err.hidden=true;
+    const picks=[...list.querySelectorAll("li")].map(li=>({course:li.querySelector(".mp-course").value.trim().slice(0,40), name:li.querySelector(".mp-dish").value.trim().slice(0,80)})).filter(c=>c.name).slice(0,12).map(c=>Object.assign(c,{rid:mpRid(c.name)}));
+    if(picks.length<2){ err.textContent="A menu needs at least 2 dishes."; err.hidden=false; return; }
+    const title=(F.querySelector("#mp-title").value.trim()||"A good menu").slice(0,80), b=F.querySelector('[type=submit]'); b.disabled=true;
+    const id="photo-"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+    try{ await db.collection("menuideas").doc(id).set({uid:me, at:Date.now(), request:F.querySelector("#mp-occ").value.trim().slice(0,300), title, picks, v:1, src:"photo"});
+      out.innerHTML=""; toast("Kept as a good menu – the AI will use it for ideas"); drawMenuPhotos(); }
+    catch(x){ b.disabled=false; err.textContent="Couldn't save. Check your connection."; err.hidden=false; } };
 }
 function menuPage(){
   const prev=store("gk-menu-q")||"";
@@ -6571,11 +6631,16 @@ function menuPage(){
       <div><button class="primary" type="submit">Make a menu</button></div>
     </form>
     <div id="mn-out" aria-live="polite"></div>
+    ${mayMenuPhoto()?`<div class="panel-a" id="mp-box"><h3>📷 Teach the AI a good menu</h3>
+      <p class="hint">Take a picture of a menu you like – from a simcha, a restaurant or a magazine. The AI reads the dishes, you check them, and it's kept as a good menu. The AI uses these as ideas for new menus.</p>
+      <label class="btn solid mp-pick">📷 Take or choose a photo of a menu<input type="file" accept="image/*" id="mp-file" hidden></label>
+      <div id="mp-out" aria-live="polite"></div><div id="mp-list"></div></div>`:""}
   </section>`;
   const F=document.getElementById("mnform"), ta=F.querySelector("#mn-q");
   F.querySelectorAll("[data-mq]").forEach(b=>b.onclick=()=>{ const v=ta.value.trim(); ta.value = v ? v.replace(/[.,\s]+$/,"")+", "+b.dataset.mq.toLowerCase() : b.dataset.mq; ta.focus(); });
   F.onsubmit=e=>{ e.preventDefault(); makeMenu([]); };
   if(lastMenu) showMenu(lastMenu.menu, lastMenu.opts, lastMenu.via);
+  if(mayMenuPhoto()) wireMenuPhoto();
 }
 async function makeMenu(avoid){
   const F=document.getElementById("mnform"); if(!F) return;

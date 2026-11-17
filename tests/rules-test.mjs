@@ -466,6 +466,14 @@ await check('a menu someone made themselves counts as liked', assertSucceeds(set
 await check('…and stays up to date when they change it', assertSucceeds(setDoc(doc(E9, 'menuideas', 'own-m1'), { uid: 'e9', at: 2, request: 'Friday night', title: 'Friday night', picks: [], v: 1, src: 'own' })));
 await check("…but can't be turned into a dislike", assertFails(updateDoc(doc(E9, 'menuideas', 'own-m1'), { v: -1 })));
 await check('everyone signed in can read them, so the AI can learn', assertSucceeds(getDoc(doc(C9, 'menuideas', 'own-m1'))));
+// menuphoto: good menus the team photographed
+const MP = { uid: 'e9', at: 1, request: 'Wedding', title: 'Wedding dinner', picks: [{ course: 'Main', name: 'Roast', rid: '' }, { course: 'Dessert', name: 'Sorbet', rid: '' }], v: 1, src: 'photo' };
+await check('the team can keep a good menu from a photo', assertSucceeds(setDoc(doc(E9, 'menuideas', 'photo-1'), MP)));
+await check("…customers can't", assertFails(setDoc(doc(C9, 'menuideas', 'photo-2'), Object.assign({}, MP, { uid: 'c9' }))));
+await check("…it can't be turned into a dislike", assertFails(updateDoc(doc(E9, 'menuideas', 'photo-1'), { v: -1, ratedAt: 2 })));
+await check("…a customer can't remove it", assertFails(deleteDoc(doc(C9, 'menuideas', 'photo-1'))));
+await check('…whoever kept it can remove it', assertSucceeds(deleteDoc(doc(E9, 'menuideas', 'photo-1'))));
+await check("…but an AI menu can't be removed", assertFails(deleteDoc(doc(C9, 'menuideas', 'mi1'))));
 await check('an admin chooses who sees the names', assertSucceeds(setDoc(doc(OWN, 'meta', 'menunames'), { show: 'none' })));
 await check("…an employee can't", assertFails(setDoc(doc(E9, 'meta', 'menunames'), { show: 'ratings' })));
 

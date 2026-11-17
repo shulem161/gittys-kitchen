@@ -1,6 +1,6 @@
 {
-  "web": "4.55",
+  "web": "4.56",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Undo the last move to another category."
+  "notes": "Teach the AI a good menu from a photo."
 }
