@@ -96,6 +96,10 @@ button{font:inherit;color:inherit}
 .ed-also{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}.also-c{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:14px;cursor:pointer;background:var(--paper)}
 .also-c:has(input:checked){border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}.also-c[hidden]{display:none}.also-new{display:inline-flex;gap:6px}.also-new input{width:150px}
 .ed-also-f .lbl{font-weight:600;font-size:14px}.chip-also{text-decoration:none;opacity:.85}
+.labels-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}.lchip{display:inline-flex;align-items:center;gap:4px;font-size:13px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink);text-decoration:none}
+.lchip.meal{border-color:#E7B66A}.lchip.dish{border-color:#9DB4D9}.lchip.kind.dairy{border-color:#7FB2E5}.lchip.kind.meat{border-color:#D98C8C}.lchip.kind.other,.lchip.kind.fish{border-color:#9CCB9A}.lchip.pesach{border-color:#B79BD6}
+.lbl-box{display:grid;gap:10px}.lbl-grp b{display:block;font-size:13px;margin-bottom:4px;color:var(--muted)}.lbl-opts{display:flex;flex-wrap:wrap;gap:6px}
+.find-btn{float:right;margin-top:22px}.find-f{display:grid;gap:10px}
 .qr-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.qr-row .qr{font-size:13px}
 .rq-acts .qr-row{flex-basis:100%}
 .ln-notes ul{margin:4px 0 0;padding-left:18px;display:grid;gap:4px}
@@ -1205,6 +1209,12 @@ function autoKind(r){
   if(items.some(it=>FISH_RE.test(it.replace(/\b(mock|falsche)\s+fish\b/gi," "))) || /\b(gefilte|fish)\b/i.test((r.t||"").replace(/\b(mock|falsche)\b.*$/i,""))) return "fish";
   return "other";
 }
+// labels: meal, dish type and “good for Pesach” on each recipe (dairy/meat/pareve is the recipe's kind)
+const LMEALS = [["breakfast","Breakfast","🍳"],["lunch","Lunch","🥪"],["supper","Supper","🍽️"]];
+const DISHES = [["appetizer","Appetizer"],["main","Main dish"],["side","Side dish"],["soup","Soup"],["salad","Salad"],["dip","Dip or spread"],["bread","Bread"],["cake","Cake"],["cookie","Cookies"],["dessert","Dessert"],["snack","Snack"],["drink","Drink"],["sauce","Sauce"]];
+const MEAL_L = Object.fromEntries(LMEALS.map(([k,l])=>[k,l])), DISH_L = Object.fromEntries(DISHES);
+const KIND_WORD = k => ({meat:"Meat", dairy:"Dairy", fish:"Fish (pareve)", other:"Pareve"})[k] || "";
+const mayLabel = () => feat("labels") && (isAdmin() || may("labels")) && !offline && recipesOnline;
 const kindOf = r => (r && (r.kind==="meat"||r.kind==="dairy"||r.kind==="fish"||r.kind==="other")) ? r.kind : autoKind(r||{});
 const KIND_LABEL = {meat:"Meat", dairy:"Dairy", fish:"Fish", other:""};
 const PAREVE = k => k==="other" || k==="fish";   // fish is pareve: it can go with meat or dairy meals
@@ -1386,10 +1396,10 @@ let PUB = {allow:{}, cats:{}};
 // the extras are off unless granted. Public members all share the Customer portal settings. Admins can do everything.
 const EXTRA_PERMS = [["editdirect","Edit recipes directly, without sending a request (not delete, move or make public)"],
   ["del","Delete recipes (and the Duplicate recipes page)"],["moverec","Move recipes to another category, and OK move requests"],["pub","Make recipes public or team only, and OK go-public requests"],
-  ["kosher","The Not kosher inbox"],["members","Approve or deny people who ask to join"],["activity","See Activity: who added, changed or moved what"],["portal","Customer portal settings: what customers can see and do"],["proofread","Proofread recipes (the Need to proofread inbox)"],["review","Approve recipes and photos (the For approval inbox)"],["release","Release approved recipes, to the public or for the team only (the Ready to release inbox)"],["answer","Recipe requests: see them, answer them, and get a notice for new ones"],["inbox","Read and answer suggestions & comments"],["viewas","Log in as a customer, to see exactly what they see"],["ratings","Likes and dislikes: see them, and get a notice for each one"],["yoely","The Yoely inbox: put recipes in it and clear them (cleared, they go straight to For approval)"],["scanto","Choose the first inbox for a new recipe they scan or add: Need to proofread, "+YO()+" or Not kosher"]];
+  ["kosher","The Not kosher inbox"],["members","Approve or deny people who ask to join"],["activity","See Activity: who added, changed or moved what"],["portal","Customer portal settings: what customers can see and do"],["proofread","Proofread recipes (the Need to proofread inbox)"],["review","Approve recipes and photos (the For approval inbox)"],["release","Release approved recipes, to the public or for the team only (the Ready to release inbox)"],["answer","Recipe requests: see them, answer them, and get a notice for new ones"],["inbox","Read and answer suggestions & comments"],["viewas","Log in as a customer, to see exactly what they see"],["ratings","Likes and dislikes: see them, and get a notice for each one"],["yoely","The Yoely inbox: put recipes in it and clear them (cleared, they go straight to For approval)"],["scanto","Choose the first inbox for a new recipe they scan or add: Need to proofread, Yoely or Not kosher"],["labels","Change recipes' labels: meal, dish type, dairy/meat/pareve and good for Pesach"]];
 const isExtra = k => EXTRA_PERMS.some(x=>x[0]===k);
 const EMP_EXTRA = ["del","moverec","pub","kosher","members","activity","portal"];
-const extraPerms = () => EXTRA_PERMS.filter(([k])=>(k!=="editdirect" || feat("empedit")) && (k!=="scanto" || feat("scanto")) && (!EMP_EXTRA.includes(k) || feat("empextra")));
+const extraPerms = () => EXTRA_PERMS.filter(([k])=>(k!=="editdirect" || feat("empedit")) && (k!=="scanto" || feat("scanto")) && (k!=="labels" || feat("labels")) && (!EMP_EXTRA.includes(k) || feat("empextra")));
 // Employee settings (meta/employees) apply to every employee; a person's own Permissions override them.
 let EMP = {allow:{}};
 const empDefault = k => EMP.allow[k]!==undefined ? EMP.allow[k]===true : !isExtra(k);
@@ -1413,7 +1423,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.63";
+const WEB_VERSION = "4.64";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1468,6 +1478,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["labels","4.64","2026-11-18","Labels on every recipe: meal, dish type, dairy/meat/pareve, good for Pesach","Every recipe can have labels: Breakfast, Lunch and/or Supper; a dish type (Appetizer, Main dish, Side dish, Soup, Dessert, Cake, Snack…); Dairy, Meat or Pareve; and “Good for Pesach”, which you set yourself and which shows only on the recipes you mark. Change them from the recipe's ⋮ menu (“Labels”), without editing the recipe. “Find by meal & type” (on the Categories page and in Kitchen tools) shows every recipe that matches, for example everything good for breakfast. Admins can let the AI fill in the meal and dish type for all recipes at once, and new scans get them too.", false],
   ["multicat","4.63","2026-11-18","A recipe in more than one category, and new categories in every list","When you add or edit a recipe, under its category there's “Also in”: tick other categories it belongs to (for example Meat & Chicken and also Side Dish), or add a new category right there. The recipe shows up in each of them, and keeps one item number, from its main category. Pesach stays separate: a Pesach recipe isn't offered year-round categories, and a year-round recipe isn't offered Pesach. And a category added anywhere (Add a category, “+ Add a new category…”, the recipe form, the scanner or “Also in”) is saved straight away, so it's in every category list from then on, even while its recipe still waits in an inbox.", false],
   ["scanmissed","4.62","2026-11-18","The scanner looks again for recipes it missed","When you scan a file that was read before, you still get the same recipes as last time, and the scanner also reads the whole file once more just to look for recipes it missed. Any it finds are added and remembered. A PDF or Word file is also checked this way the first time it's read.", false],
   ["scanexact","4.61","2026-11-17","The scanner reads more thoroughly, and the same file gives the same recipes","The scanner now reads the whole photo or file, every page, line and side note, and misses nothing: every ingredient and amount, every step, oven temperatures, times, pan sizes, servings and tips. It may still word things a little more clearly, but it doesn't drop or invent anything. Photos are sent sharper, so small or faded writing is read too. Scanning the same file (or the same photos) again gives exactly the same recipes, on any phone or computer, because the first reading is remembered.", false],
@@ -2028,6 +2039,7 @@ function catTiles(){
 const DL_IC = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>';
 function categoriesPage(){
   app.innerHTML = `<section class="wrap">
+    ${feat("labels")?`<a class="btn find-btn" href="#find">🔎 Find by meal &amp; type</a>`:""}
     <div class="section-head" style="margin-top:26px"><h2>Categories</h2><p>${RECIPES.length} recipes in ${CATS.length} categories</p></div>
     <div class="cats rows" style="padding-bottom:18px">${catTiles()}</div>
     <div class="home-foot" style="margin-bottom:32px"><button class="btn" id="dl-book" type="button"${isPublic()?" hidden":""}>${DL_IC}Download the whole cookbook</button></div>
@@ -2067,6 +2079,7 @@ function home(){
     `)}
     <div class="section-head"><h2>Kitchen tools</h2><p>Measure and plan</p></div>
     <div class="cats tools">
+      ${feat("labels")?`<a class="cat" href="#find"><div class="ic">${TOOL_IC.menu||TOOL_IC.calc}</div><div class="tool-txt"><h3>Find by meal</h3><span>Breakfast, lunch, supper and more</span></div></a>`:""}
       <a class="cat" href="#convert"><div class="ic">${TOOL_IC.calc}</div><div class="tool-txt"><h3>Calculator</h3><span>Double, halve, convert</span></div></a>
       ${offline||!can("ai")?"":`<a class="cat" href="#menu"><div class="ic">${TOOL_IC.menu}</div><div class="tool-txt"><h3>Menu ideas</h3><span>A full menu from the cookbook</span></div></a>`}
     </div>
@@ -2263,6 +2276,82 @@ function noAccessPage(){
 }
 // Recently opened (on this device, per person)
 const openedList = () => (store(uk("opened"))||[]).map(id=>RECIPES.find(r=>r.id===id)).filter(Boolean);
+// Find by meal & type: #find~meal=breakfast&dish=main&kind=dairy&pesach=1
+const findState = h => { const o={meal:[], dish:[], kind:"", pesach:false}; String(h||"").replace(/^find~?/,"").split("&").filter(Boolean).forEach(kv=>{ const [k,v]=kv.split("=");
+  if(k==="meal"||k==="dish") o[k]=v.split(",").filter(Boolean); if(k==="kind") o.kind=v||""; if(k==="pesach") o.pesach=v==="1"; }); return o; };
+const findHash = o => "#find~"+[o.meal.length?"meal="+o.meal.join(","):"", o.dish.length?"dish="+o.dish.join(","):"", o.kind?"kind="+o.kind:"", o.pesach?"pesach=1":""].filter(Boolean).join("&");
+function findPage(h){
+  const o=findState(h);
+  const match=r=>(!o.meal.length || o.meal.some(k=>(r.meals||[]).includes(k))) && (!o.dish.length || o.dish.some(k=>(r.dish||[]).includes(k)))
+    && (!o.kind || (o.kind==="other" ? ["other","fish"].includes(kindOf(r)) : kindOf(r)===o.kind)) && (!o.pesach || r.pesach || isPesach(r.c));
+  const any=o.meal.length||o.dish.length||o.kind||o.pesach, list=any?RECIPES.filter(match).sort((a,b)=>byName(a.t,b.t)):[];
+  const unl=RECIPES.filter(r=>!(r.meals||[]).length || !(r.dish||[]).length).length;
+  const tog=(grp,k,l,on)=>`<button type="button" class="act-chip${on?" on":""}" data-fg="${grp}" data-fk="${k}" style="--c:var(--accent)">${esc(l)}</button>`;
+  app.innerHTML=`<section class="wrap tools-page"><div class="section-head" style="margin-top:26px"><h2>Find by meal &amp; type</h2><p>${any?`${list.length} ${list.length===1?"recipe":"recipes"}`:"Choose what you're looking for"}</p></div>
+    <div class="panel-a find-f">
+      <div class="lbl-grp"><b>Meal</b><div class="lbl-opts">${LMEALS.map(([k,l,ic])=>tog("meal",k,ic+" "+l,o.meal.includes(k))).join("")}</div></div>
+      <div class="lbl-grp"><b>Dish type</b><div class="lbl-opts">${DISHES.map(([k,l])=>tog("dish",k,l,o.dish.includes(k))).join("")}</div></div>
+      <div class="lbl-grp"><b>Dairy, meat or pareve</b><div class="lbl-opts">${[["dairy","Dairy"],["meat","Meat"],["other","Pareve"]].map(([k,l])=>tog("kind",k,l,o.kind===k)).join("")}</div></div>
+      <div class="lbl-grp"><div class="lbl-opts">${tog("pesach","1","Good for Pesach",o.pesach)}${any?`<a class="link" href="#find" style="margin-left:8px">Clear</a>`:""}</div></div>
+      ${isAdmin()&&can("ai")&&!offline&&recipesOnline&&unl?`<p class="hint" style="margin-top:8px">${unl} ${unl===1?"recipe has":"recipes have"} no meal or dish type yet. <button type="button" class="btn sm" id="lb-ai">✨ Fill them in with AI</button> <span id="lb-ai-st"></span></p>`:""}
+    </div>
+    ${any?(list.length?`<div class="grid">${list.map(card).join("")}</div>`:`<div class="panel-a"><p class="hint">No recipe has these labels yet.</p></div>`):""}
+  </section>`;
+  app.querySelectorAll("[data-fg]").forEach(b=>b.onclick=()=>{ const g=b.dataset.fg, k=b.dataset.fk, n=findState(location.hash.slice(1));
+    if(g==="meal"||g==="dish") n[g]=n[g].includes(k)?n[g].filter(x=>x!==k):[...n[g], k]; if(g==="kind") n.kind=n.kind===k?"":k; if(g==="pesach") n.pesach=!n.pesach;
+    location.hash=findHash(n); });
+  const ai=document.getElementById("lb-ai"); if(ai) ai.onclick=()=>labelsAI(ai, document.getElementById("lb-ai-st"));
+}
+// AI: fill in meal and dish type for every recipe that doesn't have them yet (never “good for Pesach”)
+async function labelsAI(btn, st){
+  const todo=RECIPES.filter(r=>!(r.meals||[]).length || !(r.dish||[]).length); if(!todo.length) return;
+  btn.disabled=true; let done=0;
+  try{
+    for(let i=0;i<todo.length;i+=25){
+      const batch=todo.slice(i,i+25); st.textContent=`Working… ${done} of ${todo.length}`;
+      const lines=batch.map(r=>`${r.id} | ${r.t.replace(/^Untitled: /,"")} | ${r.c} | ${(r.s||[]).filter(x=>x[0]).flatMap(x=>x[2]).slice(0,8).join(", ")}`).join("\n");
+      const res=await askReader([`For each recipe below (id | title | category | first ingredients), choose labels for a family cookbook.
+- "meals": which of "breakfast", "lunch", "supper" it is ideal for, most ideal first (one, two or all three).
+- "dish": one or two of ${DISHES.map(d=>'"'+d[0]+'"').join(", ")}.
+Return ONLY JSON: {"labels": [{"id": string, "meals": [string], "dish": [string]}]}
+Recipes:
+${lines}`], null, true);
+      const j=JSON.parse(res.response.text().trim().replace(/^```(?:json)?\s*/,"").replace(/```$/,""));
+      const b=db.batch(); let n=0;
+      for(const x of (j.labels||[])){ const r=batch.find(q=>q.id===x.id); if(!r) continue;
+        const meals=(x.meals||[]).filter(k=>MEAL_L[k]).slice(0,3), dish=(x.dish||[]).filter(k=>DISH_L[k]).slice(0,2);
+        const d={}; if(!(r.meals||[]).length && meals.length) d.meals=meals; if(!(r.dish||[]).length && dish.length) d.dish=dish;
+        if(Object.keys(d).length){ b.update(db.collection("recipes").doc(r.id), d); Object.assign(r, d); n++; } }
+      if(n) await b.commit(); done+=batch.length;
+    }
+    toast(`Labels filled in for ${done} recipes. You can change any of them from the recipe's ⋮ menu.`); route();
+  }catch(e){ btn.disabled=false; st.textContent=""; toast(done?`Stopped after ${done}. Try again to do the rest.`:"The AI couldn't do it right now. Try again in a minute."); }
+}
+function labelsRow(r){
+  const chips=[...(r.meals||[]).filter(k=>MEAL_L[k]).map(k=>`<a class="lchip meal" href="#find~meal=${k}">${LMEALS.find(m=>m[0]===k)[2]} ${MEAL_L[k]}</a>`),
+    ...(r.dish||[]).filter(k=>DISH_L[k]).map(k=>`<a class="lchip dish" href="#find~dish=${k}">${esc(DISH_L[k])}</a>`),
+    ...(r.kind&&KIND_WORD(r.kind)?[`<a class="lchip kind ${r.kind}" href="#find~kind=${r.kind}">${KIND_WORD(r.kind)}</a>`]:[]),
+    ...(r.pesach?[`<a class="lchip pesach" href="#find~pesach=1">Good for Pesach</a>`]:[])];
+  return chips.length ? `<div class="labels-row">${chips.join("")}</div>` : "";
+}
+// Change a recipe's labels without editing the recipe
+function labelsBox(r){
+  const old=document.getElementById("lbl-box"); if(old){ old.remove(); return; }
+  const box=document.createElement("div"); box.id="lbl-box"; box.className="dlpick lbl-box";
+  const pick=(name,key,list,on,multi)=>`<div class="lbl-grp"><b>${name}</b><div class="lbl-opts">${list.map(([k,l,ic])=>`<label class="also-c"><input type="${multi?"checkbox":"radio"}" name="lb-${key}" value="${k}" ${on.includes(k)?"checked":""}><span>${ic?ic+" ":""}${esc(l)}</span></label>`).join("")}</div></div>`;
+  box.innerHTML=`<b>Labels for “${esc(r.t.replace(/^Untitled: /,""))}”</b><p class="hint">Tick everything that fits. This doesn't change the recipe itself.</p>
+    ${pick("Meal","meal", LMEALS, r.meals||[], true)}${pick("Dish type","dish", DISHES, r.dish||[], true)}
+    ${pick("Dairy, meat or pareve","kind", [["","Automatic"],["dairy","Dairy"],["meat","Meat"],["other","Pareve"],["fish","Fish (pareve)"]], [r.kind||""], false)}
+    <div class="lbl-grp"><label class="also-c"><input type="checkbox" id="lb-pesach" ${r.pesach?"checked":""}><span>Good for Pesach</span></label></div>
+    <div class="row"><button type="button" class="btn solid" id="lb-save">Save labels</button><button type="button" class="btn" id="lb-no">Cancel</button></div>`;
+  (document.querySelector(".rhead")||document.getElementById("app")).after(box); box.scrollIntoView({block:"nearest"});
+  box.querySelector("#lb-no").onclick=()=>box.remove();
+  box.querySelector("#lb-save").onclick=async e=>{ e.target.disabled=true;
+    const val=n=>[...box.querySelectorAll(`input[name="lb-${n}"]:checked`)].map(x=>x.value);
+    const d={meals:val("meal"), dish:val("dish"), kind:(val("kind")[0]||""), pesach:box.querySelector("#lb-pesach").checked, updated:Date.now()};
+    try{ await db.collection("recipes").doc(r.id).update(d); Object.assign(r, d); toast("Labels saved"); box.remove(); recipe(r); }
+    catch(x){ e.target.disabled=false; toast("Couldn't save. Check your connection."); } };
+}
 function recipe(r){
   if(feat("recentopen") && !pv()){ const L=(store(uk("opened"))||[]).filter(x=>x!==r.id); L.unshift(r.id); store(uk("opened"), L.slice(0,12)); }
   const saved = store(uk(r.id)) || {i:[],s:[]};
@@ -2302,6 +2391,7 @@ function recipe(r){
       ${!isPublic()&&subs.some(s=>s.status==="pending"&&s.dropOf===r.id)?`<div class="rv-bar"><span>🔀 Merged into <a class="link" href="#${esc(subs.find(s=>s.status==="pending"&&s.dropOf===r.id).editOf)}">${esc(subs.find(s=>s.status==="pending"&&s.dropOf===r.id).t)}</a>. This recipe is deleted automatically when the merged one is released.</span></div>`:""}
       ${!isPublic()&&!feat("recact")&&(r.rvLog||[]).length?`<details class="rv-log"><summary>Who moved it through the inboxes</summary><ul>${rvLogHTML(r.rvLog)}</ul></details>`:""}
       ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}
+      ${feat("labels")?labelsRow(r):""}
       <div class="facts">
         ${t.length?`<div class="fact hot">Oven <b>${t.join(" → ")}</b></div>`:""}
         ${servesText(r,sx)?`<div class="fact serves">${TOOL_IC.people}<b>${esc(servesText(r,sx))}</b>${sx!==1?` <small>at ${fmtNum(sx)}×</small>`:""}</div>`:""}
@@ -2328,6 +2418,7 @@ function recipe(r){
         ${mayNK()&&recipesOnline&&!offline&&r.rv!=="kosher"?`<button class="btn" id="nk-btn" type="button">🚫 Put in Not kosher</button>`:""}
         ${!isAdmin()&&may("del")&&recipesOnline&&!offline?`<button class="btn" id="del-btn" type="button">🗑 Delete recipe</button>`:""}
         <div class="rm-sep" role="separator"></div>
+        ${mayLabel()?`<button class="btn" id="lbl-btn" type="button">🏷️ Labels – meal, dish type, dairy/meat, Pesach</button>`:""}
         <button class="btn" id="toplan-btn" type="button">${TOOL_IC.cal}Add to calendar</button>
         <a class="btn" href="#timers-${r.id}">${TIMER_IC.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Set a timer</a>
         <button class="btn fav" id="fav" aria-pressed="${isFav}">${HEART}${isFav?"Saved to favorites":"Save to favorites"}</button>
@@ -2387,6 +2478,7 @@ function recipe(r){
   document.getElementById("reset").onclick=()=>{store(uk(r.id),{i:[],s:[]});recipe(r)};
   app.querySelectorAll("[data-sx]").forEach(b=>b.onclick=()=>{ const y=window.scrollY; scaleNow[r.id]=+b.dataset.sx; recipe(r); window.scrollTo(0,y); });
   document.getElementById("groc").onclick=()=>{ const y=window.scrollY; const added=groceryToggle(r,sx); toast(added?"Added to the grocery list":"Taken off the grocery list"); recipe(r); window.scrollTo(0,y); };
+  const lbb=document.getElementById("lbl-btn"); if(lbb) lbb.onclick=()=>{ setRecipeMenu(false); labelsBox(r); };
   const pxb=document.getElementById("privex-btn"); if(pxb) pxb.onclick=()=>{ setRecipeMenu(false); const old=document.getElementById("privex-box"); if(old){ old.remove(); return; }
     const box=document.createElement("div"); box.id="privex-box"; box.className="dlpick";
     box.innerHTML=`<b>Make “${esc(r.t.replace(/^Untitled: /,""))}” public?</b><p class="hint">It went through Private, so it's kept in the family. Making it public is your exception: customers will see it. Only you can do this.</p>
@@ -4416,9 +4508,9 @@ let onlineIds = new Set();    // every recipe id stored online (including delete
 let unsubRecipes = null;
 const withHistory = (rec, base, action, by) => { rec.history = [...((base&&base.history)||[]), {a:action, by:by||"a member", at:Date.now()}].slice(-12); return rec; };
 const historyLines = r => (r.history||[]).slice(-6).map(h=>h.a==="moved" ? `Moved here${h.from?" from "+h.from:""} by ${h.by} on ${fmtDate(h.at)}` : `${h.a==="added"?"Added":"Changed"} by ${h.by} on ${fmtDate(h.at)}`);
-const toDoc = r => ({pub: r.pub===undefined ? pubDefault(r.c) : !!r.pub, ...(r.priv?{priv:true}:{}), ...(Array.isArray(r.also)?{also:r.also.filter(x=>x&&x!==r.c)}:{}), c:r.c, t:r.t, by:r.by||"", n:r.n||"", pre:r.pre||[], kind:r.kind||"", time:r.time||"", serves:r.serves||"", sec:r.sec||"", ...(r.no?{no:r.no}:{}), ...(r.code?{code:r.code}:{}), ord:r.ord||0, deleted:false, updated:Date.now(), ...(r.history?{history:r.history}:{}),
+const toDoc = r => ({pub: r.pub===undefined ? pubDefault(r.c) : !!r.pub, ...(Array.isArray(r.meals)?{meals:r.meals}:{}), ...(Array.isArray(r.dish)?{dish:r.dish}:{}), ...(r.pesach?{pesach:true}:{}), ...(r.priv?{priv:true}:{}), ...(Array.isArray(r.also)?{also:r.also.filter(x=>x&&x!==r.c)}:{}), c:r.c, t:r.t, by:r.by||"", n:r.n||"", pre:r.pre||[], kind:r.kind||"", time:r.time||"", serves:r.serves||"", sec:r.sec||"", ...(r.no?{no:r.no}:{}), ...(r.code?{code:r.code}:{}), ord:r.ord||0, deleted:false, updated:Date.now(), ...(r.history?{history:r.history}:{}),
   s:r.s.map(([ing,h,items])=>({k:ing?"ing":"step", h:h||"", items:items}))});
-const fromDoc = (id,d) => ({id, pub: d.pub===undefined ? undefined : !!d.pub, ...(d.priv?{priv:true}:{}), ...(Array.isArray(d.also)&&d.also.length?{also:d.also}:{}), c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, pre:d.pre, kind:d.kind||"", time:d.time||"", serves:d.serves||"", sec:d.sec||"", no:d.no||0, code:d.code||"", ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[], rv:d.rv||"", rvNote:d.rvNote||"", rvNoteBy:d.rvNoteBy||"", rvBy:d.rvBy||"", rvUids:d.rvUids||[], rvAsk:d.rvAsk||[], rvLog:d.rvLog||[], oldCodes:d.oldCodes||[], kosherPub:d.kosherPub, kosherFrom:d.kosherFrom||"",
+const fromDoc = (id,d) => ({id, pub: d.pub===undefined ? undefined : !!d.pub, ...(Array.isArray(d.meals)?{meals:d.meals}:{}), ...(Array.isArray(d.dish)?{dish:d.dish}:{}), ...(d.pesach?{pesach:true}:{}), ...(d.priv?{priv:true}:{}), ...(Array.isArray(d.also)&&d.also.length?{also:d.also}:{}), c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, pre:d.pre, kind:d.kind||"", time:d.time||"", serves:d.serves||"", sec:d.sec||"", no:d.no||0, code:d.code||"", ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[], rv:d.rv||"", rvNote:d.rvNote||"", rvNoteBy:d.rvNoteBy||"", rvBy:d.rvBy||"", rvUids:d.rvUids||[], rvAsk:d.rvAsk||[], rvLog:d.rvLog||[], oldCodes:d.oldCodes||[], kosherPub:d.kosherPub, kosherFrom:d.kosherFrom||"",
   s:(d.s||[]).map(x=>[x.k==="ing"?1:0, x.h||"", x.items||[]])});
 // Recipes are listed A to Z by category, then by recipe code (101001, 101002…); any without a code go after, A to Z by name.
 const sortName = r => r.t.replace(/^Untitled:\s*/,"").replace(/^[^A-Za-z0-9]+/,"");
@@ -4780,7 +4872,7 @@ function editor(r, cat, sub, draft){
       const btn0=F.querySelector(".primary");
       if(sub){   // fixing a recipe in an inbox: save it there; it goes on through the inboxes
         btn0.disabled=true; btn0.textContent="Saving…";
-        const d=toDoc({c, t, also, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s});
+        const d=toDoc({c, t, also, ...(src&&Array.isArray(src.meals)?{meals:src.meals}:{}), ...(src&&Array.isArray(src.dish)?{dish:src.dish}:{}), by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s});
         const back = feat("moveback") && stageOf(sub)!=="proof" ? {stage:"proof", proofUid:"", proofBy:"", approvedUid:"", approvedBy:"", uids:[], log:[...(sub.log||[]), {from:stageOf(sub), to:"proof", by:myName(), uid:me, at:Date.now(), back:true, edited:true}].slice(-30)} : {};
         const revs = [...subRevs(sub), {by:myName(), uid:me, at:Date.now(), s:d.s, t:d.t}].slice(-15);
         const recode = feat("subcode") && sub.code && !sub.editOf && !codeFits(sub.code, d.c, d.sec||"") ? {code:""} : {};
@@ -4804,10 +4896,10 @@ function editor(r, cat, sub, draft){
       }
       if(suggest){
         btn0.disabled=true; btn0.textContent="Sending…";
-        const d=toDoc({c, t, also, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s, ord:0});
+        const d=toDoc({c, t, also, ...(src&&Array.isArray(src.meals)?{meals:src.meals}:{}), ...(src&&Array.isArray(src.dish)?{dish:src.dish}:{}), by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s, ord:0});
         try{
           const to = editOf ? "proof" : sendToOf("ed-sendto");
-          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves||"",sec:d.sec,s:d.s, ...(d.also&&d.also.length?{also:d.also}:{}), uid:actUid(), byName:actName(), status:"pending", stage:to, ...(to!=="proof"?{sentTo:to}:{}), ...(to==="yoely"&&feat("private")?{priv:true}:{}), created:Date.now(), revs:[{by:actName(), uid:actUid(), at:Date.now(), s:d.s, t:d.t}], editOf, ...(rqDraft&&rqDraft.id?{rq:rqDraft.id}:{}), ...(draft&&draft.dropOf?{dropOf:draft.dropOf}:{})});
+          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves||"",sec:d.sec,s:d.s, ...(d.also&&d.also.length?{also:d.also}:{}), ...(d.meals&&d.meals.length?{meals:d.meals}:{}), ...(d.dish&&d.dish.length?{dish:d.dish}:{}), uid:actUid(), byName:actName(), status:"pending", stage:to, ...(to!=="proof"?{sentTo:to}:{}), ...(to==="yoely"&&feat("private")?{priv:true}:{}), created:Date.now(), revs:[{by:actName(), uid:actUid(), at:Date.now(), s:d.s, t:d.t}], editOf, ...(rqDraft&&rqDraft.id?{rq:rqDraft.id}:{}), ...(draft&&draft.dropOf?{dropOf:draft.dropOf}:{})});
           if(draft && draft.fromSub) db.collection("submissions").doc(draft.fromSub).delete().catch(()=>{});
           { const eb = isTeam() && target ? editedBack(target, Date.now()) : null; if(eb) await db.collection("recipes").doc(target.id).update(eb).catch(()=>{}); }
           if(to!=="proof"){ sentNotice(to, 1, myName()); toast(`Sent to ${INBOX_NAME[to]}.`); location.hash = to; }
@@ -6056,7 +6148,7 @@ Read the WHOLE photo or document again, every page from beginning to end, and re
 }
 function scanPrompt(){
   return `You are helping a family put recipes into their cookbook app. Read the recipe(s) in this photo or document (it may be handwritten, printed, a screenshot, or a Word/PDF file) and return ONLY JSON in this shape:
-{"recipes": [{"title": string, "category": string, "from": string, "note": string,
+{"recipes": [{"title": string, "category": string, "from": string, "note": string,${feat("labels")?` "meals": [string], "dish": [string],`:""}
   "parts": [{"type": "ingredients" | "method", "heading": string, "items": [string]}]}]}
 Rules:
 - Include every complete recipe you find, in the order they appear (at most 60). Skip tables of contents, page numbers and cover pages.
@@ -6073,7 +6165,8 @@ ${feat("scanexact")?"":`- Method: one clear step per item, in order, as short se
 `}
 - If a recipe has separate parts (dough, filling, topping, glaze, sauce), make a separate ingredients part for each with that heading, and method parts with headings when the steps are grouped.
 - "category": choose the best fit from: ${CATS.join(", ")}. ${feat("scanexact")?"Only if clearly none fits, suggest a short new category name.":"If none fits, suggest a short new category name."}
-- "from": the person the recipe is credited to (often written in brackets before the title, like "(Bobby)"), otherwise "".
+${feat("labels")?`- "meals": which of "breakfast", "lunch", "supper" the recipe is ideal for, most ideal first. "dish": one or two of ${DISHES.map(d=>'"'+d[0]+'"').join(", ")}.
+`:""}- "from": the person the recipe is credited to (often written in brackets before the title, like "(Bobby)"), otherwise "".
 - "note": anything useful that isn't an ingredient or step (servings, pan size, tips), otherwise "".
 - If there is no recipe or it can't be read, return {"error": "Short reason"}.`;
 }
@@ -6140,7 +6233,8 @@ function draftFromScan(j){
   const parts = Array.isArray(j.parts) ? j.parts : [];
   const s = parts.map(p=>[p.type==="ingredients"?1:0, String(p.heading||"").trim(), (Array.isArray(p.items)?p.items:[]).map(x=>String(x).trim()).filter(Boolean)]).filter(x=>x[2].length);
   if(!s.length) return null;
-  return {id:"", c:String(j.category||"").trim()||CATS[0], t:String(j.title||"").trim()||"Untitled recipe", by:String(j.from||"").trim(), n:String(j.note||"").trim()||undefined, s};
+  const lab = feat("labels") ? {meals:(Array.isArray(j.meals)?j.meals:[]).filter(k=>MEAL_L[k]).slice(0,3), dish:(Array.isArray(j.dish)?j.dish:[]).filter(k=>DISH_L[k]).slice(0,2)} : {};
+  return Object.assign({id:"", c:String(j.category||"").trim()||CATS[0], t:String(j.title||"").trim()||"Untitled recipe", by:String(j.from||"").trim(), n:String(j.note||"").trim()||undefined, s}, lab);
 }
 function scanPage(cat){
   app.innerHTML = `<section class="wrap editor">
@@ -6278,7 +6372,7 @@ function importList(drafts, cat){
         rememberCat(d.c);
         btn.textContent=`Sending… ${done+1} of ${rows.length}`;
         { const doc=toDoc(Object.assign({}, d, {ord:0}));
-          await db.collection("submissions").doc("s-"+newId()).set({c:doc.c,t:doc.t,by:doc.by,n:doc.n,s:doc.s, uid:actUid(), byName:actName(), status:"pending", stage:to, ...(to!=="proof"?{sentTo:to}:{}), ...(to==="yoely"&&feat("private")?{priv:true}:{}), created:Date.now(), editOf:""}); }
+          await db.collection("submissions").doc("s-"+newId()).set({c:doc.c,t:doc.t,by:doc.by,n:doc.n,s:doc.s, ...(doc.meals&&doc.meals.length?{meals:doc.meals}:{}), ...(doc.dish&&doc.dish.length?{dish:doc.dish}:{}), uid:actUid(), byName:actName(), status:"pending", stage:to, ...(to!=="proof"?{sentTo:to}:{}), ...(to==="yoely"&&feat("private")?{priv:true}:{}), created:Date.now(), editOf:""}); }
         done++;
       }
       if(to!=="proof"){ sentNotice(to, done, myName()); toast(`${done} ${done===1?"recipe":"recipes"} sent to ${INBOX_NAME[to]}`); location.hash = to; }
@@ -7691,6 +7785,7 @@ function routePage(){
   document.body.classList.remove("split-on"); renderSplitBtn();
   if(h.startsWith("split~") && maySplit()){ const [,a,b2]=h.split("~"); q.value=""; splitPage(a||"", b2||""); return; }
   if(h.startsWith("act-") && mayRecAct()){ q.value=""; recipeActPage(h.slice(4)); window.scrollTo(0,0); return; }
+  if((h==="find" || h.startsWith("find~")) && feat("labels")){ q.value=""; findPage(h); window.scrollTo(0,0); return; }
   if(h==="inboxmove" && mayInboxMove()){ q.value=""; inboxMovePage(); window.scrollTo(0,0); return; }
   if(h==="newcat" && mayAddCat()){ q.value=""; newCatPage(); window.scrollTo(0,0); return; }
   if(h==="declined" && mayDeclined()){ q.value=""; declinedPage(); window.scrollTo(0,0); return; }

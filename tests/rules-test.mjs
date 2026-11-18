@@ -344,6 +344,13 @@ await check('a member can remember a scanner reading', assertSucceeds(setDoc(doc
 await check("…nobody can make it shorter", assertFails(setDoc(doc(PUB, 'scans', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'), { json: 'x', at: 2, by: 'Pub' })));
 await check('…but recipes that were missed can be added to it', assertSucceeds(setDoc(doc(PUB, 'scans', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'), { json: '{"recipes":[{"title":"Missed one"}]}', at: 3, by: 'Pub' })));
 await check('members can read it', assertSucceeds(getDoc(doc(PUB, 'scans', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'))));
+// Labels (4.64)
+await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
+  await setDoc(doc(d, 'recipes', 'r-lb'), { c: 'Cakes', t: 'Label cake', pub: true, s: [] });
+  await setDoc(doc(d, 'users', 'lb1'), { name: 'Lb One', status: 'approved', role: 'employee', perms: { labels: true }, created: 1, favs: [] }); });
+await check('an employee allowed to change labels can label a recipe', assertSucceeds(updateDoc(doc(as('lb1'), 'recipes', 'r-lb'), { meals: ['breakfast'], dish: ['cake'], kind: 'dairy', pesach: true, updated: 1 })));
+await check('…but not change the recipe itself that way', assertFails(updateDoc(doc(as('lb1'), 'recipes', 'r-lb'), { t: 'Renamed', meals: ['lunch'] })));
+await check("an employee without it can't", assertFails(updateDoc(doc(EMP, 'recipes', 'r-lb'), { meals: ['supper'] })));
 // New recipes: the first inbox (4.49)
 await check("a new recipe that doesn't say its first inbox is refused (it would skip Need to proofread)", assertFails(setDoc(doc(EMP, 'submissions', 's-nostage'), { uid: 'emp', status: 'pending', t: 'X', c: 'Cakes' })));
 await check("an employee without “Choose the first inbox” can't start a new recipe in Yoely", assertFails(setDoc(doc(EMP, 'submissions', 's-yo1'), { uid: 'emp', status: 'pending', stage: 'yoely', t: 'X', c: 'Cakes' })));

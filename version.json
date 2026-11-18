@@ -1,6 +1,6 @@
 {
-  "web": "4.63",
+  "web": "4.64",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "A recipe in more than one category."
+  "notes": "Labels on every recipe: meal, dish type, dairy/meat/pareve, good for Pesach."
 }
