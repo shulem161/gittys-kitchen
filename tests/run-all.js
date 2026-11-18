@@ -938,10 +938,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*55 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 55));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*56 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 56));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 55, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 56, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -952,7 +952,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /54/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /55/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1057,6 +1057,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       await A.goto(F + '#portal'); await A.waitForTimeout(300);
       await A.goto(F); await A.waitForTimeout(500);
       ok('the home page shows Recently opened', /Recently opened/.test(await A.locator('.home').last().innerText()) && (await A.locator('.home .grid a[href="#r-challah"]').count()) >= 1);
+      { const r = await A.evaluate(async () => { await new Promise(z => setTimeout(z, 300)); const d = (await db.collection('users').doc(me).get()).data();
+          return {saved: (d.opened || [])[0] === 'r-challah', mem: profile.opened[0] === 'r-challah'}; });
+        const btn = await A.locator('#opened-all').count(); await A.click('#opened-all'); await A.waitForTimeout(400);
+        const page = /Recently opened/.test(await A.locator('#app').innerText()) && (await A.locator('#app .grid a[href="#r-challah"]').count()) === 1;
+        ok('Recently opened is kept with the account (same on every device), with a “See all” button that opens the full list', r.saved && r.mem && btn === 1 && page, [r, btn, page]); }
       await A.evaluate(async () => { await db.collection('feedback').doc().set({uid: me, byName: 'Quick Tester', kind: 'idea', text: 'Add soups', status: 'new', reply: '', created: Date.now()}); }); await A.waitForTimeout(500);
       await A.goto(F + '#inbox'); await A.waitForTimeout(600);
       const it = A.locator('.fb-item', {hasText: 'Add soups'}); await it.locator('[data-qr]').first().click();

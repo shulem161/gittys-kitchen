@@ -97,7 +97,7 @@ button{font:inherit;color:inherit}
 .also-c:has(input:checked){border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}.also-c[hidden]{display:none}.also-new{display:inline-flex;gap:6px}.also-new input{width:150px}
 .ed-also-f .lbl{font-weight:600;font-size:14px}.chip-also{text-decoration:none;opacity:.85}
 .labels-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}.lchip{display:inline-flex;align-items:center;gap:4px;font-size:13px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink);text-decoration:none}
-.lchip.meal{border-color:#E7B66A}.lchip.snack{border-color:#E6A0C4}
+.lchip.meal{border-color:#E7B66A}.opened-all{display:flex;justify-content:center;margin:14px 0 6px}.lchip.snack{border-color:#E6A0C4}
 .labels-row{align-items:center}.lbl-more{position:relative}.lbl-more summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:13px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--muted)}
 .lbl-more summary::-webkit-details-marker{display:none}.lbl-more summary::after{content:"▾"}.lbl-more summary span{font-weight:700;color:var(--ink)}
 .lbl-more-list{position:absolute;z-index:25;top:calc(100% + 6px);left:0;display:flex;flex-wrap:wrap;gap:6px;width:max-content;max-width:min(320px,calc(100vw - 48px));padding:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}.lchip.dish{border-color:#9DB4D9}.lchip.kind.dairy{border-color:#7FB2E5}.lchip.kind.meat{border-color:#D98C8C}.lchip.kind.other,.lchip.kind.fish{border-color:#9CCB9A}.lchip.pesach{border-color:#B79BD6}
@@ -1428,7 +1428,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.65";
+const WEB_VERSION = "4.66";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1483,6 +1483,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["openedsync","4.66","2026-11-18","Recently opened follows your account, with “See all”","Recently opened is now kept with your account instead of the phone or computer: open a recipe on your phone and it's in Recently opened on your computer too (it updates the next time the app opens there). The home page still shows the last 4, with a “See all” button under them that opens the full list (the last 30 recipes you opened).", false],
   ["labels","4.64","2026-11-18","Labels on every recipe: meal, dish type, dairy/meat/pareve, good for Pesach","Every recipe can have labels: Breakfast, Lunch, Supper and/or Snack (a snack is marked Healthy snack or Treat); a dish type (Appetizer, Main dish, Side dish, Soup, Dessert, Cake, Snack…); Dairy, Meat or Pareve; and “Good for Pesach”, which you set yourself and which shows only on the recipes you mark. On the recipe page only Dairy / Meat / Pareve stands out; the rest sit in one small “Labels ▾” dropdown on the same line. Change them from the recipe's ⋮ menu (“Labels”), without editing the recipe. “Find by meal & type” (on the Categories page and in Kitchen tools) shows every recipe that matches, for example everything good for breakfast. Admins can let the AI fill in the meal and dish type for all recipes at once, and new scans get them too.", false],
   ["multicat","4.63","2026-11-18","A recipe in more than one category, and new categories in every list","When you add or edit a recipe, under its category there's “Also in”: tick other categories it belongs to (for example Meat & Chicken and also Side Dish), or add a new category right there. The recipe shows up in each of them, and keeps one item number, from its main category. Pesach stays separate: a Pesach recipe isn't offered year-round categories, and a year-round recipe isn't offered Pesach. And a category added anywhere (Add a category, “+ Add a new category…”, the recipe form, the scanner or “Also in”) is saved straight away, so it's in every category list from then on, even while its recipe still waits in an inbox.", false],
   ["scanmissed","4.62","2026-11-18","The scanner looks again for recipes it missed","When you scan a file that was read before, you still get the same recipes as last time, and the scanner also reads the whole file once more just to look for recipes it missed. Any it finds are added and remembered. A PDF or Word file is also checked this way the first time it's read.", false],
@@ -2072,8 +2073,8 @@ function home(){
   ${adminBanner()}
   ${dupBanner()}
   <section class="wrap home">
-    ${(op => feat("recentopen") && op.length ? `<div class="section-head"><h2>Recently opened</h2><p>On this ${matchMedia("(pointer:coarse)").matches?"device":"computer"}</p></div>
-    <div class="grid">${op.slice(0,4).map(card).join("")}</div>` : "")(pv()?[]:openedList())}
+    ${(op => feat("recentopen") && op.length ? `<div class="section-head"><h2>Recently opened</h2><p>${feat("openedsync")?"On your account":`On this ${matchMedia("(pointer:coarse)").matches?"device":"computer"}`}</p></div>
+    <div class="grid">${op.slice(0,4).map(card).join("")}</div>${feat("openedsync")?`<div class="opened-all"><a class="btn ghost" id="opened-all" href="#opened">See all${op.length>4?` ${op.length}`:""}</a></div>`:""}` : "")(pv()?[]:openedList())}
     ${nw.length?`<div class="section-head"><h2>New this week</h2><p><a class="link" href="#recent">See all ${nw.length}</a></p></div>
     <div class="grid">${nw.slice(0,4).map(card).join("")}</div>`:""}
     ${f.length?`<div class="section-head"><h2>Your favorites</h2><p><a class="link" href="#favorites">See all ${f.length}</a></p></div>
@@ -2280,7 +2281,29 @@ function noAccessPage(){
     <p><a class="btn solid" href="#">Go to the cookbook</a></p></div></section>`;
 }
 // Recently opened (on this device, per person)
-const openedList = () => (store(uk("opened"))||[]).map(id=>RECIPES.find(r=>r.id===id)).filter(Boolean);
+const OPENED_MAX = 30;
+// Recently opened: with the account (openedsync), or on this device
+const openedIds = () => {
+  if(feat("openedsync") && profile && profile.status==="approved"){
+    if(!Array.isArray(profile.opened)){ profile.opened=(store(uk("opened"))||[]).slice(0,OPENED_MAX); }
+    return profile.opened;
+  }
+  return store(uk("opened"))||[];
+};
+const openedList = () => openedIds().map(id=>RECIPES.find(r=>r.id===id)).filter(Boolean);
+function noteOpened(id){
+  const loc=(store(uk("opened"))||[]).filter(x=>x!==id); loc.unshift(id); store(uk("opened"), loc.slice(0, feat("openedsync")?OPENED_MAX:12));
+  if(!(feat("openedsync") && profile && profile.status==="approved")) return;
+  const cur=openedIds(); if(cur[0]===id) return;
+  const L=cur.filter(x=>x!==id); L.unshift(id); profile.opened=L.slice(0,OPENED_MAX); cacheProfile();
+  if(db && !offline && me) db.collection("users").doc(me).update({opened:profile.opened}).catch(()=>{});
+}
+function openedPage(){
+  const f=openedList();
+  app.innerHTML = `<section class="wrap">${tabs(null)}
+    <div class="section-head"><h2>Recently opened</h2><p>${f.length} ${f.length===1?"recipe":"recipes"}, newest first</p></div>
+    ${f.length ? `<div class="grid">${f.map(card).join("")}</div>` : `<div class="empty">Nothing opened yet. Recipes you open show up here.</div>`}</section>`;
+}
 // Find by meal & type: #find~meal=breakfast&dish=main&kind=dairy&pesach=1
 const findState = h => { const o={meal:[], dish:[], kind:"", pesach:false, snack:""}; String(h||"").replace(/^find~?/,"").split("&").filter(Boolean).forEach(kv=>{ const [k,v]=kv.split("=");
   if(k==="meal"||k==="dish") o[k]=v.split(",").filter(Boolean); if(k==="kind") o.kind=v||""; if(k==="pesach") o.pesach=v==="1"; if(k==="snack") o.snack=v||""; }); return o; };
@@ -2367,7 +2390,7 @@ function labelsBox(r){
     catch(x){ e.target.disabled=false; toast("Couldn't save. Check your connection."); } };
 }
 function recipe(r){
-  if(feat("recentopen") && !pv()){ const L=(store(uk("opened"))||[]).filter(x=>x!==r.id); L.unshift(r.id); store(uk("opened"), L.slice(0,12)); }
+  if(feat("recentopen") && !pv()) noteOpened(r.id);
   const saved = store(uk(r.id)) || {i:[],s:[]};
   const sx = scaleNow[r.id] || 1, inList = gStore().items.some(i=>i.id===r.id);
   const isFav = favs().includes(r.id);
@@ -7813,6 +7836,7 @@ function routePage(){
   if(!offline && (h==="scan" || h.startsWith("scan-"))){ q.value=""; scanPage(CATS.find(x=>slug(x)==="c-"+h.slice(5))); window.scrollTo(0,0); return; }
   if(!offline && (h==="new" || h.startsWith("new-"))){ q.value=""; editor(null, CATS.find(x=>slug(x)==="c-"+h.slice(4))); window.scrollTo(0,0); return; }
   if(h==="favorites"){ q.value=""; favorites(); window.scrollTo(0,0); return; }
+  if(h==="opened" && feat("openedsync") && feat("recentopen")){ q.value=""; openedPage(); window.scrollTo(0,0); return; }
   if(h==="requests" && !offline){ q.value=""; requestsPage(); window.scrollTo(0,0); return; }
   if(h==="recent" || h.startsWith("recent-")){ q.value=""; recentPage(h.slice(7) || store("gk-recent")); window.scrollTo(0,0); return; }
   if(h==="convert" || h.startsWith("convert-")){ q.value=""; calcPage(h.slice(8)); window.scrollTo(0,0); return; }

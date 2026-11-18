@@ -616,8 +616,10 @@ service cloud.firestore {
             && request.resource.data.email == request.auth.token.email)
         || (signedIn() && request.auth.uid == uid
             && resource.data.status == 'approved'
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favs', 'rc', 'rcAt', 'prefs'])
-            && (!('prefs' in request.resource.data) || request.resource.data.prefs is map))
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favs', 'rc', 'rcAt', 'prefs', 'opened'])
+            && (!('prefs' in request.resource.data) || request.resource.data.prefs is map)
+            // recently opened recipes, kept with the account (up to 30)
+            && (!('opened' in request.resource.data) || (request.resource.data.opened is list && request.resource.data.opened.size() <= 30)))
         // a member changing their own name: the new name must already point to them
         || (signedIn() && request.auth.uid == uid
             && resource.data.status == 'approved'
