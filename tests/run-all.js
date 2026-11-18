@@ -1176,7 +1176,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
         scanRemember(k1, '{"recipes":[{"title":"Same Cake"}]}'); try { localStorage.removeItem('gk-scan-' + k1); } catch (e) {}
         await new Promise(r => setTimeout(r, 300)); const back = await scanRecall(k1);
         const exact = (await aiModel('gemini-3.5-flash', true)) !== (await aiModel('gemini-3.5-flash', false));
-        return {same: k1 === k2 && k1 !== k3 && k1.length === 64, back, exact, prompt: /FAITHFULLY/.test(scanPrompt())}; });
+        return {same: k1 === k2 && k1 !== k3 && k1.length === 64, back, exact, prompt: /THOROUGHLY/.test(scanPrompt()) && /Do not miss anything/.test(scanPrompt())}; });
       ok('the scanner copies faithfully with no randomness, and the same file gives the same recipes on any device', r.same && /Same Cake/.test(r.back || '') && r.exact && r.prompt, r); }
     // Not kosher comes before Yoely; out of Not kosher you choose Yoely or Need to proofread
     { const nid = await A.evaluate(() => RECIPES.find(r => !r.rv && r.id !== 'r-challah' && r.id !== 'r-croissants').id);

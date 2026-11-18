@@ -1463,7 +1463,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
-  ["scanexact","4.61","2026-11-17","The scanner reads more carefully, and the same file gives the same recipes","The scanner now copies a recipe faithfully: the same title, wording, amounts and order as the original, every ingredient on its own line, and the steps split the same way every time, without adding or guessing anything. Scanning the same file (or the same photos) again gives exactly the same recipes, on any phone or computer, because the first reading is remembered.", false],
+  ["scanexact","4.61","2026-11-17","The scanner reads more thoroughly, and the same file gives the same recipes","The scanner now reads the whole photo or file, every page, line and side note, and misses nothing: every ingredient and amount, every step, oven temperatures, times, pan sizes, servings and tips. It may still word things a little more clearly, but it doesn't drop or invent anything. Photos are sent sharper, so small or faded writing is read too. Scanning the same file (or the same photos) again gives exactly the same recipes, on any phone or computer, because the first reading is remembered.", false],
   ["filecat","4.60","2026-11-17","A scanned file's name becomes its category","When you scan a photo, PDF or Word file whose name is a category (for example “Cakes.pdf” or “Soups.jpg”), its recipes go in that category. If no category has that name yet, a new one with that name is made for them (once they're released). Names a phone makes up by itself, like “IMG_1234” or “Screenshot…”, are ignored. You can still change the category before sending.", false, "team"],
   ["recact","4.59","2026-11-17","Activity for each recipe, in its ⋮ menu","Each recipe's ⋮ menu has “Activity”: everything done to that recipe, newest first, and by whom: added, edited, every move from inbox to inbox (with the reason, when there is one), released, moved category, deleted, photos, likes, requests and messages about it. Only admins and employees allowed to see Activity have it. The list of inbox moves no longer shows on the recipe page itself, so reasons stay out of sight.", false, "team"],
   ["actall","4.58","2026-11-17","Activity: everything the app does, tidier","Activity now also shows recipe requests and answers, suggestions & comments, people asking to join and being approved, likes and dislikes, team messages, requests to move or show a recipe, photos added and approved, menus made, and moves between inboxes. The most-used kinds are buttons at the top; every kind, with its colour and count, is in one “All kinds” dropdown, so the page stays neat. Photos and menus show from today on.", false, "team"],
@@ -5994,7 +5994,7 @@ function fileCategory(name){
 
 // scanexact: a reading is remembered by the file's fingerprint (on this device and for the whole family),
 // so scanning the same file or photos again gives exactly the same recipes
-const SCAN_V = "s1";
+const SCAN_V = "s2";
 async function scanKey(parts){ try{ const buf=await crypto.subtle.digest("SHA-256", new TextEncoder().encode(SCAN_V+JSON.stringify(parts)));
   return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join(""); }catch(e){ return ""; } }
 async function scanRecall(key){
@@ -6011,10 +6011,13 @@ function scanPrompt(){
   "parts": [{"type": "ingredients" | "method", "heading": string, "items": [string]}]}]}
 Rules:
 - Include every complete recipe you find, in the order they appear (at most 60). Skip tables of contents, page numbers and cover pages.
-${feat("scanexact")?`- Copy each recipe FAITHFULLY: the same title, words, amounts and order as the original. Do not add, remove, guess, reword, summarize or "improve" anything. Only fix obvious spelling mistakes. Keep the family's own words (Yiddish/Hebrew words like lukshen, bekele, kugel, challah stay as written).
-- Title: exactly as written, in Title Case. If there is no title, use the main ingredient and dish, e.g. "Apple Cake".
-- Ingredients: one ingredient per line, exactly in the original order. If one line lists several ingredients ("salt and pepper", "2 eggs and 1 yolk" stays one line only when written as one amount), keep it as written.
-- Method: keep the original steps. If the original numbers or bullets its steps, keep exactly those steps. If it is a paragraph, make one step per sentence, in order; never merge sentences, never split a sentence. Do not add steps that aren't written.
+${feat("scanexact")?`- Read THOROUGHLY: go over the whole photo or document, every page, from top to bottom, including small print, handwriting, side notes, notes in margins or between lines, crossed-out corrections (use the correction), and text that continues on the next page or on the back. Do not miss anything.
+- Nothing may be lost: every ingredient with its exact amount, every step, every oven temperature, baking or cooking time, pan or pot size, number of servings or pieces, and every tip or variation must end up in the recipe (ingredients and steps in "parts", the rest in "note"). Never invent anything that isn't written. If something can't be read, write your best reading followed by "(?)".
+- Wording: keep the meaning, amounts and order of the original. You may write a step a little more clearly, but don't drop any detail. Keep the family's own words (Yiddish/Hebrew words like lukshen, bekele, kugel, challah stay as written).
+- Title: as written, in Title Case. If there is no title, use the main ingredient and dish, e.g. "Apple Cake".
+- Ingredients: one ingredient per line, in the original order.
+- Method: in the original order. If the original numbers or bullets its steps, keep those steps; split a long paragraph into one clear step per action.
+- Before you answer, check your recipe against the original line by line, and add anything you left out.
 `:`- Keep the family's own wording and terms (Yiddish/Hebrew words like lukshen, bekele, kugel, challah stay as written). Only fix obvious spelling mistakes.
 `}- One ingredient per item, quantity first, e.g. "2 cups flour", "1½ tsp salt", "3 eggs, separated". Use ½ ¼ ¾ ⅓ ⅔ ⅛ for fractions, write tablespoon as "tbsp" and teaspoon as "tsp", always lowercase, and °F for temperatures.
 ${feat("scanexact")?"":`- Method: one clear step per item, in order, as short sentences. Split long paragraphs into steps.
@@ -6028,9 +6031,9 @@ ${feat("scanexact")?"":`- Method: one clear step per item, in order, as short se
 function resizeForScan(file){
   return new Promise((resolve,reject)=>{
     const url=URL.createObjectURL(file), img=new Image();
-    img.onload=()=>{ const k=Math.min(1,1600/Math.max(img.width,img.height)); const c=document.createElement("canvas");
+    img.onload=()=>{ const sharp=feat("scanexact"), k=Math.min(1,(sharp?2400:1600)/Math.max(img.width,img.height)); const c=document.createElement("canvas");
       c.width=Math.round(img.width*k); c.height=Math.round(img.height*k); c.getContext("2d").drawImage(img,0,0,c.width,c.height);
-      URL.revokeObjectURL(url); resolve(c.toDataURL("image/jpeg",.82)); };
+      URL.revokeObjectURL(url); resolve(c.toDataURL("image/jpeg",sharp?.9:.82)); };
     img.onerror=()=>{ URL.revokeObjectURL(url); reject(new Error("not an image")); };
     img.src=url;
   });
