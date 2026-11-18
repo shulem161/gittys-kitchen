@@ -938,10 +938,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*58 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 58));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*59 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 59));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 58, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 59, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -952,7 +952,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /57/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /58/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1204,6 +1204,17 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
         window.askReaderOnce = keep;
         return {ok: /Book Cake/.test(txt), retried: seen.length === 2 && seen[1].note && !seen[1].exact && seen[1].temp > 0, recite: isRecite({message: msg})}; });
       ok('a file the reader refuses to copy (RECITATION) is read again in its own words, keeping every ingredient', r.ok && r.retried && r.recite, r); }
+    // A PDF made on a computer: its own text is read word for word by the built-in reader
+    { const r = await A.evaluate(async () => {
+        const line = (str, x, y) => ({str, transform: [12, 0, 0, 12, x, y], width: str.length * 6, height: 12});
+        const pages = [[line('Apple Cake', 72, 740), line('6 apples, peeled and sliced', 72, 720), line('2 cups sugar', 72, 700), line('3 cups', 72, 680), line(' ', 108, 680), line('flour', 112, 680), line('Mix all the ingredients together well.', 72, 660), line('Bake at 350 for 1 hour.', 72, 640)]];
+        window.pdfjsLib = {GlobalWorkerOptions: {}, getDocument: () => ({promise: Promise.resolve({numPages: 1, getPage: async p => ({getTextContent: async () => ({items: pages[p - 1]})})})})};
+        const f = await readFileForAI(new File([new Uint8Array([37, 80, 68, 70])], 'My book.pdf', {type: 'application/pdf'}));
+        const keep = window.askReaderOnce; window.askReaderOnce = async () => ({response: {text: () => { throw new Error('Candidate was blocked due to RECITATION'); }}});
+        let threw = ''; try { await askReader(['x'], null, true, {noReword: true}); } catch (e) { threw = e.message; } window.askReaderOnce = keep; delete window.pdfjsLib;
+        const rs = localParse(f.text, 'Cakes');
+        return {pdf: !!f.part.inlineData && f.pdfText === true, text: f.text, threw: /RECITATION/.test(threw), title: rs[0] && rs[0].t, items: rs[0] && rs[0].s[0][2]}; });
+      ok('a PDF made on a computer has its text read by the built-in reader, word for word, as the last resort when the AI refuses it', r.pdf && r.threw && r.title === 'Apple Cake' && (r.items || []).includes('3 cups flour'), r); }
     // Reading a file again also looks for recipes that were missed
     { const r = await A.evaluate(async () => { const keep = window.askReader; let asked = '';
         window.askReader = async parts => { asked = parts[0]; return {response: {text: () => JSON.stringify({recipes: [

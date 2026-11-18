@@ -1482,7 +1482,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.68";
+const WEB_VERSION = "4.69";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1537,6 +1537,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["pdftext","4.69","2026-11-18","A PDF made on a computer is read word for word, without the AI","When a PDF was made on a computer (for example saved from Word, like the cookbook you wrote), the app now takes the text right out of the PDF and reads it with its own built-in reader, the same one used for Word files, so it comes in word for word and Google's AI never has to copy it. A neatly laid-out PDF (with a contents list) is read that way right away. A PDF with a messier layout still goes to the AI first, because it understands messy pages better; if the AI refuses it (“RECITATION”), it tries again in its own words, and only if that fails too is the built-in reader's word-for-word version used. A PDF of photographed or scanned pages has no text inside, so it's still read by the AI as before.", false],
   ["recitefix","4.68","2026-11-18","Files the reader refused to copy are read anyway","Some PDFs (often pages from a printed cookbook) were refused with “Candidate was blocked due to RECITATION”: the reader wouldn't copy text that looks like a published book. Now, when that happens, it reads the file again and writes the steps in its own words, keeping every ingredient and amount exactly. If it still can't, you get a clear message with what to try instead of the long error.", false],
   ["acctsync","4.67","2026-11-18","Everything personal follows your account, not the device","What you keep in the app now goes with your account, so it's the same on your phone, your computer and any device you sign in on: your grocery list (and “hide what I have”), your Today list, the ingredients and steps you checked off in a recipe, and your settings (design, light or dark, text size, the split screen button, sorting, PDF style and the like). Favorites, settings, the calendar, menus and Recently opened already went with the account. Running timers stay on the device that rings them, so the same timer doesn't ring twice.", false],
   ["openedsync","4.66","2026-11-18","Recently opened follows your account, with “See all”","Recently opened is now kept with your account instead of the phone or computer: open a recipe on your phone and it's in Recently opened on your computer too (it updates the next time the app opens there). The home page still shows the last 4, with a “See all” button under them that opens the full list (the last 30 recipes you opened).", false],
@@ -6123,10 +6124,10 @@ async function aiModel(name, exact, temp){
 // Ask the reader: move to the next model when one is busy, over its limit, unavailable or too slow.
 const isRecite = e => /RECITATION|copyrighted|resembles existing/i.test(String(e&&e.message||e));
 const RECITE_NOTE = `IMPORTANT: Don't copy the text word for word. Keep the title, every ingredient and every amount exactly as written, but write the steps and notes in your own words, in short clear sentences, without leaving anything out.`;
-async function askReader(parts, onTry, exact){
+async function askReader(parts, onTry, exact, opts){
   if(feat("recitefix")){
     try{ const res=await askReaderOnce(parts, onTry, exact); res.response.text(); return res; }
-    catch(e){ if(!isRecite(e)) throw e; }
+    catch(e){ if(!isRecite(e) || (opts && opts.noReword)) throw e; }
     // the reader wouldn't copy it (it looks like a published book): read it again in its own words, with a little freedom in the wording
     let last;
     for(const temp of [0.6, 1]){
@@ -6320,6 +6321,30 @@ function docText(buf){
   const score=a=>a.join("").replace(/[^A-Za-z]/g,"").length;
   return (score(wide)>score(narrow)?wide:narrow).join("\n");
 }
+// pdftext: the text inside a PDF made on a computer (none in a PDF of photos), read on the device with pdf.js
+const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+let _pdfjs = null;
+function loadPdfJs(){
+  if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  return _pdfjs = _pdfjs || new Promise((ok, no)=>{ const sc=document.createElement("script"); sc.src=PDFJS+"pdf.min.js";
+    sc.onload=()=>{ if(!window.pdfjsLib) return no(new Error("pdf.js")); window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+"pdf.worker.min.js"; ok(window.pdfjsLib); };
+    sc.onerror=()=>{ _pdfjs=null; no(new Error("pdf.js")); }; document.head.appendChild(sc); });
+}
+async function pdfFileText(buf){
+  const lib=await loadPdfJs(), doc=await lib.getDocument({data:new Uint8Array(buf)}).promise, pages=[];
+  for(let p=1; p<=Math.min(doc.numPages, 400); p++){
+    const items=(await (await doc.getPage(p)).getTextContent()).items.filter(i=>i.str!==undefined && i.str.trim());
+    const rows=[];
+    items.forEach(i=>{ const y=i.transform[5], x=i.transform[4], h=Math.abs(i.transform[3])||i.height||10;
+      let r=rows.find(r=>Math.abs(r.y-y)<=h*0.4); if(!r){ r={y, h, its:[]}; rows.push(r); } r.its.push({x, w:i.width||0, s:i.str}); });
+    rows.sort((a,b)=>b.y-a.y);
+    pages.push(rows.map(r=>{ r.its.sort((a,b)=>a.x-b.x); let line="", end=null;
+      r.its.forEach(t=>{ if(end!==null){ const gap=t.x-end; line += gap > r.h*2.5 ? "\t" : (gap > r.h*0.15 && !/\s$/.test(line) && !/^\s/.test(t.s)) ? " " : ""; }
+        line+=t.s; end=t.x+t.w; });
+      return line.replace(/\s+$/,""); }).join("\n"));
+  }
+  return pages.join("\n\n");
+}
 // Turn any picked file into what the reader needs: an image, a PDF, or plain text.
 async function readFileForAI(file){
   const name=(file.name||"").toLowerCase(), type=file.type||"";
@@ -6328,7 +6353,12 @@ async function readFileForAI(file){
   }
   if(file.size>15*1024*1024) throw new Error("This file is too large. Please use a file under 15 MB.");
   const buf=await file.arrayBuffer();
-  if(type==="application/pdf" || name.endsWith(".pdf")) return {label:"PDF", part:{inlineData:{data:fileB64(buf), mimeType:"application/pdf"}}};
+  if(type==="application/pdf" || name.endsWith(".pdf")){
+    const out={label:"PDF", part:{inlineData:{data:fileB64(buf), mimeType:"application/pdf"}}};
+    if(feat("pdftext")){ try{ const t=(await pdfFileText(buf.slice(0))).replace(/\n{3,}/g,"\n\n").trim().slice(0,80000);
+      if(t.replace(/[^A-Za-z]/g,"").length>=40){ out.text=t; out.pdfText=true; } }catch(e){} }
+    return out;
+  }
   let text;
   if(name.endsWith(".docx")) text=await docxText(buf);
   else if(name.endsWith(".doc")) text=docText(buf);
@@ -6397,7 +6427,7 @@ function scanPage(cat){
     status.innerHTML=`<div class="scan-prev">${src.preview?`<img src="${src.preview}" alt="The recipe photo">${n>1?`<span class="hint">+ ${n-1} more ${n===2?"page":"pages"}</span>`:""}`:`<div class="scan-file">${esc(src.name||"")}<span>${esc(src.label)}</span></div>`}<div><span class="spin" aria-hidden="true"></span><p><b>Reading…</b><br><span class="hint">This usually takes 10–30 seconds${src.preview?"":", longer for big files"}.</span></p></div></div>`;
     const localDrafts = () => { if(!src.text) return [];
       const fc = fileCategory(src.name) || cat || "Miscellaneous";
-      return localParse(src.text, fc).map(r=>({id:"", c:r.c||fc, t:r.t, by:r.by, n:undefined, s:r.s})); };
+      return localParse(src.text, fc).filter(r=>!(src.pdfText && /^(table of )?contents$/i.test((r.t||"").trim()))).map(r=>({id:"", c:r.c||fc, t:r.t, by:r.by, n:undefined, s:r.s})); };
     const showDrafts = (drafts, how) => {
       if(how) toast(how);
       const fcat = feat("filecat") ? fileCat(src.name) : "";
@@ -6411,6 +6441,7 @@ function scanPage(cat){
       const onTry = i=>{ if(i>0){ const p=status.querySelector(".scan-prev p"); if(p) p.innerHTML="<b>Still reading…</b><br><span class=\"hint\">The first reader was busy, so another one is trying.</span>"; } };
       const exact=feat("scanexact"), key = exact ? await scanKey([n, ...src.parts]) : "";
       let txt = exact ? await scanRecall(key) : null; const again=!!txt;
+      // a messy layout reads best with the AI (reworded if it won't copy); the built-in reader's word-for-word version is the last resort
       if(!txt){ const res=await askReader(askParts, onTry, exact); txt=res.response.text(); }
       const j=JSON.parse(txt.trim().replace(/^```(?:json)?\s*/,"").replace(/```$/,""));
       if(j.error) throw new Error(j.error);
@@ -6430,7 +6461,7 @@ function scanPage(cat){
     }catch(e){
       const m=String(e&&e.message||e);
       const ld=localDrafts();
-      if(ld.length){ showDrafts(ld, "Read with the built-in reader. Please check each recipe."); return; }
+      if(ld.length){ showDrafts(ld, src.pdfText ? "Read word for word from the PDF with the built-in reader. Please check each recipe." : "Read with the built-in reader. Please check each recipe."); return; }
       const off=/api-not-enabled|not been used|disabled|PERMISSION_DENIED|403|ai-logic|firebasevertexai|generativelanguage/i.test(m);
       status.innerHTML=`<p class="err">${off ? (isAdmin()?"Reading recipes isn't turned on yet. In Firebase, open AI Logic and enable the Gemini Developer API.":"This isn't available yet. Ask "+esc(ADMIN_NAME)+" to turn it on.")
         : /5\d\d|overloaded|high demand|unavailable|deadline|abort|timeout|429|quota|resource.?exhausted/i.test(m) ? "The recipe readers are busy right now. Please try again in a few minutes, or add the recipe by typing it."
