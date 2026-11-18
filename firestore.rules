@@ -433,6 +433,17 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Scanner readings remembered by the file's fingerprint (scanexact), so the same file always gives the same recipes.
+    // Members read them; anyone who can scan adds one; nobody changes one (only admins delete).
+    match /scans/{key} {
+      allow get: if approvedMember();
+      allow create: if approvedMember() && key.size() == 64
+        && request.resource.data.keys().hasOnly(['json', 'at', 'by'])
+        && request.resource.data.json is string && request.resource.data.json.size() < 400000
+        && request.resource.data.at is int;
+      allow delete: if isAdmin();
+    }
+
     // Recipes sent in by members. Only the admin sees all of them and decides.
     match /submissions/{id} {
       // a new one starts in Need to proofread; admins and employees given "Choose the first inbox" may start it in Yoely or Not kosher

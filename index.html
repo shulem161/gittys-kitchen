@@ -1408,7 +1408,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.60";
+const WEB_VERSION = "4.61";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1463,6 +1463,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["scanexact","4.61","2026-11-17","The scanner reads more carefully, and the same file gives the same recipes","The scanner now copies a recipe faithfully: the same title, wording, amounts and order as the original, every ingredient on its own line, and the steps split the same way every time, without adding or guessing anything. Scanning the same file (or the same photos) again gives exactly the same recipes, on any phone or computer, because the first reading is remembered.", false],
   ["filecat","4.60","2026-11-17","A scanned file's name becomes its category","When you scan a photo, PDF or Word file whose name is a category (for example “Cakes.pdf” or “Soups.jpg”), its recipes go in that category. If no category has that name yet, a new one with that name is made for them (once they're released). Names a phone makes up by itself, like “IMG_1234” or “Screenshot…”, are ignored. You can still change the category before sending.", false, "team"],
   ["recact","4.59","2026-11-17","Activity for each recipe, in its ⋮ menu","Each recipe's ⋮ menu has “Activity”: everything done to that recipe, newest first, and by whom: added, edited, every move from inbox to inbox (with the reason, when there is one), released, moved category, deleted, photos, likes, requests and messages about it. Only admins and employees allowed to see Activity have it. The list of inbox moves no longer shows on the recipe page itself, so reasons stay out of sight.", false, "team"],
   ["actall","4.58","2026-11-17","Activity: everything the app does, tidier","Activity now also shows recipe requests and answers, suggestions & comments, people asking to join and being approved, likes and dislikes, team messages, requests to move or show a recipe, photos added and approved, menus made, and moves between inboxes. The most-used kinds are buttons at the top; every kind, with its colour and count, is in one “All kinds” dropdown, so the page stays neat. Photos and menus show from today on.", false, "team"],
@@ -5887,7 +5888,7 @@ const FB_MODULAR = "https://www.gstatic.com/firebasejs/12.5.0/";
 // Models to try in order; if one is busy or over its free limit, the next is used right away.
 const READER_MODELS = ["gemini-3.5-flash","gemini-3.5-flash-lite","gemini-flash-lite-latest"];
 let _aiBase = null; const _aiModels = {};
-async function aiModel(name){
+async function aiModel(name, exact){
   if(!_aiBase){
     const appMod = await import(FB_MODULAR+"firebase-app.js");
     const aiMod = await import(FB_MODULAR+"firebase-ai.js");
@@ -5895,15 +5896,16 @@ async function aiModel(name){
     _aiBase = {aiMod, ai: aiMod.getAI(app2, {backend: new aiMod.GoogleAIBackend()})};
   }
   name = name || READER_MODELS[0];
-  return _aiModels[name] = _aiModels[name] || _aiBase.aiMod.getGenerativeModel(_aiBase.ai,
-    {model:name, generationConfig:{responseMimeType:"application/json", temperature:0.2}}, {timeout: 75000});
+  const key = name + (exact ? "|exact" : "");   // scanexact: no randomness, so the same page reads the same way
+  return _aiModels[key] = _aiModels[key] || _aiBase.aiMod.getGenerativeModel(_aiBase.ai,
+    {model:name, generationConfig: exact ? {responseMimeType:"application/json", temperature:0, topP:0.1, topK:1} : {responseMimeType:"application/json", temperature:0.2}}, {timeout: 75000});
 }
 // Ask the reader: move to the next model when one is busy, over its limit, unavailable or too slow.
-async function askReader(parts, onTry){
+async function askReader(parts, onTry, exact){
   let last;
   for(const [i,name] of READER_MODELS.entries()){
     if(onTry) onTry(i);
-    try{ return await (await aiModel(name)).generateContent(parts); }
+    try{ return await (await aiModel(name, exact)).generateContent(parts); }
     catch(e){ last=e; if(!/429|quota|5\d\d|overloaded|high demand|unavailable|deadline|abort|timeout|resource.?exhausted|try again|404|not found|no longer available/i.test(String(e&&e.message||e))) throw e; }
   }
   throw last;
@@ -5990,17 +5992,35 @@ function fileCategory(name){
   return CATS.find(c=>c.toLowerCase()===base) || CATS.find(c=>base.includes(c.toLowerCase())) || "";
 }
 
+// scanexact: a reading is remembered by the file's fingerprint (on this device and for the whole family),
+// so scanning the same file or photos again gives exactly the same recipes
+const SCAN_V = "s1";
+async function scanKey(parts){ try{ const buf=await crypto.subtle.digest("SHA-256", new TextEncoder().encode(SCAN_V+JSON.stringify(parts)));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join(""); }catch(e){ return ""; } }
+async function scanRecall(key){
+  if(!key) return null;
+  const local=store("gk-scan-"+key); if(local) return local;
+  try{ const d=await db.collection("scans").doc(key).get(); if(d.exists && d.data().json){ store("gk-scan-"+key, d.data().json); return d.data().json; } }catch(e){}
+  return null;
+}
+function scanRemember(key, json){ if(!key || !json) return; try{ store("gk-scan-"+key, json); }catch(e){}
+  if(db && !offline && json.length<400000) db.collection("scans").doc(key).set({json, at:Date.now(), by:myName()}).catch(()=>{}); }
 function scanPrompt(){
   return `You are helping a family put recipes into their cookbook app. Read the recipe(s) in this photo or document (it may be handwritten, printed, a screenshot, or a Word/PDF file) and return ONLY JSON in this shape:
 {"recipes": [{"title": string, "category": string, "from": string, "note": string,
   "parts": [{"type": "ingredients" | "method", "heading": string, "items": [string]}]}]}
 Rules:
 - Include every complete recipe you find, in the order they appear (at most 60). Skip tables of contents, page numbers and cover pages.
-- Keep the family's own wording and terms (Yiddish/Hebrew words like lukshen, bekele, kugel, challah stay as written). Only fix obvious spelling mistakes.
-- One ingredient per item, quantity first, e.g. "2 cups flour", "1½ tsp salt", "3 eggs, separated". Use ½ ¼ ¾ ⅓ ⅔ ⅛ for fractions, write tablespoon as "tbsp" and teaspoon as "tsp", always lowercase, and °F for temperatures.
-- Method: one clear step per item, in order, as short sentences. Split long paragraphs into steps.
+${feat("scanexact")?`- Copy each recipe FAITHFULLY: the same title, words, amounts and order as the original. Do not add, remove, guess, reword, summarize or "improve" anything. Only fix obvious spelling mistakes. Keep the family's own words (Yiddish/Hebrew words like lukshen, bekele, kugel, challah stay as written).
+- Title: exactly as written, in Title Case. If there is no title, use the main ingredient and dish, e.g. "Apple Cake".
+- Ingredients: one ingredient per line, exactly in the original order. If one line lists several ingredients ("salt and pepper", "2 eggs and 1 yolk" stays one line only when written as one amount), keep it as written.
+- Method: keep the original steps. If the original numbers or bullets its steps, keep exactly those steps. If it is a paragraph, make one step per sentence, in order; never merge sentences, never split a sentence. Do not add steps that aren't written.
+`:`- Keep the family's own wording and terms (Yiddish/Hebrew words like lukshen, bekele, kugel, challah stay as written). Only fix obvious spelling mistakes.
+`}- One ingredient per item, quantity first, e.g. "2 cups flour", "1½ tsp salt", "3 eggs, separated". Use ½ ¼ ¾ ⅓ ⅔ ⅛ for fractions, write tablespoon as "tbsp" and teaspoon as "tsp", always lowercase, and °F for temperatures.
+${feat("scanexact")?"":`- Method: one clear step per item, in order, as short sentences. Split long paragraphs into steps.
+`}
 - If a recipe has separate parts (dough, filling, topping, glaze, sauce), make a separate ingredients part for each with that heading, and method parts with headings when the steps are grouped.
-- "category": choose the best fit from: ${CATS.join(", ")}. If none fits, suggest a short new category name.
+- "category": choose the best fit from: ${CATS.join(", ")}. ${feat("scanexact")?"Only if clearly none fits, suggest a short new category name.":"If none fits, suggest a short new category name."}
 - "from": the person the recipe is credited to (often written in brackets before the title, like "(Bobby)"), otherwise "".
 - "note": anything useful that isn't an ingredient or step (servings, pan size, tips), otherwise "".
 - If there is no recipe or it can't be read, return {"error": "Short reason"}.`;
@@ -6132,11 +6152,16 @@ function scanPage(cat){
     };
     if(src.text){ const ld=localDrafts(); if(ld.length>=2 && localParse(src.text,"").usedToc){ showDrafts(ld); return; } }
     try{
-      const res=await askReader([scanPrompt()+(n>1?`\n\nThese ${n} photos are consecutive pages or sides of the same recipe card(s), in order. Combine them; a recipe that continues onto the next photo is ONE recipe.`:""), ...src.parts],
-        i=>{ if(i>0){ const p=status.querySelector(".scan-prev p"); if(p) p.innerHTML="<b>Still reading…</b><br><span class=\"hint\">The first reader was busy, so another one is trying.</span>"; } });
-      const j=JSON.parse(res.response.text().trim().replace(/^```(?:json)?\s*/,"").replace(/```$/,""));
+      const askParts=[scanPrompt()+(n>1?`\n\nThese ${n} photos are consecutive pages or sides of the same recipe card(s), in order. Combine them; a recipe that continues onto the next photo is ONE recipe.`:""), ...src.parts];
+      const onTry = i=>{ if(i>0){ const p=status.querySelector(".scan-prev p"); if(p) p.innerHTML="<b>Still reading…</b><br><span class=\"hint\">The first reader was busy, so another one is trying.</span>"; } };
+      const exact=feat("scanexact"), key = exact ? await scanKey([n, ...src.parts]) : "";
+      let txt = exact ? await scanRecall(key) : null; const again=!!txt;
+      if(!txt){ const res=await askReader(askParts, onTry, exact); txt=res.response.text(); }
+      const j=JSON.parse(txt.trim().replace(/^```(?:json)?\s*/,"").replace(/```$/,""));
       if(j.error) throw new Error(j.error);
       const drafts=(Array.isArray(j.recipes)?j.recipes:[j]).map(draftFromScan).filter(Boolean);
+      if(exact && drafts.length && !again) scanRemember(key, txt);
+      if(again) toast("This file was read before – the same recipes as last time");
       if(!drafts.length) throw new Error("No ingredients or steps were found");
       showDrafts(drafts);
     }catch(e){
