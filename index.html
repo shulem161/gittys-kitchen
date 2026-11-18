@@ -1482,7 +1482,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.67";
+const WEB_VERSION = "4.68";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1537,6 +1537,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["recitefix","4.68","2026-11-18","Files the reader refused to copy are read anyway","Some PDFs (often pages from a printed cookbook) were refused with “Candidate was blocked due to RECITATION”: the reader wouldn't copy text that looks like a published book. Now, when that happens, it reads the file again and writes the steps in its own words, keeping every ingredient and amount exactly. If it still can't, you get a clear message with what to try instead of the long error.", false],
   ["acctsync","4.67","2026-11-18","Everything personal follows your account, not the device","What you keep in the app now goes with your account, so it's the same on your phone, your computer and any device you sign in on: your grocery list (and “hide what I have”), your Today list, the ingredients and steps you checked off in a recipe, and your settings (design, light or dark, text size, the split screen button, sorting, PDF style and the like). Favorites, settings, the calendar, menus and Recently opened already went with the account. Running timers stay on the device that rings them, so the same timer doesn't ring twice.", false],
   ["openedsync","4.66","2026-11-18","Recently opened follows your account, with “See all”","Recently opened is now kept with your account instead of the phone or computer: open a recipe on your phone and it's in Recently opened on your computer too (it updates the next time the app opens there). The home page still shows the last 4, with a “See all” button under them that opens the full list (the last 30 recipes you opened).", false],
   ["labels","4.64","2026-11-18","Labels on every recipe: meal, dish type, dairy/meat/pareve, good for Pesach","Every recipe can have labels: Breakfast, Lunch, Supper and/or Snack (a snack is marked Healthy snack or Treat); a dish type (Appetizer, Main dish, Side dish, Soup, Dessert, Cake, Snack…); Dairy, Meat or Pareve; and “Good for Pesach”, which you set yourself and which shows only on the recipes you mark. On the recipe page only Dairy / Meat / Pareve stands out; the rest sit in one small “Labels ▾” dropdown on the same line. Change them from the recipe's ⋮ menu (“Labels”), without editing the recipe. “Find by meal & type” (on the Categories page and in Kitchen tools) shows every recipe that matches, for example everything good for breakfast. Admins can let the AI fill in the meal and dish type for all recipes at once, and new scans get them too.", false],
@@ -6107,7 +6108,7 @@ const FB_MODULAR = "https://www.gstatic.com/firebasejs/12.5.0/";
 // Models to try in order; if one is busy or over its free limit, the next is used right away.
 const READER_MODELS = ["gemini-3.5-flash","gemini-3.5-flash-lite","gemini-flash-lite-latest"];
 let _aiBase = null; const _aiModels = {};
-async function aiModel(name, exact){
+async function aiModel(name, exact, temp){
   if(!_aiBase){
     const appMod = await import(FB_MODULAR+"firebase-app.js");
     const aiMod = await import(FB_MODULAR+"firebase-ai.js");
@@ -6115,16 +6116,32 @@ async function aiModel(name, exact){
     _aiBase = {aiMod, ai: aiMod.getAI(app2, {backend: new aiMod.GoogleAIBackend()})};
   }
   name = name || READER_MODELS[0];
-  const key = name + (exact ? "|exact" : "");   // scanexact: no randomness, so the same page reads the same way
+  const key = name + (exact ? "|exact" : "") + (temp!==undefined ? "|t"+temp : "");   // scanexact: no randomness, so the same page reads the same way
   return _aiModels[key] = _aiModels[key] || _aiBase.aiMod.getGenerativeModel(_aiBase.ai,
-    {model:name, generationConfig: exact ? {responseMimeType:"application/json", temperature:0, topP:0.1, topK:1} : {responseMimeType:"application/json", temperature:0.2}}, {timeout: 75000});
+    {model:name, generationConfig: exact ? {responseMimeType:"application/json", temperature:0, topP:0.1, topK:1} : {responseMimeType:"application/json", temperature: temp!==undefined ? temp : 0.2}}, {timeout: 75000});
 }
 // Ask the reader: move to the next model when one is busy, over its limit, unavailable or too slow.
+const isRecite = e => /RECITATION|copyrighted|resembles existing/i.test(String(e&&e.message||e));
+const RECITE_NOTE = `IMPORTANT: Don't copy the text word for word. Keep the title, every ingredient and every amount exactly as written, but write the steps and notes in your own words, in short clear sentences, without leaving anything out.`;
 async function askReader(parts, onTry, exact){
+  if(feat("recitefix")){
+    try{ const res=await askReaderOnce(parts, onTry, exact); res.response.text(); return res; }
+    catch(e){ if(!isRecite(e)) throw e; }
+    // the reader wouldn't copy it (it looks like a published book): read it again in its own words, with a little freedom in the wording
+    let last;
+    for(const temp of [0.6, 1]){
+      try{ const res=await askReaderOnce([...parts, RECITE_NOTE], onTry, false, temp); res.response.text(); return res; }
+      catch(e){ last=e; if(!isRecite(e)) throw e; }
+    }
+    throw last;
+  }
+  return askReaderOnce(parts, onTry, exact);
+}
+async function askReaderOnce(parts, onTry, exact, temp){
   let last;
   for(const [i,name] of READER_MODELS.entries()){
     if(onTry) onTry(i);
-    try{ return await (await aiModel(name, exact)).generateContent(parts); }
+    try{ return await (await aiModel(name, exact, temp)).generateContent(parts); }
     catch(e){ last=e; if(!/429|quota|5\d\d|overloaded|high demand|unavailable|deadline|abort|timeout|resource.?exhausted|try again|404|not found|no longer available/i.test(String(e&&e.message||e))) throw e; }
   }
   throw last;
@@ -6418,6 +6435,7 @@ function scanPage(cat){
       status.innerHTML=`<p class="err">${off ? (isAdmin()?"Reading recipes isn't turned on yet. In Firebase, open AI Logic and enable the Gemini Developer API.":"This isn't available yet. Ask "+esc(ADMIN_NAME)+" to turn it on.")
         : /5\d\d|overloaded|high demand|unavailable|deadline|abort|timeout|429|quota|resource.?exhausted/i.test(m) ? "The recipe readers are busy right now. Please try again in a few minutes, or add the recipe by typing it."
         : /fetch|network|Failed to load|import/i.test(m) ? "Couldn't reach the recipe reader. Check your internet connection and try again."
+        : feat("recitefix") && isRecite(e) ? "The reader wouldn't copy this file, because it looks like pages from a printed cookbook. Try taking a photo of one recipe at a time, or add the recipe by typing it."
         : "Couldn't read a recipe from that: "+esc(m.slice(0,140))+". Try a clearer photo or another file, or add the recipe by typing it."}</p>${isAdmin()?`<details class="err-detail"><summary>Details for troubleshooting</summary><code>${esc(m.slice(0,600))}</code></details>`:""}`;
     }
   };

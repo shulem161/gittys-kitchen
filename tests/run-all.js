@@ -938,10 +938,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*57 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 57));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*58 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 58));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 57, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 58, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -952,7 +952,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /56/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /57/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1192,6 +1192,18 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
         const exact = (await aiModel('gemini-3.5-flash', true)) !== (await aiModel('gemini-3.5-flash', false));
         return {same: k1 === k2 && k1 !== k3 && k1.length === 64, back, exact, prompt: /THOROUGHLY/.test(scanPrompt()) && /Do not miss anything/.test(scanPrompt())}; });
       ok('the scanner copies faithfully with no randomness, and the same file gives the same recipes on any device', r.same && /Same Cake/.test(r.back || '') && r.exact && r.prompt, r); }
+    // A file the reader refuses to copy (RECITATION) is read again in its own words
+    { const r = await A.evaluate(async () => { const keep = window.askReaderOnce; const seen = [];
+        const blocked = () => { throw new Error('AI: Response error: Candidate was blocked due to RECITATION: The generated content was filtered because it may contain material that resembles existing copyrighted works.'); };
+        window.askReaderOnce = async (parts, onTry, exact, temp) => { seen.push({note: parts.includes(RECITE_NOTE), exact: !!exact, temp});
+          if (!parts.includes(RECITE_NOTE)) return {response: {text: blocked}};
+          return {response: {text: () => JSON.stringify({recipes: [{title: 'Book Cake'}]})}}; };
+        const res = await askReader(['read this'], null, true); const txt = res.response.text();
+        window.askReaderOnce = async () => ({response: {text: blocked}}); let msg = '';
+        try { await askReader(['read this'], null, true); } catch (e) { msg = String(e.message); }
+        window.askReaderOnce = keep;
+        return {ok: /Book Cake/.test(txt), retried: seen.length === 2 && seen[1].note && !seen[1].exact && seen[1].temp > 0, recite: isRecite({message: msg})}; });
+      ok('a file the reader refuses to copy (RECITATION) is read again in its own words, keeping every ingredient', r.ok && r.retried && r.recite, r); }
     // Reading a file again also looks for recipes that were missed
     { const r = await A.evaluate(async () => { const keep = window.askReader; let asked = '';
         window.askReader = async parts => { asked = parts[0]; return {response: {text: () => JSON.stringify({recipes: [
