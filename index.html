@@ -93,6 +93,9 @@ button{font:inherit;color:inherit}
 .newcat{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;margin-left:6px}.newcat input{min-width:150px}
 .like-wrap{margin-top:14px;display:grid;gap:10px}.like-wrap h3{margin:0}.like-box .pv{max-height:340px;overflow:auto;font-size:14px}.imp-like{flex-basis:100%;margin-top:8px;display:grid;gap:8px}
 .im-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}.im-row .im-why{flex:1;min-width:200px}
+.ed-also{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}.also-c{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:14px;cursor:pointer;background:var(--paper)}
+.also-c:has(input:checked){border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}.also-c[hidden]{display:none}.also-new{display:inline-flex;gap:6px}.also-new input{width:150px}
+.ed-also-f .lbl{font-weight:600;font-size:14px}.chip-also{text-decoration:none;opacity:.85}
 .qr-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.qr-row .qr{font-size:13px}
 .rq-acts .qr-row{flex-basis:100%}
 .ln-notes ul{margin:4px 0 0;padding-left:18px;display:grid;gap:4px}
@@ -1408,7 +1411,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.62";
+const WEB_VERSION = "4.63";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1463,6 +1466,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["multicat","4.63","2026-11-18","A recipe in more than one category, and new categories in every list","When you add or edit a recipe, under its category there's “Also in”: tick other categories it belongs to (for example Meat & Chicken and also Side Dish), or add a new category right there. The recipe shows up in each of them, and keeps one item number, from its main category. Pesach stays separate: a Pesach recipe isn't offered year-round categories, and a year-round recipe isn't offered Pesach. And a category added anywhere (Add a category, “+ Add a new category…”, the recipe form or “Also in”) is saved straight away, so it's in every category list from then on.", false],
   ["scanmissed","4.62","2026-11-18","The scanner looks again for recipes it missed","When you scan a file that was read before, you still get the same recipes as last time, and the scanner also reads the whole file once more just to look for recipes it missed. Any it finds are added and remembered. A PDF or Word file is also checked this way the first time it's read.", false],
   ["scanexact","4.61","2026-11-17","The scanner reads more thoroughly, and the same file gives the same recipes","The scanner now reads the whole photo or file, every page, line and side note, and misses nothing: every ingredient and amount, every step, oven temperatures, times, pan sizes, servings and tips. It may still word things a little more clearly, but it doesn't drop or invent anything. Photos are sent sharper, so small or faded writing is read too. Scanning the same file (or the same photos) again gives exactly the same recipes, on any phone or computer, because the first reading is remembered.", false],
   ["filecat","4.60","2026-11-17","A scanned file's name becomes its category","When you scan a photo, PDF or Word file whose name is a category (for example “Cakes.pdf” or “Soups.jpg”), its recipes go in that category. If no category has that name yet, a new one with that name is made for them (once they're released). Names a phone makes up by itself, like “IMG_1234” or “Screenshot…”, are ignored. You can still change the category before sending.", false, "team"],
@@ -2016,7 +2020,7 @@ function wireToday(){
 
 function catTiles(){
   const d=recentList(864e5).length, w=recentList(7*864e5).length;
-  return `<a class="cat cat-new" href="#recent"><span class="catcode">${w?`${w} new`:"New"}</span><div class="ic">${TOOL_IC.spark}</div><h3>New recipes</h3><span>${d?`${d} added today`:w?`${w} added this week`:"See what's been added"}</span></a>${CATS.map(c=>{const n=RECIPES.filter(r=>r.c===c).length;
+  return `<a class="cat cat-new" href="#recent"><span class="catcode">${w?`${w} new`:"New"}</span><div class="ic">${TOOL_IC.spark}</div><h3>New recipes</h3><span>${d?`${d} added today`:w?`${w} added this week`:"See what's been added"}</span></a>${CATS.map(c=>{const n=RECIPES.filter(r=>inCat(r,c)).length;
     return `<a class="cat" href="#${slug(c)}">${catPrefix(c)?`<span class="catcode" title="Recipe codes start with ${catPrefix(c)}">${catPrefix(c)}</span>`:""}<div class="ic">${icon(c)}</div><h3>${esc(c)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`}).join("")}`;
 }
 const DL_IC = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>';
@@ -2087,7 +2091,7 @@ function home(){
 
 function tabs(active){
   const nw = recentList(7*864e5).length;
-  return `<nav class="tabs" aria-label="Categories"><a class="tab tab-new" href="#recent" ${active==="__new"?'aria-current="page"':""}>New recipes <span class="n">${nw}</span></a>${CATS.map(c=>{const n=RECIPES.filter(r=>r.c===c).length;
+  return `<nav class="tabs" aria-label="Categories"><a class="tab tab-new" href="#recent" ${active==="__new"?'aria-current="page"':""}>New recipes <span class="n">${nw}</span></a>${CATS.map(c=>{const n=RECIPES.filter(r=>inCat(r,c)).length;
     return `<a class="tab" href="#${slug(c)}" ${c===active?'aria-current="page"':""}>${esc(c)} <span class="n">${n}</span></a>`}).join("")}</nav>
   ${feat("tabsearch")?`<div class="tab-search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" class="tq" placeholder="Search any recipe – name, ingredient or code" aria-label="Search any recipe" autocomplete="off" value="${esc(q.value)}"></div>`:""}`;
 }
@@ -2131,6 +2135,9 @@ function sortedCards(list, mode, emptyHTML){
 
 const SEC_ORDER = ["Family recipes","Cakes & Frostings","Fish","Soups & Accompaniments","Meat","Side Dishes, Vegetables & Salads","Kugel","Milchig","Drinks & Desserts","Miscellaneous"];
 const secOf = r => r.sec || "Family recipes";
+// multicat: a recipe can also be in other categories (r.also); its main category (r.c) gives its item number
+const alsoOf = r => feat("multicat") && Array.isArray(r.also) ? r.also : [];
+const inCat = (r, c) => r.c===c || alsoOf(r).includes(c);
 function sectionsOf(list){
   const names=[...new Set(list.map(secOf))];
   return names.sort((a,b)=>{ const i=SEC_ORDER.indexOf(a), j=SEC_ORDER.indexOf(b); return (i<0?99:i)-(j<0?99:j) || byName(a,b); });
@@ -2139,7 +2146,7 @@ const secSlug = s => "s-"+s.toLowerCase().replace(/[^a-z0-9]+/g,"-");
 const SEC_ICON = {"Family recipes":"Pesach","Cakes & Frostings":"Cakes","Soups & Accompaniments":"Soups","Side Dishes, Vegetables & Salads":"Side Dish","Milchig":"Dairy","Drinks & Desserts":"Desserts"};
 // One section inside a category (e.g. Pesach → Kugel)
 function sectionPage(c, s){
-  const all = RECIPES.filter(r=>r.c===c), secs = sectionsOf(all), list = all.filter(r=>secOf(r)===s), so = sortChoice("cat", SO_CAT, "code");
+  const all = RECIPES.filter(r=>inCat(r,c)), secs = sectionsOf(all), list = all.filter(r=>secOf(r)===s), so = sortChoice("cat", SO_CAT, "code");
   app.innerHTML = `<section class="wrap">${tabs(c)}
     <a class="back" href="#${slug(c)}">← ${esc(c)}</a>
     <nav class="sec-nav" aria-label="Sections in ${esc(c)}">${secs.map(x=>`<a class="sec-pill${x===s?" on":""}" href="#${slug(c)}--${secSlug(x)}"${x===s?' aria-current="page"':""}>${esc(x)} <span>${all.filter(r=>secOf(r)===x).length}</span></a>`).join("")}</nav>
@@ -2150,7 +2157,7 @@ function sectionPage(c, s){
   const on=app.querySelector(".sec-pill.on"); if(on) on.scrollIntoView({block:"nearest",inline:"center"});
 }
 function category(c){
-  const list = RECIPES.filter(r=>r.c===c);
+  const list = RECIPES.filter(r=>inCat(r,c));
   const secs = list.some(r=>r.sec) ? sectionsOf(list) : null, so = sortChoice("cat", SO_CAT, "code");
   app.innerHTML = `<section class="wrap">${tabs(c)}
     <div class="section-head"><h2>${esc(c)}</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}${!offline&&(!may("edit")||recipesOnline)&&(can("suggest")||may("edit"))?` · <a class="link" href="#new-${slug(c).slice(2)}">+ Add a recipe</a>${can("ai")?` · <a class="link" href="#scan-${slug(c).slice(2)}">Add from photo or file</a>`:""}`:""}</p></div>
@@ -2285,7 +2292,7 @@ function recipe(r){
     <a class="back" href="#${slug(r.c)}${r.sec&&r.c==="Pesach"?"--"+secSlug(r.sec):""}">← ${esc(r.c)}${r.sec&&r.c==="Pesach"?" · "+esc(r.sec):""}</a>
     <section class="rhead"><div class="tilestripe"></div>
       <button type="button" class="rmore-btn" id="rmore" aria-haspopup="true" aria-expanded="false" aria-controls="rmenu" title="More options" aria-label="More options for this recipe"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="5" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="19" r="2" fill="currentColor"/></svg></button>
-      ${noChip(r)}${/^pesach$/i.test(r.c)?"":`<span class="chip">${esc(r.c)}</span>`}${r.sec?`<span class="chip">${esc(r.sec)}</span>`:""}${kindChip(r)}
+      ${noChip(r)}${/^pesach$/i.test(r.c)?"":`<span class="chip">${esc(r.c)}</span>`}${alsoOf(r).map(c=>`<a class="chip chip-also" href="#${slug(c)}">${esc(c)}</a>`).join("")}${r.sec?`<span class="chip">${esc(r.sec)}</span>`:""}${kindChip(r)}
       <h1>${titleHTML(r)}</h1>
       ${!isPublic()?`<div class="aud ${pubVisible(r)?"pub":"priv"}">${pubVisible(r)?"🌐 Public":isPriv(r)?"🔒 Private – stays in the family":"🔒 Team only"}</div>`:""}
       ${!isPublic()&&(r.rv||subs.some(s=>s.status==="pending"&&s.editOf===r.id))?`<div class="rv-bar">${r.rv?`<span>📥 In <b>${INBOX_NAME[r.rv]}</b></span>`:""}${subs.filter(s=>s.status==="pending"&&s.editOf===r.id).map(s=>`<span>📝 Suggested changes in <b>${INBOX_NAME[stageOf(s)]}</b></span>`).join("")}
@@ -3813,6 +3820,16 @@ function toastUndo(t, fn){
 function moveCatOptions(cur){ return [...new Set([...CATS, ...ORDER])].sort(byName).map(c=>`<option ${c===cur?"selected":""}>${esc(c)}</option>`).join(""); }
 function moveSecField(id, cat){ const secs=sectionsOf(RECIPES.filter(r=>r.c==="Pesach"));
   return `<label class="mv-sec" ${cat==="Pesach"?"":"hidden"}>Section <input id="${id}" list="${id}-l" type="text" maxlength="40" placeholder="e.g. Kugel"><datalist id="${id}-l">${secs.map(s=>`<option value="${esc(s)}">`).join("")}</datalist></label>`; }
+// multicat: a category added anywhere is saved at once (meta/codes "added"), so every category list has it
+function rememberCat(name){
+  name=String(name||"").trim(); if(!feat("multicat") || !name || !db || offline || CATS.includes(name)) return;
+  const map=JSON.parse(JSON.stringify(CODEMAP)); if(!isPesach(name)) codeLetter(name, map);
+  map.added=[...new Set([...(map.added||[]), name])]; CODEMAP=map; store("gk-codemap", CODEMAP);
+  if(isAdmin()||may("review")||may("moverec")) db.collection("meta").doc("codes").set(map).catch(()=>{});
+  setRecipes(RAW_RECIPES);
+}
+// Pesach and the year-round categories don't mix in “Also in”
+const alsoChoices = main => CATS.filter(c=>c!==main && isPesach(c)===isPesach(main));
 // addcat: “+ Add a new category…” at the end of a category dropdown; typing a name adds it and chooses it
 const addCatOpt = () => feat("addcat") ? `<option value="__new">+ Add a new category…</option>` : "";
 function wireNewCat(sel){
@@ -3830,7 +3847,7 @@ function wireNewCat(sel){
       n=n[0].toUpperCase()+n.slice(1);
       const have=[...sel.options].find(o=>o.value!=="__new" && o.value.toLowerCase()===n.toLowerCase());
       if(!have) sel.insertBefore(new Option(n, n), sel.querySelector('option[value="__new"]'));
-      sel.value = have ? have.value : n; last=sel.value; box.remove(); sel.dispatchEvent(new Event("change"));
+      sel.value = have ? have.value : n; last=sel.value; box.remove(); if(!have) rememberCat(n); sel.dispatchEvent(new Event("change"));
       toast(have ? `${sel.value} is already a category – it's chosen` : `New category “${n}” – it shows in the cookbook once a recipe is in it`); };
     box.querySelector('[data-nc="add"]').onclick=add; inp.onkeydown=ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); add(); } };
   });
@@ -4397,9 +4414,9 @@ let onlineIds = new Set();    // every recipe id stored online (including delete
 let unsubRecipes = null;
 const withHistory = (rec, base, action, by) => { rec.history = [...((base&&base.history)||[]), {a:action, by:by||"a member", at:Date.now()}].slice(-12); return rec; };
 const historyLines = r => (r.history||[]).slice(-6).map(h=>h.a==="moved" ? `Moved here${h.from?" from "+h.from:""} by ${h.by} on ${fmtDate(h.at)}` : `${h.a==="added"?"Added":"Changed"} by ${h.by} on ${fmtDate(h.at)}`);
-const toDoc = r => ({pub: r.pub===undefined ? pubDefault(r.c) : !!r.pub, ...(r.priv?{priv:true}:{}), c:r.c, t:r.t, by:r.by||"", n:r.n||"", pre:r.pre||[], kind:r.kind||"", time:r.time||"", serves:r.serves||"", sec:r.sec||"", ...(r.no?{no:r.no}:{}), ...(r.code?{code:r.code}:{}), ord:r.ord||0, deleted:false, updated:Date.now(), ...(r.history?{history:r.history}:{}),
+const toDoc = r => ({pub: r.pub===undefined ? pubDefault(r.c) : !!r.pub, ...(r.priv?{priv:true}:{}), ...(Array.isArray(r.also)?{also:r.also.filter(x=>x&&x!==r.c)}:{}), c:r.c, t:r.t, by:r.by||"", n:r.n||"", pre:r.pre||[], kind:r.kind||"", time:r.time||"", serves:r.serves||"", sec:r.sec||"", ...(r.no?{no:r.no}:{}), ...(r.code?{code:r.code}:{}), ord:r.ord||0, deleted:false, updated:Date.now(), ...(r.history?{history:r.history}:{}),
   s:r.s.map(([ing,h,items])=>({k:ing?"ing":"step", h:h||"", items:items}))});
-const fromDoc = (id,d) => ({id, pub: d.pub===undefined ? undefined : !!d.pub, ...(d.priv?{priv:true}:{}), c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, pre:d.pre, kind:d.kind||"", time:d.time||"", serves:d.serves||"", sec:d.sec||"", no:d.no||0, code:d.code||"", ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[], rv:d.rv||"", rvNote:d.rvNote||"", rvNoteBy:d.rvNoteBy||"", rvBy:d.rvBy||"", rvUids:d.rvUids||[], rvAsk:d.rvAsk||[], rvLog:d.rvLog||[], oldCodes:d.oldCodes||[], kosherPub:d.kosherPub, kosherFrom:d.kosherFrom||"",
+const fromDoc = (id,d) => ({id, pub: d.pub===undefined ? undefined : !!d.pub, ...(d.priv?{priv:true}:{}), ...(Array.isArray(d.also)&&d.also.length?{also:d.also}:{}), c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, pre:d.pre, kind:d.kind||"", time:d.time||"", serves:d.serves||"", sec:d.sec||"", no:d.no||0, code:d.code||"", ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[], rv:d.rv||"", rvNote:d.rvNote||"", rvNoteBy:d.rvNoteBy||"", rvBy:d.rvBy||"", rvUids:d.rvUids||[], rvAsk:d.rvAsk||[], rvLog:d.rvLog||[], oldCodes:d.oldCodes||[], kosherPub:d.kosherPub, kosherFrom:d.kosherFrom||"",
   s:(d.s||[]).map(x=>[x.k==="ing"?1:0, x.h||"", x.items||[]])});
 // Recipes are listed A to Z by category, then by recipe code (101001, 101002…); any without a code go after, A to Z by name.
 const sortName = r => r.t.replace(/^Untitled:\s*/,"").replace(/^[^A-Za-z0-9]+/,"");
@@ -4417,7 +4434,7 @@ function setRecipes(list){
   const hide = feat("nk") && feat("nkhide");
   NK = feat("nk") ? sortRecipes(list.filter(r=>r.rv==="kosher")) : [];
   RECIPES = sortRecipes(hide ? list.filter(r=>r.rv!=="kosher") : list);
-  CATS = [...new Set([...ORDER.filter(c=>RECIPES.some(r=>r.c===c) || ALWAYS_SHOW.includes(c)), ...RECIPES.map(r=>r.c), ...(feat("addcat")&&!isPublic()?(CODEMAP.added||[]):[])])].sort(byName);
+  CATS = [...new Set([...ORDER.filter(c=>RECIPES.some(r=>r.c===c) || ALWAYS_SHOW.includes(c)), ...RECIPES.map(r=>r.c), ...RECIPES.flatMap(alsoOf), ...(feat("addcat")&&!isPublic()?(CODEMAP.added||[]):[])])].sort(byName);
 }
 (function(){ const c=store("gk-recipes"); if(c && c.length) setRecipes(c); })();
 function watchRecipes(){
@@ -4429,15 +4446,15 @@ function watchRecipes(){
   if(!unsubCodes) unsubCodes = db.collection("meta").doc("codes").onSnapshot(s=>{
     if(!s.exists) return; const d=s.data(); CODEMAP={cats:d.cats||{}, secs:d.secs||{}, ...(d.added?{added:d.added}:{})}; store("gk-codemap", CODEMAP);
     if(feat("addcat")) setRecipes(RAW_RECIPES);
-    if(state==="approved" && !document.querySelector(".editor, .prof-head, .prof-page, .settings, #rqform, .tools-page, #td-new:focus")) route();
+    if(state==="approved" && !document.querySelector(".editor, .prof-head, .prof-page, .settings, #rqform, .tools-page, #td-new:focus, #mvbox, .imp-list, .newcat, .dlpick")) route();
   }, ()=>{});
   if(!unsubEmp) unsubEmp = db.collection("meta").doc("employees").onSnapshot(s=>{
     const d = s.exists ? s.data() : {}; EMP = {allow:d.allow||{}}; syncTeamList();
-    if(state==="approved" && !document.querySelector(".editor, .prof-head, .prof-page, .settings, #rqform, .tools-page, #td-new:focus")) route();
+    if(state==="approved" && !document.querySelector(".editor, .prof-head, .prof-page, .settings, #rqform, .tools-page, #td-new:focus, #mvbox, .imp-list, .newcat, .dlpick")) route();
   }, ()=>{});
   if(!unsubPub) unsubPub = db.collection("meta").doc("public").onSnapshot(s=>{
     const d = s.exists ? s.data() : {}; PUB = {allow:d.allow||{}, cats:d.cats||{}};
-    if(state==="approved" && !document.querySelector(".editor, .prof-head, .prof-page, .settings, #rqform, .tools-page, #td-new:focus")) route();
+    if(state==="approved" && !document.querySelector(".editor, .prof-head, .prof-page, .settings, #rqform, .tools-page, #td-new:focus, #mvbox, .imp-list, .newcat, .dlpick")) route();
   }, ()=>{});
   const pubOnly = isPublic();
   unsubRecipes = (pubOnly ? db.collection("recipes").where("pub","==",true) : db.collection("recipes")).onSnapshot(s=>{
@@ -4449,7 +4466,7 @@ function watchRecipes(){
     if(pubOnly){ recipesOnline=true; setRecipes(live); store("gk-recipes-pub", RECIPES); }
     else if(s.docs.length){ recipesOnline=true; setRecipes(live); store("gk-recipes", RECIPES); }
     else { recipesOnline=false; setRecipes(BUNDLED.slice()); }
-    if(state==="approved" && !document.querySelector(".editor, .prof-head, .prof-page, .settings, #rqform, .tools-page, #td-new:focus")) route();
+    if(state==="approved" && !document.querySelector(".editor, .prof-head, .prof-page, .settings, #rqform, .tools-page, #td-new:focus, #mvbox, .imp-list, .newcat, .dlpick")) route();
   }, ()=>{});
 }
 const missingBundled = () => BUNDLED.filter(r=>!onlineIds.has(r.id));
@@ -4576,8 +4593,10 @@ function editor(r, cat, sub, draft){
         <div class="field"><label for="ed-t">Recipe name</label><input id="ed-t" type="text" maxlength="80" value="${esc(src?src.t:(rqDraft&&rqDraft.t)||"")}" placeholder="e.g. Potato Kugel"></div>
         <div class="row2">
           <div class="field"><label for="ed-c">Category</label>
-            <select id="ed-c"${!isAdmin()&&!suggest?" disabled":""}>${catList.map(c=>`<option ${c===catNow?"selected":""}>${esc(c)}</option>`).join("")}<option value="__new">New category…</option></select>
+            <select id="ed-c"${!isAdmin()&&!suggest?" disabled":""}>${catList.map(c=>`<option ${c===catNow?"selected":""}>${esc(c)}</option>`).join("")}<option value="__new">${feat("addcat")?"+ Add a new category…":"New category…"}</option></select>
             <input id="ed-cn" type="text" maxlength="30" placeholder="New category name" hidden></div>
+          ${feat("multicat")&&(isAdmin()||suggest)?`<div class="field ed-also-f"${isPesach(catNow)?" hidden":""}><span class="lbl">Also in <span class="hint">(optional)</span></span><div class="ed-also" id="ed-also">${[...new Set([...alsoChoices(catNow), ...((src&&src.also)||[])])].filter(c=>c!==catNow && !isPesach(c)).map(c=>`<label class="also-c"><input type="checkbox" value="${esc(c)}" ${((src&&src.also)||[]).includes(c)?"checked":""}><span>${esc(c)}</span></label>`).join("")}
+            <span class="also-new"><input id="ed-also-new" type="text" maxlength="30" placeholder="+ Add a category"><button type="button" class="btn sm" id="ed-also-add">Add</button></span></div></div>`:""}
           <div class="field"><label for="ed-by">From (optional)</label><input id="ed-by" type="text" maxlength="40" value="${esc(src?src.by:(suggest?myName():""))}" placeholder="e.g. Bobby"></div>
         </div>
         <div class="field"><label for="ed-k">Meat or dairy</label>
@@ -4623,9 +4642,19 @@ function editor(r, cat, sub, draft){
       </form></section>`;
     const F=document.getElementById("edform");
     const sel=F.querySelector("#ed-c"), cn=F.querySelector("#ed-cn");
-    sel.onchange=()=>{ cn.hidden = sel.value!=="__new"; if(!cn.hidden) cn.focus(); };
+    sel.onchange=()=>{ cn.hidden = sel.value!=="__new"; if(!cn.hidden) cn.focus();
+      const own=F.querySelector(`#ed-also input[value="${CSS.escape(sel.value)}"]`); if(own){ own.checked=false; } F.querySelectorAll("#ed-also .also-c").forEach(l=>l.hidden = l.querySelector("input").value===sel.value);
+      const af=F.querySelector(".ed-also-f"); if(af){ af.hidden = isPesach(sel.value); if(af.hidden) F.querySelectorAll("#ed-also input").forEach(x=>x.checked=false); } };
+    const alsoAdd=F.querySelector("#ed-also-add"); if(alsoAdd){ const ai=F.querySelector("#ed-also-new");
+      const addIt=()=>{ let v=ai.value.trim().replace(/\s+/g," ").replace(/[\/]/g,""); if(v.length<2){ toast("Type a category name"); return; } v=v[0].toUpperCase()+v.slice(1);
+        if(isPesach(v)){ toast("Pesach stays separate from the year-round categories"); return; }
+        const known=CATS.find(x=>x.toLowerCase()===v.toLowerCase()); if(known) v=known; else rememberCat(v);
+        const have=[...F.querySelectorAll("#ed-also input[type=checkbox]")].find(x=>x.value.toLowerCase()===v.toLowerCase());
+        if(have){ have.checked=true; } else { const l=document.createElement("label"); l.className="also-c"; l.innerHTML=`<input type="checkbox" checked><span></span>`; l.querySelector("input").value=v; l.querySelector("span").textContent=v; ai.parentElement.before(l); }
+        ai.value=""; toast(have?`${have.value} ticked`:`New category “${v}” added`); };
+      alsoAdd.onclick=addIt; ai.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); addIt(); } }; }
     const sync=()=>{ if(secs.__skip){ delete secs.__skip; return; } F.querySelectorAll(".sec").forEach((el,i)=>{ secs[i].ing = el.querySelector(".sec-k").value==="ing"; secs[i].h=el.querySelector(".sec-h").value; secs[i].items=el.querySelector(".sec-items").value; }); };
-    const keep=()=>({t:F.querySelector("#ed-t").value, c:sel.value, cn:cn.value, by:F.querySelector("#ed-by").value, n:F.querySelector("#ed-n").value, k:F.querySelector("#ed-k").value, sv:F.querySelector("#ed-serves").value, tm:F.querySelector("#ed-time").value, sc:F.querySelector("#ed-sec").value, pb:F.querySelector("#ed-pub")?F.querySelector("#ed-pub").checked:null});
+    const keep=()=>({also:[...F.querySelectorAll("#ed-also input[type=checkbox]:checked")].map(x=>x.value), t:F.querySelector("#ed-t").value, c:sel.value, cn:cn.value, by:F.querySelector("#ed-by").value, n:F.querySelector("#ed-n").value, k:F.querySelector("#ed-k").value, sv:F.querySelector("#ed-serves").value, tm:F.querySelector("#ed-time").value, sc:F.querySelector("#ed-sec").value, pb:F.querySelector("#ed-pub")?F.querySelector("#ed-pub").checked:null});
     // linked recipes picker
     const pq=F.querySelector("#ed-pre-q"), ps=F.querySelector("#ed-pre-sugg");
     const showSugg=()=>{
@@ -4640,6 +4669,7 @@ function editor(r, cat, sub, draft){
     F.querySelectorAll("[data-unpre]").forEach(b=>b.onclick=()=>{ pre.splice(pre.indexOf(b.dataset.unpre),1); redraw(); });
     const redraw=()=>{ const k=keep(); sync(); draw(); const G=document.getElementById("edform");
       G.querySelector("#ed-t").value=k.t; G.querySelector("#ed-by").value=k.by; G.querySelector("#ed-n").value=k.n; G.querySelector("#ed-k").value=k.k; G.querySelector("#ed-time").value=k.tm; G.querySelector("#ed-serves").value=k.sv; G.querySelector("#ed-sec").value=k.sc; if(k.pb!==null && G.querySelector("#ed-pub")) G.querySelector("#ed-pub").checked=k.pb;
+      (k.also||[]).forEach(v=>{ const x=[...G.querySelectorAll("#ed-also input[type=checkbox]")].find(i=>i.value===v); if(x) x.checked=true; else { const l=document.createElement("label"); l.className="also-c"; l.innerHTML=`<input type="checkbox" checked><span></span>`; l.querySelector("input").value=v; l.querySelector("span").textContent=v; const nb=G.querySelector(".also-new"); if(nb) nb.before(l); } });
       const s2=G.querySelector("#ed-c"); s2.value=k.c; if(k.c==="__new"){ const c2=G.querySelector("#ed-cn"); c2.hidden=false; c2.value=k.cn; } };
     F.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>{ sync(); const i=+b.closest(".sec").dataset.i, j=i+(+b.dataset.mv); [secs[i],secs[j]]=[secs[j],secs[i]]; secs.__skip=1; redraw(); });
     F.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ sync(); secs.splice(+b.closest(".sec").dataset.i,1); redraw(); });
@@ -4741,16 +4771,18 @@ function editor(r, cat, sub, draft){
       let c = sel.value==="__new" ? cn.value.trim() : sel.value;
       if(!t) return fail("Enter the recipe name.");
       if(!c) return fail("Choose a category, or type a new category name.");
+      const also = feat("multicat") && F.querySelector("#ed-also") ? (isPesach(c) ? [] : [...new Set([...F.querySelectorAll("#ed-also input[type=checkbox]:checked")].map(x=>x.value))].filter(x=>x && x!==c && !isPesach(x)).slice(0,12)) : undefined;
+      if(sel.value==="__new") rememberCat(c);
       const s = secs.map(x=>[x.ing?1:0, x.h.trim(), x.items.split("\n").map(l=>l.trim()).filter(Boolean)]).filter(x=>x[2].length);
       if(!s.length) return fail("Add at least one ingredient or step.");
       const btn0=F.querySelector(".primary");
       if(sub){   // fixing a recipe in an inbox: save it there; it goes on through the inboxes
         btn0.disabled=true; btn0.textContent="Saving…";
-        const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s});
+        const d=toDoc({c, t, also, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s});
         const back = feat("moveback") && stageOf(sub)!=="proof" ? {stage:"proof", proofUid:"", proofBy:"", approvedUid:"", approvedBy:"", uids:[], log:[...(sub.log||[]), {from:stageOf(sub), to:"proof", by:myName(), uid:me, at:Date.now(), back:true, edited:true}].slice(-30)} : {};
         const revs = [...subRevs(sub), {by:myName(), uid:me, at:Date.now(), s:d.s, t:d.t}].slice(-15);
         const recode = feat("subcode") && sub.code && !sub.editOf && !codeFits(sub.code, d.c, d.sec||"") ? {code:""} : {};
-        try{ await db.collection("submissions").doc(sub.id).update(Object.assign({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves,sec:d.sec,s:d.s, fixedBy:myName(), fixedAt:Date.now(), revs}, back, recode));
+        try{ await db.collection("submissions").doc(sub.id).update(Object.assign({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves,sec:d.sec,s:d.s, ...(d.also?{also:d.also}:{}), fixedBy:myName(), fixedAt:Date.now(), revs}, back, recode));
           if(recode.code==="") touchHold(sub.code);
           if(back.stage) notifyWatchers("watch-proof", `${sub.t} was edited`, `${myName()} edited it, so it needs to be proofread again.`, "#proof", "pencil2");
           toast(back.stage?"Saved. It was edited, so it goes back to Need to proofread.":"Saved"); location.hash=back.stage||stageOf(sub); }
@@ -4770,10 +4802,10 @@ function editor(r, cat, sub, draft){
       }
       if(suggest){
         btn0.disabled=true; btn0.textContent="Sending…";
-        const d=toDoc({c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s, ord:0});
+        const d=toDoc({c, t, also, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s, ord:0});
         try{
           const to = editOf ? "proof" : sendToOf("ed-sendto");
-          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves||"",sec:d.sec,s:d.s, uid:actUid(), byName:actName(), status:"pending", stage:to, ...(to!=="proof"?{sentTo:to}:{}), ...(to==="yoely"&&feat("private")?{priv:true}:{}), created:Date.now(), revs:[{by:actName(), uid:actUid(), at:Date.now(), s:d.s, t:d.t}], editOf, ...(rqDraft&&rqDraft.id?{rq:rqDraft.id}:{}), ...(draft&&draft.dropOf?{dropOf:draft.dropOf}:{})});
+          await db.collection("submissions").doc("s-"+newId()).set({c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves||"",sec:d.sec,s:d.s, ...(d.also&&d.also.length?{also:d.also}:{}), uid:actUid(), byName:actName(), status:"pending", stage:to, ...(to!=="proof"?{sentTo:to}:{}), ...(to==="yoely"&&feat("private")?{priv:true}:{}), created:Date.now(), revs:[{by:actName(), uid:actUid(), at:Date.now(), s:d.s, t:d.t}], editOf, ...(rqDraft&&rqDraft.id?{rq:rqDraft.id}:{}), ...(draft&&draft.dropOf?{dropOf:draft.dropOf}:{})});
           if(draft && draft.fromSub) db.collection("submissions").doc(draft.fromSub).delete().catch(()=>{});
           { const eb = isTeam() && target ? editedBack(target, Date.now()) : null; if(eb) await db.collection("recipes").doc(target.id).update(eb).catch(()=>{}); }
           if(to!=="proof"){ sentNotice(to, 1, myName()); toast(`Sent to ${INBOX_NAME[to]}.`); location.hash = to; }
@@ -4786,14 +4818,14 @@ function editor(r, cat, sub, draft){
       let id = r ? r.id : target ? target.id : "r-"+t.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
       if(!r && !target){ if(id==="r-") id="r-recipe"; let k=2, base=id; while(onlineIds.has(id)) id=base+"-"+(k++); }
       const pubBox=F.querySelector("#ed-pub");
-      const rec={id, pub: pubBox ? pubBox.checked : isPriv(r||target) ? false : undefined, ...((r||target)&&(r||target).priv?{priv:true}:{}), c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:pre.filter(x=>x!==id), kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), code:(r&&r.code&&r.c===c&&(r.sec||"")===(F.querySelector("#ed-sec").value.trim()))?r.code:(target&&target.code&&target.c===c)?target.code:nextCode(c, F.querySelector("#ed-sec").value.trim()), s, ord: r ? (r.ord||0) : target ? (target.ord||0) : Date.now()};
+      const rec={id, pub: pubBox ? pubBox.checked : isPriv(r||target) ? false : undefined, ...((r||target)&&(r||target).priv?{priv:true}:{}), ...(also?{also}:{}), c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:pre.filter(x=>x!==id), kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), code:(r&&r.code&&r.c===c&&(r.sec||"")===(F.querySelector("#ed-sec").value.trim()))?r.code:(target&&target.code&&target.c===c)?target.code:nextCode(c, F.querySelector("#ed-sec").value.trim()), s, ord: r ? (r.ord||0) : target ? (target.ord||0) : Date.now()};
       { const base = r || target;
         withHistory(rec, base, sub ? (sub.editOf&&base?"changed":"added") : (base?"changed":"added"), sub ? sub.byName : myName()); }
       const btn=F.querySelector(".primary"); btn.disabled=true; btn.textContent="Saving…";
       try{
         if(!isAdmin() && r){   // an employee allowed to edit directly: only the recipe itself changes
           const d=toDoc(Object.assign({}, rec, {c:r.c, sec:r.sec||""}));
-          await db.collection("recipes").doc(id).update(Object.assign({t:d.t, by:d.by, n:d.n, pre:d.pre, kind:d.kind, time:d.time, serves:d.serves, s:d.s, updated:Date.now()}, d.history?{history:d.history}:{}));
+          await db.collection("recipes").doc(id).update(Object.assign({t:d.t, by:d.by, n:d.n, pre:d.pre, kind:d.kind, time:d.time, serves:d.serves, s:d.s, ...(d.also?{also:d.also}:{}), updated:Date.now()}, d.history?{history:d.history}:{}));
           const eb=editedBack(r, Date.now()); if(eb) await db.collection("recipes").doc(id).update(eb);
         } else
         await db.collection("recipes").doc(id).set(Object.assign(toDoc(rec), editedBack(r||target, Date.now())||{}), {merge:true});

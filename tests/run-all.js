@@ -938,10 +938,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*53 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 53));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*54 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 54));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 53, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 54, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -952,7 +952,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /52/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /53/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1186,6 +1186,23 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
         const n = await scanAddMissed(j, []); window.askReader = keep;
         return {n, titles: j.recipes.map(x => x.title), listed: /ALREADY FOUND/.test(asked) && /Apple Cake/.test(asked)}; });
       ok('scanning a file again also looks for recipes that were missed, and adds only new ones', r.n === 1 && r.titles.join('|') === 'Apple Cake|Missed Pie' && r.listed, r); }
+    // A recipe in more than one category
+    { await A.goto(F + '#new'); await A.waitForTimeout(400); await A.fill('#ed-t', 'Two Category Torte');
+      await A.locator('.sec-items').nth(0).fill('7 zqx torte layers'); await A.locator('.sec-items').nth(1).fill('Stack the zqx layers');
+      await A.locator('#ed-also input[value="Desserts"]').check();
+      await A.fill('#ed-also-new', 'party food'); await A.click('#ed-also-add'); await A.waitForTimeout(200);
+      await A.locator('#edform .primary').click(); await A.waitForTimeout(900);
+      const r = await A.evaluate(async () => { const x = subs.find(s => s.t === 'Two Category Torte'); if (!x) return {none: true};
+        await approveSub(x, true); await new Promise(z => setTimeout(z, 700)); const rec = RECIPES.find(q => q.t === 'Two Category Torte');
+        return {also: rec && rec.also, inD: rec && inCat(rec, 'Desserts'), inP: rec && inCat(rec, 'Party food'), cats: CATS.includes('Party food'), code: rec && rec.code}; });
+      await A.goto(F + '#' + await A.evaluate(() => slug('Party food'))); await A.waitForTimeout(400);
+      const shown = /Two Category Torte/.test(await A.locator('#app').innerText());
+      ok('a recipe can be in more than one category (also a new one added right there); it shows in each, with one item number', r.inD && r.inP && r.cats && shown && /^1/.test(r.code || ''), [r, shown]);
+      await A.goto(F + '#new'); await A.waitForTimeout(400);
+      const opts = await A.locator('#ed-c option').allTextContents(), alsoOpts = await A.locator('#ed-also input').evaluateAll(x => x.map(i => i.value));
+      await A.selectOption('#ed-c', 'Pesach'); await A.waitForTimeout(150);
+      const pesachHidden = await A.locator('.ed-also-f').isHidden();
+      ok('a category added in “Also in” is in every category list right away; Pesach and year-round categories stay separate', opts.includes('Party food') && !alsoOpts.includes('Pesach') && pesachHidden, [opts.includes('Party food'), alsoOpts.includes('Pesach'), pesachHidden]); }
     // Not kosher comes before Yoely; out of Not kosher you choose Yoely or Need to proofread
     { const nid = await A.evaluate(() => RECIPES.find(r => !r.rv && r.id !== 'r-challah' && r.id !== 'r-croissants').id);
       await A.evaluate(async id => { await nkPut(RECIPES.find(r => r.id === id), 'test'); }, nid); await A.waitForTimeout(600);

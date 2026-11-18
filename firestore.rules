@@ -361,7 +361,7 @@ service cloud.firestore {
         || (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pub', 'updated']) && extra('pub'))
         // Employees given "Edit recipes directly": the recipe itself only, never where it is, who sees it or whether it's deleted
         || (resource != null && resource.data.get('deleted', false) == false
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['t', 'by', 'n', 'pre', 'kind', 'time', 'serves', 's', 'history', 'updated'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['t', 'by', 'n', 'pre', 'kind', 'time', 'serves', 's', 'also', 'history', 'updated'])
             && extra('editdirect'))
         || ((noRvChange() || editedBack()) && publishOk())
         || kosherMove()
