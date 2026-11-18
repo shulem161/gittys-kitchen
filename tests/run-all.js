@@ -1213,14 +1213,25 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       await A.locator('#lbl-box input[name=lb-meal][value=breakfast]').check(); await A.locator('#lbl-box input[name=lb-dish][value=bread]').check();
       await A.locator('#lbl-box input[name=lb-kind][value=other]').check(); await A.locator('#lb-pesach').check();
       await A.click('#lb-save'); await A.waitForTimeout(700);
-      const row = await A.locator('.labels-row').innerText().catch(() => '');
+      const row = await A.locator('.labels-row').evaluate(e => e.textContent).catch(() => '');
+      const front = await A.locator('.labels-row').innerText().catch(() => '');
+      const compact = /Pareve/.test(front) && !/Breakfast|Good for Pesach/.test(front) && (await A.locator('.labels-row details.lbl-more').count()) === 1;
+      await A.click('#lbl-btn'); await A.waitForTimeout(200);
+      const snackHid = await A.locator('#lbl-box .lb-snack').isHidden();
+      await A.locator('#lbl-box input[name=lb-meal][value=snack]').check(); await A.waitForTimeout(100);
+      const snackShown = await A.locator('#lbl-box .lb-snack').isVisible();
+      await A.locator('#lbl-box input[name=lb-snack][value=treat]').check(); await A.click('#lb-save'); await A.waitForTimeout(700);
+      const snack = await A.evaluate(() => { const r = RECIPES.find(x => x.id === 'r-challah'); return r.snackKind === 'treat' && r.meals.includes('snack') && /Treat/.test(document.querySelector('.labels-row').textContent); });
+      ok('labels are compact: only dairy/meat/pareve stands out, the rest in a Labels dropdown; Snack is a meal, marked healthy or treat', compact && snackHid && snackShown && snack, [front, snackHid, snackShown, snack]);
+      await A.goto(F + '#find~meal=snack&snack=treat'); await A.waitForTimeout(500);
+      ok('Find by meal & type can show only treats (or only healthy snacks)', (await A.locator('.grid a[href="#r-challah"]').count()) === 1);
       await A.goto(F + '#find~meal=breakfast'); await A.waitForTimeout(500);
       const found = await A.locator('.grid a[href="#r-challah"]').count();
       const ai = await A.evaluate(async () => { const keep = window.askReader;
         window.askReader = async parts => { const ids = [...parts[0].matchAll(/^(r-[^ ]+) \|/gm)].map(m => m[1]); return {response: {text: () => JSON.stringify({labels: ids.map(id => ({id, meals: ['supper', 'lunch'], dish: ['main']}))})}}; };
         const b = document.createElement('button'), st = document.createElement('span'); await labelsAI(b, st); window.askReader = keep;
         const r = RECIPES.find(x => x.id === 'r-croissants'), ch = RECIPES.find(x => x.id === 'r-challah');
-        return {r: r.meals && r.meals.join(','), d: r.dish && r.dish.join(','), chKept: ch.meals.join(',') === 'breakfast', noPesach: !r.pesach}; });
+        return {r: r.meals && r.meals.join(','), d: r.dish && r.dish.join(','), chKept: ch.meals.join(',') === 'breakfast,snack', noPesach: !r.pesach}; });
       ok('labels: meal, dish type, dairy/meat/pareve and good for Pesach, set from the ⋮ menu; Find by meal shows them; the AI fills in the rest (never Pesach)', /Breakfast/.test(row) && /Bread/.test(row) && /Pareve/.test(row) && /Good for Pesach/.test(row) && found === 1 && ai.r === 'supper,lunch' && ai.d === 'main' && ai.chKept && ai.noPesach, [row, found, ai]); }
     // Not kosher comes before Yoely; out of Not kosher you choose Yoely or Need to proofread
     { const nid = await A.evaluate(() => RECIPES.find(r => !r.rv && r.id !== 'r-challah' && r.id !== 'r-croissants').id);

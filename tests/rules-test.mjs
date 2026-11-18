@@ -348,7 +348,7 @@ await check('members can read it', assertSucceeds(getDoc(doc(PUB, 'scans', 'aaaa
 await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
   await setDoc(doc(d, 'recipes', 'r-lb'), { c: 'Cakes', t: 'Label cake', pub: true, s: [] });
   await setDoc(doc(d, 'users', 'lb1'), { name: 'Lb One', status: 'approved', role: 'employee', perms: { labels: true }, created: 1, favs: [] }); });
-await check('an employee allowed to change labels can label a recipe', assertSucceeds(updateDoc(doc(as('lb1'), 'recipes', 'r-lb'), { meals: ['breakfast'], dish: ['cake'], kind: 'dairy', pesach: true, updated: 1 })));
+await check('an employee allowed to change labels can label a recipe (snack: healthy or treat too)', assertSucceeds(updateDoc(doc(as('lb1'), 'recipes', 'r-lb'), { meals: ['breakfast'], dish: ['cake'], kind: 'dairy', pesach: true, snackKind: 'treat', updated: 1 })));
 await check('…but not change the recipe itself that way', assertFails(updateDoc(doc(as('lb1'), 'recipes', 'r-lb'), { t: 'Renamed', meals: ['lunch'] })));
 await check("an employee without it can't", assertFails(updateDoc(doc(EMP, 'recipes', 'r-lb'), { meals: ['supper'] })));
 // New recipes: the first inbox (4.49)
