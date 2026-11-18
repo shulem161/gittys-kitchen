@@ -373,7 +373,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('open recipe at the chosen size', /^1½ cups flour/.test(await A.locator('.col.ing li').first().innerText()));
     await A.goto(F + '#convert'); await A.waitForTimeout(300); await A.fill('#cv-n', '350'); await A.selectOption('#cv-u', '°F'); await A.waitForTimeout(100);
     ok('calculator converts oven temperature', /177\s*°C/.test(await A.locator('#cv-out').innerText()));
-    await A.goto(F + '#menu'); await A.waitForTimeout(400); await A.click('[data-mq="Beef"]'); await A.click('#mnform .primary'); await A.waitForTimeout(2500);
+    await A.goto(F + '#menu'); await A.waitForTimeout(400); await A.fill('#mn-q', 'Beef'); await A.click('#mnform .primary'); await A.waitForTimeout(2500);
     const mn = await A.locator('.mn-list li').count();
     ok('menu ideas gives a full menu', mn === 6, mn);
     ok('menu never mixes meat and dairy', !/mixes meat and dairy/.test(await A.locator('.mn-result').innerText()));
@@ -938,10 +938,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*59 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 59));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*60 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 60));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 59, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 60, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -952,7 +952,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /58/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /59/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1215,6 +1215,15 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
         const rs = localParse(f.text, 'Cakes');
         return {pdf: !!f.part.inlineData && f.pdfText === true, text: f.text, threw: /RECITATION/.test(threw), title: rs[0] && rs[0].t, items: rs[0] && rs[0].s[0][2]}; });
       ok('a PDF made on a computer has its text read by the built-in reader, word for word, as the last resort when the AI refuses it', r.pdf && r.threw && r.title === 'Apple Cake' && (r.items || []).includes('3 cups flour'), r); }
+    // Menu ideas by meal
+    { await A.goto(F + '#menu'); await A.waitForTimeout(500); await A.fill('#mn-q', '');
+      const chips = await A.locator('[data-mq]').allTextContents();
+      if (await A.locator('[data-mq="Breakfast"]').count()) await A.click('[data-mq="Breakfast"]');
+      const typed = await A.inputValue('#mn-q');
+      const courses = await A.locator('.mn-courses input').evaluateAll(x => x.map(i => i.value).join(','));
+      const r = await A.evaluate(() => { const ch = Object.assign({}, RECIPES.find(x => x.id === 'r-challah'), {meals: ['breakfast']}); const p = menuPrompt('breakfast', ['Main dish'], true, [], menuCatalog([ch]));
+        return {cat: /\| breakfast/.test(p), rule: /names a meal/.test(p)}; });
+      ok('Menu ideas: quick choices are Breakfast, Lunch, Supper, Dairy, Shabbos and Yom Tov; tapping one writes it in, the AI picks recipes labeled for that meal; Salad instead of Vegetable side dish', chips.join(',') === 'Breakfast,Lunch,Supper,Dairy,Shabbos,Yom Tov' && /Breakfast/.test(typed) && r.cat && r.rule && courses === 'Opening,Soup,Main dish,Starch side dish,Salad,Dessert', [chips, typed, r, courses]); }
     // Reading a file again also looks for recipes that were missed
     { const r = await A.evaluate(async () => { const keep = window.askReader; let asked = '';
         window.askReader = async parts => { asked = parts[0]; return {response: {text: () => JSON.stringify({recipes: [

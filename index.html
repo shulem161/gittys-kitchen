@@ -1482,7 +1482,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.69";
+const WEB_VERSION = "4.70";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1537,6 +1537,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["menumeal","4.70","2026-11-18","Menu ideas by meal: breakfast, lunch or supper; a salad course","In Menu ideas, “Vegetable side dish” is now “Salad”, and the quick choices are now Breakfast, Lunch, Supper, Dairy, Shabbos and Yom Tov (Chicken, Beef, Fish, Pesach and Weekday are gone; you can still type anything). Tap one and it's written into “What's the meal?”. When you ask for a breakfast, lunch or supper menu, the AI picks recipes labeled for that meal first.", false],
   ["pdftext","4.69","2026-11-18","A PDF made on a computer is read word for word, without the AI","When a PDF was made on a computer (for example saved from Word, like the cookbook you wrote), the app now takes the text right out of the PDF and reads it with its own built-in reader, the same one used for Word files, so it comes in word for word and Google's AI never has to copy it. A neatly laid-out PDF (with a contents list) is read that way right away. A PDF with a messier layout still goes to the AI first, because it understands messy pages better; if the AI refuses it (“RECITATION”), it tries again in its own words, and only if that fails too is the built-in reader's word-for-word version used. A PDF of photographed or scanned pages has no text inside, so it's still read by the AI as before.", false],
   ["recitefix","4.68","2026-11-18","Files the reader refused to copy are read anyway","Some PDFs (often pages from a printed cookbook) were refused with “Candidate was blocked due to RECITATION”: the reader wouldn't copy text that looks like a published book. Now, when that happens, it reads the file again and writes the steps in its own words, keeping every ingredient and amount exactly. If it still can't, you get a clear message with what to try instead of the long error.", false],
   ["acctsync","4.67","2026-11-18","Everything personal follows your account, not the device","What you keep in the app now goes with your account, so it's the same on your phone, your computer and any device you sign in on: your grocery list (and “hide what I have”), your Today list, the ingredients and steps you checked off in a recipe, and your settings (design, light or dark, text size, the split screen button, sorting, PDF style and the like). Favorites, settings, the calendar, menus and Recently opened already went with the account. Running timers stay on the device that rings them, so the same timer doesn't ring twice.", false],
@@ -6980,11 +6981,13 @@ function groceryPage(){
 
 /* ---------- menu ideas ---------- */
 /*MENU-PROMPT*/
-const COURSES = ["Opening","Soup","Main dish","Starch side dish","Vegetable side dish","Dessert"];
+const COURSES_OLD = ["Opening","Soup","Main dish","Starch side dish","Vegetable side dish","Dessert"];
+const courseList = () => feat("menumeal") ? ["Opening","Soup","Main dish","Starch side dish","Salad","Dessert"] : COURSES_OLD;   // menumeal: a salad instead of a vegetable side dish
 function menuCatalog(list){
   return list.map(r=>{
     const ing=(r.s||[]).filter(x=>x[0]).flatMap(x=>x[2]).map(t=>String(t).replace(/^[\d½¼¾⅓⅔⅛\s./-]+(cups?|tbsp|tsp|oz|lbs?|pk\.?|cans?|sticks?)?\.?\s*/i,"").replace(/\(.*?\)/g,"").trim().slice(0,22)).filter(Boolean).slice(0,6);
-    return `${r.id} | ${r.t.replace(/^Untitled:\s*/,"")} | ${r.c} | ${kindOf(r)} | ${ing.join(", ")}`;
+    const meals = feat("menumeal") ? (r.meals||[]).filter(x=>MEAL_L[x]).join("/") : "";
+    return `${r.id} | ${r.t.replace(/^Untitled:\s*/,"")} | ${r.c} | ${kindOf(r)} | ${ing.join(", ")}${feat("menumeal") ? " | "+(meals||"-") : ""}`;
   }).join("\n");
 }
 function menuPrompt(request, courses, onlyBook, avoid, catalog){
@@ -6995,10 +6998,11 @@ Rules:
 - Pick a recipe from the CATALOG for each course whenever one fits, and give its exact id.
 - Kosher: never put meat and dairy in the same meal. If any course is meat, every other course must be meat, "fish" or "other" (pareve), including dessert. If the meal is dairy, nothing may be meat. Fish counts as pareve.
 - Follow the request: main ingredient (for example chicken or beef), occasion (Shabbos, Yom Tov, Pesach, weekday), number of people, and anything to avoid.
-- Each recipe may be used only once. Make the menu balanced and appealing; the opening is a starter such as fish, a dip or a salad; the starch side is something like a kugel, potatoes, rice or noodles; the vegetable side is vegetable-based.
+${feat("menumeal") ? `- If the request names a meal (breakfast, lunch or supper), choose dishes that suit that meal. The last catalog column lists the meals a recipe is labeled for: prefer recipes labeled for the requested meal, and never use one that clearly doesn't suit it (for example, a heavy roast for breakfast).\n` : ""}
+${feat("menumeal") ? `- Each recipe may be used only once. Make the menu balanced and appealing; the opening is a starter such as fish or a dip; the starch side is something like a kugel, potatoes, rice or noodles; the salad is a fresh or cooked salad.` : `- Each recipe may be used only once. Make the menu balanced and appealing; the opening is a starter such as fish, a dip or a salad; the starch side is something like a kugel, potatoes, rice or noodles; the vegetable side is vegetable-based.`}
 - ${onlyBook ? 'Use only catalog recipes. If nothing fits a course, return recipeId null and name "Nothing in the cookbook fits".' : "If nothing in the catalog fits a course, suggest a well-known kosher dish instead (recipeId null) and describe it in \"why\"."}
 ${avoid && avoid.length ? `- Try to choose different recipes from these: ${avoid.join(", ")}.\n` : ""}Return ONLY JSON: {"title": "short name for the menu", "note": "one short sentence", "courses": [{"course": "course name", "recipeId": "id from the catalog or null", "name": "dish name", "why": "short reason, under 15 words"}]}
-CATALOG (id | name | category | meat/dairy/fish/other | main ingredients):
+CATALOG (id | name | category | meat/dairy/fish/other | main ingredients${feat("menumeal") ? " | meals" : ""}):
 ${catalog}`;
 }
 /*END-MENU-PROMPT*/
@@ -7008,7 +7012,10 @@ function localMenu(request, courses, avoid){
   const want = /beef|steak|brisket|flanken/.test(q) ? "beef" : /chicken|turkey/.test(q) ? "chicken" : /dairy|milchig|cheese/.test(q) ? "dairy" : /fish|salmon/.test(q) ? "fish" : "";
   const text = r => (r.t+" "+(r.s||[]).flatMap(x=>x[2]).join(" ")).toLowerCase();
   const used=new Set(); let mealKind = want==="dairy" ? "dairy" : (want==="beef"||want==="chicken") ? "meat" : "";
-  const ok = r => !used.has(r.id) && !(avoid||[]).includes(r.id) && (!mealKind || PAREVE(kindOf(r)) || kindOf(r)===mealKind);
+  const meal = feat("menumeal") ? ((q.match(/\b(breakfast|lunch|supper)\b/)||[])[1]||"") : "";
+  const okBase = r => !used.has(r.id) && !(avoid||[]).includes(r.id) && (!mealKind || PAREVE(kindOf(r)) || kindOf(r)===mealKind);
+  let mealOnly = !!meal;   // a breakfast, lunch or supper menu: recipes labeled for that meal first
+  const ok = r => okBase(r) && (!mealOnly || (r.meals||[]).includes(meal));
   const pick = (f) => { const c=RECIPES.filter(r=>ok(r)&&f(r)); if(!c.length) return null; const r=c[Math.floor(Math.random()*c.length)]; used.add(r.id); if(!PAREVE(kindOf(r))) mealKind=kindOf(r); return r; };
   const STARCH=/kugel|potato|rice|noodle|knish|couscous|quinoa|farfel|lokshen|pasta|yerushalmi/i, VEG=/broccoli|cauliflower|zucchini|carrot|green bean|vegetable|salad|squash|eggplant|mushroom|cabbage|spinach|asparagus|letcho/i;
   const rules = {
@@ -7017,10 +7024,11 @@ function localMenu(request, courses, avoid){
     "Soup": r => r.c==="Soups",
     "Starch side dish": r => r.c==="Kugel" || (r.c==="Side Dish" && STARCH.test(r.t)),
     "Vegetable side dish": r => r.c==="Side Dish" && VEG.test(r.t) && !STARCH.test(r.t),
+    "Salad": r => /salad/i.test(r.t) || /^salads?$/i.test(r.c),
     "Dessert": r => r.c==="Desserts" || r.c==="Cakes" || r.c==="Cookies",
   };
   const order=["Main dish",...courses.filter(c=>c!=="Main dish")].filter(c=>courses.includes(c));
-  const got={}; for(const c of order){ const r=pick(rules[c]||(()=>false)); got[c]=r; }
+  const got={}; for(const c of order){ let r=pick(rules[c]||(()=>false)); if(!r && mealOnly){ mealOnly=false; r=pick(rules[c]||(()=>false)); mealOnly=!!meal; } got[c]=r; }
   return {title: want ? `${want[0].toUpperCase()+want.slice(1)} menu` : "Menu from the cookbook", note:"Picked from your cookbook.",
     courses: courses.map(c=>({course:c, recipeId:got[c]?got[c].id:null, name:got[c]?got[c].t:"Nothing in the cookbook fits", why:""}))};
 }
@@ -7107,9 +7115,9 @@ function menuPage(){
     <div class="section-head" style="margin-top:28px"><h2>Menu ideas</h2><p>A full menu from the cookbook</p></div>
     <form class="panel-a" id="mnform" novalidate>
       <div class="field"><label for="mn-q">What's the meal?</label>
-        <textarea id="mn-q" rows="2" maxlength="300" placeholder="e.g. Chicken for Shabbos, 10 people, nothing too spicy">${esc(prev)}</textarea></div>
-      <div class="mn-quick">${["Chicken","Beef","Fish","Dairy","Shabbos","Yom Tov","Pesach","Weekday"].map(x=>`<button type="button" class="btn sm" data-mq="${x}">${x}</button>`).join("")}</div>
-      <fieldset class="mn-courses"><legend>Courses</legend>${COURSES.map(c=>`<label><input type="checkbox" value="${c}" checked> ${c}</label>`).join("")}</fieldset>
+        <textarea id="mn-q" rows="2" maxlength="300" placeholder="${feat("menumeal")?"e.g. Supper for Shabbos, 10 people, nothing too spicy":"e.g. Chicken for Shabbos, 10 people, nothing too spicy"}">${esc(prev)}</textarea></div>
+      <div class="mn-quick">${(feat("menumeal") ? ["Breakfast","Lunch","Supper","Dairy","Shabbos","Yom Tov"] : ["Chicken","Beef","Fish","Dairy","Shabbos","Yom Tov","Pesach","Weekday"]).map(x=>`<button type="button" class="btn sm" data-mq="${x}">${x}</button>`).join("")}</div>
+      <fieldset class="mn-courses"><legend>Courses</legend>${courseList().map(c=>`<label><input type="checkbox" value="${c}" checked> ${c}</label>`).join("")}</fieldset>
       <label class="mn-only"><input type="checkbox" id="mn-only" checked> Only recipes from the cookbook</label>
       <p class="err" id="mn-err" role="alert" hidden></p>
       <div><button class="primary" type="submit">Make a menu</button></div>
