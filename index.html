@@ -1408,7 +1408,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.59";
+const WEB_VERSION = "4.60";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1463,6 +1463,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["filecat","4.60","2026-11-17","A scanned file's name becomes its category","When you scan a photo, PDF or Word file whose name is a category (for example “Cakes.pdf” or “Soups.jpg”), its recipes go in that category. If no category has that name yet, a new one with that name is made for them (once they're released). Names a phone makes up by itself, like “IMG_1234” or “Screenshot…”, are ignored. You can still change the category before sending.", false, "team"],
   ["recact","4.59","2026-11-17","Activity for each recipe, in its ⋮ menu","Each recipe's ⋮ menu has “Activity”: everything done to that recipe, newest first, and by whom: added, edited, every move from inbox to inbox (with the reason, when there is one), released, moved category, deleted, photos, likes, requests and messages about it. Only admins and employees allowed to see Activity have it. The list of inbox moves no longer shows on the recipe page itself, so reasons stay out of sight.", false, "team"],
   ["actall","4.58","2026-11-17","Activity: everything the app does, tidier","Activity now also shows recipe requests and answers, suggestions & comments, people asking to join and being approved, likes and dislikes, team messages, requests to move or show a recipe, photos added and approved, menus made, and moves between inboxes. The most-used kinds are buttons at the top; every kind, with its colour and count, is in one “All kinds” dropdown, so the page stays neat. Photos and menus show from today on.", false, "team"],
   ["inboxmove","4.58","2026-11-17","Move a recipe between Need to proofread, Private and Not kosher","Manage → Move between inboxes: admins can move any recipe among Need to proofread, Private and Not kosher, both ways. You must write why; the reason is kept with the recipe (in “Who moved it through the inboxes” and in Activity), so it can be traced. A move like this doesn't count as one of the three steps, so it doesn't lock you out of the next step.", false, "admin"],
@@ -5973,6 +5974,17 @@ function localParse(text, fileCat){
   const out = recipes.map(r=>Object.assign(r,{s:r.s.filter(x=>x[2].length)})).filter(r=>r.s.length && r.t);
   out.usedToc = hasToc; return out;
 }
+// filecat: the file's name as the category — an existing one when it matches, otherwise a new one
+const GENERIC_FILE = /^(img|image|images|photo|photos|pic|picture|pxl|dsc|dscn|dcim|mvimg|scan|scanned|scanner|camscanner|document|doc|docs|file|files|untitled|screenshot|screen shot|whatsapp|signal|telegram|download|downloads|new|copy|page|pages|recipe|recipes|cookbook|pdf|word|text|attachment|export|blob)\b/i;
+function fileCat(name){
+  let base=String(name||"").replace(/\.[^.]+$/,"").replace(/^[0-9a-f]{6,}-/i,"").replace(/[_]+/g," ").replace(/\(\d+\)/g," ").replace(/\s+-\s+/g," ").trim();
+  if(!base || GENERIC_FILE.test(base) || !/[a-z]{2}/i.test(base) || /\d{3,}/.test(base)) return "";
+  base=base.replace(/\brecipes?\b/ig," ").replace(/[^\p{L}\p{N}&' ]+/gu," ").replace(/\s+/g," ").trim();
+  if(base.length<2 || base.length>30 || !/[a-z]{2}/i.test(base)) return "";
+  const forms = w => { w=w.toLowerCase(); return [w, w.replace(/s$/,""), w.replace(/es$/,""), w.replace(/ies$/,"y")]; };
+  const have=[...new Set([...CATS, ...ORDER])].find(c=>{ const a=forms(c), b2=forms(base); return a.some(x=>b2.includes(x)); });
+  return have || base.replace(/\b\p{L}/gu, m=>m.toUpperCase());
+}
 function fileCategory(name){
   const base=String(name||"").replace(/\.[^.]+$/,"").replace(/^[0-9a-f]{6,}-/i,"").replace(/[_-]+/g," ").trim().toLowerCase();
   return CATS.find(c=>c.toLowerCase()===base) || CATS.find(c=>base.includes(c.toLowerCase())) || "";
@@ -6090,10 +6102,12 @@ function scanPage(cat){
     pagesBox.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ pages.splice(+b.dataset.rm,1); drawPages(); });
     document.getElementById("scan-clear").onclick=()=>{ pages=[]; drawPages(); status.innerHTML=""; };
     document.getElementById("scan-read").onclick=()=>{ const imgs=pages.slice(); pagesBox.innerHTML="";
-      read({preview:imgs[0], label:"", parts:imgs.map(d=>({inlineData:{data:d.split(",")[1], mimeType:"image/jpeg"}}))}, imgs.length); };
+      read({preview:imgs[0], label:"", name:pageName, parts:imgs.map(d=>({inlineData:{data:d.split(",")[1], mimeType:"image/jpeg"}}))}, imgs.length); };
   };
+  let pageName="";
   const addPhotos=async input=>{
     const files=[...(input.files||[])]; input.value=""; if(!files.length) return;
+    if(!pages.length) pageName=files[0].name||"";
     let bad=0;
     for(const f of files){ if(pages.length>=10) break; try{ pages.push(await resizeForScan(f)); }catch(e){ bad++; } }
     status.innerHTML = bad ? `<p class="err">${bad} ${bad===1?"file":"files"} couldn't be used as a photo.</p>` : "";
@@ -6111,6 +6125,8 @@ function scanPage(cat){
       return localParse(src.text, fc).map(r=>({id:"", c:r.c||fc, t:r.t, by:r.by, n:undefined, s:r.s})); };
     const showDrafts = (drafts, how) => {
       if(how) toast(how);
+      const fcat = feat("filecat") ? fileCat(src.name) : "";
+      if(fcat){ drafts.forEach(d=>d.c=fcat); toast(CATS.includes(fcat) ? `From the file's name: ${fcat}` : `From the file's name: a new category, ${fcat}`); }
       if(drafts.length===1){ toast("Recipe read. Check it, then "+(may("edit")?"add it.":"send it for approval.")); editor(null, cat, null, drafts[0]); }
       else importList(drafts, cat);
     };

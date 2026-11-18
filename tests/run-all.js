@@ -938,10 +938,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*50 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 50));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*51 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 51));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 50, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 51, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -952,7 +952,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /49/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /50/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1167,6 +1167,9 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       const feedTxt = await A.locator('.act-feed').first().innerText().catch(() => '');
       ok('Activity: the most-used kinds as buttons, every kind with its colour in one dropdown, and moves between inboxes with their reason', chips <= 6 && kinds.some(k => /Recipe requested/.test(k)) && kinds.some(k => /Team message/.test(k)) && kinds.some(k => /Photo added/.test(k)) && /moved/.test(feedTxt) && /family recipe/.test(feedTxt), [chips, kinds.join('|'), feedTxt.slice(0, 160)]);
       await A.evaluate(() => { actFilter.kind = ''; }); }
+    // A scanned file's name becomes its category
+    { const r = await A.evaluate(() => [fileCat('Cakes.pdf'), fileCat('cake recipes.docx'), fileCat('soups (1).jpg'), fileCat('Salads for Shabbos.pdf'), fileCat('IMG_1234.jpg'), fileCat('Screenshot 2026-11-17 at 9.12.png'), fileCat('PXL_20261117_1.jpg'), fileCat('document.pdf')]);
+      ok("a scanned file's name becomes its category (an existing one, or a new one); names a phone makes up are ignored", JSON.stringify(r) === JSON.stringify(['Cakes', 'Cakes', 'Soups', 'Salads For Shabbos', '', '', '', '']), r); }
     // Not kosher comes before Yoely; out of Not kosher you choose Yoely or Need to proofread
     { const nid = await A.evaluate(() => RECIPES.find(r => !r.rv && r.id !== 'r-challah' && r.id !== 'r-croissants').id);
       await A.evaluate(async id => { await nkPut(RECIPES.find(r => r.id === id), 'test'); }, nid); await A.waitForTimeout(600);
