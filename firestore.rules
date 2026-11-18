@@ -515,6 +515,10 @@ service cloud.firestore {
     }
 
     // Each person's own calendar: only they can see or change it.
+    // everything personal that goes with the account (grocery list, Today list, checked-off steps, settings): only its owner
+    match /mine/{uid} {
+      allow read, write: if approvedMember() && request.auth.uid == uid;
+    }
     match /plans/{uid} {
       allow read, write: if approvedMember() && request.auth.uid == uid;
       // "Log in as": an admin can change the calendar of someone they manage

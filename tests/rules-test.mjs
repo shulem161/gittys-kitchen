@@ -32,6 +32,8 @@ await check('member can change capital letters only', assertSucceeds(updateDoc(d
 await check('favorites still save', assertSucceeds(updateDoc(doc(G, 'users', 'gitty'), { favs: ['r-x'] })));
 await check('a member can keep their recently opened recipes with their account', assertSucceeds(updateDoc(doc(G, 'users', 'gitty'), { opened: ['r-x', 'r-y'] })));
 await check("…but not a huge list", assertFails(updateDoc(doc(G, 'users', 'gitty'), { opened: Array.from({length: 31}, (_, i) => 'r-' + i) })));
+await check('a member keeps their own grocery list, Today list and settings with their account', assertSucceeds(setDoc(doc(G, 'mine', 'gitty'), { 'u:grocery': '{"items":[]}', at: 1 }, { merge: true })));
+await check("…and nobody else can read or change them", assertFails(getDoc(doc(A, 'mine', 'gitty'))));
 await check('a member can save their own settings', assertSucceeds(updateDoc(doc(G, 'users', 'gitty'), { prefs: { todoDays: 7 } })));
 await check("…but can't sneak a role in with them", assertFails(updateDoc(doc(G, 'users', 'gitty'), { prefs: { todoDays: 3 }, role: 'admin' })));
 

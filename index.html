@@ -1339,7 +1339,61 @@ function store(key,val){
   }
   MEM[key]=val;
   try{ if(val===null) localStorage.removeItem(key); else localStorage.setItem(key,JSON.stringify(val)); }catch(e){}
+  if(!SYNC_QUIET) syncPut(key, val);
 }
+/* ---------- everything personal goes with the account (acctsync): mine/{uid} ---------- */
+const SYNC_SETTINGS = ["gk-look","gk-theme","gk-textsize","gk-splitmode","gk-pdfstyle","gk-hidehave","gk-cmpview","gk-recent","gk-updtab","gk-menu-q","gk-rq-draft"];
+const SYNC_OWN = ["opened","prefs","plan","menus"];   // these already go with the account their own way
+var SYNC_QUIET = false, SYNC_PENDING = {}, SYNC_TIMER = null, unsubSync = null, syncUid = "";
+const syncOn = () => typeof feat==="function" && feat("acctsync") && !!db && !offline && !!me && !pv() && typeof profile==="object" && !!profile && profile.status==="approved";
+function syncField(key){
+  const u="gk-u-"+me+"-";
+  if(key.startsWith(u)){ const n=key.slice(u.length); return SYNC_OWN.includes(n) ? "" : "u:"+n; }
+  if(SYNC_SETTINGS.includes(key) || key.startsWith("gk-sort-")) return "s:"+key.slice(3);
+  if(key==="gk-emailnudge-"+me) return "s:emailnudge";
+  return "";
+}
+const syncKey = f => f.startsWith("u:") ? "gk-u-"+me+"-"+f.slice(2) : f==="s:emailnudge" ? "gk-emailnudge-"+me : f.startsWith("s:") ? "gk-"+f.slice(2) : "";
+function syncPut(key, val){
+  try{ if(!unsubSync || !syncOn()) return; }catch(e){ return; }
+  const f=syncField(key); if(!f) return;
+  SYNC_PENDING[f]=JSON.stringify(val===undefined?null:val);
+  clearTimeout(SYNC_TIMER); SYNC_TIMER=setTimeout(syncFlush, 700);
+}
+function syncFlush(){
+  clearTimeout(SYNC_TIMER); SYNC_TIMER=null;
+  const d=SYNC_PENDING; SYNC_PENDING={}; if(!Object.keys(d).length || !syncOn()) return;
+  db.collection("mine").doc(me).set(Object.assign(d, {at:Date.now()}), {merge:true}).catch(()=>{ SYNC_PENDING=Object.assign(d, SYNC_PENDING); });
+}
+window.addEventListener("pagehide", ()=>{ if(SYNC_TIMER) syncFlush(); });
+function localSyncFields(){
+  const out={}; try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i), f=syncField(k); if(f) out[f]=localStorage.getItem(k); } }catch(e){}
+  Object.keys(MEM).forEach(k=>{ const f=syncField(k); if(f && !(f in out) && MEM[k]!==null) out[f]=JSON.stringify(MEM[k]); });
+  return out;
+}
+function watchSync(){
+  if(unsubSync || !syncOn()) return;
+  syncUid=me; let first=true;
+  unsubSync = db.collection("mine").doc(me).onSnapshot(s=>{
+    if(s.metadata && s.metadata.hasPendingWrites) return;
+    const d=(s.exists && s.data()) || {}; let changed=false;
+    if(first){ first=false;
+      // the first time on this account: what this device has goes up, without overwriting what the account already has
+      const loc=localSyncFields(), up={}; Object.keys(loc).forEach(f=>{ if(!(f in d)) up[f]=loc[f]; });
+      if(Object.keys(up).length){ Object.assign(SYNC_PENDING, up); syncFlush(); }
+    }
+    SYNC_QUIET=true;
+    try{ Object.keys(d).forEach(f=>{ if(f==="at" || f in SYNC_PENDING) return; const k=syncKey(f); if(!k) return;
+      let cur=null; try{ cur=localStorage.getItem(k); }catch(e){ cur=k in MEM ? JSON.stringify(MEM[k]) : null; }
+      const v=d[f]; if(cur===v || (cur===null && v==="null")) return;
+      let val=null; try{ val=JSON.parse(v); }catch(e){}
+      store(k, val); changed=true; }); }
+    finally{ SYNC_QUIET=false; }
+    if(changed){ try{ applyTheme(); applyLook(); applyTextSize(); renderSplitBtn(); }catch(e){}
+      if(!document.querySelector(".editor, input:focus, textarea:focus, #pv-panel, .modal")) route(); }
+  }, ()=>{});
+}
+function stopSync(){ if(SYNC_TIMER) syncFlush(); if(unsubSync){ unsubSync(); unsubSync=null; } syncUid=""; }
 
 /* ---------- online accounts (Firebase) ---------- */
 const FIREBASE_CONFIG = /*FIREBASE*/{"apiKey": "AIzaSyC6khY66tYIbhpH7aLSlb68BNopt_cT8DU", "authDomain": "gittys-kitchen.firebaseapp.com", "projectId": "gittys-kitchen", "storageBucket": "gittys-kitchen.firebasestorage.app", "messagingSenderId": "490546783263", "appId": "1:490546783263:web:1241118153141fa97ea12a"};
@@ -1428,7 +1482,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.66";
+const WEB_VERSION = "4.67";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1466,7 +1520,7 @@ const SPLIT_PANE = new URLSearchParams(location.search).has("pane");   // inside
 let paneRestore = SPLIT_PANE ? (P => P.has("y")||P.has("q") ? {y:+P.get("y")||0, q:P.get("q")||""} : null)(new URLSearchParams(location.search)) : null;   // the left side: where you were
 let splitFrom = null;   // set when you tap Split screen: scroll spot and search, carried to the left side
 const splitAvail = () => feat("split") && !appBuild && !SPLIT_PANE;            // the website only
-const splitOn = () => { try{ return localStorage.getItem("gk-splitmode")==="1"; }catch(e){ return false; } };   // off unless turned on in Website settings
+const splitOn = () => String(store("gk-splitmode"))==="1";   // off unless turned on in Website settings
 const maySplit = () => splitAvail() && splitOn();
 function renderSplitBtn(){ const b=document.getElementById("split-btn"); if(!b) return;
   if(SPLIT_PANE){ const inSplit = window.parent!==window;
@@ -1483,6 +1537,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["acctsync","4.67","2026-11-18","Everything personal follows your account, not the device","What you keep in the app now goes with your account, so it's the same on your phone, your computer and any device you sign in on: your grocery list (and “hide what I have”), your Today list, the ingredients and steps you checked off in a recipe, and your settings (design, light or dark, text size, the split screen button, sorting, PDF style and the like). Favorites, settings, the calendar, menus and Recently opened already went with the account. Running timers stay on the device that rings them, so the same timer doesn't ring twice.", false],
   ["openedsync","4.66","2026-11-18","Recently opened follows your account, with “See all”","Recently opened is now kept with your account instead of the phone or computer: open a recipe on your phone and it's in Recently opened on your computer too (it updates the next time the app opens there). The home page still shows the last 4, with a “See all” button under them that opens the full list (the last 30 recipes you opened).", false],
   ["labels","4.64","2026-11-18","Labels on every recipe: meal, dish type, dairy/meat/pareve, good for Pesach","Every recipe can have labels: Breakfast, Lunch, Supper and/or Snack (a snack is marked Healthy snack or Treat); a dish type (Appetizer, Main dish, Side dish, Soup, Dessert, Cake, Snack…); Dairy, Meat or Pareve; and “Good for Pesach”, which you set yourself and which shows only on the recipes you mark. On the recipe page only Dairy / Meat / Pareve stands out; the rest sit in one small “Labels ▾” dropdown on the same line. Change them from the recipe's ⋮ menu (“Labels”), without editing the recipe. “Find by meal & type” (on the Categories page and in Kitchen tools) shows every recipe that matches, for example everything good for breakfast. Admins can let the AI fill in the meal and dish type for all recipes at once, and new scans get them too.", false],
   ["multicat","4.63","2026-11-18","A recipe in more than one category, and new categories in every list","When you add or edit a recipe, under its category there's “Also in”: tick other categories it belongs to (for example Meat & Chicken and also Side Dish), or add a new category right there. The recipe shows up in each of them, and keeps one item number, from its main category. Pesach stays separate: a Pesach recipe isn't offered year-round categories, and a year-round recipe isn't offered Pesach. And a category added anywhere (Add a category, “+ Add a new category…”, the recipe form, the scanner or “Also in”) is saved straight away, so it's in every category list from then on, even while its recipe still waits in an inbox.", false],
@@ -1563,7 +1618,7 @@ let unsubFeat = null;
 function watchFeatures(){
   if(unsubFeat || !db) return;
   unsubFeat = db.collection("meta").doc("features").onSnapshot(s=>{
-    FEAT = (s.exists && s.data().on) || {}; setRecipes(RAW_RECIPES); if(lastCodeDocs.length) usedCodes = heldCodes(lastCodeDocs); renderAcct(); renderPreviewBar();
+    FEAT = (s.exists && s.data().on) || {}; if(state==="approved") watchSync(); setRecipes(RAW_RECIPES); if(lastCodeDocs.length) usedCodes = heldCodes(lastCodeDocs); renderAcct(); renderPreviewBar();
     if(state==="approved" && !document.querySelector(".editor, textarea:focus, #pv-panel")) route();
   }, ()=>{});
 }
@@ -1682,7 +1737,7 @@ function boot(){
     if(unsubLook){unsubLook();unsubLook=null}
     if(unsubPub){unsubPub();unsubPub=null}
     if(unsubEmp){unsubEmp();unsubEmp=null}
-    stopPlans();
+    stopPlans(); stopSync();
     if(unsubGolive){unsubGolive();unsubGolive=null;GOLIVE=[]}
     stopTeam();
     if(unsubDupes){unsubDupes();unsubDupes=null;DUP_IGNORE=new Set()}
@@ -1708,7 +1763,7 @@ function boot(){
       if((isAdmin()||may("members")) && !unsubAll) watchMembers();
       if(isAdmin()) watchDupes();
       if(profile.status==="approved"){ watchGolive(); watchTeam(); }
-      if(state==="approved"){ watchFeatures(); watchPlans(); watchRecipes(); watchSubs(); watchPendingPhotos(); watchFeedback(); watchRequests(); if(!update){ lastUpdCheck=Date.now(); checkUpdates(false); } else renderUpdateBar(); }
+      if(state==="approved"){ watchFeatures(); watchPlans(); watchSync(); watchRecipes(); watchSubs(); watchPendingPhotos(); watchFeedback(); watchRequests(); if(!update){ lastUpdCheck=Date.now(); checkUpdates(false); } else renderUpdateBar(); }
       if(was!==state || state!=="approved") route();
     }, ()=>{
       const c=store("gk-cache");
@@ -7363,7 +7418,7 @@ function settingsPage(){
   </section>`;
   app.querySelectorAll("[data-theme]").forEach(b=>b.onclick=()=>{ store("gk-theme", b.dataset.theme==="auto"?null:b.dataset.theme); applyTheme(); settingsPage(); });
   app.querySelectorAll("[data-tsize]").forEach(b=>b.onclick=()=>{ store("gk-textsize", b.dataset.tsize==="1"?null:b.dataset.tsize); applyTextSize(); settingsPage(); });
-  const ps=document.getElementById("pref-split"); if(ps) ps.onchange=()=>{ try{ localStorage.setItem("gk-splitmode", ps.checked?"1":"0"); }catch(e){} renderSplitBtn(); toast(ps.checked?"Split screen button is at the top now":"Split screen is off"); };
+  const ps=document.getElementById("pref-split"); if(ps) ps.onchange=()=>{ store("gk-splitmode", ps.checked?"1":"0"); renderSplitBtn(); toast(ps.checked?"Split screen button is at the top now":"Split screen is off"); };
   const pt=document.getElementById("pref-todo"); if(pt) pt.onchange=()=>{ setPref("todoDays", +pt.value); toast("Saved"); };
   document.getElementById("set-upd").onclick=()=>checkUpdates(true);
   const stn=document.getElementById("set-ntfy"); if(stn) stn.onclick=async()=>{ const r=await notifyAdmin("Test from Gitty's Kitchen","Notifications are working.","","white_check_mark"); toast(r&&r.ok?"Test sent. Check your device.":"Couldn't send. Check your connection."); };
