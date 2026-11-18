@@ -1265,6 +1265,8 @@ const touchHold = code => { if(code && db) db.collection("codeholds").doc(code).
 let codingSubs = false;
 async function codeSubs(){
   if(codingSubs || !feat("subcode") || !mayInboxes() || offline || !recipesOnline || !db) return;
+  // a new category in a recipe waiting in the inboxes is put in the whole category system straight away
+  if(feat("multicat")) subs.filter(x=>x.status==="pending").forEach(x=>{ if(x.c) rememberCat(x.c); (x.also||[]).forEach(rememberCat); });
   const todo = subs.filter(x=>x.status==="pending" && !x.editOf && !x.code && x.c);
   if(!todo.length) return;
   codingSubs = true;
@@ -1466,7 +1468,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
-  ["multicat","4.63","2026-11-18","A recipe in more than one category, and new categories in every list","When you add or edit a recipe, under its category there's “Also in”: tick other categories it belongs to (for example Meat & Chicken and also Side Dish), or add a new category right there. The recipe shows up in each of them, and keeps one item number, from its main category. Pesach stays separate: a Pesach recipe isn't offered year-round categories, and a year-round recipe isn't offered Pesach. And a category added anywhere (Add a category, “+ Add a new category…”, the recipe form or “Also in”) is saved straight away, so it's in every category list from then on.", false],
+  ["multicat","4.63","2026-11-18","A recipe in more than one category, and new categories in every list","When you add or edit a recipe, under its category there's “Also in”: tick other categories it belongs to (for example Meat & Chicken and also Side Dish), or add a new category right there. The recipe shows up in each of them, and keeps one item number, from its main category. Pesach stays separate: a Pesach recipe isn't offered year-round categories, and a year-round recipe isn't offered Pesach. And a category added anywhere (Add a category, “+ Add a new category…”, the recipe form, the scanner or “Also in”) is saved straight away, so it's in every category list from then on, even while its recipe still waits in an inbox.", false],
   ["scanmissed","4.62","2026-11-18","The scanner looks again for recipes it missed","When you scan a file that was read before, you still get the same recipes as last time, and the scanner also reads the whole file once more just to look for recipes it missed. Any it finds are added and remembered. A PDF or Word file is also checked this way the first time it's read.", false],
   ["scanexact","4.61","2026-11-17","The scanner reads more thoroughly, and the same file gives the same recipes","The scanner now reads the whole photo or file, every page, line and side note, and misses nothing: every ingredient and amount, every step, oven temperatures, times, pan sizes, servings and tips. It may still word things a little more clearly, but it doesn't drop or invent anything. Photos are sent sharper, so small or faded writing is read too. Scanning the same file (or the same photos) again gives exactly the same recipes, on any phone or computer, because the first reading is remembered.", false],
   ["filecat","4.60","2026-11-17","A scanned file's name becomes its category","When you scan a photo, PDF or Word file whose name is a category (for example “Cakes.pdf” or “Soups.jpg”), its recipes go in that category. If no category has that name yet, a new one with that name is made for them (once they're released). Names a phone makes up by itself, like “IMG_1234” or “Screenshot…”, are ignored. You can still change the category before sending.", false, "team"],
@@ -4772,7 +4774,7 @@ function editor(r, cat, sub, draft){
       if(!t) return fail("Enter the recipe name.");
       if(!c) return fail("Choose a category, or type a new category name.");
       const also = feat("multicat") && F.querySelector("#ed-also") ? (isPesach(c) ? [] : [...new Set([...F.querySelectorAll("#ed-also input[type=checkbox]:checked")].map(x=>x.value))].filter(x=>x && x!==c && !isPesach(x)).slice(0,12)) : undefined;
-      if(sel.value==="__new") rememberCat(c);
+      rememberCat(c); (also||[]).forEach(rememberCat);   // a new category is in the whole system at once, even while the recipe waits in an inbox
       const s = secs.map(x=>[x.ing?1:0, x.h.trim(), x.items.split("\n").map(l=>l.trim()).filter(Boolean)]).filter(x=>x[2].length);
       if(!s.length) return fail("Add at least one ingredient or step.");
       const btn0=F.querySelector(".primary");
@@ -6273,6 +6275,7 @@ function importList(drafts, cat){
     try{
       for(const li of rows){
         const d=Object.assign({}, drafts[+li.dataset.i], {c: li.querySelector(".imp-cat").value});
+        rememberCat(d.c);
         btn.textContent=`Sending… ${done+1} of ${rows.length}`;
         { const doc=toDoc(Object.assign({}, d, {ord:0}));
           await db.collection("submissions").doc("s-"+newId()).set({c:doc.c,t:doc.t,by:doc.by,n:doc.n,s:doc.s, uid:actUid(), byName:actName(), status:"pending", stage:to, ...(to!=="proof"?{sentTo:to}:{}), ...(to==="yoely"&&feat("private")?{priv:true}:{}), created:Date.now(), editOf:""}); }

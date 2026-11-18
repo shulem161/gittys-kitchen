@@ -1202,6 +1202,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       const opts = await A.locator('#ed-c option').allTextContents(), alsoOpts = await A.locator('#ed-also input').evaluateAll(x => x.map(i => i.value));
       await A.selectOption('#ed-c', 'Pesach'); await A.waitForTimeout(150);
       const pesachHidden = await A.locator('.ed-also-f').isHidden();
+      await A.evaluate(async () => { await db.collection('submissions').doc('s-lunch').set({c: 'Lunchbox', t: 'Lunch Wrap', s: toDoc({c: 'Lunchbox', t: 'x', s: [[1, '', ['1 wrap']]]}).s, uid: me, byName: myName(), status: 'pending', stage: 'proof', created: Date.now(), revs: []}); });
+      await A.waitForTimeout(1500);
+      const lunch = await A.evaluate(() => CATS.includes('Lunchbox') && !RECIPES.some(r => r.c === 'Lunchbox'));
+      ok("a new category on a recipe that's still waiting in an inbox is in the category system already", lunch);
+      await A.evaluate(async () => { await db.collection('submissions').doc('s-lunch').delete(); });
       ok('a category added in “Also in” is in every category list right away; Pesach and year-round categories stay separate', opts.includes('Party food') && !alsoOpts.includes('Pesach') && pesachHidden, [opts.includes('Party food'), alsoOpts.includes('Pesach'), pesachHidden]); }
     // Not kosher comes before Yoely; out of Not kosher you choose Yoely or Need to proofread
     { const nid = await A.evaluate(() => RECIPES.find(r => !r.rv && r.id !== 'r-challah' && r.id !== 'r-croissants').id);
