@@ -341,7 +341,8 @@ await check('admins read Activity', assertSucceeds(getDoc(doc(ADM, 'activity', '
 await check("customers can't", assertFails(getDoc(doc(PUB, 'activity', 'a1'))));
 // Remembered scanner readings (4.61)
 await check('a member can remember a scanner reading', assertSucceeds(setDoc(doc(EMP, 'scans', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'), { json: '{"recipes":[]}', at: 1, by: 'Emp' })));
-await check("…nobody can change it later", assertFails(setDoc(doc(PUB, 'scans', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'), { json: 'x', at: 2, by: 'Pub' })));
+await check("…nobody can make it shorter", assertFails(setDoc(doc(PUB, 'scans', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'), { json: 'x', at: 2, by: 'Pub' })));
+await check('…but recipes that were missed can be added to it', assertSucceeds(setDoc(doc(PUB, 'scans', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'), { json: '{"recipes":[{"title":"Missed one"}]}', at: 3, by: 'Pub' })));
 await check('members can read it', assertSucceeds(getDoc(doc(PUB, 'scans', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'))));
 // New recipes: the first inbox (4.49)
 await check("a new recipe that doesn't say its first inbox is refused (it would skip Need to proofread)", assertFails(setDoc(doc(EMP, 'submissions', 's-nostage'), { uid: 'emp', status: 'pending', t: 'X', c: 'Cakes' })));

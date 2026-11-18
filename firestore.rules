@@ -441,6 +441,12 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['json', 'at', 'by'])
         && request.resource.data.json is string && request.resource.data.json.size() < 400000
         && request.resource.data.at is int;
+      // a reading can only grow: recipes that were missed are added to it
+      allow update: if approvedMember()
+        && request.resource.data.keys().hasOnly(['json', 'at', 'by'])
+        && request.resource.data.json is string && request.resource.data.json.size() < 400000
+        && request.resource.data.json.size() > resource.data.json.size()
+        && request.resource.data.at is int;
       allow delete: if isAdmin();
     }
 

@@ -1,6 +1,6 @@
 {
-  "web": "4.61",
+  "web": "4.62",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "The scanner reads more carefully, and the same file gives the same recipes."
+  "notes": "The scanner looks again for recipes it missed."
 }
