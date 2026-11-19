@@ -154,6 +154,13 @@ service cloud.firestore {
 
     // Recipe code numbers per category and per Pesach section. Members read, only the admin writes.
     // The design everyone gets (chosen by an admin).
+    // Kitchen Guide: admins' changes to the built-in topics, and topics they add; everyone signed in and approved reads them
+    match /guide/{id} {
+      allow read: if approvedMember();
+      allow write: if isAdmin() && request.resource.data.keys().hasOnly(['t', 'body', 'ord', 'hidden', 'updated', 'by'])
+        && request.resource.data.t is string && request.resource.data.body is string && request.resource.data.body.size() < 30000;
+      allow delete: if isAdmin();
+    }
     match /meta/look {
       allow get: if signedIn();
       allow write: if isAdmin();

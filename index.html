@@ -97,7 +97,8 @@ button{font:inherit;color:inherit}
 .also-c:has(input:checked){border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}.also-c[hidden]{display:none}.also-new{display:inline-flex;gap:6px}.also-new input{width:150px}
 .ed-also-f .lbl{font-weight:600;font-size:14px}.chip-also{text-decoration:none;opacity:.85}
 .labels-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}.lchip{display:inline-flex;align-items:center;gap:4px;font-size:13px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink);text-decoration:none}
-.lchip.meal{border-color:#E7B66A}.send-to select.need{outline:2px solid #C0392B}
+.lchip.meal{border-color:#E7B66A}
+.guide-topic h2{margin:0 0 8px}.guide-body h3{margin:16px 0 6px;font-size:1.05em}.guide-body p,.guide-body li{line-height:1.55}.guide-body ul,.guide-body ol{padding-left:22px;margin:6px 0}.guide .cat.off{opacity:.55}.send-to select.need{outline:2px solid #C0392B}
 .scan-mode{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 14px}.sm-opt{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:12px;cursor:pointer;background:var(--paper)}
 .sm-opt:has(input:checked){border-color:var(--accent,#2C5A9E);box-shadow:0 0 0 1px var(--accent,#2C5A9E)}.sm-opt input{margin-top:3px}.sm-opt span{display:flex;flex-direction:column;gap:2px}.sm-opt small{color:var(--muted);font-size:12.5px;line-height:1.3}.opened-all{display:flex;justify-content:center;margin:14px 0 6px}.lchip.snack{border-color:#E6A0C4}
 .labels-row{align-items:center}.lbl-more{position:relative}.lbl-more summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:13px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--muted)}
@@ -1484,7 +1485,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.76";
+const WEB_VERSION = "4.78";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1539,6 +1540,8 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["guide","4.78","2026-11-18","Kitchen Guide","A Kitchen Guide in Kitchen tools (on the home page and in the menu): short how-to topics from the cooking-class notes – cooking methods, the mother sauces and the sauces made from them, butter sauces, preparing pans, angel food cakes, the pilaf method, making a coulis, pasta dough, the potato dishes made from duchesse, working with gelatin, deep-frying safely, choux paste tips and kosher swaps. Search finds words inside the topics. Admins can change a topic, hide it or add new ones.", false],
+  ["inboxmovebtn","4.77","2026-11-18","“Move to…” on every recipe in the four first inboxes","In Need to proofread, Private, Grandma's Hungarian Recipes and Not kosher, each recipe has a “⇄ Move to…” button next to Edit and Decline. Choose one of the other three inboxes, write why, and it moves, the same as Manage → Move between inboxes: nobody's name is written down for the move, and the reason is kept in Activity. For admins.", false],
   ["pickinbox","4.76","2026-11-18","Choose where a new recipe goes, every time","When you add, scan or import recipes, “Send to” no longer starts on Need to proofread. It says “Choose where it goes…”, and the recipe isn't sent until you pick an inbox (Need to proofread, Private, Grandma's Hungarian Recipes or Not kosher). People who can't choose the first inbox still send to Need to proofread as before.", false],
   ["hungarian","4.75","2026-11-18","Grandma's Hungarian Recipes inbox","A new inbox, Grandma's Hungarian Recipes, next to Private, with the same rules: the same people use it (admins, and employees given the Private inbox), cleared it skips Need to proofread and goes straight to For approval (whoever clears it counts as the first of the three people), and everything that goes through it stays in the family, like Private. You can send a new recipe or a scanned file straight to it, put a recipe in from its ⋮ menu, and in Manage → Move between inboxes move recipes among Need to proofread, Private, Grandma's Hungarian Recipes and Not kosher, without anyone's name being written down for the move.", false],
   ["keepplace","4.74","2026-11-18","Back to where you left off in the list","When you open a recipe from a list or an inbox and come back (with ← or the phone's back button), or come back after sending a recipe up, declining it or anything else you do on it, the list opens at the same spot you left it, instead of jumping to the top. When a list redraws by itself (something new came in), it stays where you are too.", false],
@@ -2153,6 +2156,7 @@ function home(){
     <div class="cats tools">
       ${feat("labels")?`<a class="cat" href="#find"><div class="ic">${TOOL_IC.menu||TOOL_IC.calc}</div><div class="tool-txt"><h3>Find by meal</h3><span>Breakfast, lunch, supper and more</span></div></a>`:""}
       <a class="cat" href="#convert"><div class="ic">${TOOL_IC.calc}</div><div class="tool-txt"><h3>Calculator</h3><span>Double, halve, convert</span></div></a>
+      ${feat("guide")&&!offline?`<a class="cat" href="#guide"><div class="ic" style="font-size:22px">📖</div><div class="tool-txt"><h3>Kitchen Guide</h3><span>Methods, sauces, baking how-tos</span></div></a>`:""}
       ${offline||!can("ai")?"":`<a class="cat" href="#menu"><div class="ic">${TOOL_IC.menu}</div><div class="tool-txt"><h3>Menu ideas</h3><span>A full menu from the cookbook</span></div></a>`}
     </div>
   </section>
@@ -4590,7 +4594,7 @@ function openMenu(confirming){
     ${group("recipes","Recipes", recipes, 0)}
     ${group("tools","Kitchen tools", [
       isTeam() ? item("#compare~~","Compare recipes") : "",
-      item("#grocery","Grocery list"), item("#timers","Timers", timersRunning()?timersRunning()+" running":""), item("#plan","Calendar &amp; menus"), item("#convert","Calculator"),
+      item("#grocery","Grocery list"), item("#timers","Timers", timersRunning()?timersRunning()+" running":""), item("#plan","Calendar &amp; menus"), item("#convert","Calculator"), feat("guide")&&!offline ? item("#guide","📖 Kitchen Guide") : "",
       offline||!can("ai") ? "" : item("#menu","Menu ideas"),
       offline||!can("feedback")||may("inbox") ? "" : item("#feedback","Suggestions &amp; comments"),
     ].filter(Boolean), 0)}
@@ -5088,7 +5092,7 @@ function subPanel(st){
   return `<div class="panel-a rv-panel"><h3>New recipes, not in the cookbook yet <span class="count">${L.length}</span></h3>
     <ul class="rv-list">${L.map(x=>`<li><div class="rv-top">${x.code&&feat("subcode")?`<span class="nochip" title="Item number">${esc(x.code)}</span> `:""}<b>${esc(x.t)}</b><span class="hint">${esc(x.c||"")} · from ${esc(x.byName||"a member")} · ${fmtDate(x.created)}</span></div>
       <details class="rv-log"><summary>See the recipe</summary><div class="pv">${previewHTML(x)}</div></details>
-      <div class="row rv-acts">${btns(x)}${mayInboxes()?`<a class="btn sm" href="#review-${esc(x.id)}">Edit</a>`:""}<button type="button" class="btn sm" data-sx="decline" data-sid="${esc(x.id)}">Decline</button></div></li>`).join("")}</ul></div>`;
+      <div class="row rv-acts">${btns(x)}${mayInboxes()?`<a class="btn sm" href="#review-${esc(x.id)}">Edit</a>`:""}<button type="button" class="btn sm" data-sx="decline" data-sid="${esc(x.id)}">Decline</button>${moveBtn("s", x.id, st)}</div></li>`).join("")}</ul></div>`;
 }
 function wireSubPanel(after){
   app.querySelectorAll("[data-sx]").forEach(b=>b.onclick=async()=>{ const x=subs.find(z=>z.id===b.dataset.sid); if(!x) return; const k=b.dataset.sx, now=Date.now(), from=stageOf(x);
@@ -5140,6 +5144,19 @@ function yoelyPage(box){
 // inboxmove (Manage): admins move a recipe among Need to proofread, Private and Not kosher, with a reason.
 // It isn't one of the three steps: nobody is written down as having moved it up, and the reason stays in its log.
 const MOVE_BOXES = ["proof","yoely","hu","kosher"];
+// inboxmovebtn: a “Move to…” button on each recipe in these inboxes (one click handler for the whole app)
+const moveBtn = (kind, id, at) => feat("inboxmovebtn") && mayInboxMove() && moveBoxes().includes(at) && moveBoxes().length>1 ? `<button type="button" class="btn sm" data-mvto="${kind}:${esc(id)}:${at}">⇄ Move to…</button>` : "";
+document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest("[data-mvto]"); if(!b) return;
+  const [kind, id, at]=b.dataset.mvto.split(":"); const row=b.parentElement; if(row.nextElementSibling && row.nextElementSibling.classList.contains("mv-inline")){ row.nextElementSibling.remove(); return; }
+  const box=document.createElement("div"); box.className="row im-row mv-inline";
+  box.innerHTML=`<label>Move to <select class="im-to">${moveBoxes().filter(x=>x!==at).map(x=>`<option value="${x}">${esc(INBOX_NAME[x])}</option>`).join("")}</select></label>
+    <input class="im-why" type="text" maxlength="300" placeholder="Why? (needed – it's kept in Activity)"><button type="button" class="btn sm solid im-go">Move</button><button type="button" class="btn sm im-x">Cancel</button>`;
+  row.after(box); box.querySelector(".im-why").focus(); box.querySelector(".im-x").onclick=()=>box.remove();
+  box.querySelector(".im-go").onclick=async()=>{ const why=box.querySelector(".im-why"), reason=why.value.trim(), to=box.querySelector(".im-to").value;
+    if(reason.length<3){ toast("Write why you're moving it"); why.focus(); return; }
+    const go=box.querySelector(".im-go"); go.disabled=true;
+    const ok = kind==="r" ? await inboxMoveRecipe(findAny(id), to, reason) : await inboxMoveSub(subs.find(x=>x.id===id), to, reason);
+    if(ok){ const y=window.scrollY; route(); window.scrollTo(0,y); } else go.disabled=false; }; });
 const mayInboxMove = () => feat("inboxmove") && isAdmin() && recipesOnline && !offline;
 const moveBoxes = () => MOVE_BOXES.filter(b => b==="proof" || (b==="yoely" ? feat("yoely") : b==="hu" ? huOn() : feat("nk")));
 async function inboxMoveRecipe(r, toBox, reason){
@@ -5302,6 +5319,11 @@ const rvEditBtn = r => !feat("rvedit") || offline || !recipesOnline || isPublic(
   : `<a class="btn sm" href="${r.rvNote&&(!feat("fixlink")||mayFix(r))?fixHref(r.id, r.rvNote):"#edit-"+esc(r.id)}">✎ ${may("edit")?"Edit":"Request a change"}</a>`;
 // The buttons for one stage (for a recipe already in the cookbook)
 function rvButtons(r){
+  const st=r.rv; if(!st) return "";
+  if(["proof","yoely","kosher"].includes(st) && feat("inboxmovebtn")) return rvButtons0(r) + moveBtn("r", r.id, boxOf(st, r));
+  return rvButtons0(r);
+}
+function rvButtons0(r){
   const st=r.rv; if(!st) return "";
   const undo = feat("moveback") && lastMove(r) ? `<button type="button" class="btn sm" data-rv="undo" data-rid="${esc(r.id)}">↩ Undo – move it back to ${INBOX_NAME[lastMove(r).from]}</button>` : "";
   if(st==="yoely") return !mayYoely() ? "" : `<button type="button" class="btn sm solid" data-rv="yoOk" data-rid="${esc(r.id)}">✓ Cleared – send to For approval</button><button type="button" class="btn sm" data-rv="yoOut" data-rid="${esc(r.id)}">Take it out of ${esc(INBOX_NAME[boxOf("yoely", r)])}</button>`;
@@ -5591,7 +5613,7 @@ function recipeInbox(stage){
   const lockMsg = s => (stage==="approve"||stage==="release") && ((s.uids||[]).includes(me) || s.proofUid===me || s.approvedUid===me) ? "You moved this one up already, so someone else has to do the next step." : "";
   const subLast = s => { const L=s.log||[], e=L[L.length-1]; return feat("moveback") && e && e.to===stageOf(s) && ["proof","approve"].includes(e.from) && !e.back && e.uid===me ? e : null; };
   const subUndo = s => subLast(s) ? `<button type="button" class="btn" data-ib="undo">↩ Undo – move it back to ${INBOX_NAME[subLast(s).from]}</button>` : "";
-  const acts = s => lockMsg(s) ? `<span class="hint lock">🔒 ${lockMsg(s)}</span>${subUndo(s)}` : stage==="proof" ? `<button type="button" class="btn solid" data-ib="ok">✓ Proofread – send to For approval</button><button type="button" class="btn" data-ib="fix">✗ Needs changes</button><a class="btn" href="#review-${esc(s.id)}">Edit</a><button type="button" class="btn" data-ib="ask-reject">Decline</button>`
+  const acts = s => lockMsg(s) ? `<span class="hint lock">🔒 ${lockMsg(s)}</span>${subUndo(s)}` : stage==="proof" ? `<button type="button" class="btn solid" data-ib="ok">✓ Proofread – send to For approval</button><button type="button" class="btn" data-ib="fix">✗ Needs changes</button><a class="btn" href="#review-${esc(s.id)}">Edit</a><button type="button" class="btn" data-ib="ask-reject">Decline</button>${moveBtn("s", s.id, "proof").replace('class="btn sm"','class="btn"')}`
     : stage==="approve" ? `<button type="button" class="btn solid" data-ib="approve">✓ Approve – send to Ready to release</button><a class="btn" href="#review-${esc(s.id)}">Edit</a>${feat("moveback")?"":`<button type="button" class="btn" data-ib="back">Back to proofread</button>`}<button type="button" class="btn" data-ib="ask-reject">Decline</button>${subUndo(s)}`
     : `${isPriv(s)?`<span class="hint lock">🔒 Private: it stays in the family.</span>`:`<button type="button" class="btn solid" data-ib="pub">🌐 Release to the public</button>`}<button type="button" class="btn${isPriv(s)?" solid":""}" data-ib="priv">🔒 Release for the team only</button><a class="btn" href="#review-${esc(s.id)}">Edit</a>${subUndo(s)}`;
   app.innerHTML = `<section class="wrap admin inbox">
@@ -6420,6 +6442,231 @@ async function pdfFileText(buf){
       return line.replace(/\s+$/,""); }).join("\n"));
   }
   return pages.join("\n\n");
+}
+// guide: the Kitchen Guide – short how-to topics. Built-in ones below; admins' changes and new topics in guide/{id}.
+const GUIDE_BASE = [
+["methods","Cooking Methods",`Every way of cooking falls into two families: dry heat and moist heat.
+
+## Dry heat (no water)
+• Roasting and baking – in the oven, hot air all around. Good for whole chickens, roasts, vegetables, breads and cakes.
+• Grilling and broiling – strong heat from below (grill) or above (broiler). Quick, with a browned crust.
+• Sautéing – a little fat in a hot pan, small pieces, stirred or tossed. Fast and on high heat.
+• Pan-frying – more fat (about halfway up the food), medium-high heat, turned once. Cutlets, latkes.
+• Deep-frying – the food swims in hot oil (about 350°F). See Deep-Frying Safely.
+
+## Moist heat (water, stock or steam)
+• Boiling – big bubbles, 212°F. Pasta, potatoes, blanching vegetables.
+• Simmering – small, gentle bubbles. Soups, stocks, grains.
+• Poaching – barely moving liquid, 160–180°F. Fish, eggs, fruit.
+• Steaming – over boiling water, not in it. Vegetables, dumplings.
+
+## Both together
+• Braising – brown the meat first, then cook it covered in a little liquid, slowly, until tender. Brisket, short ribs, Swiss steak.
+• Stewing – the same idea with smaller pieces, fully covered in liquid.
+
+Tip: tough cuts of meat get tender with long, moist cooking; tender cuts are best quick and dry.`],
+["sauces","The Mother Sauces",`Classic French cooking builds most sauces from five “mother” sauces. Each one is the start of many smaller sauces.
+
+## The five
+• Espagnole (brown sauce) – brown stock thickened with a brown roux, with caramelized vegetables and tomato.
+• Velouté – white stock (chicken, veal or fish) thickened with a light roux.
+• Béchamel – milk thickened with a white roux.
+• Tomato sauce – tomatoes cooked down with vegetables and seasonings.
+• Hollandaise – egg yolks and warm butter whisked into a smooth sauce (see Butter Sauces).
+
+## Small sauces from them
+• Demi-glace – half espagnole and half brown stock, cooked down by half. From demi-glace: Bordelaise (red wine and shallots), Robert (onions, white wine and Dijon mustard), Chasseur (mushrooms, shallots, tomato and white wine).
+• Suprême – chicken velouté finished with cream and mushrooms (chicken only).
+
+## Kosher notes
+• Espagnole, demi-glace and chicken velouté are meat: make the roux with margarine or oil, never butter, and use non-dairy creamer instead of cream.
+• Béchamel is dairy, so it can't go with meat.
+• Tomato sauce is pareve when made with oil and vegetable stock.`],
+["butter","Butter Sauces and Compound Butters",`These are dairy, so they go with fish, vegetables, eggs and dairy meals – never with meat.
+
+## Hollandaise
+Whisk egg yolks with a little water and lemon juice over gentle heat until thick, then slowly whisk in warm clarified butter until smooth. Keep it warm, not hot, or it splits.
+• Béarnaise – add tarragon (and a shallot-vinegar reduction).
+• Choron – béarnaise with a little tomato.
+• Maltaise – blood orange or mandarin juice instead of the lemon.
+
+## Beurre blanc and beurre rouge
+Cook white (or red) wine with shallots, lemon and herbs until almost dry, then whisk in cold butter, a few cubes at a time, off and on the heat.
+
+## Melted butters
+• Beurre fondu – simply melted.
+• Beurre noisette – cooked until light brown and nutty.
+• Beurre noir – cooked darker, with a splash of vinegar or lemon.
+
+## Compound butters
+Soft butter mixed with flavors, rolled in plastic, chilled and sliced onto hot food.
+• Maître d'hôtel – parsley and lemon.
+• Herb butter – green onion and fresh herbs.
+• Basil butter.
+• Fruit butter – honey and lemon.`],
+["pans","Preparing Cake Pans",`Get the pans ready before you mix the batter, so it can go in the oven as soon as it's done. If batter waits, the air in it escapes and the cake comes out lower.
+
+• Solid shortening is better than butter or margarine for greasing: it has no water (water makes cakes stick in spots), it doesn't burn as easily, and it holds a dusting of flour better.
+• For a sure release, grease the pan, line the bottom with parchment, and grease the paper too.
+• Pan-release sprays save time and work very well together with parchment liners; spray every corner.
+• Sponge and angel food cakes are the exception: leave the sides ungreased so the batter can climb up as it rises.
+• Cheesecake: spray the pan, dust it lightly with flour, then pour in the batter – it comes out easily.`],
+["angel","Angel Food Cakes",`Angel food cakes are tall and light, made with no fat at all and raised by a lot of whipped egg whites.
+
+## How to make one
+1. Heat the oven.
+2. Mix the dry ingredients with part of the sugar and set aside.
+3. Whip the egg whites with the rest of the sugar until stiff and glossy.
+4. Gently fold the dry ingredients into the whites.
+5. Spoon into an ungreased tube pan and bake right away.
+6. Turn the pan upside down as soon as it comes out, and let it cool hanging that way.
+
+## Why it works
+• Even a drop of fat or yolk stops whites from whipping, so the bowl and whisk must be completely clean.
+• The pan isn't greased so the batter can cling to the sides and climb.
+• Cooling upside down lets gravity keep the cake from sinking.
+
+Serve with fresh fruit, a fruit compote or whipped topping.`],
+["pilaf","The Pilaf Method (Rice and Grains)",`In the pilaf method the raw grains are first lightly cooked in fat, then simmered in hot stock, covered, until the liquid is absorbed. The grains stay separate and full of flavor.
+
+1. Bring the stock (or water) to a boil.
+2. Heat the fat in a heavy pot over medium heat. Add onion, garlic or other flavorings and cook 1–2 minutes without browning.
+3. Add the grains and stir so every grain is coated with fat. Don't let them brown.
+4. Pour in all the boiling liquid at once.
+5. Bring back to a boil, lower to a simmer and cover.
+6. Cook on the stove or in a 350°F oven until the liquid is absorbed (long-grain rice: about 18–20 minutes).
+7. Fluff with a fork and take out any bay leaf.
+
+Works for rice, farro, quinoa, bulgur and orzo – only the liquid and the time change.`],
+["coulis","Making a Coulis",`A coulis is a smooth sauce made by pureeing a cooked vegetable or fruit.
+
+1. Cook the main ingredient (and any flavorings) in a suitable liquid until very tender.
+2. Puree in a blender, food processor or food mill.
+3. Simmer the puree with more liquid to blend the flavors.
+4. Strain, then thin and season it the way you want it.
+
+Examples in the cookbook: Red Pepper Coulis, Raspberry Coulis.`],
+["pasta","Pasta Dough: Mixing and Rolling",`## Mixing by hand
+1. Mound the flour on the counter and make a well in the middle.
+2. Put the eggs in the well and beat them with a fork.
+3. With your fingers, slowly bring more flour from the sides into the eggs.
+4. With a dough scraper, keep working in flour until it's a firm dough.
+5. Knead the stiff dough until smooth. Wrap it and let it rest 20–30 minutes.
+
+## Rolling with a pasta machine
+1. Work with a small piece; keep the rest covered so it doesn't dry out. Flatten it with your hand.
+2. Set the rollers to the widest setting and pass the dough through.
+3. Dust with flour, fold in thirds and pass it through again. Repeat 4–6 times, until smooth.
+4. Tighten the rollers one or two marks at a time, passing the dough through each time without folding.
+5. Stop when you can see your hand through the sheet but it doesn't tear.
+6. Cut into ribbons with the cutting blades, or by hand.
+7. Lay the pasta in one layer on a floured sheet pan to dry; separate layers with parchment.
+
+Semolina can replace part of the flour: stronger dough, harder to work by hand.`],
+["potatoes","Potato Dishes from Duchesse",`Duchesse potatoes (mashed potatoes with butter, egg yolks and nutmeg, piped and baked) are the start of many classic potato dishes:
+
+• Duchesse + diced tomato = Marquis
+• Duchesse + chopped truffles, coated in almonds and deep-fried = Berny
+• Duchesse shaped into little cylinders, breaded and deep-fried = Croquettes
+• Duchesse + choux paste (éclair paste), piped and deep-fried = Dauphine
+• Dauphine + grated Parmesan, piped in crescents and fried = Lorette
+
+Recipes: see Duchesse Potatoes and Dauphine Potatoes in Side Dish.`],
+["gelatin","Working with Gelatin",`• Powdered gelatin: sprinkle it over cold water and let it soften at least 5 minutes.
+• Sheet gelatin: soak it in ice water at least 15 minutes, then squeeze out the water.
+• Then dissolve it in a hot liquid, or melt it gently and stir it into a warm one.
+• Powdered and sheet gelatin can replace each other weight for weight.
+• Never let gelatin boil – it loses its strength.
+• For a mousse, let the gelatin mixture cool and start to thicken before folding in whipped cream or meringue.
+• Kosher note: use a gelatin with a hechsher; many are pareve, some are meat.`],
+["frying","Deep-Frying Safely",`• Fill the pot only half full of oil, and use a back burner.
+• Make sure every tool and the food are completely dry – water makes hot oil spatter.
+• Keep the oil around 350°F. If it smokes, it's too hot and can catch fire. A thermometer helps.
+• Don't crowd the pot: too much food at once cools the oil and makes it greasy.
+• Keep paper towels and draining paper away from the flame.
+• Have a lid nearby. Never pour water on an oil fire – cover it and turn off the heat.
+• Drain fried food on a rack or crumpled paper, and serve it hot.`],
+["choux","Choux Paste (Éclairs and Cream Puffs)",`• Bring the water (or milk), fat and salt to a full boil so the fat is completely melted, then add all the flour at once and beat hard.
+• Put it back on the heat and keep beating until the dough pulls away from the pot and leaves a thin film.
+• Let it cool a little (to about 130°F) before adding the eggs, or they'll cook.
+• Add the eggs a little at a time and wait until each is mixed in. Stop when the dough is shiny and holds its shape – you may not need all of them.
+• Pipe onto parchment, not greased pans: grease makes them spread flat.
+• Bake hot first (about 425°F) to puff them, then lower the heat until they're dry inside. Don't open the oven early, and don't cool them too fast, or they collapse.
+• Make it right before baking – the paste doesn't keep. Baked shells freeze well.`],
+["swaps","Kosher Swaps",`Many class recipes were written with dairy or non-kosher ingredients. These swaps keep a recipe kosher or pareve:
+
+• Milk or cream → Coffee Rich, Mimiccream, soy, rice or almond milk
+• Heavy cream (whipped) → non-dairy whipping cream or whipped topping
+• Butter → margarine, or oil for frying and roux
+• Cream cheese → Tofutti cream cheese
+• Sour cream → Tofutti or tofu sour cream
+• Bacon, salt pork, pancetta → beef fry or smoked turkey (or leave it out)
+• Lard → oil or vegetable shortening
+• Shellfish (shrimp, crab, scallops) → surimi or a firm white fish
+• Worcestershire sauce has anchovies: don't use it with meat unless it's one made without fish
+
+Remember: meat and dairy never together, and fish isn't served together with meat.`],
+];
+let GUIDE_DB = null;   // guide/{id}: {t, body, ord, hidden, updated, by}
+const mayGuideEdit = () => isAdmin() && !!db && !offline;
+async function guideLoad(force){
+  if(GUIDE_DB && !force) return GUIDE_DB;
+  try{ const q=await db.collection("guide").get(); GUIDE_DB={}; q.docs.forEach(d=>GUIDE_DB[d.id]=d.data()); }catch(e){ GUIDE_DB = GUIDE_DB || {}; }
+  return GUIDE_DB;
+}
+function guideTopics(all){
+  const D=GUIDE_DB||{}, base=GUIDE_BASE.map(([id,t,body],i)=>Object.assign({id, t, body, ord:i, base:true}, D[id]||{}));
+  const extra=Object.entries(D).filter(([id])=>!GUIDE_BASE.some(b=>b[0]===id)).map(([id,d],i)=>Object.assign({id, ord:100+i}, d));
+  return [...base, ...extra].filter(x=>all || !x.hidden).sort((a,b)=>(a.ord||0)-(b.ord||0));
+}
+function guideHTML(body){
+  const out=[]; let list=null, olist=null;
+  const close=()=>{ if(list){ out.push(`<ul>${list.join("")}</ul>`); list=null; } if(olist){ out.push(`<ol>${olist.join("")}</ol>`); olist=null; } };
+  String(body||"").split("\n").forEach(l=>{ const t=l.trim();
+    if(!t){ close(); return; }
+    if(t.startsWith("## ")){ close(); out.push(`<h3>${esc(t.slice(3))}</h3>`); return; }
+    if(/^[•\-*]\s/.test(t)){ if(olist) close(); (list=list||[]).push(`<li>${esc(t.replace(/^[•\-*]\s+/,""))}</li>`); return; }
+    if(/^\d+[.)]\s/.test(t)){ if(list) close(); (olist=olist||[]).push(`<li>${esc(t.replace(/^\d+[.)]\s+/,""))}</li>`); return; }
+    close(); out.push(`<p>${esc(t)}</p>`); });
+  close(); return out.join("");
+}
+async function guidePage(id){
+  app.innerHTML=`<section class="wrap guide"><div class="section-head" style="margin-top:28px"><h2>📖 Kitchen Guide</h2></div><p class="hint">Loading…</p></section>`;
+  await guideLoad(); if(!location.hash.startsWith("#guide")) return;
+  const T=guideTopics(mayGuideEdit()), topic=id ? T.find(x=>x.id===id) : null;
+  if(topic){
+    app.innerHTML=`<section class="wrap guide"><p style="margin-top:22px"><a class="link" href="#guide">← Kitchen Guide</a></p>
+      <article class="panel-a guide-topic"><h2>${esc(topic.t)}</h2>${topic.hidden?`<p class="hint">Hidden from everyone but admins.</p>`:""}<div class="guide-body">${guideHTML(topic.body)}</div>
+      ${mayGuideEdit()?`<div class="row mn-actions"><button type="button" class="btn" id="gd-edit">Edit</button><button type="button" class="btn" id="gd-hide">${topic.hidden?"Show it again":(topic.base?"Hide it":"Delete it")}</button></div>`:""}</article></section>`;
+    const ed=document.getElementById("gd-edit"); if(ed) ed.onclick=()=>guideEditor(topic);
+    const hd=document.getElementById("gd-hide"); if(hd) hd.onclick=async()=>{ try{
+      if(!topic.base && !topic.hidden){ if(!hd.dataset.sure){ hd.dataset.sure="1"; hd.textContent="Tap again to delete"; hd.classList.add("warn"); return; } await db.collection("guide").doc(topic.id).delete(); delete GUIDE_DB[topic.id]; toast("Deleted"); location.hash="guide"; return; }
+      const d={t:topic.t, body:topic.body, ord:topic.ord||0, hidden:!topic.hidden, updated:Date.now(), by:myName()};
+      await db.collection("guide").doc(topic.id).set(d); GUIDE_DB[topic.id]=d; toast(d.hidden?"Hidden":"Shown again"); guidePage(topic.id); }catch(e){ toast("Couldn't save. Check your connection."); } };
+    return;
+  }
+  app.innerHTML=`<section class="wrap guide"><div class="section-head" style="margin-top:28px"><h2>📖 Kitchen Guide</h2><p>${T.filter(x=>!x.hidden).length} topics</p></div>
+    <p class="hint" style="margin:-4px 0 10px">How-to notes from the cooking classes: methods, sauces, baking and more.</p>
+    <input type="search" id="gd-q" placeholder="Search the guide…" autocomplete="off" style="width:100%;margin-bottom:10px">
+    <div class="cats tools" id="gd-list">${T.map(x=>`<a class="cat${x.hidden?" off":""}" href="#guide-${esc(x.id)}" data-gd="${esc((x.t+" "+x.body).toLowerCase())}"><div class="tool-txt"><h3>${esc(x.t)}${x.hidden?" (hidden)":""}</h3><span>${esc(String(x.body||"").replace(/##\s*/g,"").replace(/\s+/g," ").slice(0,80))}…</span></div></a>`).join("")}</div>
+    <p class="hint" id="gd-none" hidden>Nothing in the guide matches that.</p>
+    ${mayGuideEdit()?`<div class="row mn-actions" style="margin-top:12px"><button type="button" class="btn solid" id="gd-add">+ Add a topic</button></div>`:""}</section>`;
+  const q=document.getElementById("gd-q"); q.oninput=()=>{ const s=q.value.trim().toLowerCase(); let n=0;
+    app.querySelectorAll("[data-gd]").forEach(a=>{ const on=!s || a.dataset.gd.includes(s); a.hidden=!on; if(on) n++; });
+    document.getElementById("gd-none").hidden = n>0; };
+  const add=document.getElementById("gd-add"); if(add) add.onclick=()=>guideEditor({id:"g-"+newId(), t:"", body:"", ord:200, base:false});
+}
+function guideEditor(topic){
+  app.innerHTML=`<section class="wrap guide"><p style="margin-top:22px"><a class="link" href="#guide">← Kitchen Guide</a></p>
+    <form class="panel-a" id="gd-form"><h2>${topic.t?"Edit topic":"New topic"}</h2>
+      <div class="field"><label for="gd-t">Title</label><input id="gd-t" maxlength="80" value="${esc(topic.t||"")}" required></div>
+      <div class="field"><label for="gd-b">Text</label><textarea id="gd-b" rows="16" maxlength="20000">${esc(topic.body||"")}</textarea>
+        <p class="hint">Start a line with “## ” for a heading, “• ” for a point, or “1. ” for a numbered step. A blank line starts a new paragraph.</p></div>
+      <div class="row mn-actions"><button type="submit" class="btn solid">Save</button><a class="btn" href="#guide${topic.t?"-"+esc(topic.id):""}">Cancel</a></div></form></section>`;
+  document.getElementById("gd-form").onsubmit=async e=>{ e.preventDefault();
+    const t=document.getElementById("gd-t").value.trim(), body=document.getElementById("gd-b").value.trim(); if(!t){ toast("Give it a title"); return; }
+    const d={t, body, ord:topic.ord||0, hidden:!!topic.hidden, updated:Date.now(), by:myName()};
+    try{ await db.collection("guide").doc(topic.id).set(d); GUIDE_DB[topic.id]=d; toast("Saved"); location.hash="guide-"+topic.id; }catch(err){ toast("Couldn't save. Check your connection."); } };
 }
 // Turn any picked file into what the reader needs: an image, a PDF, or plain text.
 async function readFileForAI(file){
@@ -8070,6 +8317,7 @@ function routePage(){
   if(!offline && (h==="scan" || h.startsWith("scan-"))){ q.value=""; scanPage(CATS.find(x=>slug(x)==="c-"+h.slice(5))); window.scrollTo(0,0); return; }
   if(!offline && (h==="new" || h.startsWith("new-"))){ q.value=""; editor(null, CATS.find(x=>slug(x)==="c-"+h.slice(4))); window.scrollTo(0,0); return; }
   if(h==="favorites"){ q.value=""; favorites(); window.scrollTo(0,0); return; }
+  if((h==="guide" || h.startsWith("guide-")) && feat("guide") && !offline){ q.value=""; guidePage(h.startsWith("guide-")?h.slice(6):""); window.scrollTo(0,0); return; }
   if(h==="opened" && feat("openedsync") && feat("recentopen")){ q.value=""; openedPage(); window.scrollTo(0,0); return; }
   if(h==="requests" && !offline){ q.value=""; requestsPage(); window.scrollTo(0,0); return; }
   if(h==="recent" || h.startsWith("recent-")){ q.value=""; recentPage(h.slice(7) || store("gk-recent")); window.scrollTo(0,0); return; }
