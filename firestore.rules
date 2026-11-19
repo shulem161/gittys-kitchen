@@ -95,7 +95,7 @@ service cloud.firestore {
     function kosherMove() {
       return resource != null
         && (request.resource.data.get('rv', '') == 'kosher' || resource.data.get('rv', '') == 'kosher')
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub', 'kosherFrom', 'kosherPub', 'yoelyFrom', 'priv'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvNote', 'rvNoteBy', 'rvBy', 'rvAt', 'rvUids', 'rvAsk', 'rvLog', 'pub', 'kosherFrom', 'kosherPub', 'yoelyFrom', 'priv', 'hu'])
         && isAdmin();
     }
     // Private (the Yoely inbox): a recipe that went through it is marked priv and stays in the family.
@@ -116,21 +116,22 @@ service cloud.firestore {
       let now = request.resource.data.get('rv', '');
       let after = request.resource.data.get('rvUids', []);
       return resource != null
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'yoelyFrom', 'priv', 'pub'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'yoelyFrom', 'priv', 'pub', 'hu'])
         && (request.resource.data.get('pub', null) == resource.data.get('pub', null) || request.resource.data.get('pub', true) == false)
         && ((was in ['', 'proof'] && now == 'yoely' && after.size() == 0 && request.resource.data.get('yoelyFrom', '') == was)
             || (was == 'yoely' && now == 'approve' && request.auth.uid in after)
             || (was == 'yoely' && now == resource.data.get('yoelyFrom', '') && after.size() == 0))
         && extra('yoely');
     }
-    // Manage → Move between inboxes (admins): among Need to proofread, Private and Not kosher, both ways.
+    // Manage → Move between inboxes (admins): among Need to proofread, Private, Grandma's Hungarian Recipes (Private marked hu) and Not kosher, both ways.
     // Not one of the three steps: nobody is written down (rvUids empty); the reason goes in the log.
     function inboxMoveOk() {
       let was = resource.data.get('rv', '');
       let now = request.resource.data.get('rv', '');
-      return resource != null && was in ['proof', 'yoely', 'kosher'] && now in ['proof', 'yoely', 'kosher'] && was != now
+      return resource != null && was in ['proof', 'yoely', 'kosher'] && now in ['proof', 'yoely', 'kosher']
+        && (was != now || request.resource.data.get('hu', false) != resource.data.get('hu', false))
         && request.resource.data.get('rvUids', []).size() == 0
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'kosherFrom', 'kosherPub', 'pub', 'yoelyFrom', 'priv'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'kosherFrom', 'kosherPub', 'pub', 'yoelyFrom', 'priv', 'hu'])
         && isAdmin();
     }
     // An edit to a recipe in For approval or Ready to release sends it back to Need to proofread, in the same save
@@ -376,7 +377,7 @@ service cloud.firestore {
         || yoelyMove()
         || inboxMoveOk()
         || (resource != null && (resource.data.get('rv', '') == 'kosher' || request.resource.data.get('rv', '') == 'kosher')
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'pub', 'kosherPub', 'kosherFrom', 'yoelyFrom', 'priv'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rv', 'rvUids', 'rvAsk', 'rvBy', 'rvAt', 'rvLog', 'rvNote', 'rvNoteBy', 'pub', 'kosherPub', 'kosherFrom', 'yoelyFrom', 'priv', 'hu'])
             && extra('kosher'))
         // Recipe inboxes: proofreaders, approvers and releasers move a recipe along (rv), one step at a time;
         // releasers choose public or team only

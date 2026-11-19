@@ -333,6 +333,8 @@ await check('the owner can make an exception', assertSucceeds(updateDoc(doc(OWN,
 // Move between inboxes (4.58) and the activity log
 await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'recipes', 'r-im'), { c: 'Cakes', t: 'Inbox move', pub: false, rv: 'proof', rvUids: ['pr1'], s: [] }); });
 await check('an admin can move a recipe from Need to proofread to Private, with nobody written down', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-im'), { rv: 'yoely', yoelyFrom: 'proof', priv: true, pub: false, rvUids: [], rvLog: [{ moved: true, reason: 'family recipe' }] })));
+await check("…and from Private into Grandma's Hungarian Recipes (Private marked hu), with nobody written down", assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-im'), { hu: true, rvUids: [], rvLog: [] })));
+await check("…but an employee can't do that move", assertFails(updateDoc(doc(EMP, 'recipes', 'r-im'), { hu: false, rvUids: [] })));
 await check('…and on to Not kosher', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-im'), { rv: 'kosher', kosherFrom: 'yoely', kosherPub: false, rvNote: 'check', rvUids: [] })));
 await check("an employee can't move it between inboxes that way", assertFails(updateDoc(doc(PR1, 'recipes', 'r-im'), { rv: 'proof', rvUids: [] })));
 await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'recipes', 'r-im2'), { c: 'Cakes', t: 'Inbox move two', pub: false, rv: 'yoely', rvUids: [], s: [] }); });

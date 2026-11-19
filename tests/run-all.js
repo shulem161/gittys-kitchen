@@ -30,6 +30,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
   const openMenuFor = (p, sel) => p.evaluate(s => { const m = document.getElementById('rmenu'); if (!m || !m.hidden) return;
     let el = null; try { el = s.startsWith('text=') ? [...m.querySelectorAll('a,button')].find(b => b.textContent.includes(s.slice(5))) : document.querySelector(s); } catch (e) {}
     if (el && m.contains(el)) document.getElementById('rmore').click(); }, sel).catch(() => {});
+  const pickSend = async p => { if (await p.locator('#ed-sendto').count() && !(await p.locator('#ed-sendto').inputValue())) await p.selectOption('#ed-sendto', 'proof'); };
   const page = async () => { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(e.message + ' @ ' + (e.stack||'').split('\n').slice(1,3).join(' | ')));
     const click = p.click.bind(p); p.click = async (sel, o) => { await openMenuFor(p, sel); return click(sel, o); };
     await p.goto(F); await p.waitForTimeout(400); return p; };
@@ -284,7 +285,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // Linked recipes
     await A.goto(F + '#edit-r-croissants'); await A.waitForTimeout(500);
     await A.fill('#ed-pre-q', "bobby's challah"); await A.waitForTimeout(200); await A.locator('.pre-opt').first().click(); await A.waitForTimeout(200);
-    await A.click('#edform .primary'); await A.waitForTimeout(1500);
+    await pickSend(A); await A.click('#edform .primary'); await A.waitForTimeout(1500);
     ok('recipe shows Make first link', /Make first:\s*Bobby's Challah/.test(await A.locator('.links-box').innerText().catch(() => '')), [await A.evaluate(() => location.hash), await A.locator('#ed-err').innerText().catch(() => ''), await A.locator('main h1, main h2').first().innerText().catch(() => '')]);
     await A.goto(F + '#r-bobbys-challah'); await A.waitForTimeout(500);
     ok('linked recipe shows Use it in', /Use it in:\s*Croissants/i.test(await A.locator('.links-box').innerText().catch(() => '')));
@@ -301,7 +302,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     const cardBgs = await A.$$eval('.rc', els => [...new Set(els.map(e => getComputedStyle(e).backgroundColor))]);
     ok('recipe cards keep one background color', cardBgs.length === 1, cardBgs);
     await A.goto(F + '#edit-r-bobbys-challah'); await A.waitForTimeout(500);
-    await A.selectOption('#ed-k', 'dairy'); await A.click('#edform .primary'); await A.waitForTimeout(800);
+    await A.selectOption('#ed-k', 'dairy'); await pickSend(A); await A.click('#edform .primary'); await A.waitForTimeout(800);
     ok('admin can mark a recipe Dairy', /dairy/i.test(await A.locator('.rhead .kchip').innerText().catch(() => '')));
 
     await A.goto(F); await A.waitForTimeout(400);
@@ -418,7 +419,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.goto(F + '#c-fish'); await A.waitForTimeout(400);
     ok('fish recipes say Fish', await A.$$eval('.rc', els => els.length > 0 && els.every(e => /\bFish\b/i.test(e.querySelector('.kchip')?.textContent || ''))));
     await A.goto(F + '#new-pesach'); await A.waitForTimeout(400);
-    await A.fill('#ed-t', 'Test Pesach Kugel'); await A.fill('#ed-sec', 'Kugel'); await A.locator('.sec-items').nth(0).fill('5 potatoes'); await A.click('#edform .primary'); await A.waitForTimeout(1000);
+    await A.fill('#ed-t', 'Test Pesach Kugel'); await A.fill('#ed-sec', 'Kugel'); await A.locator('.sec-items').nth(0).fill('5 potatoes'); await pickSend(A); await A.click('#edform .primary'); await A.waitForTimeout(1000);
     ok('a recipe an admin writes goes to Need to proofread too', /#proof$/.test(await A.evaluate(() => location.hash)) && (await A.locator('.sub-card', {hasText: 'Test Pesach Kugel'}).count()) === 1);
     await through(A, 'Test Pesach Kugel'); await A.goto(F + '#' + await A.evaluate(() => RECIPES.find(r => r.t === 'Test Pesach Kugel').id)); await A.waitForTimeout(500);
     const newNo = await A.locator('.rhead .nochip').innerText().catch(() => '');
@@ -433,7 +434,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
 
     await A.goto(F + '#c-pesach'); await A.waitForTimeout(300); await A.locator('.cats .cat', {hasText: 'Kugel'}).click(); await A.waitForTimeout(300);
     ok('Pesach recipes say Pesach', await A.$$eval('.rc', els => els.length > 0 && els.every(e => /Pesach/i.test([...e.querySelectorAll('.kchip')].map(k => k.textContent).join(' ')))));
-    await A.goto(F + '#new-bread'); await A.waitForTimeout(300); await A.fill('#ed-t', 'Test Bread Code'); await A.locator('.sec-items').nth(0).fill('2 cups flour'); await A.click('#edform .primary'); await A.waitForTimeout(1000);
+    await A.goto(F + '#new-bread'); await A.waitForTimeout(300); await A.fill('#ed-t', 'Test Bread Code'); await A.locator('.sec-items').nth(0).fill('2 cups flour'); await pickSend(A); await A.click('#edform .primary'); await A.waitForTimeout(1000);
     await through(A, 'Test Bread Code', true); await A.goto(F + '#' + await A.evaluate(() => RECIPES.find(r => r.t === 'Test Bread Code').id)); await A.waitForTimeout(500);
     ok('“Release for the team only” keeps it from customers, and the recipe says so', /Team only/.test(await A.locator('.rhead .aud').innerText()) && await A.evaluate(() => RECIPES.find(r => r.t === 'Test Bread Code').pub === false));
     ok('other recipes get a number code starting with 1, counting from 001', /^1\d{2}\d{3}$/.test(await A.locator('.rhead .nochip').innerText().catch(() => '')) && !/1\d\d$/.test(await A.locator('.rhead .nochip').innerText().catch(() => '')), await A.locator('.rhead .nochip').innerText().catch(() => ''));
@@ -567,7 +568,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await V.click('.rhead a[href^="#edit-"]'); await V.waitForTimeout(400);
     const firstIng = await V.locator('.sec-items').nth(0).inputValue();
     await V.locator('.sec-items').nth(0).fill(firstIng.split('\n').slice(1).join('\n') + '\n3 tbsp honey');
-    await V.click('#edform .primary'); await V.waitForTimeout(900);
+    await pickSend(V); await V.click('#edform .primary'); await V.waitForTimeout(900);
     await A.goto(F + '#proof'); await A.waitForTimeout(600);
     const cmpCard = A.locator('.sub-card', {has: A.locator('.cmp')}).first();
     ok('suggested changes show the recipe once, with the changes marked', (await cmpCard.locator('.cmp-one .cmp-l.del').count()) === 1 && /3 tbsp honey/.test(await cmpCard.locator('.cmp-one .cmp-l.add').first().innerText()) && (await cmpCard.locator('.cmp-one .bl-who').count()) === 0 && !(await cmpCard.locator('.cmp-cols').isVisible()));
@@ -576,7 +577,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await cmpCard.locator('.cmp-viewsel').selectOption('one');
     { const sid = await cmpCard.getAttribute('data-id'), vnB = await V.evaluate(() => myName());
       await A.goto(F + '#review-' + sid); await A.waitForTimeout(500);
-      const v0 = await A.locator('.sec-items').nth(0).inputValue(); await A.locator('.sec-items').nth(0).fill(v0 + '\n1 cup raisins'); await A.click('#edform .primary'); await A.waitForTimeout(900);
+      const v0 = await A.locator('.sec-items').nth(0).inputValue(); await A.locator('.sec-items').nth(0).fill(v0 + '\n1 cup raisins'); await pickSend(A); await A.click('#edform .primary'); await A.waitForTimeout(900);
       await A.goto(F + '#proof'); await A.waitForTimeout(600);
       const card = A.locator('.sub-card[data-id="' + sid + '"]');
       ok('changes show without names at first', (await card.locator('.cmp-who').isHidden()) && (await card.locator('.cmp-one .bl-who').count()) === 0);
@@ -614,7 +615,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await V.goto(F + '#edit-r-challah'); await V.waitForTimeout(500);
     const locked = await V.locator('#ed-c').isDisabled() && (await V.locator('#ed-pub').count()) === 0 && (await V.locator('#ed-del').count()) === 0;
     const subs0 = await A.evaluate(() => subs.length);
-    await V.fill('#ed-n', 'Edited straight away by an employee'); await V.click('#edform .primary'); await V.waitForTimeout(900);
+    await V.fill('#ed-n', 'Edited straight away by an employee'); await pickSend(V); await V.click('#edform .primary'); await V.waitForTimeout(900);
     ok('one employee given it edits a recipe straight away (not delete, move or make public)', canEd && locked && await A.evaluate(() => RECIPES.find(r => r.id === 'r-challah').n === 'Edited straight away by an employee') && await A.evaluate(n => subs.length === n, subs0), [canEd, locked]);
     await perm(A, vu0, 'editdirect', false, 1500);
     await V.goto(F + '#r-challah'); await V.waitForTimeout(500);
@@ -770,7 +771,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('…and that cooking day lists it', /Croissants/.test(await A.locator('.pl-cooking').innerText().catch(() => '')));
 
     // Servings
-    await A.goto(F + '#edit-r-croissants'); await A.waitForTimeout(300); await A.fill('#ed-serves', '6–8'); await A.click('#edform .primary'); await A.waitForTimeout(800);
+    await A.goto(F + '#edit-r-croissants'); await A.waitForTimeout(300); await A.fill('#ed-serves', '6–8'); await pickSend(A); await A.click('#edform .primary'); await A.waitForTimeout(800);
     await A.goto(F + '#r-croissants'); await A.waitForTimeout(400);
     ok('a recipe shows how many it serves', /Serves 6–8/.test(await A.locator('.fact.serves').innerText().catch(() => '')));
     await A.click('[data-sx="2"]'); await A.waitForTimeout(300);
@@ -918,7 +919,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     const mg = await V.locator('.sec-items').evaluateAll(els => els.map(e => e.value).join('\n'));
     const plain = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
     ok('two recipes can be merged, keeping just the lines you ticked from each', /Merged with/.test(await V.locator('#ed-n').inputValue()) && plain(mg).includes(plain(pickTxt).slice(0, 12)) && !plain(mg).includes(plain(dropTxt)) && /Send the request/.test(await V.locator('#edform .primary').innerText()));
-    await V.click('#edform .primary'); await V.waitForTimeout(800);
+    await pickSend(V); await V.click('#edform .primary'); await V.waitForTimeout(800);
     await A.goto(F + '#proof'); await A.waitForTimeout(600);
     ok('…as a change to the first recipe', (await A.locator('.sub-card', {hasText: 'Merged with'}).count()) === 1);
     await A.goto(F + '#r-challah'); await A.waitForTimeout(500);
@@ -938,10 +939,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*64 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 64));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*66 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 66));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 64, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 66, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -952,7 +953,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /63/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /65/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1001,7 +1002,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       await A.fill('#ed-ai-what', 'a sesame topping'); await A.click('#ed-ai-add'); await A.waitForTimeout(800);
       ok('“Add something with AI” works the addition into the recipe, and can be undone', /Added/.test(await A.locator('#ed-ai-msg').innerText()) && (await A.locator('#ed-ai-undo').count()) === 1);
       await A.click('#ed-ai-undo'); await A.waitForTimeout(300);
-      const v0 = await A.locator('.sec-items').nth(0).inputValue(); await A.locator('.sec-items').nth(0).fill(v0 + '\n1 tbsp honey'); await A.click('#edform .primary'); await A.waitForTimeout(1000);
+      const v0 = await A.locator('.sec-items').nth(0).inputValue(); await A.locator('.sec-items').nth(0).fill(v0 + '\n1 tbsp honey'); await pickSend(A); await A.click('#edform .primary'); await A.waitForTimeout(1000);
       await A.goto(F + '#r-bobbys-challah'); await A.waitForTimeout(400);
       const hasLink = (await A.locator('#rmenu a[href="#history-r-bobbys-challah"]').count()) === 1;
       await A.goto(F + '#history-r-bobbys-challah'); await A.waitForTimeout(800);
@@ -1159,7 +1160,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     { const ex = await A.evaluate(() => { const r = RECIPES.find(x => x.id === 'r-challah'); return {t: r.t, ing: r.s.filter(x => x[0]).flatMap(x => x[2]).join('\n'), st: r.s.filter(x => !x[0]).flatMap(x => x[2]).join('\n')}; });
       await A.goto(F + '#new'); await A.waitForTimeout(400); await A.fill('#ed-t', 'My Challah Copy');
       await A.locator('.sec-items').nth(0).fill(ex.ing); await A.locator('.sec-items').nth(1).fill(ex.st);
-      await A.locator('#edform .primary').click(); await A.waitForTimeout(500);
+      await pickSend(A); await A.locator('#edform .primary').click(); await A.waitForTimeout(500);
       const shown = await A.locator('#ed-likes').innerText().catch(() => '');
       const notSent = await A.evaluate(() => !subs.some(s => s.t === 'My Challah Copy'));
       await A.click('#dup-send'); await A.waitForTimeout(900);
@@ -1176,6 +1177,18 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       await li.locator('.im-why').fill('It is a family recipe'); await li.locator('.im-go').click(); await A.waitForTimeout(700);
       const moved = await A.evaluate(id => { const r = findAny(id), e = r.rvLog[r.rvLog.length - 1]; return r.rv === 'yoely' && r.rvUids.length === 0 && e.moved && e.reason === 'It is a family recipe'; }, mid);
       ok('Manage → Move between inboxes moves a recipe among Need to proofread, Private and Not kosher; a reason is needed and kept, and nobody is written down', stillThere && moved, [stillThere, moved]);
+      { await A.goto(F + '#inboxmove'); await A.waitForTimeout(500);
+        const li2 = A.locator(`[data-im="r:${mid}"]`);
+        await li2.locator('.im-to').selectOption('hu'); await li2.locator('.im-why').fill('From grandma'); await li2.locator('.im-go').click(); await A.waitForTimeout(700);
+        const r = await A.evaluate(id => { const r = findAny(id); return {inHu: r.rv === 'yoely' && r.hu === true && r.priv === true && r.rvUids.length === 0, notPriv: !rvIn('yoely').some(x => x.id === id), listed: rvIn('hu').some(x => x.id === id)}; }, mid);
+        await A.goto(F + '#hu'); await A.waitForTimeout(500);
+        const page = await A.locator('#app').innerText();
+        const menu = await A.evaluate(() => { openMenu(); const t = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return t; });
+        const sendOpt = await A.evaluate(() => sendTargets().map(x => x[0]).join(','));
+        ok("Grandma's Hungarian Recipes: its own inbox (like Private), in the menu and as a first inbox; Move between inboxes moves recipes in and out of it with nobody's name written down", r.inHu && r.notPriv && r.listed && /Grandma's Hungarian Recipes/.test(page) && /Cleared/.test(page) && /Grandma's Hungarian Recipes/.test(menu) && sendOpt === 'proof,yoely,hu,kosher', [r, sendOpt]);
+        await A.goto(F + '#inboxmove'); await A.waitForTimeout(500);
+        const li3 = A.locator(`[data-im="r:${mid}"]`); await li3.locator('.im-to').selectOption('yoely'); await li3.locator('.im-why').fill('Back to private'); await li3.locator('.im-go').click(); await A.waitForTimeout(700);
+        ok('…and back to Private', await A.evaluate(id => { const r = findAny(id); return r.rv === 'yoely' && !r.hu && rvIn('yoely').some(x => x.id === id); }, mid)); }
       await A.goto(F + '#' + mid); await A.waitForTimeout(500);
       const onPage = /family recipe/.test(await A.locator('.rhead').innerText());
       await A.click('a[href="#act-' + mid + '"]'); await A.waitForTimeout(600);
@@ -1282,7 +1295,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       await A.locator('.sec-items').nth(0).fill('7 zqx torte layers'); await A.locator('.sec-items').nth(1).fill('Stack the zqx layers');
       await A.locator('#ed-also input[value="Desserts"]').check();
       await A.fill('#ed-also-new', 'party food'); await A.click('#ed-also-add'); await A.waitForTimeout(200);
-      await A.locator('#edform .primary').click(); await A.waitForTimeout(900);
+      await pickSend(A); await A.locator('#edform .primary').click(); await A.waitForTimeout(900);
       const r = await A.evaluate(async () => { const x = subs.find(s => s.t === 'Two Category Torte'); if (!x) return {none: true};
         await approveSub(x, true); await new Promise(z => setTimeout(z, 700)); const rec = RECIPES.find(q => q.t === 'Two Category Torte');
         return {also: rec && rec.also, inD: rec && inCat(rec, 'Desserts'), inP: rec && inCat(rec, 'Party food'), cats: CATS.includes('Party food'), code: rec && rec.code}; });
@@ -1338,12 +1351,13 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     { await A.goto(F + '#new'); await A.waitForTimeout(400); await A.fill('#ed-t', 'Yoely Scone');
       await A.locator('.sec-items').nth(0).fill('2 cups flour');
       const opts = await A.locator('#ed-sendto option').evaluateAll(o => o.map(x => x.value).join(','));
-      await A.selectOption('#ed-sendto', 'yoely'); await A.locator('#edform .primary').click(); await A.waitForTimeout(900);
+      const noDefault = (await A.locator('#ed-sendto').inputValue()) === '' && /Choose where it goes/.test(await A.locator('#ed-sendto').innerText());
+      await A.selectOption('#ed-sendto', 'yoely'); await pickSend(A); await A.locator('#edform .primary').click(); await A.waitForTimeout(900);
       const there = await A.evaluate(() => { const x = subs.find(s => s.t === 'Yoely Scone'); return x ? x.stage : ''; });
       const inPage = /Yoely Scone/.test(await A.locator('#app').innerText()), notInBook = await A.evaluate(() => !RECIPES.some(r => r.t === 'Yoely Scone'));
       await A.locator('li', {hasText: 'Yoely Scone'}).locator('[data-sx=yoOk]').click(); await A.waitForTimeout(700);
       const after = await A.evaluate(() => { const x = subs.find(s => s.t === 'Yoely Scone'); return x && x.stage === 'approve' && (x.uids || []).includes(me); });
-      ok('a new recipe can be sent first to Yoely (or Not kosher, or Need to proofread); it waits there, not in the cookbook, and cleared it goes to For approval', opts === 'proof,yoely,kosher' && there === 'yoely' && inPage && notInBook && after, [opts, there, inPage, notInBook, after]);
+      ok('a new recipe can be sent first to Yoely (or Not kosher, or Need to proofread); it waits there, not in the cookbook, and cleared it goes to For approval', opts === ',proof,yoely,hu,kosher' && noDefault && there === 'yoely' && inPage && notInBook && after, [opts, there, inPage, notInBook, after]);
       await A.evaluate(async () => { const x = subs.find(s => s.t === 'Yoely Scone'); if (x) await db.collection('submissions').doc(x.id).delete(); }); await A.waitForTimeout(300); }
     // “+ Add a new category…” in the move dropdown
     { await A.goto(F + '#r-challah'); await A.waitForTimeout(500); await A.click('#mv-btn'); await A.waitForTimeout(300);
@@ -1533,7 +1547,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     await A.locator('#rv-list li', {hasText: 'Croissants'}).locator('[data-rv=undo]').click(); await A.waitForTimeout(700);
     ok('…undo moves it back one inbox, and they may do that step again', await A.evaluate(() => { const r = RECIPES.find(x => x.id === 'r-croissants'); return r.rv === 'approve' && r.rvLog[r.rvLog.length - 1].undo === true && !r.rvUids.includes(me); }));
     await A.evaluate(async () => { await db.collection('recipes').doc('r-croissants').update({rv: 'release', rvUids: []}); }); await A.waitForTimeout(500);
-    await V.goto(F + '#edit-r-croissants'); await V.waitForTimeout(400); await V.fill('#ed-n', 'Proof the dough 1 hour'); await V.click('#edform .primary'); await V.waitForTimeout(900);
+    await V.goto(F + '#edit-r-croissants'); await V.waitForTimeout(400); await V.fill('#ed-n', 'Proof the dough 1 hour'); await pickSend(V); await V.click('#edform .primary'); await V.waitForTimeout(900);
     ok('when someone else sends a change, the recipe goes back to Need to proofread', await A.evaluate(() => { const r = RECIPES.find(x => x.id === 'r-croissants'); const e = r.rvLog[r.rvLog.length - 1]; return r.rv === 'proof' && e.edited === true; }));
     await A.evaluate(async () => { for (const s of subs.filter(s => s.editOf === 'r-croissants' && s.status === 'pending')) await db.collection('submissions').doc(s.id).delete(); await db.collection('recipes').doc('r-croissants').update({rv: 'release', rvUids: []}); });
     await A.goto(F + '#release'); await A.waitForTimeout(600); await A.reload(); await A.waitForTimeout(900); await A.locator('#rv-list li', {hasText: 'Croissants'}).locator('[data-rv=pub]').click(); await A.waitForTimeout(700);
