@@ -50,6 +50,17 @@ service cloud.firestore {
       return isAdmin()
         || (approvedMember() && me.get('role', 'public') == 'employee' && me.get('perms', {}).get(k, empAllow(k, false)) == true);
     }
+    // Grandma's Hungarian Recipes (Private items marked hu) has its own setting 'hu'; until one is set it follows Private ('yoely').
+    function extraHu() {
+      let me = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let yo = me.get('perms', {}).get('yoely', empAllow('yoely', false));
+      return isAdmin()
+        || (approvedMember() && me.get('role', 'public') == 'employee' && me.get('perms', {}).get('hu', empAllow('hu', yo)) == true);
+    }
+    // A Private item uses the Private setting; one marked hu uses the Hungarian one.
+    function yoelyBoxOk(was, now) {
+      return (was.get('hu', false) == true || now.get('hu', false) == true) ? extraHu() : extra('yoely');
+    }
     // Who may write recipes: admins, and employees allowed to approve (only admins edit; everyone else requests a change).
     // Those employees can't change whether the public sees a recipe; new recipes follow their category.
     function publishOk() {
@@ -121,7 +132,7 @@ service cloud.firestore {
         && ((was in ['', 'proof'] && now == 'yoely' && after.size() == 0 && request.resource.data.get('yoelyFrom', '') == was)
             || (was == 'yoely' && now == 'approve' && request.auth.uid in after)
             || (was == 'yoely' && now == resource.data.get('yoelyFrom', '') && after.size() == 0))
-        && extra('yoely');
+        && yoelyBoxOk(resource.data, request.resource.data);
     }
     // Manage → Move between inboxes (admins): among Need to proofread, Private, Grandma's Hungarian Recipes (Private marked hu) and Not kosher, both ways.
     // Not one of the three steps: nobody is written down (rvUids empty); the reason goes in the log.
@@ -473,10 +484,10 @@ service cloud.firestore {
         && (request.resource.data.get('stage', '') == 'proof' || (request.resource.data.get('stage', '') in ['yoely', 'kosher'] && extra('scanto')))
         && (can('suggest') || extra('edit') || isAdmin())
         && (request.resource.data.uid == request.auth.uid || (isAdmin() && canManage(request.resource.data.uid)));
-      allow read: if extra('review') || extra('proofread') || extra('release') || extra('yoely') || extra('kosher') || (signedIn() && resource.data.uid == request.auth.uid);
+      allow read: if extra('review') || extra('proofread') || extra('release') || extra('yoely') || extraHu() || extra('kosher') || (signedIn() && resource.data.uid == request.auth.uid);
       // three different people: whoever proofread can't approve; neither of them can release
       allow update: if (extra('review') || extra('proofread') || extra('release')
-          || (resource.data.get('stage', '') == 'yoely' && extra('yoely')) || (resource.data.get('stage', '') == 'kosher' && extra('kosher')))
+          || (resource.data.get('stage', '') == 'yoely' && yoelyBoxOk(resource.data, request.resource.data)) || (resource.data.get('stage', '') == 'kosher' && extra('kosher')))
         && (request.resource.data.get('stage', '') != 'release' || resource.data.get('stage', '') == 'release'
             || !(request.auth.uid in resource.data.get('uids', [])))
         && (request.resource.data.status != 'approved' || resource.data.status == 'approved'

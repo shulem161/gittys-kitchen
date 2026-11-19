@@ -1467,8 +1467,9 @@ const EMP_EXTRA = ["del","moverec","pub","kosher","members","activity","portal"]
 const extraPerms = () => EXTRA_PERMS.filter(([k])=>(k!=="editdirect" || feat("empedit")) && (k!=="scanto" || feat("scanto")) && (k!=="labels" || feat("labels")) && (!EMP_EXTRA.includes(k) || feat("empextra")));
 // Employee settings (meta/employees) apply to every employee; a person's own Permissions override them.
 let EMP = {allow:{}};
-const empDefault = k => EMP.allow[k]!==undefined ? EMP.allow[k]===true : !isExtra(k);
-const permOf = (m,k) => { const p=(m&&m.perms)||{}; return p[k]!==undefined ? p[k]===true : empDefault(k); };
+const empDefault = k => EMP.allow[k]!==undefined ? EMP.allow[k]===true : k==="hu" ? empDefault("yoely") : !isExtra(k);
+// allinboxes: Grandma's Hungarian Recipes has its own setting; until one is set it follows Private
+const permOf = (m,k) => { const p=(m&&m.perms)||{}; return p[k]!==undefined ? p[k]===true : k==="hu" ? (EMP.allow.hu!==undefined ? EMP.allow.hu===true : permOf(m,"yoely")) : empDefault(k); };
 const may = k => { if(isAdmin()) return true; if(!profile) return false;
   if(k==="editdirect" && !feat("empedit")) return false;
   if(EMP_EXTRA.includes(k) && (!feat("empextra") || isPublic())) return false;
@@ -1488,7 +1489,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.81";
+const WEB_VERSION = "4.82";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1543,6 +1544,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["allinboxes","4.82","2026-11-19","Every inbox in Inbox settings","Inbox settings lists every inbox, in the same order as the Inboxes menu: Private, Grandma's Hungarian Recipes, Not kosher, the three steps, Declined, Needs admin approval, Recipe requests, Suggestions & comments, Likes & dislikes, and App & web updates. Grandma's Hungarian Recipes gets its own tick boxes, so it can be given to different people than Private (until you change it, it follows Private). Inboxes that go with something else, like Declined, say who gets them. A new inbox will show up there too.",false],
   ["longtoc","4.81","2026-11-19","Long recipe files are read to the end","A recipe file (.txt) that starts with a long Contents list (more than about 70 recipes) is now read all the way through. Before, only the first 70 or so titles in the list were found, and everything after them ran together into one recipe.",false],
   ["importall","4.80","2026-11-19","Select all when importing several recipes","When a file or scan finds several recipes, a “Select all” box sits at the top of the list. Tick it to tick every recipe, untick it to untick them all. It shows whether everything is ticked (a dash when only some are) and how many of them are ticked.",false],
   ["catline","4.79","2026-11-19","One file for recipes of many categories","A recipe file (.txt) can hold recipes for many categories: a line like “Category: Cakes” puts the recipes after it into Cakes, until the next “Category:” line. Before, the whole file went into one category, from the file's name. You can still change any recipe's category on the list before sending.",false],
@@ -2527,7 +2529,7 @@ function recipe(r){
         ${myRole()==="employee"&&!may("moverec")&&recipesOnline&&!offline?(myMoveAsk(r.id)?`<span class="btn pub-state" aria-disabled="true">Asked to move to ${esc(myMoveAsk(r.id).to)} ✓</span>`:`<button class="btn" id="mv-btn" type="button">Ask to move to another category</button>`):""}
         ${isPriv(r)&&realOwner()&&!viewingAs()&&recipesOnline&&!offline&&!r.rv&&!pubVisible(r)?`<button class="btn" id="privex-btn" type="button">🌐 Make public anyway (an exception to Private)</button>`:""}
         ${isTeam()&&!isPublic()&&recipesOnline&&!offline&&!r.rv&&!pubVisible(r)&&!isPriv(r)?`<button class="btn" id="go3-btn" type="button">🌐 Send through the 3 steps to go public</button>`:""}
-        ${yoelyCanPut(r)?`<button class="btn" id="yo-btn" type="button">📥 Put in ${YO()}</button>`:""}${yoelyCanPut(r)&&huOn()?`<button class="btn" id="hu-btn" type="button">📜 Put in ${esc(HU_NAME)}</button>`:""}
+        ${yoelyCanPut(r)?`<button class="btn" id="yo-btn" type="button">📥 Put in ${YO()}</button>`:""}${huCanPut(r)?`<button class="btn" id="hu-btn" type="button">📜 Put in ${esc(HU_NAME)}</button>`:""}
         ${mayNK()&&recipesOnline&&!offline&&r.rv!=="kosher"?`<button class="btn" id="nk-btn" type="button">🚫 Put in Not kosher</button>`:""}
         ${!isAdmin()&&may("del")&&recipesOnline&&!offline?`<button class="btn" id="del-btn" type="button">🗑 Delete recipe</button>`:""}
         <div class="rm-sep" role="separator"></div>
@@ -2898,7 +2900,18 @@ function adminPage(){
   });
 }
 const INBOX_PERMS = [["yoely",""+YO()+""],["proofread","1. Need to proofread"],["review","2. For approval"],["release","3. Ready to release"],["answer","Recipe requests"],["inbox","Suggestions & comments"],["ratings","Likes & dislikes"]];
-const isInboxPerm = k => INBOX_PERMS.some(x=>x[0]===k);
+const isInboxPerm = k => INBOX_PERMS.some(x=>x[0]===k) || k==="hu";
+// allinboxes: every inbox has a row in Inbox settings, in the same order as the Inboxes menu.
+// A new inbox goes in this list too, so it shows up there: [permission, name] or [key, name, "who gets it" text].
+const INBOX_ROWS = () => [
+  ["#updates", "App & web updates", 1, "Only "+ADMIN_NAME+" (the owner)"],
+  ...(()=>{ const yo=[["yoely", YO(), feat("yoely")], ["hu", HU_NAME, huOn()]], nk=[["kosher", "Not kosher", feat("nk")]]; return feat("nkyoely") ? [...nk, ...yo] : [...yo, ...nk]; })(),
+  ["proofread","1. Need to proofread",1], ["review","2. For approval",1], ["release","3. Ready to release",1],
+  ["#declined", "Declined", feat("declinedbox"), "Everyone who has Need to proofread, For approval or Ready to release"],
+  ["#admin-approval", "Needs admin approval", 1, "Admins, and employees given Move recipes or Make recipes public (Employee settings)"],
+  ["answer","Recipe requests",1], ["inbox","Suggestions & comments",1], ["ratings","Likes & dislikes",1]];
+const inboxRows = () => feat("allinboxes") ? INBOX_ROWS().filter(x=>x[2]).map(([k,l,,f])=>f===undefined?[k,l]:[k,l,f])
+  : INBOX_PERMS.filter(([k])=>k!=="yoely"||feat("yoely"));
 // The table box fills exactly the screen space left under it, so you scroll inside it (up/down and sideways)
 // without the page moving; if there isn't room, the page first brings the box up under the top bar.
 function fitPermBox(){
@@ -2917,7 +2930,7 @@ const PERM_SHORT = {suggest:"Suggest", photos:"Photos", requests:"Ask for recipe
 // One tick per person and permission (Employee settings, Inbox settings)
 function wirePermTable(redraw){
   app.querySelectorAll("[data-ibs]").forEach(c=>c.onchange=async()=>{ const m=members.find(x=>x.uid===c.dataset.ibu); if(!m) return;
-    const k=c.dataset.ibs, perms=Object.assign({}, m.perms||{}); if(c.checked===empDefault(k)) delete perms[k]; else perms[k]=c.checked;
+    const k=c.dataset.ibs, perms=Object.assign({}, m.perms||{}); if(k!=="hu" && c.checked===empDefault(k)) delete perms[k]; else perms[k]=c.checked;
     try{ await db.collection("users").doc(m.uid).update({perms}); m.perms=perms; toast(`${m.name}: ${c.checked?"allowed":"not allowed"}`); syncTeamList(); if(redraw) redraw(); }
     catch(e){ c.checked=!c.checked; toast("Couldn't save. Check your connection."); } });
 }
@@ -4571,7 +4584,7 @@ function openMenu(confirming){
   const manageN = (isAdmin()?mp:0);
   const inboxes = [realOwner()&&!viewingAs() ? item("#updates","App &amp; web updates", updWaiting()?updWaiting()+" to approve":"", updWaiting()) : "",
     ...(()=>{ const yo = (mayYoely()&&recipesOnline ? item("#yoely",""+YO()+"", inboxCount("yoely")?inboxCount("yoely")+" waiting":"", inboxCount("yoely")) : "")
-        + (mayYoely()&&recipesOnline&&huOn() ? item("#hu", HU_NAME, inboxCount("hu")?inboxCount("hu")+" waiting":"", inboxCount("hu")) : ""),
+        + (mayHu()&&recipesOnline ? item("#hu", HU_NAME, inboxCount("hu")?inboxCount("hu")+" waiting":"", inboxCount("hu")) : ""),
       nk = mayNK()&&recipesOnline ? item("#kosher","Not kosher", inboxCount("kosher")?inboxCount("kosher")+" waiting":"", inboxCount("kosher")) : "";
       return feat("nkyoely") ? [nk, yo] : [yo, nk]; })(), ...INBOXES.filter(([,,p])=>may(p)).map(([st,l])=>item("#"+st, l, inboxCount(st)?inboxCount(st)+" waiting":"", inboxCount(st))),
     mayDeclined() ? item("#declined","Declined", declinedList().length?declinedList().length+" in all":"", 0) : "",
@@ -5068,7 +5081,7 @@ const boxOf = (where, x) => where==="yoely" && huOn() && x.hu ? "hu" : where;
 const nkHidden = () => feat("nk") && feat("nkhide");
 const INBOXES = [["proof","Need to proofread","proofread"],["approve","For approval","review"],["release","Ready to release","release"]];
 const mayInboxes = () => may("proofread") || may("review") || may("release");
-const inboxCount = st => st==="hu" ? (mayYoely() && huOn() ? rvIn("hu").length + (feat("scanto")?inStage("hu").length:0) : 0) : st==="yoely" ? (mayYoely() ? rvIn("yoely").length + (feat("scanto")?inStage("yoely").length:0) : 0) : st==="kosher" ? (mayNK() ? rvIn("kosher").length + (feat("scanto")?inStage("kosher").length:0) : 0) : st==="proof" ? (may("proofread") ? inStage("proof").length + rvIn("proof").length : 0)
+const inboxCount = st => st==="hu" ? (mayHu() ? rvIn("hu").length + (feat("scanto")?inStage("hu").length:0) : 0) : st==="yoely" ? (mayYoely() ? rvIn("yoely").length + (feat("scanto")?inStage("yoely").length:0) : 0) : st==="kosher" ? (mayNK() ? rvIn("kosher").length + (feat("scanto")?inStage("kosher").length:0) : 0) : st==="proof" ? (may("proofread") ? inStage("proof").length + rvIn("proof").length : 0)
   : st==="approve" ? (may("review") ? inStage("approve").length + rvIn("approve").length : 0)
   : st==="admin" ? (isAdmin() ? pendingPhotos.length + openMoves() + openGolive() + openDeletes() : (may("moverec")?openMoves():0) + (may("pub")?openGolive():0))
   : (may("release") ? inStage("release").length + rvIn("release").length : 0);
@@ -5076,6 +5089,7 @@ const INBOX_NAME = {get yoely(){ return YO(); }, hu:HU_NAME, kosher:"Not kosher"
 // Yoely: an inbox before the three steps. Nothing goes there by itself; admins and employees allowed to use it put a recipe there.
 // Cleared, it skips Need to proofread and goes straight to For approval; whoever cleared it counts as the first of the three people.
 const mayYoely = () => feat("yoely") && (isAdmin() || may("yoely"));
+const mayHu = () => huOn() && (isAdmin() || (feat("allinboxes") ? may("hu") : may("yoely")));
 // “private”: the Yoely inbox is called Private, and what goes through it stays in the family (team only)
 const isPriv = r => !!(r && r.priv && feat("private"));
 // scanto: a new recipe's first inbox, chosen when it's sent (admins, and employees given “Choose the first inbox”)
@@ -5088,7 +5102,7 @@ const sendToMissing = id => { if(sendToOf(id)!=="") return false; const el=docum
 const sentNotice = (to, n, who) => to==="hu" ? notifyWatchers("watch-yoely", `${n} new ${n===1?"recipe":"recipes"} in ${HU_NAME}`, `From ${who}. Waiting in ${HU_NAME}.`, "#hu", "inbox_tray") : to==="yoely" ? notifyWatchers("watch-yoely", `${n} new ${n===1?"recipe":"recipes"} in ${YO()}`, `From ${who}. Waiting in ${YO()}.`, "#yoely", "inbox_tray")
   : to==="kosher" ? notifyAdmin(`${n} new ${n===1?"recipe":"recipes"} in Not kosher`, `From ${who}. Waiting in Not kosher.`, "#kosher", "no_entry_sign") : null;
 // Who sees every sent-in recipe: the inboxes' people, and (scanto) those working in Yoely or Not kosher
-const maySubsAll = () => mayInboxes() || (feat("scanto") && (mayYoely() || mayNK()));
+const maySubsAll = () => mayInboxes() || (feat("scanto") && (mayYoely() || mayHu() || mayNK()));
 // New recipes waiting in Yoely or Not kosher (not in the cookbook yet)
 function subPanel(st){
   if(!feat("scanto")) return "";
@@ -5117,6 +5131,7 @@ function wireSubPanel(after){
     catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); } });
 }
 const yoelyCanPut = r => mayYoely() && recipesOnline && !offline && (!r.rv || r.rv==="proof");
+const huCanPut = r => mayHu() && recipesOnline && !offline && (!r.rv || r.rv==="proof");
 async function yoelyPut(r, hu){
   const now=Date.now(), box = hu && huOn() ? "hu" : "yoely", nm = INBOX_NAME[box];
   const ok = await setRv(r, {rv:"yoely", yoelyFrom:r.rv||"", ...(feat("private")?{priv:true, pub:false}:{}), ...(huOn()&&(hu||r.hu)?{hu:!!hu}:{}), rvUids:[], rvAsk:[], rvBy:myName(), rvAt:now,
@@ -5242,9 +5257,9 @@ function kosherPage(){
 }
 // The row of inboxes at the top of each inbox page; Not kosher (admins) comes before the three steps
 function inboxSteps(stage){
-  const nk=mayNK(), yo=mayYoely();
-  const yoLi = (yo?`<li class="nk${stage==="yoely"?" on":""}"><a href="#yoely"><b>📥</b> ${YO()}${inboxCount("yoely")?` <span class="count">${inboxCount("yoely")}</span>`:""}</a></li>`:"")
-    + (yo&&huOn()?`<li class="nk${stage==="hu"?" on":""}"><a href="#hu"><b>📜</b> ${esc(HU_NAME)}${inboxCount("hu")?` <span class="count">${inboxCount("hu")}</span>`:""}</a></li>`:""), nkFirst = feat("nkyoely");
+  const nk=mayNK(), yo=mayYoely()||mayHu();
+  const yoLi = (mayYoely()?`<li class="nk${stage==="yoely"?" on":""}"><a href="#yoely"><b>📥</b> ${YO()}${inboxCount("yoely")?` <span class="count">${inboxCount("yoely")}</span>`:""}</a></li>`:"")
+    + (mayHu()?`<li class="nk${stage==="hu"?" on":""}"><a href="#hu"><b>📜</b> ${esc(HU_NAME)}${inboxCount("hu")?` <span class="count">${inboxCount("hu")}</span>`:""}</a></li>`:""), nkFirst = feat("nkyoely");
   return `<ol class="ib-steps${nk&&yo?" with-nk with-yo":nk||yo?" with-nk":""}">${nkFirst?"":yoLi}${nk?`<li class="nk${stage==="kosher"?" on":""}"><a href="#kosher"><b>🚫</b> Not kosher${inboxCount("kosher")?` <span class="count">${inboxCount("kosher")}</span>`:""}</a></li>`:""}${nkFirst?yoLi:""}${INBOXES.map(([st,l,p],i)=>`<li class="${st===stage?"on":""}">${may(p)?`<a href="#${st}">`:"<span>"}<b>${i+1}</b> ${l}${inboxCount(st)?` <span class="count">${inboxCount(st)}</span>`:""}${may(p)?"</a>":"</span>"}</li>`).join("")}</ol>`;
 }
 // Move a cookbook recipe through the inboxes
@@ -5332,7 +5347,7 @@ function rvButtons(r){
 function rvButtons0(r){
   const st=r.rv; if(!st) return "";
   const undo = feat("moveback") && lastMove(r) ? `<button type="button" class="btn sm" data-rv="undo" data-rid="${esc(r.id)}">↩ Undo – move it back to ${INBOX_NAME[lastMove(r).from]}</button>` : "";
-  if(st==="yoely") return !mayYoely() ? "" : `<button type="button" class="btn sm solid" data-rv="yoOk" data-rid="${esc(r.id)}">✓ Cleared – send to For approval</button><button type="button" class="btn sm" data-rv="yoOut" data-rid="${esc(r.id)}">Take it out of ${esc(INBOX_NAME[boxOf("yoely", r)])}</button>`;
+  if(st==="yoely") return !(r.hu&&huOn() ? mayHu() : mayYoely()) ? "" : `<button type="button" class="btn sm solid" data-rv="yoOk" data-rid="${esc(r.id)}">✓ Cleared – send to For approval</button><button type="button" class="btn sm" data-rv="yoOut" data-rid="${esc(r.id)}">Take it out of ${esc(INBOX_NAME[boxOf("yoely", r)])}</button>`;
   const nkYo = feat("nkyoely") && feat("yoely") ? `<button type="button" class="btn sm solid" data-rv="nkYo" data-rid="${esc(r.id)}">${nkHidden()?"✓ Approve – back in the cookbook, on to "+YO()+"":"Fixed – send to "+YO()+""}</button>` : "";
   if(st==="kosher") return !(isAdmin()||may("kosher")) ? "" : nkHidden() ? `<button type="button" class="btn sm solid" data-rv="nkOk" data-rid="${esc(r.id)}">✓ Approve – back in the cookbook, on to Need to proofread</button>${nkYo}<a class="btn sm" href="#edit-${esc(r.id)}">Fix it</a>`
     : `<button type="button" class="btn sm solid" data-rv="nkFix" data-rid="${esc(r.id)}">Fixed – send to Need to proofread</button>${nkYo}<button type="button" class="btn sm" data-rv="nkOut" data-rid="${esc(r.id)}">✓ It's kosher – take it out</button>`;
@@ -7808,7 +7823,7 @@ function inboxSettings(){
     <div class="panel-a"><p class="hint">Recipes go through <b>1 Need to proofread</b> → <b>2 For approval</b> → <b>3 Ready to release</b>, and the same person can never do two steps for one recipe. Whoever has an inbox also gets its notices. <b>Needs admin approval</b> (moving a recipe, photos, going public) is for admins only.</p>
       ${emps.length?`<div class="ibs-wrap perms-wrap"><table class="ibs perms-t">
       <thead><tr><th>Inbox</th><th>All employees</th>${emps.map(m=>`<th>${esc(m.name)}${m.no?`<small>no. ${m.no}</small>`:""}</th>`).join("")}</tr></thead>
-      <tbody>${INBOX_PERMS.filter(([k])=>k!=="yoely"||feat("yoely")).map(([k,l])=>`<tr><th>${esc(yoName(l))}</th><td><label class="ibs-c"><input type="checkbox" data-ea="${k}" ${empDefault(k)?"checked":""}><span class="sr">All employees: ${esc(l)}</span></label>${allDot(k, emps)}</td>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="perms-hint" hidden>Swipe inside the table to see everything: up and down, and side to side for more people.</p>`
+      <tbody>${inboxRows().map(([k,l,fixed])=>fixed!==undefined ? `<tr class="ibs-fixed"><th>${esc(l)}</th><td colspan="${emps.length+1}"><span class="hint">${esc(fixed)}</span></td></tr>` : `<tr><th>${esc(yoName(l))}</th><td><label class="ibs-c"><input type="checkbox" data-ea="${k}" ${empDefault(k)?"checked":""}><span class="sr">All employees: ${esc(l)}</span></label>${allDot(k, emps)}</td>${emps.map(m=>`<td><label class="ibs-c"><input type="checkbox" data-ibs="${k}" data-ibu="${esc(m.uid)}" ${permOf(m,k)?"checked":""}><span class="sr">${esc(m.name)}: ${esc(l)}</span></label>${(m.perms||{})[k]!==undefined?'<span class="perm-dot" title="Set for this person">●</span>':""}</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="perms-hint" hidden>Swipe inside the table to see everything: up and down, and side to side for more people.</p>`
       :`<p class="hint">No employees yet.</p>`}
       <p class="hint" style="margin-top:8px" data-ibs-note>“All employees” is for everyone who has nothing of their own set; a <span class="perm-dot">●</span> marks a person's own setting${feat("alldot")?", and by All employees it means someone is set differently":""}. Admins${admins.length?` (${admins.map(m=>esc(m.name)).join(", ")})`:""} can always use every inbox. To make someone an admin or an employee, use <a class="link" href="#admin">Members</a>.</p></div>
     ${feat("menurate")?`<div class="panel-a" id="mn-names"><h3>AI menus: who sees who made each menu</h3>
@@ -8330,7 +8345,7 @@ function routePage(){
   if(h==="newcat" && mayAddCat()){ q.value=""; newCatPage(); window.scrollTo(0,0); return; }
   if(h==="declined" && mayDeclined()){ q.value=""; declinedPage(); window.scrollTo(0,0); return; }
   if(h==="yoely" && mayYoely()){ q.value=""; yoelyPage(); window.scrollTo(0,0); return; }
-  if(h==="hu" && mayYoely() && huOn()){ q.value=""; yoelyPage("hu"); window.scrollTo(0,0); return; }
+  if(h==="hu" && mayHu()){ q.value=""; yoelyPage("hu"); window.scrollTo(0,0); return; }
   if(h==="kosher" && mayNK()){ q.value=""; kosherPage(); window.scrollTo(0,0); return; }
   if(h==="admin-approval" && (isAdmin()||may("moverec")||may("pub"))){ q.value=""; adminApprovalPage(); window.scrollTo(0,0); return; }
   if(h==="proof" && may("proofread")){ q.value=""; recipeInbox("proof"); window.scrollTo(0,0); return; }

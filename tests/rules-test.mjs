@@ -370,6 +370,20 @@ await check('an admin can start one in Not kosher', assertSucceeds(setDoc(doc(AD
 await check('…and send it on to Yoely', assertSucceeds(updateDoc(doc(ADM, 'submissions', 's-nk1'), { stage: 'yoely' })));
 await check('an admin can put it in Yoely and take it out again', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-yo'), { rv: 'yoely', yoelyFrom: '', rvUids: [] }))
   .then(() => assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-yo'), { rv: '', yoelyFrom: '', rvUids: [] }))));
+// Grandma's Hungarian Recipes has its own setting (4.82); until it's set it follows Private
+await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
+  for (const id of ['r-hu1', 'r-hu2', 'r-hu3', 'r-hu4']) await setDoc(doc(d, 'recipes', id), { c: 'Cakes', t: 'Hu ' + id, pub: false, rv: '', s: [] });
+  await setDoc(doc(d, 'users', 'hun'), { name: 'Hu No', status: 'approved', role: 'employee', perms: { yoely: true, hu: false }, created: 1, favs: [] });
+  await setDoc(doc(d, 'users', 'huy'), { name: 'Hu Yes', status: 'approved', role: 'employee', perms: { hu: true }, created: 1, favs: [] }); });
+const HUN = as('hun'), HUY = as('huy');
+const putHu = (db, id, hu) => updateDoc(doc(db, 'recipes', id), { rv: 'yoely', yoelyFrom: '', hu, rvUids: [], rvAsk: [], rvBy: 'X', rvAt: 1, rvLog: [] });
+await check("someone with Private and nothing set for Hungarian can put a recipe in Grandma's Hungarian Recipes", assertSucceeds(putHu(YO, 'r-hu1', true)));
+await check("someone with Private but not Hungarian can't", assertFails(putHu(HUN, 'r-hu2', true)));
+await check('…but can still use Private', assertSucceeds(putHu(HUN, 'r-hu3', false)));
+await check('someone with only Hungarian can put a recipe there', assertSucceeds(putHu(HUY, 'r-hu2', true)));
+await check('…but not in Private', assertFails(putHu(HUY, 'r-hu4', false)));
+await check("…and can't take one out of Private", assertFails(updateDoc(doc(HUY, 'recipes', 'r-hu3'), { rv: '', yoelyFrom: '', rvUids: [] })));
+await check('…but can take one out of Grandma\'s Hungarian Recipes', assertSucceeds(updateDoc(doc(HUY, 'recipes', 'r-hu2'), { rv: '', yoelyFrom: '', rvUids: [] })));
 await check('an admin can put a recipe in Not kosher', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-nk'), { rv: 'kosher', kosherFrom: '', kosherPub: true, pub: false, rvNote: 'x', rvNoteBy: 'Adm', rvBy: 'Adm', rvAt: 1, rvUids: [], rvAsk: [], rvLog: [] })));
 await check("…an employee can't take it out", assertFails(updateDoc(doc(PR1, 'recipes', 'r-nk'), { rv: 'proof', rvUids: [] })));
 await check('…an admin can', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-nk'), { rv: 'proof', pub: true, kosherPub: null, kosherFrom: '', rvNote: '', rvNoteBy: '', rvUids: [], rvAsk: [], rvLog: [] })));
