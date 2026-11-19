@@ -934,6 +934,9 @@ body.out .ptr{top:calc(env(safe-area-inset-top,0px) + 16px)}
 .imp{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--line);flex-wrap:wrap}
 .imp:first-child{border-top:0}
 .imp-pick input{width:20px;height:20px;margin-top:2px}
+.imp-all{display:flex;align-items:center;gap:8px;font-weight:600;padding:10px 0;border-bottom:1px solid var(--line,#ddd);margin-bottom:4px;cursor:pointer}
+.imp-all input{width:20px;height:20px}
+.imp-all .hint{font-weight:400}
 .imp-body{flex:1;min-width:200px;display:flex;flex-direction:column;gap:2px}
 .imp-body summary{cursor:pointer;color:var(--accent);font-size:14px;margin-top:4px}
 .imp-cat{padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;font-size:15px}
@@ -1485,7 +1488,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.79";
+const WEB_VERSION = "4.80";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1540,6 +1543,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["importall","4.80","2026-11-19","Select all when importing several recipes","When a file or scan finds several recipes, a “Select all” box sits at the top of the list. Tick it to tick every recipe, untick it to untick them all. It shows whether everything is ticked (a dash when only some are) and how many of them are ticked.",false],
   ["catline","4.79","2026-11-19","One file for recipes of many categories","A recipe file (.txt) can hold recipes for many categories: a line like “Category: Cakes” puts the recipes after it into Cakes, until the next “Category:” line. Before, the whole file went into one category, from the file's name. You can still change any recipe's category on the list before sending.",false],
   ["guide","4.78","2026-11-18","Kitchen Guide","A Kitchen Guide in Kitchen tools (on the home page and in the menu): short how-to topics from the cooking-class notes – cooking methods, the mother sauces and the sauces made from them, butter sauces, preparing pans, angel food cakes, the pilaf method, making a coulis, pasta dough, the potato dishes made from duchesse, working with gelatin, deep-frying safely, choux paste tips and kosher swaps. Search finds words inside the topics. Admins can change a topic, hide it or add new ones.", false],
   ["inboxmovebtn","4.77","2026-11-18","“Move to…” on every recipe in the four first inboxes","In Need to proofread, Private, Grandma's Hungarian Recipes and Not kosher, each recipe has a “⇄ Move to…” button next to Edit and Decline. Choose one of the other three inboxes, write why, and it moves, the same as Manage → Move between inboxes: nobody's name is written down for the move, and the reason is kept in Activity. For admins.", false],
@@ -6846,6 +6850,7 @@ function importList(drafts, cat){
     <div class="panel-a scan">
       <h2>${drafts.length} recipes found</h2>
       <p class="sub">Untick any you don't want and check the categories. ${may("edit")?"They'll be added to the cookbook.":"Each one goes to "+esc(ADMIN_NAME)+" for approval, who can also fix anything."}</p>
+      ${feat("importall")&&drafts.length>1?`<label class="imp-all"><input type="checkbox" id="imp-all"> <span>Select all</span> <span class="hint" id="imp-count"></span></label>`:""}
       <ul class="imp-list">${drafts.map((d,i)=>{ const lk=lookAlikes(d); d._likes=lk; const dup=have.has(norm(d.t))||lk.length; return `<li class="imp" data-i="${i}">
         <label class="imp-pick"><input type="checkbox" ${dup?"":"checked"} aria-label="Keep ${esc(d.t)}"></label>
         <div class="imp-body"><b>${esc(d.t)}</b>${lk.length?`<span class="pill wait dup">Looks like ${esc(lk[0].r.t.replace(/^Untitled: /,""))}${lk[0].sim>=0.8?` (${Math.floor(lk[0].sim*100)}%)`:""}</span><button type="button" class="btn sm" data-likecmp="${i}">Compare side by side</button>`:have.has(norm(d.t))?`<span class="pill wait dup">Already in the cookbook</span>`:""}<span class="hint">${d.by?"From "+esc(d.by)+" · ":""}${nIng(d)} ingredients · ${nSteps(d)} steps</span>
@@ -6858,6 +6863,14 @@ function importList(drafts, cat){
     </div></section>`;
   document.getElementById("imp-back").onclick=()=>{ scanPage(cat); window.scrollTo(0,0); };
   app.querySelectorAll(".imp-cat").forEach(wireNewCat);
+  // importall: one box at the top ticks or unticks every recipe, and shows whether all of them are ticked
+  const allBox=document.getElementById("imp-all");
+  if(allBox){ const picks=[...app.querySelectorAll(".imp-pick input")];
+    const sync=()=>{ const n=picks.filter(x=>x.checked).length; allBox.checked=n===picks.length; allBox.indeterminate=n>0&&n<picks.length;
+      document.getElementById("imp-count").textContent=`(${n} of ${picks.length} ticked)`; };
+    allBox.onchange=()=>{ picks.forEach(x=>x.checked=allBox.checked); sync(); };
+    picks.forEach(x=>x.addEventListener("change",sync)); sync();
+    app.querySelectorAll("[data-likecmp]").forEach(b=>b.addEventListener("click",()=>setTimeout(()=>{ const box=b.closest(".imp").querySelector(".imp-like"); box.querySelectorAll("button").forEach(x=>x.addEventListener("click",sync)); },0))); }
   app.querySelectorAll("[data-likecmp]").forEach(b=>b.onclick=()=>{ const li=b.closest(".imp"), d=drafts[+b.dataset.likecmp], box=li.querySelector(".imp-like");
     if(!box.hidden){ box.hidden=true; return; }
     box.innerHTML=`${(d._likes||[]).map(l=>sideBySide(d, l)).join("")}<div class="ed-actions"><button type="button" class="btn solid" data-likeyes>Still send it</button><button type="button" class="btn" data-likeno>Don't send it</button></div>`;
