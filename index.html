@@ -1484,7 +1484,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.72";
+const WEB_VERSION = "4.73";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1539,6 +1539,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["declineback","4.73","2026-11-18","A declined recipe goes back where it came from","In the Declined inbox, “↩ Send back” now returns a recipe to the inbox it was declined from (Need to proofread, For approval, Ready to release, Not kosher or Private), with everything it had already been through, instead of always to Need to proofread. The people watching that inbox get a notice.", false],
   ["claudereader","4.72","2026-11-18","When Google refuses: “Let Claude read it”","When Google's reader refuses a photo or file (“RECITATION”, it looks like a printed book), admins and employees get a button, “Let Claude read it”: Claude, from Anthropic, reads it with the same careful Deep scan rules, and you check the recipes as usual before they go to an inbox. Claude is paid per use (usually a few cents a page) from your own Anthropic account, and only used when you tap the button. It needs a one-time setup: a small Cloudflare Worker that keeps your Anthropic key secret, and its address pasted into Settings → Claude reader (owner only).", false],
   ["scanmode","4.71","2026-11-18","Basic scan and Deep scan","When you add a recipe from a photo or file, you choose Basic scan or Deep scan. Basic scan reads the way the scanner did before it was made more thorough: quick, and fine for a clear, simple recipe. It never guesses: if anything is hard to read, unclear or it isn't sure, it switches to a Deep scan by itself. Deep scan is today's thorough reading (every word, every page, the same file gives the same recipes, and it looks for recipes that were missed); a word it really can't read is now marked [?] for you to fix instead of being guessed. The app remembers your choice.", false],
   ["menumeal","4.70","2026-11-18","Menu ideas by meal: breakfast, lunch or supper; a salad course","In Menu ideas, “Vegetable side dish” is now “Salad”, and the quick choices are now Breakfast, Lunch, Supper, Dairy, Shabbos and Yom Tov (Chicken, Beef, Fish, Pesach and Weekday are gone; you can still type anything). Tap one and it's written into “What's the meal?”. When you ask for a breakfast, lunch or supper menu, the AI picks recipes labeled for that meal first.", false],
@@ -5637,19 +5638,24 @@ function declinedPage(){
   const L=declinedList();
   app.innerHTML=`<section class="wrap admin inbox">
     <div class="section-head" style="margin-top:28px"><h2>Declined</h2><p>${L.length} ${L.length===1?"recipe":"recipes"}</p></div>
-    <p class="hint" style="margin:-4px 0 12px">Every recipe and suggested change that was declined lands here. ${feat("codeforever")?"A new recipe's item number is never given to another recipe.":"A new recipe's item number stays taken for a year after it was declined."} Send one back to Need to proofread to give it another go.</p>
+    <p class="hint" style="margin:-4px 0 12px">Every recipe and suggested change that was declined lands here. ${feat("codeforever")?"A new recipe's item number is never given to another recipe.":"A new recipe's item number stays taken for a year after it was declined."} ${feat("declineback")?"Send one back to the inbox it came from to give it another go.":"Send one back to Need to proofread to give it another go."}</p>
     ${L.length?`<div class="panel-a rv-panel"><ul class="rv-list">${L.map(x=>`<li data-dec="${esc(x.id)}"><div class="rv-top">${x.code&&feat("subcode")?`<span class="nochip" title="Item number">${esc(x.code)}</span> `:""}<b>${esc(x.t)}</b>
         <span class="hint">${x.editOf?`Suggested change to <a class="link" href="#${esc(x.editOf)}">${esc((findAny(x.editOf)||{t:x.t}).t.replace(/^Untitled: /,""))}</a>`:"New recipe"} · ${esc(x.c||"")} · from ${esc(x.byName||"a member")}, sent ${fmtDate(x.created)}</span>
         <span class="hint">✗ Declined${x.declinedBy?" by "+esc(x.declinedBy):""}${x.decided?" · "+fmtDate(x.decided):""}${x.code&&!x.editOf&&x.decided?(feat("codeforever")?` · number ${esc(x.code)} kept for this recipe for good`:` · number taken until ${fmtDate(x.decided+CODE_HOLD)}`):""}</span></div>
       <details class="rv-log"><summary>See the recipe</summary><div class="pv">${previewHTML(x)}</div></details>
-      <div class="row rv-acts"><button type="button" class="btn sm" data-reopen="${esc(x.id)}">↩ Send back to Need to proofread</button>${may("review")?`<button type="button" class="btn sm danger-btn" data-decdel="${esc(x.id)}">Delete</button>`:""}</div></li>`).join("")}</ul></div>`
+      <div class="row rv-acts"><button type="button" class="btn sm" data-reopen="${esc(x.id)}">↩ Send back to ${esc(feat("declineback") ? (INBOX_NAME[x.stage||"proof"]||INBOX_NAME.proof) : "Need to proofread")}</button>${may("review")?`<button type="button" class="btn sm danger-btn" data-decdel="${esc(x.id)}">Delete</button>`:""}</div></li>`).join("")}</ul></div>`
     :`<div class="panel-a"><p class="hint mempty">Nothing declined.</p></div>`}
   </section>`;
   const again=()=>{ const y=window.scrollY; declinedPage(); window.scrollTo(0,y); };
   app.querySelectorAll("[data-reopen]").forEach(b=>b.onclick=async()=>{ const x=subs.find(z=>z.id===b.dataset.reopen); if(!x) return; b.disabled=true;
-    const data={status:"pending", stage:"proof", decided:null, proofUid:"", proofBy:"", approvedUid:"", approvedBy:"", proofNote:"", proofNoteBy:"", uids:[], log:[...(x.log||[]), {from:"declined", to:"proof", by:myName(), uid:me, at:Date.now(), back:true}].slice(-30)};
-    try{ await db.collection("submissions").doc(x.id).update(data); Object.assign(x, data); touchHold(x.code); toast("Sent back to Need to proofread");
-      notifyWatchers("watch-proof", `A declined recipe is back`, `“${x.t}” needs to be proofread.`, "#proof", "pencil2"); renderAcct(); again(); }
+    // declineback: back to the inbox it was declined from, with everything it had been through
+    const st = feat("declineback") && INBOX_NAME[x.stage] ? x.stage : "proof";
+    const data = st!=="proof" || feat("declineback") ? {status:"pending", decided:null, log:[...(x.log||[]), {from:"declined", to:st, by:myName(), uid:me, at:Date.now(), back:true}].slice(-30)}
+      : {status:"pending", stage:"proof", decided:null, proofUid:"", proofBy:"", approvedUid:"", approvedBy:"", proofNote:"", proofNoteBy:"", uids:[], log:[...(x.log||[]), {from:"declined", to:"proof", by:myName(), uid:me, at:Date.now(), back:true}].slice(-30)};
+    if(feat("declineback") && !x.stage) data.stage="proof";
+    try{ await db.collection("submissions").doc(x.id).update(data); Object.assign(x, data); touchHold(x.code); toast("Sent back to "+(INBOX_NAME[st]||"Need to proofread"));
+      const W={proof:"watch-proof", approve:"watch-approve", release:"watch-release", yoely:"watch-yoely"}[st];
+      if(W) notifyWatchers(W, `A declined recipe is back`, `“${x.t}” is back in ${INBOX_NAME[st]}.`, "#"+st, "pencil2"); renderAcct(); again(); }
     catch(e){ b.disabled=false; toast("Couldn't save. Check your connection."); } });
   app.querySelectorAll("[data-decdel]").forEach(b=>b.onclick=()=>{ const box=b.parentElement, x=subs.find(z=>z.id===b.dataset.decdel); if(!x) return;
     box.innerHTML=`<span class="hint">Delete “${esc(x.t)}” for good?${x.code?" "+(feat("codeforever")?"Its number is never given to another recipe.":"Its number stays taken for a year."):""}</span><button type="button" class="btn sm warn" data-yes>Delete</button><button type="button" class="btn sm" data-no>Cancel</button>`;
