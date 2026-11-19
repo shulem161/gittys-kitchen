@@ -939,10 +939,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*68 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 68));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*69 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 69));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 68, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 69, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -953,7 +953,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /67/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /68/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1244,6 +1244,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
         const rs = localParse(f.text, 'Cakes');
         return {pdf: !!f.part.inlineData && f.pdfText === true, text: f.text, threw: /RECITATION/.test(threw), title: rs[0] && rs[0].t, items: rs[0] && rs[0].s[0][2]}; });
       ok('a PDF made on a computer has its text read by the built-in reader, word for word, as the last resort when the AI refuses it', r.pdf && r.threw && r.title === 'Apple Cake' && (r.items || []).includes('3 cups flour'), r); }
+    // One file for everything: a "Category: …" line puts the recipes after it into that category
+    { const r = await A.evaluate(() => { const t = 'Contents\nApple Pie\t1\nPea Soup\t2\nGarlic Bread\t3\n\nCategory: Desserts\nApple Pie\n6 apples\n• Bake it.\n\nCategory: soups\nPea Soup\n1 cup peas\n• Cook it.\n\nGarlic Bread\n1 loaf bread\n• Bake it.\n';
+        const rs = localParse(t, 'Cakes'); return rs.map(x => x.t + ':' + x.c + ':' + (x.cl ? 1 : 0) + ':' + x.s.length).join('|'); });
+      ok('one file for everything: a "Category:" line sets the category of the recipes after it (an existing one whatever the case), and isn\'t read as an ingredient', r === 'Apple Pie:Desserts:1:2|Pea Soup:Soups:1:2|Garlic Bread:Soups:1:2', r); }
     // Menu ideas by meal
     { await A.goto(F + '#menu'); await A.waitForTimeout(500); await A.fill('#mn-q', '');
       const chips = await A.locator('[data-mq]').allTextContents();

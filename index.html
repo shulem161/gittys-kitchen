@@ -1485,7 +1485,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.78";
+const WEB_VERSION = "4.79";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1540,6 +1540,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["catline","4.79","2026-11-19","One file for recipes of many categories","A recipe file (.txt) can hold recipes for many categories: a line like “Category: Cakes” puts the recipes after it into Cakes, until the next “Category:” line. Before, the whole file went into one category, from the file's name. You can still change any recipe's category on the list before sending.",false],
   ["guide","4.78","2026-11-18","Kitchen Guide","A Kitchen Guide in Kitchen tools (on the home page and in the menu): short how-to topics from the cooking-class notes – cooking methods, the mother sauces and the sauces made from them, butter sauces, preparing pans, angel food cakes, the pilaf method, making a coulis, pasta dough, the potato dishes made from duchesse, working with gelatin, deep-frying safely, choux paste tips and kosher swaps. Search finds words inside the topics. Admins can change a topic, hide it or add new ones.", false],
   ["inboxmovebtn","4.77","2026-11-18","“Move to…” on every recipe in the four first inboxes","In Need to proofread, Private, Grandma's Hungarian Recipes and Not kosher, each recipe has a “⇄ Move to…” button next to Edit and Decline. Choose one of the other three inboxes, write why, and it moves, the same as Manage → Move between inboxes: nobody's name is written down for the move, and the reason is kept in Activity. For admins.", false],
   ["pickinbox","4.76","2026-11-18","Choose where a new recipe goes, every time","When you add, scan or import recipes, “Send to” no longer starts on Need to proofread. It says “Choose where it goes…”, and the recipe isn't sent until you pick an inbox (Need to proofread, Private, Grandma's Hungarian Recipes or Not kosher). People who can't choose the first inbox still send to Need to proofread as before.", false],
@@ -6271,7 +6272,9 @@ function localParse(text, fileCat){
   const ALIAS={"brownies#2":"brownie#2","zucherbeansalad":"zucerbeansalad","krepelech#3":"kreplech#3"};
   const want = titles.map(t=>[norm(t),t]); const used = want.map(()=>false);
   const recipes=[]; let cur=null;
-  const startRecipe = t => { const m=t.match(/^\((.*?)\)\s*(.*)$/); cur={t:(m?m[2]:t).trim(), by:m?m[1].trim():"", c:fileCat, s:[]}; recipes.push(cur); };
+  // catline: a "Category: Cakes" line puts the recipes after it into that category (one file for everything)
+  let lineCat="";
+  const startRecipe = t => { const m=t.match(/^\((.*?)\)\s*(.*)$/); cur={t:(m?m[2]:t).trim(), by:m?m[1].trim():"", c:lineCat||fileCat, s:[]}; if(lineCat) cur.cl=true; recipes.push(cur); };
   const push = (kind, text, title) => { if(!cur) return; const secs=cur.s, last=secs[secs.length-1];
     if(title!==undefined){ secs.push([kind,title,[]]); return; }
     if(last && last[0]===kind) last[2].push(text); else secs.push([kind,"",[text]]); };
@@ -6279,6 +6282,8 @@ function localParse(text, fileCat){
   for(let i=0;i<raw.length;i++){
     const l=raw[i]; if(!l.trim()) continue;
     const bullet=isBullet(l), text=localClean(strip(l)); if(!text) continue;
+    if(!bullet && feat("catline")){ const cm=text.match(/^categor(?:y|ies)\s*:\s*(.{2,30})$/i);
+      if(cm){ const w=cm[1].trim().replace(/[.:]+$/,""); lineCat=CATS.find(c=>c.toLowerCase()===w.toLowerCase())||w.replace(/\b\p{L}/gu,x=>x.toUpperCase()); cur=null; continue; } }
     if(!bullet){
       const n=norm(text), nn=ALIAS[n]||n;
       if(want.length){
@@ -6755,11 +6760,11 @@ function scanPage(cat){
     status.innerHTML=`<div class="scan-prev">${src.preview?`<img src="${src.preview}" alt="The recipe photo">${n>1?`<span class="hint">+ ${n-1} more ${n===2?"page":"pages"}</span>`:""}`:`<div class="scan-file">${esc(src.name||"")}<span>${esc(src.label)}</span></div>`}<div><span class="spin" aria-hidden="true"></span><p><b>Reading…</b><br><span class="hint">This usually takes 10–30 seconds${src.preview?"":", longer for big files"}.</span></p></div></div>`;
     const localDrafts = () => { if(!src.text) return [];
       const fc = fileCategory(src.name) || cat || "Miscellaneous";
-      return localParse(src.text, fc).filter(r=>!(src.pdfText && /^(table of )?contents$/i.test((r.t||"").trim()))).map(r=>({id:"", c:r.c||fc, t:r.t, by:r.by, n:undefined, s:r.s})); };
+      return localParse(src.text, fc).filter(r=>!(src.pdfText && /^(table of )?contents$/i.test((r.t||"").trim()))).map(r=>({id:"", c:r.c||fc, t:r.t, by:r.by, n:undefined, s:r.s, ...(r.cl?{cl:true}:{})})); };
     const showDrafts = (drafts, how) => {
       if(how) toast(how);
       const fcat = feat("filecat") ? fileCat(src.name) : "";
-      if(fcat){ drafts.forEach(d=>d.c=fcat); toast(CATS.includes(fcat) ? `From the file's name: ${fcat}` : `From the file's name: a new category, ${fcat}`); }
+      if(fcat){ drafts.forEach(d=>{ if(!d.cl) d.c=fcat; }); toast(CATS.includes(fcat) ? `From the file's name: ${fcat}` : `From the file's name: a new category, ${fcat}`); }
       if(drafts.length===1){ toast("Recipe read. Check it, then "+(may("edit")?"add it.":"send it for approval.")); editor(null, cat, null, drafts[0]); }
       else importList(drafts, cat);
     };
