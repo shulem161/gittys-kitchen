@@ -1484,7 +1484,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.73";
+const WEB_VERSION = "4.74";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1539,6 +1539,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["keepplace","4.74","2026-11-18","Back to where you left off in the list","When you open a recipe from a list or an inbox and come back (with ← or the phone's back button), or come back after sending a recipe up, declining it or anything else you do on it, the list opens at the same spot you left it, instead of jumping to the top. When a list redraws by itself (something new came in), it stays where you are too.", false],
   ["declineback","4.73","2026-11-18","A declined recipe goes back where it came from","In the Declined inbox, “↩ Send back” now returns a recipe to the inbox it was declined from (Need to proofread, For approval, Ready to release, Not kosher or Private), with everything it had already been through, instead of always to Need to proofread. The people watching that inbox get a notice.", false],
   ["claudereader","4.72","2026-11-18","When Google refuses: “Let Claude read it”","When Google's reader refuses a photo or file (“RECITATION”, it looks like a printed book), admins and employees get a button, “Let Claude read it”: Claude, from Anthropic, reads it with the same careful Deep scan rules, and you check the recipes as usual before they go to an inbox. Claude is paid per use (usually a few cents a page) from your own Anthropic account, and only used when you tap the button. It needs a one-time setup: a small Cloudflare Worker that keeps your Anthropic key secret, and its address pasted into Settings → Claude reader (owner only).", false],
   ["scanmode","4.71","2026-11-18","Basic scan and Deep scan","When you add a recipe from a photo or file, you choose Basic scan or Deep scan. Basic scan reads the way the scanner did before it was made more thorough: quick, and fine for a clear, simple recipe. It never guesses: if anything is hard to read, unclear or it isn't sure, it switches to a Deep scan by itself. Deep scan is today's thorough reading (every word, every page, the same file gives the same recipes, and it looks for recipes that were missed); a word it really can't read is now marked [?] for you to fix instead of being guessed. The app remembers your choice.", false],
@@ -7989,7 +7990,16 @@ window.addEventListener("hashchange", ()=>{ const h=location.hash;
 function navBack(){ if(navStack.length>1){ navGoingBack=true; history.back(); } else location.hash=""; }
 function setBack(){ const b=document.getElementById("navback"); if(b) b.hidden = !location.hash || location.hash==="#" || state!=="approved"; }
 document.getElementById("navback").onclick=navBack;
-function route(){ setBack(); if(guideOn && location.hash.slice(1)!==guideOn.r.id) closeGuide(true); document.body.classList.remove("on-recipe"); routePage(); setNav(); tickTimers(); restorePane(); }
+function route(){ setBack(); if(guideOn && location.hash.slice(1)!==guideOn.r.id) closeGuide(true); document.body.classList.remove("on-recipe");
+  // keepplace: coming back to a list (A → recipe → A) opens it where you left it; a list redrawn in place stays put
+  const kh=location.hash||"#", kSame=kh===KEEP.cur, kBack=!kSame && kh===KEEP.prev && KEEP.y[kh]!==undefined, kY=window.scrollY;
+  routePage(); setNav(); tickTimers(); restorePane();
+  if(feat("keepplace") && !paneRestore){ if(kSame) keepTo(kY); else if(kBack) keepTo(KEEP.y[kh]); }
+  if(!kSame){ KEEP.prev=KEEP.cur; KEEP.cur=kh; }
+}
+var KEEP = {y:{}, cur:"", prev:""};
+window.addEventListener("scroll", ()=>{ if((location.hash||"#")===KEEP.cur) KEEP.y[KEEP.cur]=window.scrollY; }, {passive:true});
+function keepTo(y){ if(!y) return; const go=()=>window.scrollTo(0, y); go(); requestAnimationFrame(go); setTimeout(go, 80); }
 // Split screen, left side: put back the search and the scroll spot you had before splitting (once, after the page is drawn)
 function restorePane(){ if(!paneRestore || state!=="approved") return; const R=paneRestore; paneRestore=null;
   if(R.q){ q.value=R.q; q.dispatchEvent(new Event("input",{bubbles:true})); }
