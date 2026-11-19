@@ -159,6 +159,12 @@ service cloud.firestore {
     }
 
     // Pairs of recipes an admin marked "not duplicates".
+    // The Claude reader's address (a Cloudflare Worker that keeps the Anthropic key secret): set by the owner
+    match /meta/claude {
+      allow get: if approvedMember();
+      allow write: if isOwner() && request.resource.data.keys().hasOnly(['url', 'at'])
+        && request.resource.data.url is string && (request.resource.data.url == '' || request.resource.data.url.matches('https://.+'));
+    }
     match /meta/dupes {
       allow get: if isAdmin();
       allow write: if isAdmin() && request.resource.data.keys().hasOnly(['ignore']) && request.resource.data.ignore is list;

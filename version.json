@@ -1,6 +1,6 @@
 {
-  "web": "4.71",
+  "web": "4.72",
   "apk": 12,
   "apkUrl": "Gittys-Kitchen.apk",
-  "notes": "Basic scan and Deep scan."
+  "notes": "When Google refuses a file: Let Claude read it."
 }

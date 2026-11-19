@@ -938,10 +938,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*61 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 61));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*62 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 62));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 61, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 62, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -952,7 +952,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /60/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /61/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1236,6 +1236,21 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       const t = await A.locator('#ed-t').inputValue().catch(() => ''), asks = await A.evaluate(() => window.__asks.join(','));
       await A.evaluate(() => { window.askReaderOnce = window.__aro; store('gk-scanmode', null); });
       ok('Basic scan and Deep scan: basic reads the way it did before and never guesses; if it isn\'t sure it goes on to a deep scan by itself', both && !/THOROUGHLY/.test(pr.basic) && /unsure/.test(pr.basic) && /THOROUGHLY/.test(pr.deep) && /\[\?\]/.test(pr.deep) && t === 'Clear Cake' && /^basic,deep/.test(asks), [both, t, asks]); }
+    // When Google refuses: “Let Claude read it” (through the owner's Cloudflare Worker)
+    { let sent = null;
+      await A.route('https://gk-reader.test/**', r => { sent = JSON.parse(r.request().postData() || '{}'); r.fulfill({status: 200, contentType: 'application/json', headers: {'access-control-allow-origin': '*'},
+        body: JSON.stringify({text: JSON.stringify({recipes: [{title: 'Claude Cake', category: 'Cakes', parts: [{type: 'ingredients', heading: '', items: ['2 cups flour']}, {type: 'method', heading: '', items: ['Bake at 350°F']}]}]})})}); });
+      await A.goto(F + '#settings'); await A.waitForTimeout(600);
+      await A.fill('#cl-url', 'https://gk-reader.test/'); await A.click('#cl-save'); await A.waitForTimeout(500);
+      const saved = await A.evaluate(async () => (await db.collection('meta').doc('claude').get()).data().url);
+      await A.evaluate(async () => { [...Object.keys(localStorage), ...Object.keys(MEM)].filter(k => k.startsWith('gk-scan-')).forEach(k => store(k, null)); for (const d of (await db.collection('scans').get()).docs) await db.collection('scans').doc(d.id).delete().catch(() => {}); });
+      await A.evaluate(() => { store('gk-scanmode', 'deep'); window.__aro = window.askReaderOnce; window.askReaderOnce = async () => ({response: {text: () => { throw new Error('AI: Response error: Candidate was blocked due to RECITATION'); }}}); });
+      await A.goto(F + '#scan'); await A.waitForTimeout(400);
+      await A.setInputFiles('#scan-file', IMG); await A.waitForTimeout(1200); await A.click('#scan-read'); await A.waitForTimeout(2500);
+      const btn = await A.locator('#scan-claude').count(); if (btn) { await A.click('#scan-claude'); await A.waitForTimeout(1500); }
+      const t = await A.locator('#ed-t').inputValue().catch(() => '');
+      await A.evaluate(() => { window.askReaderOnce = window.__aro; store('gk-scanmode', null); });
+      ok('when Google refuses a file, “Let Claude read it” sends it to the owner\'s Claude reader, and the recipe comes back to check', saved === 'https://gk-reader.test/' && btn === 1 && t === 'Claude Cake' && sent && /THOROUGHLY/.test(sent.prompt) && sent.files[0].mime === 'image/jpeg', [saved, btn, t, sent && sent.files && sent.files.length]); }
     // Reading a file again also looks for recipes that were missed
     { const r = await A.evaluate(async () => { const keep = window.askReader; let asked = '';
         window.askReader = async parts => { asked = parts[0]; return {response: {text: () => JSON.stringify({recipes: [

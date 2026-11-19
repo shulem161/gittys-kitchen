@@ -422,6 +422,9 @@ await check("…nor set a member up to take over as owner", assertFails(updateDo
 await check('admin can still approve and change a member', assertSucceeds(updateDoc(doc(ADM, 'users', 'pub'), { status: 'approved', role: 'public' })));
 await check('admin can change public settings', assertSucceeds(setDoc(doc(ADM, 'meta', 'public'), { allow: { requests: true }, cats: { Cakes: false } })));
 await check("employee can't change public settings", assertFails(setDoc(doc(EMP, 'meta', 'public'), { allow: {}, cats: {} })));
+await check('the owner sets the Claude reader address', assertSucceeds(setDoc(doc(OWN, 'meta', 'claude'), { url: 'https://gk.example.workers.dev', at: 1 })));
+await check("…an admin can't change it", assertFails(setDoc(doc(ADM, 'meta', 'claude'), { url: 'https://evil.example', at: 1 })));
+await check('…and members can read it, to use it', assertSucceeds(getDoc(doc(EMP, 'meta', 'claude'))));
 await check('admin can set the design for everyone', assertSucceeds(setDoc(doc(ADM, 'meta', 'look'), { look: 'garden', by: 'Adm', at: 1 })));
 await check('owner can make an employee an admin', assertSucceeds(updateDoc(doc(OWN, 'users', 'emp'), { role: 'admin' })));
 await check('owner can take admin away', assertSucceeds(updateDoc(doc(OWN, 'users', 'adm2'), { role: 'employee' })));

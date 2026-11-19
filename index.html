@@ -1484,7 +1484,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.71";
+const WEB_VERSION = "4.72";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1539,6 +1539,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["claudereader","4.72","2026-11-18","When Google refuses: “Let Claude read it”","When Google's reader refuses a photo or file (“RECITATION”, it looks like a printed book), admins and employees get a button, “Let Claude read it”: Claude, from Anthropic, reads it with the same careful Deep scan rules, and you check the recipes as usual before they go to an inbox. Claude is paid per use (usually a few cents a page) from your own Anthropic account, and only used when you tap the button. It needs a one-time setup: a small Cloudflare Worker that keeps your Anthropic key secret, and its address pasted into Settings → Claude reader (owner only).", false],
   ["scanmode","4.71","2026-11-18","Basic scan and Deep scan","When you add a recipe from a photo or file, you choose Basic scan or Deep scan. Basic scan reads the way the scanner did before it was made more thorough: quick, and fine for a clear, simple recipe. It never guesses: if anything is hard to read, unclear or it isn't sure, it switches to a Deep scan by itself. Deep scan is today's thorough reading (every word, every page, the same file gives the same recipes, and it looks for recipes that were missed); a word it really can't read is now marked [?] for you to fix instead of being guessed. The app remembers your choice.", false],
   ["menumeal","4.70","2026-11-18","Menu ideas by meal: breakfast, lunch or supper; a salad course","In Menu ideas, “Vegetable side dish” is now “Salad”, and the quick choices are now Breakfast, Lunch, Supper, Dairy, Shabbos and Yom Tov (Chicken, Beef, Fish, Pesach and Weekday are gone; you can still type anything). Tap one and it's written into “What's the meal?”. When you ask for a breakfast, lunch or supper menu, the AI picks recipes labeled for that meal first.", false],
   ["pdftext","4.69","2026-11-18","A PDF made on a computer is read word for word, without the AI","When a PDF was made on a computer (for example saved from Word, like the cookbook you wrote), the app now takes the text right out of the PDF and reads it with its own built-in reader, the same one used for Word files, so it comes in word for word and Google's AI never has to copy it. A neatly laid-out PDF (with a contents list) is read that way right away. A PDF with a messier layout still goes to the AI first, because it understands messy pages better; if the AI refuses it (“RECITATION”), it tries again in its own words, and only if that fails too is the built-in reader's word-for-word version used. A PDF of photographed or scanned pages has no text inside, so it's still read by the AI as before.", false],
@@ -6127,6 +6128,44 @@ async function aiModel(name, exact, temp){
   return _aiModels[key] = _aiModels[key] || _aiBase.aiMod.getGenerativeModel(_aiBase.ai,
     {model:name, generationConfig: exact ? {responseMimeType:"application/json", temperature:0, topP:0.1, topK:1} : {responseMimeType:"application/json", temperature: temp!==undefined ? temp : 0.2}}, {timeout: 75000});
 }
+// claudereader: the backup reader for what Google refuses (a Cloudflare Worker that keeps the Anthropic key secret; address in meta/claude)
+let CLAUDE_CFG = null;
+async function claudeCfg(force){
+  if(CLAUDE_CFG && !force) return CLAUDE_CFG;
+  try{ const d=await db.collection("meta").doc("claude").get(); CLAUDE_CFG = d.exists ? d.data() : {}; }catch(e){ CLAUDE_CFG = {}; }
+  return CLAUDE_CFG;
+}
+const mayClaude = () => feat("claudereader") && isTeam() && !offline && !!db;
+async function askClaude(prompt, parts){
+  const cfg=await claudeCfg(); if(!cfg.url) throw new Error("The Claude reader isn't set up yet");
+  const files=parts.map(p=>typeof p==="string" ? {text:p} : p.text ? {text:p.text} : p.inlineData ? {mime:p.inlineData.mimeType, data:p.inlineData.data} : null).filter(Boolean);
+  const tok = auth && auth.currentUser ? await auth.currentUser.getIdToken() : "";
+  const r = await fetch(cfg.url, {method:"POST", headers:{"Content-Type":"application/json", Authorization:"Bearer "+tok}, body:JSON.stringify({prompt, files})});
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok || !j.text) throw new Error("Claude: "+(j.error||("error "+r.status)));
+  return j;
+}
+function claudeSetPanel(){
+  if(!(feat("claudereader") && realOwner() && !viewingAs() && db && !offline)) return "";
+  return `<div class="panel-a" id="claude-set"><h3>Claude reader</h3>
+    <p class="hint">For photos and files Google's reader refuses. Paste the address of your Cloudflare Worker (it ends in .workers.dev).</p>
+    <div class="field"><label for="cl-url">Worker address</label><input id="cl-url" type="url" placeholder="https://gk-claude-reader.yourname.workers.dev" autocomplete="off"></div>
+    <div class="row mn-actions"><button type="button" class="btn solid" id="cl-save">Save</button><button type="button" class="btn" id="cl-test">Test it</button></div>
+    <p class="hint" id="cl-msg"></p></div>`;
+}
+async function wireClaudeSet(){
+  const box=document.getElementById("claude-set"); if(!box) return;
+  const inp=box.querySelector("#cl-url"), msg=box.querySelector("#cl-msg");
+  const cfg=await claudeCfg(true); inp.value=cfg.url||""; msg.textContent = cfg.url ? "Set up. Admins and employees get “Let Claude read it” when Google refuses a file." : "Not set up yet.";
+  box.querySelector("#cl-save").onclick=async()=>{ const url=inp.value.trim();
+    if(url && !/^https:\/\/[^\s/]+\.[^\s]+$/.test(url)){ msg.textContent="That doesn't look like a web address (it should start with https://)."; return; }
+    try{ await db.collection("meta").doc("claude").set({url, at:Date.now()}); CLAUDE_CFG={url}; msg.textContent = url ? "Saved." : "Removed."; toast("Saved"); }
+    catch(e){ msg.textContent="Couldn't save. Check your connection."; } };
+  box.querySelector("#cl-test").onclick=async()=>{ const url=inp.value.trim(); if(!url){ msg.textContent="Paste the address first."; return; }
+    msg.textContent="Testing…";
+    try{ const r=await fetch(url); const j=await r.json(); msg.textContent = j.ready ? "✅ The Worker answers and the Anthropic key is set." : j.ok ? "The Worker answers, but the Anthropic key isn't added yet (Settings → Variables and Secrets → ANTHROPIC_API_KEY)." : "The Worker didn't answer as expected."; }
+    catch(e){ msg.textContent="Couldn't reach the Worker. Check the address."; } };
+}
 // Ask the reader: move to the next model when one is busy, over its limit, unavailable or too slow.
 const isRecite = e => /RECITATION|copyrighted|resembles existing/i.test(String(e&&e.message||e));
 const RECITE_NOTE = `IMPORTANT: Don't copy the text word for word. Keep the title, every ingredient and every amount exactly as written, but write the steps and notes in your own words, in short clear sentences, without leaving anything out.`;
@@ -6499,6 +6538,24 @@ function scanPage(cat){
         : /fetch|network|Failed to load|import/i.test(m) ? "Couldn't reach the recipe reader. Check your internet connection and try again."
         : feat("recitefix") && isRecite(e) ? "The reader wouldn't copy this file, because it looks like pages from a printed cookbook. Try taking a photo of one recipe at a time, or add the recipe by typing it."
         : "Couldn't read a recipe from that: "+esc(m.slice(0,140))+". Try a clearer photo or another file, or add the recipe by typing it."}</p>${isAdmin()?`<details class="err-detail"><summary>Details for troubleshooting</summary><code>${esc(m.slice(0,600))}</code></details>`:""}`;
+      // claudereader: Google refused it, so Claude can do the hard work
+      if(feat("recitefix") && isRecite(e) && mayClaude()) claudeCfg().then(cfg=>{
+        if(!cfg.url){ if(realOwner()) status.insertAdjacentHTML("beforeend", `<p class="hint">Claude could read this for you. Set up the Claude reader in <a class="link" href="#settings">Settings</a>.</p>`); return; }
+        status.insertAdjacentHTML("beforeend", `<div class="row" style="margin-top:10px"><button type="button" class="primary" id="scan-claude">✨ Let Claude read it</button></div><p class="hint">Claude, from Anthropic, reads it carefully instead. Paid per use, usually a few cents a page.</p>`);
+        document.getElementById("scan-claude").onclick=async()=>{
+          status.innerHTML=`<div class="scan-prev"><div><span class="spin" aria-hidden="true"></span><p><b>Claude is reading it…</b><br><span class="hint">This can take a minute or two for a long file.</span></p></div></div>`;
+          try{ const prompt=scanPrompt("deep")+(n>1?`\n\nThese ${n} photos are consecutive pages or sides of the same recipe card(s), in order. Combine them; a recipe that continues onto the next photo is ONE recipe.`:"");
+            const r=await askClaude(prompt, src.parts);
+            const j=JSON.parse(r.text.trim().replace(/^[\s\S]*?```(?:json)?\s*/,"").replace(/```[\s\S]*$/,"").trim() || r.text);
+            if(j.error) throw new Error(j.error);
+            if(!Array.isArray(j.recipes)) j.recipes=[Object.assign({}, j)];
+            const drafts=j.recipes.map(draftFromScan).filter(Boolean);
+            if(!drafts.length) throw new Error("No ingredients or steps were found");
+            if(r.truncated) toast("This file was long: Claude read the first part. Add the rest as a separate file.");
+            showDrafts(drafts, "Read by Claude. Please check each recipe.");
+          }catch(e3){ status.innerHTML=`<p class="err">Claude couldn't read it: ${esc(String(e3&&e3.message||e3).slice(0,200))}. Try a photo of one recipe at a time, or add the recipe by typing it.</p>`; }
+        };
+      });
     }
   };
   document.getElementById("scan-cam").onchange=e=>addPhotos(e.target);
@@ -7483,6 +7540,7 @@ function settingsPage(){
       ${seg("theme", [["light","Light"],["dark","Dark"],["auto","Automatic"]], myTheme())}
       <p class="hint" style="margin-top:8px">Automatic follows your ${appBuild?"phone":"device"}'s setting. Also used for the step-by-step cooking guide.</p></div>
     ${lookPanel()}
+    ${claudeSetPanel()}
     ${splitAvail()?`<div class="panel-a"><h3>Split screen mode</h3>
       <label class="pub-row"><input type="checkbox" id="pref-split" ${splitOn()?"checked":""}><span>Show a “⧉ Split screen” button at the top, to see two pages side by side</span></label>
       <p class="hint" style="margin-top:6px">For big screens, on this ${appBuild?"phone":"device"} only. Off until you turn it on.</p></div>`:""}
@@ -7505,6 +7563,7 @@ function settingsPage(){
   </section>`;
   app.querySelectorAll("[data-theme]").forEach(b=>b.onclick=()=>{ store("gk-theme", b.dataset.theme==="auto"?null:b.dataset.theme); applyTheme(); settingsPage(); });
   app.querySelectorAll("[data-tsize]").forEach(b=>b.onclick=()=>{ store("gk-textsize", b.dataset.tsize==="1"?null:b.dataset.tsize); applyTextSize(); settingsPage(); });
+  wireClaudeSet();
   const ps=document.getElementById("pref-split"); if(ps) ps.onchange=()=>{ store("gk-splitmode", ps.checked?"1":"0"); renderSplitBtn(); toast(ps.checked?"Split screen button is at the top now":"Split screen is off"); };
   const pt=document.getElementById("pref-todo"); if(pt) pt.onchange=()=>{ setPref("todoDays", +pt.value); toast("Saved"); };
   document.getElementById("set-upd").onclick=()=>checkUpdates(true);
