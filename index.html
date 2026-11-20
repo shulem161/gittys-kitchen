@@ -1489,7 +1489,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.83";
+const WEB_VERSION = "4.84";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1544,6 +1544,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["pesachalso","4.84","2026-11-19","Pesach recipes in a regular category too","A Pesach recipe can now also be in a year-round category, like Pesach and Cakes, so it shows in both. When you add or edit a Pesach recipe, “Also in” lets you pick them. In a recipe file, a line like “Category: Pesach, Cakes” puts the recipes after it in Pesach and also in Cakes. Year-round recipes still never go into Pesach.",false],
   ["searchall","4.83","2026-11-19","Search everywhere (admins)","A new page for admins, in the menu under Manage: 🔎 Search everywhere. One search finds every recipe wherever it is – the cookbook, every inbox (Private, Grandma's Hungarian Recipes, Not kosher and the three steps), new recipes and suggested changes still waiting, Declined, and the Recycle bin – and each result says where it is. It searches titles, codes, who it's by, categories, ingredients and steps, and buttons narrow it to the cookbook, the inboxes, waiting, declined or the recycle bin. The regular search results also get a link to search everywhere for the same words.",false],
   ["allinboxes","4.82","2026-11-19","Every inbox in Inbox settings","Inbox settings lists every inbox, in the same order as the Inboxes menu: Private, Grandma's Hungarian Recipes, Not kosher, the three steps, Declined, Needs admin approval, Recipe requests, Suggestions & comments, Likes & dislikes, and App & web updates. Grandma's Hungarian Recipes gets its own tick boxes, so it can be given to different people than Private (until you change it, it follows Private). Inboxes that go with something else, like Declined, say who gets them. A new inbox will show up there too.",false],
   ["longtoc","4.81","2026-11-19","Long recipe files are read to the end","A recipe file (.txt) that starts with a long Contents list (more than about 70 recipes) is now read all the way through. Before, only the first 70 or so titles in the list were found, and everything after them ran together into one recipe.",false],
@@ -4088,7 +4089,9 @@ function rememberCat(name){
   setRecipes(RAW_RECIPES);
 }
 // Pesach and the year-round categories don't mix in “Also in”
-const alsoChoices = main => CATS.filter(c=>c!==main && isPesach(c)===isPesach(main));
+// pesachalso: a Pesach recipe can also be in a year-round category; a year-round recipe still never goes in Pesach
+const alsoChoices = main => CATS.filter(c=>c!==main && (isPesach(c)===isPesach(main) || (feat("pesachalso") && isPesach(main) && !isPesach(c))));
+const alsoHidden = c => isPesach(c) && !feat("pesachalso");
 // addcat: “+ Add a new category…” at the end of a category dropdown; typing a name adds it and chooses it
 const addCatOpt = () => feat("addcat") ? `<option value="__new">+ Add a new category…</option>` : "";
 function wireNewCat(sel){
@@ -4856,7 +4859,7 @@ function editor(r, cat, sub, draft){
           <div class="field"><label for="ed-c">Category</label>
             <select id="ed-c"${!isAdmin()&&!suggest?" disabled":""}>${catList.map(c=>`<option ${c===catNow?"selected":""}>${esc(c)}</option>`).join("")}<option value="__new">${feat("addcat")?"+ Add a new category…":"New category…"}</option></select>
             <input id="ed-cn" type="text" maxlength="30" placeholder="New category name" hidden></div>
-          ${feat("multicat")&&(isAdmin()||suggest)?`<div class="field ed-also-f"${isPesach(catNow)?" hidden":""}><span class="lbl">Also in <span class="hint">(optional)</span></span><div class="ed-also" id="ed-also">${[...new Set([...alsoChoices(catNow), ...((src&&src.also)||[])])].filter(c=>c!==catNow && !isPesach(c)).map(c=>`<label class="also-c"><input type="checkbox" value="${esc(c)}" ${((src&&src.also)||[]).includes(c)?"checked":""}><span>${esc(c)}</span></label>`).join("")}
+          ${feat("multicat")&&(isAdmin()||suggest)?`<div class="field ed-also-f"${alsoHidden(catNow)?" hidden":""}><span class="lbl">Also in <span class="hint">(optional)</span></span><div class="ed-also" id="ed-also">${[...new Set([...alsoChoices(catNow), ...((src&&src.also)||[])])].filter(c=>c!==catNow && !isPesach(c)).map(c=>`<label class="also-c"><input type="checkbox" value="${esc(c)}" ${((src&&src.also)||[]).includes(c)?"checked":""}><span>${esc(c)}</span></label>`).join("")}
             <span class="also-new"><input id="ed-also-new" type="text" maxlength="30" placeholder="+ Add a category"><button type="button" class="btn sm" id="ed-also-add">Add</button></span></div></div>`:""}
           <div class="field"><label for="ed-by">From (optional)</label><input id="ed-by" type="text" maxlength="40" value="${esc(src?src.by:(suggest?myName():""))}" placeholder="e.g. Bobby"></div>
         </div>
@@ -4905,7 +4908,7 @@ function editor(r, cat, sub, draft){
     const sel=F.querySelector("#ed-c"), cn=F.querySelector("#ed-cn");
     sel.onchange=()=>{ cn.hidden = sel.value!=="__new"; if(!cn.hidden) cn.focus();
       const own=F.querySelector(`#ed-also input[value="${CSS.escape(sel.value)}"]`); if(own){ own.checked=false; } F.querySelectorAll("#ed-also .also-c").forEach(l=>l.hidden = l.querySelector("input").value===sel.value);
-      const af=F.querySelector(".ed-also-f"); if(af){ af.hidden = isPesach(sel.value); if(af.hidden) F.querySelectorAll("#ed-also input").forEach(x=>x.checked=false); } };
+      const af=F.querySelector(".ed-also-f"); if(af){ af.hidden = alsoHidden(sel.value); if(af.hidden) F.querySelectorAll("#ed-also input").forEach(x=>x.checked=false); } };
     const alsoAdd=F.querySelector("#ed-also-add"); if(alsoAdd){ const ai=F.querySelector("#ed-also-new");
       const addIt=()=>{ let v=ai.value.trim().replace(/\s+/g," ").replace(/[\/]/g,""); if(v.length<2){ toast("Type a category name"); return; } v=v[0].toUpperCase()+v.slice(1);
         if(isPesach(v)){ toast("Pesach stays separate from the year-round categories"); return; }
@@ -5032,7 +5035,7 @@ function editor(r, cat, sub, draft){
       let c = sel.value==="__new" ? cn.value.trim() : sel.value;
       if(!t) return fail("Enter the recipe name.");
       if(!c) return fail("Choose a category, or type a new category name.");
-      const also = feat("multicat") && F.querySelector("#ed-also") ? (isPesach(c) ? [] : [...new Set([...F.querySelectorAll("#ed-also input[type=checkbox]:checked")].map(x=>x.value))].filter(x=>x && x!==c && !isPesach(x)).slice(0,12)) : undefined;
+      const also = feat("multicat") && F.querySelector("#ed-also") ? (alsoHidden(c) ? [] : [...new Set([...F.querySelectorAll("#ed-also input[type=checkbox]:checked")].map(x=>x.value))].filter(x=>x && x!==c && !isPesach(x)).slice(0,12)) : undefined;
       rememberCat(c); (also||[]).forEach(rememberCat);   // a new category is in the whole system at once, even while the recipe waits in an inbox
       const s = secs.map(x=>[x.ing?1:0, x.h.trim(), x.items.split("\n").map(l=>l.trim()).filter(Boolean)]).filter(x=>x[2].length);
       if(!s.length) return fail("Add at least one ingredient or step.");
@@ -6336,8 +6339,8 @@ function localParse(text, fileCat){
   const want = titles.map(t=>[norm(t),t]); const used = want.map(()=>false);
   const recipes=[]; let cur=null;
   // catline: a "Category: Cakes" line puts the recipes after it into that category (one file for everything)
-  let lineCat="";
-  const startRecipe = t => { const m=t.match(/^\((.*?)\)\s*(.*)$/); cur={t:(m?m[2]:t).trim(), by:m?m[1].trim():"", c:lineCat||fileCat, s:[]}; if(lineCat) cur.cl=true; recipes.push(cur); };
+  let lineCat="", lineAlso=[];
+  const startRecipe = t => { const m=t.match(/^\((.*?)\)\s*(.*)$/); cur={t:(m?m[2]:t).trim(), by:m?m[1].trim():"", c:lineCat||fileCat, s:[]}; if(lineCat) cur.cl=true; if(lineAlso.length) cur.also=lineAlso.slice(); recipes.push(cur); };
   const push = (kind, text, title) => { if(!cur) return; const secs=cur.s, last=secs[secs.length-1];
     if(title!==undefined){ secs.push([kind,title,[]]); return; }
     if(last && last[0]===kind) last[2].push(text); else secs.push([kind,"",[text]]); };
@@ -6345,8 +6348,10 @@ function localParse(text, fileCat){
   for(let i=0;i<raw.length;i++){
     const l=raw[i]; if(!l.trim()) continue;
     const bullet=isBullet(l), text=localClean(strip(l)); if(!text) continue;
-    if(!bullet && feat("catline")){ const cm=text.match(/^categor(?:y|ies)\s*:\s*(.{2,30})$/i);
-      if(cm){ const w=cm[1].trim().replace(/[.:]+$/,""); lineCat=CATS.find(c=>c.toLowerCase()===w.toLowerCase())||w.replace(/\b\p{L}/gu,x=>x.toUpperCase()); cur=null; continue; } }
+    if(!bullet && feat("catline")){ const cm=text.match(/^categor(?:y|ies)\s*:\s*(.{2,60})$/i);
+      if(cm){ const fix=w=>{ w=w.trim().replace(/[.:]+$/,""); return CATS.find(c=>c.toLowerCase()===w.toLowerCase())||w.replace(/\b\p{L}/gu,x=>x.toUpperCase()); };
+        const parts=feat("pesachalso") ? cm[1].split(/\s*,\s*/).filter(Boolean).map(fix) : [fix(cm[1])];
+        lineCat=parts[0]; lineAlso=parts.slice(1).filter(x=>x!==lineCat && !isPesach(x) && (isPesach(lineCat) || !isPesach(x))); cur=null; continue; } }
     if(!bullet){
       const n=norm(text), nn=ALIAS[n]||n;
       if(want.length){
@@ -6823,7 +6828,7 @@ function scanPage(cat){
     status.innerHTML=`<div class="scan-prev">${src.preview?`<img src="${src.preview}" alt="The recipe photo">${n>1?`<span class="hint">+ ${n-1} more ${n===2?"page":"pages"}</span>`:""}`:`<div class="scan-file">${esc(src.name||"")}<span>${esc(src.label)}</span></div>`}<div><span class="spin" aria-hidden="true"></span><p><b>Reading…</b><br><span class="hint">This usually takes 10–30 seconds${src.preview?"":", longer for big files"}.</span></p></div></div>`;
     const localDrafts = () => { if(!src.text) return [];
       const fc = fileCategory(src.name) || cat || "Miscellaneous";
-      return localParse(src.text, fc).filter(r=>!(src.pdfText && /^(table of )?contents$/i.test((r.t||"").trim()))).map(r=>({id:"", c:r.c||fc, t:r.t, by:r.by, n:undefined, s:r.s, ...(r.cl?{cl:true}:{})})); };
+      return localParse(src.text, fc).filter(r=>!(src.pdfText && /^(table of )?contents$/i.test((r.t||"").trim()))).map(r=>({id:"", c:r.c||fc, t:r.t, by:r.by, n:undefined, s:r.s, ...(r.cl?{cl:true}:{}), ...(r.also?{also:r.also}:{})})); };
     const showDrafts = (drafts, how) => {
       if(how) toast(how);
       const fcat = feat("filecat") ? fileCat(src.name) : "";
@@ -6914,7 +6919,7 @@ function importList(drafts, cat){
         <label class="imp-pick"><input type="checkbox" ${dup?"":"checked"} aria-label="Keep ${esc(d.t)}"></label>
         <div class="imp-body"><b>${esc(d.t)}</b>${lk.length?`<span class="pill wait dup">Looks like ${esc(lk[0].r.t.replace(/^Untitled: /,""))}${lk[0].sim>=0.8?` (${Math.floor(lk[0].sim*100)}%)`:""}</span><button type="button" class="btn sm" data-likecmp="${i}">Compare side by side</button>`:have.has(norm(d.t))?`<span class="pill wait dup">Already in the cookbook</span>`:""}<span class="hint">${d.by?"From "+esc(d.by)+" · ":""}${nIng(d)} ingredients · ${nSteps(d)} steps</span>
           <details><summary>Preview</summary><div class="pv">${previewHTML({s:d.s.map(([ing,h,items])=>({k:ing?"ing":"step",h,items}))})}</div></details></div>
-        <select class="imp-cat" aria-label="Category for ${esc(d.t)}">${catOpts(d.c)}${addCatOpt()}</select>
+        <select class="imp-cat" aria-label="Category for ${esc(d.t)}">${catOpts(d.c)}${addCatOpt()}</select>${d.also&&d.also.length&&feat("multicat")?`<span class="hint imp-also">Also in ${esc(d.also.join(", "))}</span>`:""}
         <div class="imp-like" hidden></div>
       </li>`; }).join("")}</ul>
       <p class="err" id="imp-err" role="alert" hidden></p>
@@ -6945,10 +6950,11 @@ function importList(drafts, cat){
     try{
       for(const li of rows){
         const d=Object.assign({}, drafts[+li.dataset.i], {c: li.querySelector(".imp-cat").value});
-        rememberCat(d.c);
+        if(d.also) d.also = feat("pesachalso") && isPesach(d.c) ? d.also.filter(x=>x!==d.c && !isPesach(x)) : d.also.filter(x=>x!==d.c && !isPesach(x));
+        rememberCat(d.c); (d.also||[]).forEach(rememberCat);
         btn.textContent=`Sending… ${done+1} of ${rows.length}`;
         { const doc=toDoc(Object.assign({}, d, {ord:0}));
-          await db.collection("submissions").doc("s-"+newId()).set({c:doc.c,t:doc.t,by:doc.by,n:doc.n,s:doc.s, ...(doc.meals&&doc.meals.length?{meals:doc.meals}:{}), ...(doc.dish&&doc.dish.length?{dish:doc.dish}:{}), uid:actUid(), byName:actName(), status:"pending", stage:to==="hu"?"yoely":to, ...(to==="hu"?{hu:true}:{}), ...(to!=="proof"?{sentTo:to}:{}), ...((to==="yoely"||to==="hu")&&feat("private")?{priv:true}:{}), created:Date.now(), editOf:""}); }
+          await db.collection("submissions").doc("s-"+newId()).set({c:doc.c,t:doc.t,by:doc.by,n:doc.n,s:doc.s, ...(feat("multicat")&&doc.also&&doc.also.length?{also:doc.also}:{}), ...(doc.meals&&doc.meals.length?{meals:doc.meals}:{}), ...(doc.dish&&doc.dish.length?{dish:doc.dish}:{}), uid:actUid(), byName:actName(), status:"pending", stage:to==="hu"?"yoely":to, ...(to==="hu"?{hu:true}:{}), ...(to!=="proof"?{sentTo:to}:{}), ...((to==="yoely"||to==="hu")&&feat("private")?{priv:true}:{}), created:Date.now(), editOf:""}); }
         done++;
       }
       if(to!=="proof"){ sentNotice(to, done, myName()); toast(`${done} ${done===1?"recipe":"recipes"} sent to ${INBOX_NAME[to]}`); location.hash = to; }

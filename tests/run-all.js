@@ -939,10 +939,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*73 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 73));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*74 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 74));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 73, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 74, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -953,7 +953,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /72/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /73/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1289,6 +1289,11 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       ok('Search everywhere finds recipes in the recycle bin, still waiting and declined, says where each one is, and can narrow it down', /Quokka Bin Torte/.test(r.all) && /Recycle bin/.test(r.all) && /Quokka Waiting Kugel/.test(r.all) && /Need to proofread/.test(r.all) && /Quokka Declined Soup/.test(r.all) && /Declined/.test(r.all) && /Quokka Bin/.test(r.bin) && !/Waiting Kugel/.test(r.bin) && r.menu, r);
       const v = await V.evaluate(() => typeof mayAllSearch === 'function' && mayAllSearch());
       ok('…and it is only for admins', v === false); }
+    // Pesach recipes can also be in a year-round category (file: "Category: Pesach, Cakes"); never the other way round
+    { const r = await A.evaluate(() => { const t = 'Contents\nMatzo Torte\t1\nPlain Cake\t2\nOther Cake\t3\n\nCategory: Pesach, Cakes\nMatzo Torte\n6 eggs\n• Bake it.\n\nCategory: Cakes, Pesach\nPlain Cake\n1 cup flour\n• Bake it.\n\nOther Cake\n1 cup sugar\n• Bake it.\n';
+        const rs = localParse(t, ''); return {a: rs[0].c + '|' + (rs[0].also || []).join(','), b: rs[1].c + '|' + (rs[1].also || []).join(','),
+          ch: alsoChoices('Pesach').includes('Cakes') && !alsoChoices('Cakes').includes('Pesach')}; });
+      ok('a Pesach recipe can also be in a year-round category (from a file too), but a year-round recipe never goes in Pesach', r.a === 'Pesach|Cakes' && r.b === 'Cakes|' && r.ch, r); }
     // Menu ideas by meal
     { await A.goto(F + '#menu'); await A.waitForTimeout(500); await A.fill('#mn-q', '');
       const chips = await A.locator('[data-mq]').allTextContents();
@@ -1378,7 +1383,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       const lunch = await A.evaluate(() => CATS.includes('Lunchbox') && !RECIPES.some(r => r.c === 'Lunchbox'));
       ok("a new category on a recipe that's still waiting in an inbox is in the category system already", lunch);
       await A.evaluate(async () => { await db.collection('submissions').doc('s-lunch').delete(); });
-      ok('a category added in “Also in” is in every category list right away; Pesach and year-round categories stay separate', opts.includes('Party food') && !alsoOpts.includes('Pesach') && pesachHidden, [opts.includes('Party food'), alsoOpts.includes('Pesach'), pesachHidden]); }
+      ok('a category added in “Also in” is in every category list right away; Pesach and year-round categories stay separate', opts.includes('Party food') && !alsoOpts.includes('Pesach') && pesachHidden === !(await A.evaluate(() => feat('pesachalso'))), [opts.includes('Party food'), alsoOpts.includes('Pesach'), pesachHidden]); }
     // Labels: meal, dish type, dairy/meat/pareve, good for Pesach; find by them; the AI fills them in
     { await A.goto(F + '#r-challah'); await A.waitForTimeout(500); await A.click('#lbl-btn'); await A.waitForTimeout(200);
       await A.locator('#lbl-box input[name=lb-meal][value=breakfast]').check(); await A.locator('#lbl-box input[name=lb-dish][value=bread]').check();
