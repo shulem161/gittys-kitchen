@@ -939,10 +939,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*74 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 74));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*75 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 75));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 74, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 75, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -953,7 +953,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /73/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /74/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1294,6 +1294,21 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
         const rs = localParse(t, ''); return {a: rs[0].c + '|' + (rs[0].also || []).join(','), b: rs[1].c + '|' + (rs[1].also || []).join(','),
           ch: alsoChoices('Pesach').includes('Cakes') && !alsoChoices('Cakes').includes('Pesach')}; });
       ok('a Pesach recipe can also be in a year-round category (from a file too), but a year-round recipe never goes in Pesach', r.a === 'Pesach|Cakes' && r.b === 'Cakes|' && r.ch, r); }
+    // An opened dropdown in an inbox stays open when the page redraws itself
+    { const r = await A.evaluate(async () => {
+        await db.collection('submissions').doc('s-keepopen').set({c: 'Cakes', t: 'Keep Open Cake', s: toDoc({c: 'Cakes', t: 'x', s: [[1, '', ['1 egg']]]}).s, uid: me, byName: myName(), status: 'pending', stage: 'yoely', hu: true, created: Date.now()});
+        await new Promise(z => setTimeout(z, 800)); location.hash = 'hu'; await new Promise(z => setTimeout(z, 500));
+        const d = [...document.querySelectorAll('details')].find(x => x.closest('li') && /Keep Open Cake/.test(x.closest('li').textContent)); if (!d) return {found: false};
+        d.open = true; await db.collection('submissions').doc('s-keepopen2').set({c: 'Cakes', t: 'Another Cake', s: [], uid: me, byName: myName(), status: 'pending', stage: 'yoely', hu: true, created: Date.now()});
+        await new Promise(z => setTimeout(z, 900));
+        const d2 = [...document.querySelectorAll('details')].find(x => x.closest('li') && /Keep Open Cake/.test(x.closest('li').textContent));
+        const out = {found: true, redrawn: d2 !== d, open: !!(d2 && d2.open)};
+        await db.collection('submissions').doc('s-keepopen').delete(); await db.collection('submissions').doc('s-keepopen2').delete(); return out; });
+      ok('in an inbox, “See the recipe” stays open when the page redraws because something new came in', r.found && r.open, r); }
+    { const r = await A.evaluate(async () => { location.hash = ''; await new Promise(z => setTimeout(z, 300)); const css = document.createElement('style'); css.textContent = '.menu{max-height:120px !important}'; document.head.appendChild(css); openMenu(); const m = acct.querySelector('.menu');
+        m.scrollTop = 60; m.dispatchEvent(new Event('scroll')); const y = m.scrollTop;
+        renderAcct(); route(); await new Promise(z => setTimeout(z, 200)); const m2 = acct.querySelector('.menu'); const out = {open: !!m2, y, y2: m2 && m2.scrollTop}; closeMenu(); css.remove(); return out; });
+      ok('the menu stays open, where you scrolled to, when the app redraws by itself', r.open && r.y > 0 && Math.abs(r.y2 - r.y) < 2, r); }
     // Menu ideas by meal
     { await A.goto(F + '#menu'); await A.waitForTimeout(500); await A.fill('#mn-q', '');
       const chips = await A.locator('[data-mq]').allTextContents();

@@ -1489,7 +1489,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.84";
+const WEB_VERSION = "4.85";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1544,6 +1544,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["keepopen","4.85","2026-11-20","Things stay open and in place when something changes","When new recipes come in or something changes, the app redraws by itself. In an inbox, the recipe you opened with “See the recipe” used to close and the page jumped; and the menu (from your profile picture) jumped back to the top while you scrolled it, or closed. Now what you opened stays open, the page stays where you are, and the menu stays open where you scrolled to.",false],
   ["pesachalso","4.84","2026-11-19","Pesach recipes in a regular category too","A Pesach recipe can now also be in a year-round category, like Pesach and Cakes, so it shows in both. When you add or edit a Pesach recipe, “Also in” lets you pick them. In a recipe file, a line like “Category: Pesach, Cakes” puts the recipes after it in Pesach and also in Cakes. Year-round recipes still never go into Pesach.",false],
   ["searchall","4.83","2026-11-19","Search everywhere (admins)","A new page for admins, in the menu under Manage: 🔎 Search everywhere. One search finds every recipe wherever it is – the cookbook, every inbox (Private, Grandma's Hungarian Recipes, Not kosher and the three steps), new recipes and suggested changes still waiting, Declined, and the Recycle bin – and each result says where it is. It searches titles, codes, who it's by, categories, ingredients and steps, and buttons narrow it to the cookbook, the inboxes, waiting, declined or the recycle bin. The regular search results also get a link to search everywhere for the same words.",false],
   ["allinboxes","4.82","2026-11-19","Every inbox in Inbox settings","Inbox settings lists every inbox, in the same order as the Inboxes menu: Private, Grandma's Hungarian Recipes, Not kosher, the three steps, Declined, Needs admin approval, Recipe requests, Suggestions & comments, Likes & dislikes, and App & web updates. Grandma's Hungarian Recipes gets its own tick boxes, so it can be given to different people than Private (until you change it, it follows Private). Inboxes that go with something else, like Declined, say who gets them. A new inbox will show up there too.",false],
@@ -3117,8 +3118,11 @@ function renderAcct(){
   const pc = ((isAdmin()||mayInboxes()||may("answer")||may("inbox")) ? pendingCount() : 0) + (isTeam() ? unreadThreads() : 0);
   acct.innerHTML = `<button class="avatar" id="avbtn" aria-label="Account menu for ${esc(shownName())}${pc?`, ${pc} waiting for approval`:""}" aria-haspopup="true">${esc(initial(shownName()))}${pc?`<span class="dot">${pc}</span>`:""}</button>`;
   document.getElementById("avbtn").onclick = e=>{ e.stopPropagation(); acct.querySelector(".menu") ? closeMenu() : openMenu(); };
-  if(open) openMenu();
+  if(open){ openMenu(); if(feat("keepopen")){ const m=acct.querySelector(".menu"); if(m) m.scrollTop=menuY; } }
 }
+// keepopen: the menu keeps its scroll spot when it's redrawn (counts changed) or the page under it redraws by itself
+var menuY = 0;
+document.addEventListener("scroll", e=>{ if(e.target && e.target.classList && e.target.classList.contains("menu")) menuY=e.target.scrollTop; }, {capture:true, passive:true});
 /* ---------- duplicate recipes (admins): whole recipes compared, not only names ---------- */
 const DUP_STOP = new Set("a an and the of to in on with for or at by it its into then until about over from as is be are this that each your you add mix put let".split(" "));
 let DUP_IGNORE = new Set(store("gk-dupes-ignore")||[]), unsubDupes = null, _dupMemo = null;   // kept on the device too, so hidden pairs stay hidden while it loads
@@ -8339,11 +8343,22 @@ document.getElementById("navback").onclick=navBack;
 function route(){ setBack(); if(guideOn && location.hash.slice(1)!==guideOn.r.id) closeGuide(true); document.body.classList.remove("on-recipe");
   // keepplace: coming back to a list (A → recipe → A) opens it where you left it; a list redrawn in place stays put
   const kh=location.hash||"#", kSame=kh===KEEP.cur, kBack=!kSame && kh===KEEP.prev && KEEP.y[kh]!==undefined, kY=window.scrollY;
-  routePage(); setNav(); tickTimers(); restorePane();
+  const kOpen = kSame && feat("keepopen") ? openDetailsKeys() : null;
+  const kMenu = kSame && feat("keepopen") && !!acct.querySelector(".menu");
+  routePage(); if(kMenu && !acct.querySelector(".menu")){ openMenu(); const m=acct.querySelector(".menu"); if(m) m.scrollTop=menuY; } setNav(); tickTimers(); restorePane();
+  if(kOpen && kOpen.length) reopenDetails(kOpen);
+  if(feat("keepopen") && kSame && !paneRestore && !feat("keepplace")) keepTo(kY);
   if(feat("keepplace") && !paneRestore){ if(kSame) keepTo(kY); else if(kBack) keepTo(KEEP.y[kh]); }
   if(!kSame){ KEEP.prev=KEEP.cur; KEEP.cur=kh; }
 }
 var KEEP = {y:{}, cur:"", prev:""};
+// keepopen: when a page is redrawn by itself (new data came in), a “See the recipe” or other dropdown you opened stays open
+function detailsKey(d){ const li=d.closest("li, .panel-a, .imp"), idEl=li && li.querySelector("[data-sid],[data-rid],[data-id]");
+  const id = idEl ? (idEl.dataset.sid||idEl.dataset.rid||idEl.dataset.id) : (li && li.dataset.i) || "";
+  const sum=d.querySelector("summary"); return id+"|"+(sum?sum.textContent.trim():""); }
+function openDetailsKeys(){ const all=[...app.querySelectorAll("details")]; return all.filter(d=>d.open).map(d=>{ const k=detailsKey(d); return [k, all.filter(x=>detailsKey(x)===k).indexOf(d)]; }); }
+function reopenDetails(keys){ const all=[...app.querySelectorAll("details")];
+  keys.forEach(([k,i])=>{ const same=all.filter(x=>detailsKey(x)===k); if(same[i]) same[i].open=true; }); }
 window.addEventListener("scroll", ()=>{ if((location.hash||"#")===KEEP.cur) KEEP.y[KEEP.cur]=window.scrollY; }, {passive:true});
 function keepTo(y){ if(!y) return; const go=()=>window.scrollTo(0, y); go(); requestAnimationFrame(go); setTimeout(go, 80); }
 // Split screen, left side: put back the search and the scroll spot you had before splitting (once, after the page is drawn)
