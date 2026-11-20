@@ -1489,7 +1489,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.85";
+const WEB_VERSION = "4.86";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1544,6 +1544,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["subsfix","4.86","2026-11-20","Employees see everything in their inboxes","Someone given an inbox (Private, Grandma's Hungarian Recipes, Not kosher or one of the three steps) sometimes saw only the recipes they had sent themselves, not everyone's, until they closed and opened the app again. The same happened when you look at the app as one of them. Now they see every recipe in the inbox right away.",false],
   ["keepopen","4.85","2026-11-20","Things stay open and in place when something changes","When new recipes come in or something changes, the app redraws by itself. In an inbox, the recipe you opened with “See the recipe” used to close and the page jumped; and the menu (from your profile picture) jumped back to the top while you scrolled it, or closed. Now what you opened stays open, the page stays where you are, and the menu stays open where you scrolled to.",false],
   ["pesachalso","4.84","2026-11-19","Pesach recipes in a regular category too","A Pesach recipe can now also be in a year-round category, like Pesach and Cakes, so it shows in both. When you add or edit a Pesach recipe, “Also in” lets you pick them. In a recipe file, a line like “Category: Pesach, Cakes” puts the recipes after it in Pesach and also in Cakes. Year-round recipes still never go into Pesach.",false],
   ["searchall","4.83","2026-11-19","Search everywhere (admins)","A new page for admins, in the menu under Manage: 🔎 Search everywhere. One search finds every recipe wherever it is – the cookbook, every inbox (Private, Grandma's Hungarian Recipes, Not kosher and the three steps), new recipes and suggested changes still waiting, Declined, and the Recycle bin – and each result says where it is. It searches titles, codes, who it's by, categories, ingredients and steps, and buttons narrow it to the cookbook, the inboxes, waiting, declined or the recycle bin. The regular search results also get a link to search everywhere for the same words.",false],
@@ -3110,7 +3111,7 @@ async function viewAsPerson(x){
   setViewAs(role, {uid:m.uid, name:m.name, no:m.no||"", perms:m.perms||{}, favs:m.favs||[], prefs:m.prefs||{}, was:m.was||[]});
 }
 function renderAcct(){
-  viewAsBar();
+  viewAsBar(); resyncSubs();
   applyNoCapture();
   const ob=document.getElementById("offbar"); if(ob) ob.hidden = !(offline && state==="approved");
   if(state!=="approved"){ acct.innerHTML=""; return; }
@@ -5414,8 +5415,16 @@ function wireRv(root, after){
     b.disabled=true; if(await rvActs[k](r)) after(); else b.disabled=false; });
 }
 const inboxTotal = () => INBOXES.reduce((n,[st])=>n+inboxCount(st), 0) + inboxCount("admin") + inboxCount("kosher") + inboxCount("yoely") + inboxCount("hu");
+// subsfix: who sees which waiting recipes is worked out again whenever it can change (the app's updates and
+// settings load after sign-in, an admin gives someone an inbox, or an admin looks at the app as someone else),
+// so someone given an inbox sees everything in it right away, not only the recipes they sent themselves
+let subsMode = "";
+const subsWant = () => maySubsAll() ? "all" : "own:"+who();
+function resyncSubs(){ if(!feat("subsfix") || !unsubSubs || state!=="approved") return; if(subsWant()===subsMode) return;
+  unsubSubs(); unsubSubs=null; watchSubs(); }
 function watchSubs(){
   if(unsubSubs || !db || !me) return;
+  subsMode = subsWant();
   const q = maySubsAll() ? db.collection("submissions") : db.collection("submissions").where("uid","==",who());
   unsubSubs = q.onSnapshot(s=>{
     subs = s.docs.map(d=>Object.assign({id:d.id}, d.data())).sort((a,b)=>(b.created||0)-(a.created||0));
