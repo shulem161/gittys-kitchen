@@ -1489,7 +1489,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.82";
+const WEB_VERSION = "4.83";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1544,6 +1544,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["searchall","4.83","2026-11-19","Search everywhere (admins)","A new page for admins, in the menu under Manage: 🔎 Search everywhere. One search finds every recipe wherever it is – the cookbook, every inbox (Private, Grandma's Hungarian Recipes, Not kosher and the three steps), new recipes and suggested changes still waiting, Declined, and the Recycle bin – and each result says where it is. It searches titles, codes, who it's by, categories, ingredients and steps, and buttons narrow it to the cookbook, the inboxes, waiting, declined or the recycle bin. The regular search results also get a link to search everywhere for the same words.",false],
   ["allinboxes","4.82","2026-11-19","Every inbox in Inbox settings","Inbox settings lists every inbox, in the same order as the Inboxes menu: Private, Grandma's Hungarian Recipes, Not kosher, the three steps, Declined, Needs admin approval, Recipe requests, Suggestions & comments, Likes & dislikes, and App & web updates. Grandma's Hungarian Recipes gets its own tick boxes, so it can be given to different people than Private (until you change it, it follows Private). Inboxes that go with something else, like Declined, say who gets them. A new inbox will show up there too.",false],
   ["longtoc","4.81","2026-11-19","Long recipe files are read to the end","A recipe file (.txt) that starts with a long Contents list (more than about 70 recipes) is now read all the way through. Before, only the first 70 or so titles in the list were found, and everything after them ran together into one recipe.",false],
   ["importall","4.80","2026-11-19","Select all when importing several recipes","When a file or scan finds several recipes, a “Select all” box sits at the top of the list. Tick it to tick every recipe, untick it to untick them all. It shows whether everything is ticked (a dash when only some are) and how many of them are ticked.",false],
@@ -2293,9 +2294,11 @@ function results(term){
   const rest = list.filter(r=>!r.t.toLowerCase().includes(t));
   app.innerHTML = `<section class="wrap">${tabs(null)}
     <div class="section-head"><h2>Results for “${esc(term)}”</h2><p>${list.length} ${list.length===1?"recipe":"recipes"}</p></div>
+    ${mayAllSearch()?`<p class="hint" style="margin:-6px 0 10px"><a class="link" href="#search-all" id="sa-from">🔎 Search everywhere for “${esc(term)}”</a> (inboxes, waiting, declined and the recycle bin too)</p>`:""}
     ${list.length>1?sortBar("search", ["best",...SO_ALL], so):""}
     <div class="grid">${list.length? (so==="best"?"":"")+(()=>{ const L=sortList([...titleHits,...rest], so); return so==="cat"||so==="newest"||so==="oldest" ? `</div>${sortedCards(L, so)}<div class="grid">` : L.map(card).join(""); })() : `<div class="empty">No recipes match that search. Try a dish like “challah” or an ingredient like “farmer's cheese”.</div>`}</div></section>`;
   wireSort(()=>results(term));
+  const saf=document.getElementById("sa-from"); if(saf) saf.onclick=e=>{ e.preventDefault(); history.pushState(null,"","#search-all"); allSearchPage(term); window.scrollTo(0,0); };
 }
 
 function buildParts(r){
@@ -3662,6 +3665,41 @@ function binWho(r){
 }
 // Recycle bin: deleted recipes, newest first, with who deleted them; Restore puts one back
 const mayBin = () => feat("recbin") && (isAdmin() || may("del"));
+// searchall (admins): one search over every recipe there is — the cookbook, every inbox, waiting and declined
+// submissions, Not kosher and the Recycle bin — each result saying where it is
+const mayAllSearch = () => feat("searchall") && isAdmin() && !offline;
+function allSearchItems(){
+  const out=[], hay = x => [x.t||"", x.by||"", x.c||"", x.sec||"", codeOf(x), x.no?String(x.no):"", (()=>{ try{ return allText(x); }catch(e){ return ""; } })()].join(" ").toLowerCase();
+  const recWhere = r => r.rv ? (INBOX_NAME[boxOf(r.rv, r)] || r.rv) : "Cookbook" + (pubVisible(r) ? "" : " (team only)");
+  RECIPES.forEach(r=>out.push({x:r, where:recWhere(r), href:"#"+r.id, kind:r.rv?"inbox":"book"}));
+  if(recipesOnline){ NK.forEach(r=>out.push({x:r, where:"Not kosher", href:"#"+r.id, kind:"inbox"}));
+    BIN.forEach(r=>out.push({x:r, where:"Recycle bin", href:"#bin", kind:"bin"})); }
+  subs.forEach(x=>{ if(x.status==="approved") return;
+    const ed = x.editOf ? findAny(x.editOf) : null, t = (x.t||"") + (ed ? "" : "");
+    const where = x.status==="rejected" ? "Declined" : (INBOX_NAME[boxOf(stageOf(x), x)] || "Waiting");
+    out.push({x:Object.assign({}, x, {t}), where: (x.editOf ? "Suggested change · " : "New recipe · ") + where,
+      href: x.status==="rejected" ? "#declined" : "#"+boxOf(stageOf(x), x), kind: x.status==="rejected" ? "declined" : "sub", from:x.byName||""}); });
+  out.forEach(o=>o.h=hay(o.x)); return out;
+}
+function allSearchPage(term){
+  term = term || "";
+  app.innerHTML=`<section class="wrap admin">
+    <div class="section-head" style="margin-top:28px"><h2>Search everywhere</h2><p>Every recipe, wherever it is</p></div>
+    <p class="hint" style="margin:-6px 0 12px">Finds recipes in the cookbook, in every inbox (Private, Grandma's Hungarian Recipes, Not kosher, the three steps), new recipes and suggested changes still waiting, Declined, and the Recycle bin. Searches titles, codes, who it's by, categories, ingredients and steps.</p>
+    <input type="search" id="sa-q" placeholder="Search every recipe" autocomplete="off" style="width:100%;margin-bottom:10px" value="${esc(term)}">
+    <div class="seg sa-where" role="group" aria-label="Where">${[["all","Everywhere"],["book","Cookbook"],["inbox","Inboxes"],["sub","Waiting"],["declined","Declined"],["bin","Recycle bin"]].map(([k,l],i)=>`<button type="button" data-saw="${k}" aria-pressed="${i===0}">${l}</button>`).join("")}</div>
+    <div id="sa-res" style="margin-top:12px"></div></section>`;
+  const items=allSearchItems(), q=document.getElementById("sa-q"), res=document.getElementById("sa-res"); let where="all";
+  const draw=()=>{ const t=q.value.trim().toLowerCase();
+    if(!t){ res.innerHTML=`<p class="hint">Type a word, a recipe name or a code. ${items.length} recipes to search.</p>`; return; }
+    const L=items.filter(o=>(where==="all"||o.kind===where) && o.h.includes(t)).sort((a,b)=>((b.x.t||"").toLowerCase().includes(t))-((a.x.t||"").toLowerCase().includes(t)) || byName(a.x.t||"", b.x.t||""));
+    res.innerHTML = L.length ? `<p class="hint">${L.length} ${L.length===1?"recipe":"recipes"}</p><div class="panel-a"><ul class="mlist">${L.slice(0,300).map(o=>`<li class="mrow sa-row"><div class="mwho"><b>${noChip(o.x)} <a class="link" href="${esc(o.href)}">${esc((o.x.t||"Untitled").replace(/^Untitled: /,""))}</a></b>
+        <span><span class="pill">${esc(o.where)}</span> ${esc(o.x.c||"")}${o.x.by?" · by "+esc(o.x.by):""}${o.from?" · sent by "+esc(o.from):""}</span></div></li>`).join("")}</ul></div>${L.length>300?`<p class="hint">Showing the first 300. Type more to narrow it down.</p>`:""}`
+      : `<p class="hint">Nothing found anywhere for “${esc(q.value.trim())}”.</p>`; };
+  q.oninput=draw;
+  app.querySelectorAll("[data-saw]").forEach(b=>b.onclick=()=>{ where=b.dataset.saw; app.querySelectorAll("[data-saw]").forEach(x=>x.setAttribute("aria-pressed", x===b)); draw(); });
+  draw(); q.focus();
+}
 function binPage(){
   const L=BIN.slice().sort((a,b)=>(b.deletedAt||0)-(a.deletedAt||0));
   app.innerHTML=`<section class="wrap admin">
@@ -4579,6 +4617,7 @@ function openMenu(confirming){
     isAdmin() ? item("#admin","Members", mp?mp+" waiting":"", mp) : may("members") ? item("#admin","People asking to join", mp?mp+" waiting":"", mp) : "",
     (isAdmin()||may("activity"))&&recipesOnline ? item("#activity","Activity") : "",
     mayInboxMove() ? item("#inboxmove","Move between inboxes") : "",
+    mayAllSearch() ? item("#search-all","🔎 Search everywhere") : "",
 
   ].filter(Boolean);
   const manageN = (isAdmin()?mp:0);
@@ -8318,6 +8357,7 @@ function routePage(){
   if(h==="admin" && isAdmin()){ q.value=""; adminPage(); window.scrollTo(0,0); return; }
   if(h==="public" && (isAdmin()||may("portal")||may("pub"))){ q.value=""; publicPage(); window.scrollTo(0,0); return; }
   if(h==="activity" && (isAdmin()||may("activity"))){ q.value=""; activityPage(); window.scrollTo(0,0); return; }
+  if(h==="search-all" && mayAllSearch()){ const t=q.value; q.value=""; allSearchPage(t); window.scrollTo(0,0); return; }
   if(h==="bin" && mayBin()){ q.value=""; binPage(); window.scrollTo(0,0); return; }
   if(h==="dupes" && (isAdmin()||may("del"))){ q.value=""; dupesPage(); window.scrollTo(0,0); return; }
   if(h==="viewas" && (canViewAs()||viewingAs())){ q.value=""; viewAsPage(); window.scrollTo(0,0); return; }

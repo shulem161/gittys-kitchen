@@ -939,10 +939,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*72 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 72));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*73 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 73));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 72, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 73, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -953,7 +953,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /71/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /72/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1276,6 +1276,19 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
         huOwn = await A.evaluate(([u, b]) => { const m = members.find(x => x.uid === u); return permOf(m, 'hu') === !b && permOf(m, 'yoely') === b; }, [emp, before]);
         await A.locator(`.perms-t [data-ibs=hu][data-ibu="${emp}"]`).setChecked(before); await A.waitForTimeout(900); }
       ok('Inbox settings list every inbox in the Inboxes menu, in the same order, and Grandma\'s Hungarian Recipes is set on its own', !missing.length && rows.some(r => /Hungarian/.test(r)) && rows.some(r => /Not kosher/.test(r)) && rows.some(r => /Declined/.test(r)) && huOwn, {missing, rows}); }
+    // Search everywhere (admins): the cookbook, inboxes, waiting, declined and the recycle bin
+    { const r = await A.evaluate(async () => {
+        BIN.push({id: 'r-zzbin', t: 'Quokka Bin Torte', c: 'Cakes', s: [[1, '', ['1 egg']]]});
+        subs.push({id: 's-zzw', t: 'Quokka Waiting Kugel', c: 'Kugel', status: 'pending', stage: 'proof', s: [[1, '', ['1 potato']]]});
+        subs.push({id: 's-zzd', t: 'Quokka Declined Soup', c: 'Soups', status: 'rejected', s: []});
+        location.hash = 'search-all'; await new Promise(z => setTimeout(z, 300));
+        const q = document.getElementById('sa-q'); q.value = 'quokka'; q.oninput(); const all = document.getElementById('sa-res').innerText;
+        document.querySelector('[data-saw=bin]').click(); const bin = document.getElementById('sa-res').innerText;
+        BIN.pop(); subs.splice(subs.findIndex(x => x.id === 's-zzw'), 1); subs.splice(subs.findIndex(x => x.id === 's-zzd'), 1);
+        return {all, bin, menu: (() => { openMenu(); const t = document.querySelector('.menu').innerText; closeMenu(); return /Search everywhere/.test(t); })()}; });
+      ok('Search everywhere finds recipes in the recycle bin, still waiting and declined, says where each one is, and can narrow it down', /Quokka Bin Torte/.test(r.all) && /Recycle bin/.test(r.all) && /Quokka Waiting Kugel/.test(r.all) && /Need to proofread/.test(r.all) && /Quokka Declined Soup/.test(r.all) && /Declined/.test(r.all) && /Quokka Bin/.test(r.bin) && !/Waiting Kugel/.test(r.bin) && r.menu, r);
+      const v = await V.evaluate(() => typeof mayAllSearch === 'function' && mayAllSearch());
+      ok('…and it is only for admins', v === false); }
     // Menu ideas by meal
     { await A.goto(F + '#menu'); await A.waitForTimeout(500); await A.fill('#mn-q', '');
       const chips = await A.locator('[data-mq]').allTextContents();
