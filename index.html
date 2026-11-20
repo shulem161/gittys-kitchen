@@ -1135,7 +1135,7 @@ body.out .tpill,body.out .talarm{display:none}
 
 <div class="updbar" id="updbar" role="status" aria-live="polite" hidden></div>
 <div class="offbar" id="offbar" hidden>You're offline. The recipes still work; favorites need internet.</div>
-<main id="app"><section class="auth wrap"><div class="auth-card"><div class="auth-brand"><h1>Gitty's Kitchen</h1><p>175 family recipes in 13 categories.</p></div><div class="auth-form"><h2>Open this in a browser</h2><p class="sub">This preview can't run the cookbook.</p><p class="hint">On Android, install the Gitty's Kitchen app. On iPhone or iPad, open the cookbook's web link in Safari or Chrome.</p></div></div></section></main>
+<main id="app"><section class="auth wrap"><div class="auth-card"><div class="auth-brand"><h1>Gitty's Kitchen</h1><p>Family recipes from our kitchen to yours.</p></div><div class="auth-form"><h2>Open this in a browser</h2><p class="sub">This preview can't run the cookbook.</p><p class="hint">On Android, install the Gitty's Kitchen app. On iPhone or iPad, open the cookbook's web link in Safari or Chrome.</p></div></div></section></main>
 <footer class="wrap">Gitty's Kitchen · January 2009</footer>
 <nav class="tabbar" id="tabbar" aria-label="Main">
   <a href="#" data-nav="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Home</a>
@@ -1490,7 +1490,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.87";
+const WEB_VERSION = "4.88";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1545,6 +1545,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["nocount","4.88","2026-11-20","No recipe counts on the welcome page","The sign-in and Ask to join page no longer says how many recipes and categories there are (“175 family recipes in 13 categories”), since that keeps changing. It says “Family recipes from our kitchen to yours.” The Categories page says “Every family recipe, by category” instead of the counts.",false],
   ["huoff","4.87","2026-11-20","Grandma's Hungarian Recipes: off until you give it","Like every other inbox, nobody has Grandma's Hungarian Recipes until you tick it for them in Inbox settings (or tick All employees). Before, someone who had Private got it too, until you set it.",false],
   ["subsfix","4.86","2026-11-20","Employees see everything in their inboxes","Someone given an inbox (Private, Grandma's Hungarian Recipes, Not kosher or one of the three steps) sometimes saw only the recipes they had sent themselves, not everyone's, until they closed and opened the app again. The same happened when you look at the app as one of them. Now they see every recipe in the inbox right away.",false],
   ["keepopen","4.85","2026-11-20","Things stay open and in place when something changes","When new recipes come in or something changes, the app redraws by itself. In an inbox, the recipe you opened with “See the recipe” used to close and the page jumped; and the menu (from your profile picture) jumped back to the top while you scrolled it, or closed. Now what you opened stays open, the page stays where you are, and the menu stays open where you scrolled to.",false],
@@ -2129,7 +2130,7 @@ const DL_IC = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" strok
 function categoriesPage(){
   app.innerHTML = `<section class="wrap">
     ${feat("labels")?`<a class="btn find-btn" href="#find">🔎 Find by meal &amp; type</a>`:""}
-    <div class="section-head" style="margin-top:26px"><h2>Categories</h2><p>${RECIPES.length} recipes in ${CATS.length} categories</p></div>
+    <div class="section-head" style="margin-top:26px"><h2>Categories</h2><p>${feat("nocount") ? "Every family recipe, by category" : `${RECIPES.length} recipes in ${CATS.length} categories`}</p></div>
     <div class="cats rows" style="padding-bottom:18px">${catTiles()}</div>
     <div class="home-foot" style="margin-bottom:32px"><button class="btn" id="dl-book" type="button"${isPublic()?" hidden":""}>${DL_IC}Download the whole cookbook</button></div>
   </section>`;
@@ -2683,7 +2684,7 @@ const robotOk = () => !!robotTok || robotDown;
 function shell(inner){
   app.innerHTML = `<section class="auth wrap">
     <div class="auth-card">
-      <div class="auth-brand">${CHEF}<h1>Gitty's Kitchen</h1><p>${RECIPES.length} family recipes in ${CATS.length} categories, from challah to rugelach.</p><div class="small">Family recipes · January 2009</div></div>
+      <div class="auth-brand">${CHEF}<h1>Gitty's Kitchen</h1><p>${feat("nocount") ? "Family recipes from our kitchen to yours." : `${RECIPES.length} family recipes in ${CATS.length} categories, from challah to rugelach.`}</p><div class="small">Family recipes · January 2009</div></div>
       <form class="auth-form" id="authform" novalidate>${inner}</form>
     </div></section>`;
   const F=document.getElementById("authform");
