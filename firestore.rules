@@ -498,6 +498,11 @@ service cloud.firestore {
     }
 
     // Photos of finished dishes. Members' photos wait for an admin's approval.
+    // photopub (4.89): once the owner approves it for everyone, customers only get photos of public recipes (pub == true)
+    function photoPubOn() {
+      let f = /databases/$(database)/documents/meta/features;
+      return exists(f) && get(f).data.get('on', {}).get('photopub', false) == true;
+    }
     match /photos/{id} {
       allow create: if can('photos')
         && request.resource.data.uid == request.auth.uid
@@ -507,7 +512,8 @@ service cloud.firestore {
         && request.resource.data.thumb is string && request.resource.data.thumb.size() < 80000;
       allow read: if extra('review')
         || (signedIn() && resource.data.uid == request.auth.uid)
-        || (resource.data.status == 'approved' && approvedMember());
+        || (resource.data.status == 'approved' && approvedMember()
+            && (!photoPubOn() || isTeam() || resource.data.get('pub', false) == true));
       allow update: if extra('review');
       allow delete: if extra('review')
         || (signedIn() && resource.data.uid == request.auth.uid && resource.data.status == 'pending');

@@ -1,7 +1,7 @@
 // Checks firestore.rules in the Firestore emulator (no live data is touched).
 // Run: npx firebase emulators:exec --only firestore --project demo-gk "node tests/rules-test.mjs"
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, setDoc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, collection, where } from 'firebase/firestore';
 import { readFileSync } from 'fs';
 
 process.on('unhandledRejection', e => { console.log('::warning::CRASH ' + String(e && e.message || e).split('\n').slice(0, 3).join(' | ').slice(0, 400)); process.exit(1); });
@@ -586,6 +586,22 @@ await check('a note on it is still fine', assertSucceeds(updateDoc(doc(PR2, 'sub
 // "Ask to join again": someone whose profile was removed can see the update switches and send a new request
 await check('someone without a profile can read the update switches', assertSucceeds(getDoc(doc(as('gone'), 'meta', 'features'))));
 await check('…but not change them', assertFails(setDoc(doc(as('gone'), 'meta', 'features'), { on: {} })));
+
+// Photos of public recipes only, for customers (4.89 photopub: on once the owner approves it for everyone)
+await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
+  await setDoc(doc(d, 'photos', 'pp-pub'), { uid: 'adm', status: 'approved', img: 'x', thumb: 'x', recipeId: 'r-pub', pub: true });
+  await setDoc(doc(d, 'photos', 'pp-team'), { uid: 'adm', status: 'approved', img: 'x', thumb: 'x', recipeId: 'r-team', pub: false });
+  await setDoc(doc(d, 'photos', 'pp-old'), { uid: 'adm', status: 'approved', img: 'x', thumb: 'x', recipeId: 'r-old' });
+  await setDoc(doc(d, 'meta', 'features'), { on: {} }, { merge: true }); });
+await check('before the update is on, a customer still reads approved photos as before', assertSucceeds(getDoc(doc(PUB, 'photos', 'pp-team'))));
+await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'meta', 'features'), { on: { photopub: true } }, { merge: true }); });
+await check('once it is on, a customer reads a photo of a public recipe', assertSucceeds(getDoc(doc(PUB, 'photos', 'pp-pub'))));
+await check("…but not one of a team-only recipe", assertFails(getDoc(doc(PUB, 'photos', 'pp-team'))));
+await check("…or one not marked public", assertFails(getDoc(doc(PUB, 'photos', 'pp-old'))));
+await check('the team still reads every approved photo', assertSucceeds(getDoc(doc(EMP, 'photos', 'pp-team'))));
+await check('a customer can list the public photos of a recipe', assertSucceeds(getDocs(query(collection(PUB, 'photos'), where('recipeId', '==', 'r-pub'), where('status', '==', 'approved'), where('pub', '==', true)))));
+await check("…but not all of a recipe's photos", assertFails(getDocs(query(collection(PUB, 'photos'), where('recipeId', '==', 'r-team'), where('status', '==', 'approved')))));
+await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'meta', 'features'), { on: { photopub: false } }, { merge: true }); });
 
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);

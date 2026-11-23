@@ -1490,7 +1490,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.88";
+const WEB_VERSION = "4.89";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1545,6 +1545,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["photopub","4.89","2026-11-23","Customers see only the photos of public recipes","From the weekly check-up: customers could read any approved dish photo if they knew where to look, also photos of team-only and Private recipes (they never saw them in the app, but the database let them). Now every photo carries its recipe's public setting, kept up to date when a recipe becomes public or team only, and customers can only get photos of public recipes. The family and the team see every photo as before. Turning this on switches the stricter rule on in the database too.",false],
   ["nocount","4.88","2026-11-20","No recipe counts on the welcome page","The sign-in and Ask to join page no longer says how many recipes and categories there are (“175 family recipes in 13 categories”), since that keeps changing. It says “Family recipes from our kitchen to yours.” The Categories page says “Every family recipe, by category” instead of the counts.",false],
   ["huoff","4.87","2026-11-20","Grandma's Hungarian Recipes: off until you give it","Like every other inbox, nobody has Grandma's Hungarian Recipes until you tick it for them in Inbox settings (or tick All employees). Before, someone who had Private got it too, until you set it.",false],
   ["subsfix","4.86","2026-11-20","Employees see everything in their inboxes","Someone given an inbox (Private, Grandma's Hungarian Recipes, Not kosher or one of the three steps) sometimes saw only the recipes they had sent themselves, not everyone's, until they closed and opened the app again. The same happened when you look at the app as one of them. Now they see every recipe in the inbox right away.",false],
@@ -4709,6 +4710,18 @@ function setRecipes(list){
   CATS = [...new Set([...ORDER.filter(c=>RECIPES.some(r=>r.c===c) || ALWAYS_SHOW.includes(c)), ...RECIPES.map(r=>r.c), ...RECIPES.flatMap(alsoOf), ...(feat("addcat")&&!isPublic()?(CODEMAP.added||[]):[])])].sort(byName);
 }
 (function(){ const c=store("gk-recipes"); if(c && c.length) setRecipes(c); })();
+// photopub: every dish photo carries its recipe's public setting (pub), so customers can be given only the photos of
+// public recipes. When a recipe becomes public or team only, its photos follow (done by whoever may approve photos).
+let photoPubSeen = null;
+const photoPubOf = r => !!r && !r.deleted && pubVisible(r) && !isPriv(r);
+function syncPhotoPub(){
+  if(!db || offline || !recipesOnline || isPublic() || !may("review")) return;
+  const now = new Map(RAW_RECIPES.map(r=>[r.id, photoPubOf(r)]));
+  if(!photoPubSeen){ photoPubSeen = now; return; }
+  const changed = [...now].filter(([id,v])=>photoPubSeen.has(id) && photoPubSeen.get(id)!==v); photoPubSeen = now;
+  changed.forEach(async ([id,v])=>{ try{ const q=await db.collection("photos").where("recipeId","==",id).get();
+    await Promise.all(q.docs.filter(d=>d.data().pub!==v).map(d=>db.collection("photos").doc(d.id).update({pub:v}))); }catch(e){} });
+}
 function watchRecipes(){
   if(unsubRecipes || !db) return;
   if(!unsubLook) unsubLook = db.collection("meta").doc("look").onSnapshot(s=>{
@@ -4738,6 +4751,7 @@ function watchRecipes(){
     if(pubOnly){ recipesOnline=true; setRecipes(live); store("gk-recipes-pub", RECIPES); }
     else if(s.docs.length){ recipesOnline=true; setRecipes(live); store("gk-recipes", RECIPES); }
     else { recipesOnline=false; setRecipes(BUNDLED.slice()); }
+    syncPhotoPub();
     if(state==="approved" && !document.querySelector(".editor, .prof-head, .prof-page, .settings, #rqform, .tools-page, #td-new:focus, #mvbox, .imp-list, .newcat, .dlpick")) route();
   }, ()=>{});
 }
@@ -5862,7 +5876,8 @@ function loadPhotos(r){
     });
   };
   const col = db.collection("photos");
-  unsubRecipePhotos.push(col.where("recipeId","==",r.id).where("status","==","approved").onSnapshot(s=>{
+  const pq = col.where("recipeId","==",r.id).where("status","==","approved");
+  unsubRecipePhotos.push((isPublic() && feat("photopub") ? pq.where("pub","==",true) : pq).onSnapshot(s=>{
     approved = s.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>(a.created||0)-(b.created||0)); draw(); }, ()=>{ approved=[]; draw(); }));
   if(!may("review")) unsubRecipePhotos.push(col.where("recipeId","==",r.id).where("uid","==",me).onSnapshot(s=>{
     mine = s.docs.map(d=>Object.assign({id:d.id},d.data())); draw(); }, ()=>{}));
@@ -5889,7 +5904,7 @@ function loadPhotos(r){
         for(const shot of shots.slice()){
           btn.textContent=`Uploading ${sent+1} of ${shots.length}…`;
           const id="p-"+newId();
-          await db.collection("photos").doc(id).set({recipeId:r.id, recipeTitle:r.t, uid:me, byName:myName(), caption, img:shot.img, thumb:shot.thumb, status, created:Date.now()+sent});
+          await db.collection("photos").doc(id).set({recipeId:r.id, recipeTitle:r.t, uid:me, byName:myName(), caption, img:shot.img, thumb:shot.thumb, status, created:Date.now()+sent, pub:photoPubOf(r)});
           logAct("photo", r.t, r.id);
           if(may("review") && !r.cover){ await db.collection("recipes").doc(r.id).update({cover:shot.thumb, coverPhoto:id}).catch(()=>{}); r.cover=shot.thumb; r.coverPhoto=id; }
           sent++;
@@ -5921,7 +5936,7 @@ async function lightbox(p, r){
   document.addEventListener("keydown",esc1); document.body.appendChild(box); box.querySelector(".lb-close").focus();
 }
 async function approvePhoto(p){
-  await db.collection("photos").doc(p.id).update({status:"approved", decided:Date.now()});
+  await db.collection("photos").doc(p.id).update({status:"approved", decided:Date.now(), pub:photoPubOf(findAny(p.recipeId))});
   logAct("photook", p.recipeTitle||"", p.recipeId||"");
   const rec=RECIPES.find(x=>x.id===p.recipeId);
   if(rec && !rec.cover) await db.collection("recipes").doc(rec.id).update({cover:p.thumb, coverPhoto:p.id}).catch(()=>{});
