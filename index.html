@@ -95,6 +95,7 @@ button{font:inherit;color:inherit}
 .im-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}.im-row .im-why{flex:1;min-width:200px}
 .ed-also{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}.also-c{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:14px;cursor:pointer;background:var(--paper)}
 .also-c:has(input:checked){border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}.also-c[hidden]{display:none}.also-new{display:inline-flex;gap:6px}.also-new input{width:150px}
+.sa-where{font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--accent);margin-bottom:4px}.sa-where-btns{flex-wrap:wrap}
 .ed-also-f .lbl{font-weight:600;font-size:14px}.chip-also{text-decoration:none;opacity:.85}
 .labels-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}.lchip{display:inline-flex;align-items:center;gap:4px;font-size:13px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink);text-decoration:none}
 .lchip.meal{border-color:#E7B66A}
@@ -1490,7 +1491,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.89";
+const WEB_VERSION = "4.90";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1545,6 +1546,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["searchall2","4.90","2026-11-24","Search everywhere looks like the rest of the app","Search everywhere keeps the top bar and the bottom bar. You type in the regular search at the top (the keyboard doesn't pop up by itself), and the results are recipe cards like everywhere else, each with a 📍 line saying where it is (Cookbook, Recycle bin, Need to proofread…). The Everywhere / Cookbook / Inboxes / Waiting / Declined / Recycle bin buttons are still there.",false],
   ["photopub","4.89","2026-11-23","Customers see only the photos of public recipes","From the weekly check-up: customers could read any approved dish photo if they knew where to look, also photos of team-only and Private recipes (they never saw them in the app, but the database let them). Now every photo carries its recipe's public setting, kept up to date when a recipe becomes public or team only, and customers can only get photos of public recipes. The family and the team see every photo as before. Turning this on switches the stricter rule on in the database too.",false],
   ["nocount","4.88","2026-11-20","No recipe counts on the welcome page","The sign-in and Ask to join page no longer says how many recipes and categories there are (“175 family recipes in 13 categories”), since that keeps changing. It says “Family recipes from our kitchen to yours.” The Categories page says “Every family recipe, by category” instead of the counts.",false],
   ["huoff","4.87","2026-11-20","Grandma's Hungarian Recipes: off until you give it","Like every other inbox, nobody has Grandma's Hungarian Recipes until you tick it for them in Inbox settings (or tick All employees). Before, someone who had Private got it too, until you set it.",false],
@@ -3691,7 +3693,25 @@ function allSearchItems(){
       href: x.status==="rejected" ? "#declined" : "#"+boxOf(stageOf(x), x), kind: x.status==="rejected" ? "declined" : "sub", from:x.byName||""}); });
   out.forEach(o=>o.h=hay(o.x)); return out;
 }
+// searchall2: Search everywhere looks like the rest of the app – you type in the search bar at the top (the top bar and
+// the bottom bar stay, no keyboard pops up by itself) and the results are recipe cards, each saying where it is
+function allSearchPage2(term){
+  term = term || ""; q.value = term;
+  const where = allSearchPage2.where || "all", t = term.trim().toLowerCase(), items = allSearchItems();
+  const L = !t ? [] : items.filter(o=>(where==="all"||o.kind===where) && o.h.includes(t)).sort((a,b)=>((b.x.t||"").toLowerCase().includes(t))-((a.x.t||"").toLowerCase().includes(t)) || byName(a.x.t||"", b.x.t||""));
+  const cardOf = o => { const c = card(Object.assign({}, o.x, {cover: o.x.cover||""})).replace(/href="#[^"]*"/, `href="${esc(o.href)}"`);
+    return c.replace('<div class="rc-body">', `<div class="rc-body"><div class="sa-where">📍 ${esc(o.where)}${o.from?` · sent by ${esc(o.from)}`:""}</div>`); };
+  app.innerHTML = `<section class="wrap">
+    <div class="section-head" style="margin-top:26px"><h2>🔎 Search everywhere</h2><p>${t ? `${L.length} ${L.length===1?"recipe":"recipes"} for “${esc(term.trim())}”` : "Type in the search at the top"}</p></div>
+    <div class="seg sa-where-btns" role="group" aria-label="Where">${[["all","Everywhere"],["book","Cookbook"],["inbox","Inboxes"],["sub","Waiting"],["declined","Declined"],["bin","Recycle bin"]].map(([k,l])=>`<button type="button" data-saw="${k}" aria-pressed="${k===where}">${l}</button>`).join("")}</div>
+    ${t ? (L.length ? `<div class="grid" style="margin-top:14px">${L.slice(0,200).map(cardOf).join("")}</div>${L.length>200?`<p class="hint">Showing the first 200. Type more to narrow it down.</p>`:""}`
+        : `<div class="panel-a" style="margin-top:14px"><p class="hint">Nothing found anywhere for “${esc(term.trim())}”.</p></div>`)
+      : `<div class="panel-a" style="margin-top:14px"><p class="hint">Finds recipes in the cookbook, in every inbox (Private, Grandma's Hungarian Recipes, Not kosher, the three steps), new recipes and suggested changes still waiting, Declined, and the Recycle bin. Type a word, a recipe name or a code in the search at the top.</p></div>`}
+  </section>`;
+  app.querySelectorAll("[data-saw]").forEach(b=>b.onclick=()=>{ allSearchPage2.where=b.dataset.saw; allSearchPage2(q.value); });
+}
 function allSearchPage(term){
+  if(feat("searchall2")) return allSearchPage2(term);
   term = term || "";
   app.innerHTML=`<section class="wrap admin">
     <div class="section-head" style="margin-top:28px"><h2>Search everywhere</h2><p>Every recipe, wherever it is</p></div>
@@ -8405,7 +8425,7 @@ function routePage(){
   if(h==="admin" && isAdmin()){ q.value=""; adminPage(); window.scrollTo(0,0); return; }
   if(h==="public" && (isAdmin()||may("portal")||may("pub"))){ q.value=""; publicPage(); window.scrollTo(0,0); return; }
   if(h==="activity" && (isAdmin()||may("activity"))){ q.value=""; activityPage(); window.scrollTo(0,0); return; }
-  if(h==="search-all" && mayAllSearch()){ const t=q.value; q.value=""; allSearchPage(t); window.scrollTo(0,0); return; }
+  if(h==="search-all" && mayAllSearch()){ const t=q.value; if(!feat("searchall2")) q.value=""; allSearchPage(t); window.scrollTo(0,0); return; }
   if(h==="bin" && mayBin()){ q.value=""; binPage(); window.scrollTo(0,0); return; }
   if(h==="dupes" && (isAdmin()||may("del"))){ q.value=""; dupesPage(); window.scrollTo(0,0); return; }
   if(h==="viewas" && (canViewAs()||viewingAs())){ q.value=""; viewAsPage(); window.scrollTo(0,0); return; }
@@ -8475,6 +8495,7 @@ function routePage(){
 }
 q.addEventListener("input",()=>{
   const v=q.value.trim();
+  if(feat("searchall2") && location.hash==="#search-all" && mayAllSearch()){ allSearchPage2(q.value); return; }
   if(location.hash){ history.replaceState(null,"",location.pathname+location.search); }
   document.body.classList.remove("on-recipe");
   v ? results(v) : home(); setNav();

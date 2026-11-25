@@ -939,10 +939,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*79 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 79));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*80 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 80));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 79, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 80, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -953,7 +953,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /78/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /79/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1282,8 +1282,9 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
         subs.push({id: 's-zzw', t: 'Quokka Waiting Kugel', c: 'Kugel', status: 'pending', stage: 'proof', s: [[1, '', ['1 potato']]]});
         subs.push({id: 's-zzd', t: 'Quokka Declined Soup', c: 'Soups', status: 'rejected', s: []});
         location.hash = 'search-all'; await new Promise(z => setTimeout(z, 300));
-        const q = document.getElementById('sa-q'); q.value = 'quokka'; q.oninput(); const all = document.getElementById('sa-res').innerText;
-        document.querySelector('[data-saw=bin]').click(); const bin = document.getElementById('sa-res').innerText;
+        let all, bin; if (document.getElementById('sa-q')) { const q = document.getElementById('sa-q'); q.value = 'quokka'; q.oninput(); all = document.getElementById('sa-res').innerText;
+        document.querySelector('[data-saw=bin]').click(); bin = document.getElementById('sa-res').innerText; }
+        else { allSearchPage2.where = 'all'; allSearchPage2('quokka'); all = document.getElementById('app').innerText; document.querySelector('[data-saw=bin]').click(); bin = document.getElementById('app').innerText; allSearchPage2.where = 'all'; q.value = ''; }
         BIN.pop(); subs.splice(subs.findIndex(x => x.id === 's-zzw'), 1); subs.splice(subs.findIndex(x => x.id === 's-zzd'), 1);
         return {all, bin, menu: (() => { openMenu(); const t = document.querySelector('.menu').innerText; closeMenu(); return /Search everywhere/.test(t); })()}; });
       ok('Search everywhere finds recipes in the recycle bin, still waiting and declined, says where each one is, and can narrow it down', /Quokka Bin Torte/.test(r.all) && /Recycle bin/.test(r.all) && /Quokka Waiting Kugel/.test(r.all) && /Need to proofread/.test(r.all) && /Quokka Declined Soup/.test(r.all) && /Declined/.test(r.all) && /Quokka Bin/.test(r.bin) && !/Waiting Kugel/.test(r.bin) && r.menu, r);
@@ -1332,6 +1333,15 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
         const back = (await db.collection('photos').doc('ph-pubtest').get()).data().pub;
         await db.collection('photos').doc('ph-pubtest').delete(); return {after, back}; });
       ok("a dish photo follows its recipe's public setting (so customers only get photos of public recipes)", r.after === false && r.back === true, r); }
+    // Search everywhere: typed in the top search bar, results as recipe cards, top and bottom bars stay
+    { await A.goto(F + '#search-all'); await A.waitForTimeout(400);
+      const noInner = await A.locator('#sa-q').count() === 0;
+      const word = await A.evaluate(() => RECIPES[0].t.split(' ')[0]);
+      await A.fill('#q', word); await A.waitForTimeout(400);
+      const r = await A.evaluate(() => ({hash: location.hash, cards: document.querySelectorAll('#app .grid .rc').length, where: !!document.querySelector('#app .sa-where'),
+        bar: getComputedStyle(document.querySelector('header.bar')).display !== 'none', tab: !document.body.classList.contains('kb-open')}));
+      ok('Search everywhere uses the search at the top, shows recipe cards that say where each one is, and keeps the top and bottom bars', noInner && r.hash === '#search-all' && r.cards > 0 && r.where && r.bar && r.tab, r);
+      await A.fill('#q', ''); await A.waitForTimeout(200); }
     // Menu ideas by meal
     { await A.goto(F + '#menu'); await A.waitForTimeout(500); await A.fill('#mn-q', '');
       const chips = await A.locator('[data-mq]').allTextContents();
