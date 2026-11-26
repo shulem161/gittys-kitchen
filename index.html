@@ -95,6 +95,7 @@ button{font:inherit;color:inherit}
 .im-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}.im-row .im-why{flex:1;min-width:200px}
 .ed-also{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}.also-c{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:14px;cursor:pointer;background:var(--paper)}
 .also-c:has(input:checked){border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}.also-c[hidden]{display:none}.also-new{display:inline-flex;gap:6px}.also-new input{width:150px}
+.sa-pick{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.sa-pick b{margin-right:4px}
 .sa-where{font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--accent);margin-bottom:4px}.sa-where-btns{flex-wrap:wrap}
 .ed-also-f .lbl{font-weight:600;font-size:14px}.chip-also{text-decoration:none;opacity:.85}
 .labels-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}.lchip{display:inline-flex;align-items:center;gap:4px;font-size:13px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink);text-decoration:none}
@@ -1491,7 +1492,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.90";
+const WEB_VERSION = "4.91";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1546,6 +1547,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["catnum","4.91","2026-11-26","Search everywhere opens like the Categories page; no more “Cakes 1”","Search everywhere (admins only, it says so at the top) now opens like the Categories page: every category with how many recipes it has everywhere – the cookbook, the inboxes, waiting, Declined and the Recycle bin. Open one to see all its recipes, each saying where it is, or type in the search at the top. At the top, every place is ticked when it opens – the cookbook, the inboxes, waiting, Declined and the Recycle bin; untick any place to leave it out. What you type in the search at the top is shown the same way, by category, with how many were found in each. Also: a file named like cakes_1.pdf or Cookies 1.txt made a new category “Cakes 1”; now the number is left off, so it goes into Cakes. The “Cakes 1”, “Cookies 1” (and any other numbered copies) already made are merged into their real category when this goes live.",false],
   ["searchall2","4.90","2026-11-24","Search everywhere looks like the rest of the app","Search everywhere keeps the top bar and the bottom bar. You type in the regular search at the top (the keyboard doesn't pop up by itself), and the results are recipe cards like everywhere else, each with a 📍 line saying where it is (Cookbook, Recycle bin, Need to proofread…). The Everywhere / Cookbook / Inboxes / Waiting / Declined / Recycle bin buttons are still there.",false],
   ["photopub","4.89","2026-11-23","Customers see only the photos of public recipes","From the weekly check-up: customers could read any approved dish photo if they knew where to look, also photos of team-only and Private recipes (they never saw them in the app, but the database let them). Now every photo carries its recipe's public setting, kept up to date when a recipe becomes public or team only, and customers can only get photos of public recipes. The family and the team see every photo as before. Turning this on switches the stricter rule on in the database too.",false],
   ["nocount","4.88","2026-11-20","No recipe counts on the welcome page","The sign-in and Ask to join page no longer says how many recipes and categories there are (“175 family recipes in 13 categories”), since that keeps changing. It says “Family recipes from our kitchen to yours.” The Categories page says “Every family recipe, by category” instead of the counts.",false],
@@ -3695,14 +3697,42 @@ function allSearchItems(){
 }
 // searchall2: Search everywhere looks like the rest of the app – you type in the search bar at the top (the top bar and
 // the bottom bar stay, no keyboard pops up by itself) and the results are recipe cards, each saying where it is
+// catnum: where to search – every place is ticked when Search everywhere opens; untick a place to leave it out
+const SA_WHERE = [["book","Cookbook"],["inbox","Inboxes"],["sub","Waiting (new recipes and changes)"],["declined","Declined"],["bin","Recycle bin"]];
+const saOff = () => allSearchPage2.off || (allSearchPage2.off = new Set());
+const whereBtns = () => feat("catnum") ? `<div class="sa-pick" role="group" aria-label="Search in"><b>Search in</b>${SA_WHERE.map(([k,l])=>`<label class="also-c"><input type="checkbox" data-saon="${k}"${saOff().has(k)?"":" checked"}><span>${esc(l)}</span></label>`).join("")}</div>` : `<div class="seg sa-where-btns" role="group" aria-label="Where">${[["all","Everywhere"],["book","Cookbook"],["inbox","Inboxes"],["sub","Waiting"],["declined","Declined"],["bin","Recycle bin"]].map(([k,l])=>`<button type="button" data-saw="${k}" aria-pressed="${k===(allSearchPage2.where||"all")}">${l}</button>`).join("")}</div>`;
 function allSearchPage2(term){
   term = term || ""; q.value = term;
   const where = allSearchPage2.where || "all", t = term.trim().toLowerCase(), items = allSearchItems();
   const L = !t ? [] : items.filter(o=>(where==="all"||o.kind===where) && o.h.includes(t)).sort((a,b)=>((b.x.t||"").toLowerCase().includes(t))-((a.x.t||"").toLowerCase().includes(t)) || byName(a.x.t||"", b.x.t||""));
-  const cardOf = o => { const c = card(Object.assign({}, o.x, {cover: o.x.cover||""})).replace(/href="#[^"]*"/, `href="${esc(o.href)}"`);
+  const cardOf = o => { const x = (o.kind==="sub"||o.kind==="declined") ? (()=>{ try{ return Object.assign(fromDoc(o.x.id, o.x), {t:o.x.t||"Untitled"}); }catch(e){ return Object.assign({}, o.x, {s:[]}); } })() : o.x;
+    if(!Array.isArray(x.s) || x.s.some(v=>!Array.isArray(v)||!Array.isArray(v[2]))) x.s = [];
+    const c = card(Object.assign({}, x, {cover: x.cover||""})).replace(/href="#[^"]*"/, `href="${esc(o.href)}"`);
     return c.replace('<div class="rc-body">', `<div class="rc-body"><div class="sa-where">📍 ${esc(o.where)}${o.from?` · sent by ${esc(o.from)}`:""}</div>`); };
+  const cat = allSearchPage2.cat || "";
+  if(feat("catnum")){
+    const pool = items.filter(o=>!saOff().has(o.kind) && (!t || o.h.includes(t))), inC = (o,c)=>o.x.c===c || (Array.isArray(o.x.also) && o.x.also.includes(c));
+    if(cat){ const CL = pool.filter(o=>inC(o,cat)).sort((a,b)=>byName(a.x.t||"", b.x.t||""));
+      app.innerHTML = `<section class="wrap"><button type="button" class="back linkbtn" id="sa-back">← All categories</button>
+        <div class="section-head" style="margin-top:14px"><h2>${esc(cat)}</h2><p><span class="pill">Admins only</span> Search everywhere · ${CL.length} ${CL.length===1?"recipe":"recipes"}${t?` for “${esc(term.trim())}”`:""}</p></div>
+        ${whereBtns()}${CL.length?`<div class="grid" style="margin-top:14px">${CL.map(cardOf).join("")}</div>`:`<div class="panel-a" style="margin-top:14px"><p class="hint">No recipes here.</p></div>`}</section>`;
+      document.getElementById("sa-back").onclick=()=>{ allSearchPage2.cat=""; allSearchPage2(q.value); window.scrollTo(0,0); };
+    } else {
+      const allCats=[...new Set([...(t?[]:CATS), ...pool.flatMap(o=>[o.x.c, ...(Array.isArray(o.x.also)?o.x.also:[])]).filter(Boolean)])].sort(byName);
+      app.innerHTML = `<section class="wrap">
+        <div class="section-head" style="margin-top:26px"><h2>🔎 Search everywhere</h2><p><span class="pill">Admins only</span> ${t ? `${pool.length} ${pool.length===1?"recipe":"recipes"} for “${esc(term.trim())}”, by category` : "Every recipe, wherever it is"}</p></div>
+        <p class="hint" style="margin:-6px 0 10px">${t ? "Open a category to see the recipes found in it." : "Choose where to search, then type in the search at the top, or open a category."}</p>
+        ${whereBtns()}
+        ${t && !pool.length ? `<div class="panel-a" style="margin-top:14px"><p class="hint">Nothing found for “${esc(term.trim())}” in the places ticked.</p></div>` : ""}
+        <div class="cats rows" style="padding:14px 0 18px">${allCats.map(c=>{ const n=pool.filter(o=>inC(o,c)).length;
+          return `<a class="cat" href="#search-all" data-sacat="${esc(c)}">${catPrefix(c)?`<span class="catcode">${catPrefix(c)}</span>`:""}<div class="ic">${icon(c)}</div><h3>${esc(c)}</h3><span>${n} ${n===1?"recipe":"recipes"}</span></a>`; }).join("")}</div></section>`;
+      app.querySelectorAll("[data-sacat]").forEach(a=>a.onclick=e=>{ e.preventDefault(); allSearchPage2.cat=a.dataset.sacat; allSearchPage2(q.value); window.scrollTo(0,0); });
+    }
+    app.querySelectorAll("[data-saon]").forEach(c=>c.onchange=()=>{ if(c.checked) saOff().delete(c.dataset.saon); else saOff().add(c.dataset.saon); allSearchPage2(q.value); });
+    return;
+  }
   app.innerHTML = `<section class="wrap">
-    <div class="section-head" style="margin-top:26px"><h2>🔎 Search everywhere</h2><p>${t ? `${L.length} ${L.length===1?"recipe":"recipes"} for “${esc(term.trim())}”` : "Type in the search at the top"}</p></div>
+    <div class="section-head" style="margin-top:26px"><h2>🔎 Search everywhere</h2><p>${feat("catnum")?`<span class="pill">Admins only</span> `:""}${t ? `${L.length} ${L.length===1?"recipe":"recipes"} for “${esc(term.trim())}”` : "Type in the search at the top"}</p></div>
     <div class="seg sa-where-btns" role="group" aria-label="Where">${[["all","Everywhere"],["book","Cookbook"],["inbox","Inboxes"],["sub","Waiting"],["declined","Declined"],["bin","Recycle bin"]].map(([k,l])=>`<button type="button" data-saw="${k}" aria-pressed="${k===where}">${l}</button>`).join("")}</div>
     ${t ? (L.length ? `<div class="grid" style="margin-top:14px">${L.slice(0,200).map(cardOf).join("")}</div>${L.length>200?`<p class="hint">Showing the first 200. Type more to narrow it down.</p>`:""}`
         : `<div class="panel-a" style="margin-top:14px"><p class="hint">Nothing found anywhere for “${esc(term.trim())}”.</p></div>`)
@@ -6430,7 +6460,9 @@ function localParse(text, fileCat){
 // filecat: the file's name as the category — an existing one when it matches, otherwise a new one
 const GENERIC_FILE = /^(img|image|images|photo|photos|pic|picture|pxl|dsc|dscn|dcim|mvimg|scan|scanned|scanner|camscanner|document|doc|docs|file|files|untitled|screenshot|screen shot|whatsapp|signal|telegram|download|downloads|new|copy|page|pages|recipe|recipes|cookbook|pdf|word|text|attachment|export|blob)\b/i;
 function fileCat(name){
-  let base=String(name||"").replace(/\.[^.]+$/,"").replace(/^[0-9a-f]{6,}-/i,"").replace(/[_]+/g," ").replace(/\(\d+\)/g," ").replace(/\s+-\s+/g," ").trim();
+  let base=String(name||"").replace(/\.[^.]+$/,"");
+  if(feat("catnum")) base=base.replace(/[\s_-]*\(?\d{1,2}\)?$/,"");   // catnum: "cakes_1", "Cookies 1", "Cakes (2)" are still Cakes / Cookies
+  base=base.replace(/^[0-9a-f]{6,}-/i,"").replace(/[_]+/g," ").replace(/\(\d+\)/g," ").replace(/\s+-\s+/g," ").trim();
   if(!base || GENERIC_FILE.test(base) || !/[a-z]{2}/i.test(base) || /\d{3,}/.test(base)) return "";
   base=base.replace(/\brecipes?\b/ig," ").replace(/[^\p{L}\p{N}&' ]+/gu," ").replace(/\s+/g," ").trim();
   if(base.length<2 || base.length>30 || !/[a-z]{2}/i.test(base)) return "";
@@ -8425,7 +8457,7 @@ function routePage(){
   if(h==="admin" && isAdmin()){ q.value=""; adminPage(); window.scrollTo(0,0); return; }
   if(h==="public" && (isAdmin()||may("portal")||may("pub"))){ q.value=""; publicPage(); window.scrollTo(0,0); return; }
   if(h==="activity" && (isAdmin()||may("activity"))){ q.value=""; activityPage(); window.scrollTo(0,0); return; }
-  if(h==="search-all" && mayAllSearch()){ const t=q.value; if(!feat("searchall2")) q.value=""; allSearchPage(t); window.scrollTo(0,0); return; }
+  if(h==="search-all" && mayAllSearch()){ const t=q.value; if(!t){ allSearchPage2.cat=""; if(KEEP.cur!=="#search-all") allSearchPage2.off=new Set(); } if(!feat("searchall2")) q.value=""; allSearchPage(t); window.scrollTo(0,0); return; }
   if(h==="bin" && mayBin()){ q.value=""; binPage(); window.scrollTo(0,0); return; }
   if(h==="dupes" && (isAdmin()||may("del"))){ q.value=""; dupesPage(); window.scrollTo(0,0); return; }
   if(h==="viewas" && (canViewAs()||viewingAs())){ q.value=""; viewAsPage(); window.scrollTo(0,0); return; }
@@ -8495,7 +8527,7 @@ function routePage(){
 }
 q.addEventListener("input",()=>{
   const v=q.value.trim();
-  if(feat("searchall2") && location.hash==="#search-all" && mayAllSearch()){ allSearchPage2(q.value); return; }
+  if(feat("searchall2") && location.hash==="#search-all" && mayAllSearch()){ if(feat("catnum")) allSearchPage2.cat=""; allSearchPage2(q.value); return; }
   if(location.hash){ history.replaceState(null,"",location.pathname+location.search); }
   document.body.classList.remove("on-recipe");
   v ? results(v) : home(); setNav();

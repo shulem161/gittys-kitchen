@@ -939,10 +939,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*80 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 80));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*81 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 81));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 80, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 81, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -953,7 +953,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /79/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /80/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1284,6 +1284,8 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
         location.hash = 'search-all'; await new Promise(z => setTimeout(z, 300));
         let all, bin; if (document.getElementById('sa-q')) { const q = document.getElementById('sa-q'); q.value = 'quokka'; q.oninput(); all = document.getElementById('sa-res').innerText;
         document.querySelector('[data-saw=bin]').click(); bin = document.getElementById('sa-res').innerText; }
+        else if (feat('catnum')) { allSearchPage2.off = new Set(); allSearchPage2.cat = ''; const each = () => [...document.querySelectorAll('[data-sacat]')].map(a => { allSearchPage2.cat = a.dataset.sacat; allSearchPage2('quokka'); const t = document.getElementById('app').innerText; allSearchPage2.cat = ''; allSearchPage2('quokka'); return t; }).join('\n');
+          allSearchPage2('quokka'); all = each(); allSearchPage2.off = new Set(['book', 'inbox', 'sub', 'declined']); allSearchPage2('quokka'); bin = each(); allSearchPage2.off = new Set(); q.value = ''; }
         else { allSearchPage2.where = 'all'; allSearchPage2('quokka'); all = document.getElementById('app').innerText; document.querySelector('[data-saw=bin]').click(); bin = document.getElementById('app').innerText; allSearchPage2.where = 'all'; q.value = ''; }
         BIN.pop(); subs.splice(subs.findIndex(x => x.id === 's-zzw'), 1); subs.splice(subs.findIndex(x => x.id === 's-zzd'), 1);
         return {all, bin, menu: (() => { openMenu(); const t = document.querySelector('.menu').innerText; closeMenu(); return /Search everywhere/.test(t); })()}; });
@@ -1340,8 +1342,23 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       await A.fill('#q', word); await A.waitForTimeout(400);
       const r = await A.evaluate(() => ({hash: location.hash, cards: document.querySelectorAll('#app .grid .rc').length, where: !!document.querySelector('#app .sa-where'),
         bar: getComputedStyle(document.querySelector('header.bar')).display !== 'none', tab: !document.body.classList.contains('kb-open')}));
-      ok('Search everywhere uses the search at the top, shows recipe cards that say where each one is, and keeps the top and bottom bars', noInner && r.hash === '#search-all' && r.cards > 0 && r.where && r.bar && r.tab, r);
+      const tiles = await A.locator('#app [data-sacat]').count();
+      ok('Search everywhere uses the search at the top, shows what it finds (by category, or as recipe cards that say where each one is), and keeps the top and bottom bars', noInner && r.hash === '#search-all' && (r.cards > 0 && r.where || tiles > 0) && r.bar && r.tab, [r, tiles]);
       await A.fill('#q', ''); await A.waitForTimeout(200); }
+    // catnum: file names with a number don't make a new category; Search everywhere opens with category tiles
+    { const r = await A.evaluate(() => ({a: fileCat('cakes_1.pdf'), b: fileCat('Cookies 1.txt'), c: fileCat('Cakes (2).txt')}));
+      ok('a file named cakes_1.pdf or "Cookies 1.txt" goes into Cakes / Cookies, not a new “Cakes 1”', r.a === 'Cakes' && r.b === 'Cookies' && r.c === 'Cakes', r);
+      await A.fill('#q', ''); await A.goto(F + '#search-all'); await A.waitForTimeout(400);
+      const tiles = await A.locator('#app [data-sacat]').count(), txt = await A.locator('#app').innerText();
+      await A.locator('#app [data-sacat]').first().click(); await A.waitForTimeout(300);
+      const inCat = await A.locator('#app .grid .rc').count(), back = await A.locator('#sa-back').count();
+      ok('Search everywhere opens like the Categories page, says it is for admins only, and a category lists all its recipes', tiles > 3 && /Admins only/.test(txt) && inCat > 0 && back === 1, {tiles, inCat});
+      await A.goto(F + '#search-all'); await A.waitForTimeout(300); const w = await A.evaluate(() => RECIPES[0].t.split(' ')[0]);
+      const allOn = await A.locator('[data-saon]:checked').count(), allBoxes = await A.locator('[data-saon]').count();
+      await A.locator('[data-saon=bin]').uncheck(); await A.fill('#q', w); await A.waitForTimeout(400);
+      const st = await A.evaluate(() => ({tiles: document.querySelectorAll('#app [data-sacat]').length, binOff: !document.querySelector('[data-saon=bin]').checked, bookOn: document.querySelector('[data-saon=book]').checked, txt: document.getElementById('app').innerText}));
+      ok('Search everywhere opens with every place ticked, a place can be unticked, and what you search shows by category', allOn === allBoxes && allBoxes === 5 && st.binOff && st.bookOn && st.tiles > 0 && /by category/.test(st.txt), [allOn, allBoxes, st]);
+      await A.evaluate(() => { allSearchPage2.off = new Set(); }); await A.fill('#q', ''); }
     // Menu ideas by meal
     { await A.goto(F + '#menu'); await A.waitForTimeout(500); await A.fill('#mn-q', '');
       const chips = await A.locator('[data-mq]').allTextContents();
