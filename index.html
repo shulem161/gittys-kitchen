@@ -95,6 +95,7 @@ button{font:inherit;color:inherit}
 .im-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}.im-row .im-why{flex:1;min-width:200px}
 .ed-also{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}.also-c{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:14px;cursor:pointer;background:var(--paper)}
 .also-c:has(input:checked){border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}.also-c[hidden]{display:none}.also-new{display:inline-flex;gap:6px}.also-new input{width:150px}
+.gv{position:relative;display:flex;flex-direction:column;gap:6px}.gv-chips{display:flex;flex-wrap:wrap;gap:6px}.gv-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px;font-size:14px}.gv-chip.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}.gv-chip button{border:0;background:none;cursor:pointer;font-size:13px;color:inherit}.gv-sug{position:absolute;top:100%;left:0;right:0;z-index:20;background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column;max-height:260px;overflow:auto}.gv-sug[hidden]{display:none}.gv-sug button{text-align:left;border:0;background:none;padding:9px 10px;border-radius:8px;cursor:pointer;font:inherit}.gv-sug button:hover{background:var(--accent-soft)}.gv-sug small{opacity:.7}.gv-edit{font-size:14px;margin-top:4px}.gv-panel{margin-top:8px}.gv-panel .row{margin-top:8px}
 .sa-pick{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.sa-pick b{margin-right:4px}
 .sa-where{font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--accent);margin-bottom:4px}.sa-where-btns{flex-wrap:wrap}
 .ed-also-f .lbl{font-weight:600;font-size:14px}.chip-also{text-decoration:none;opacity:.85}
@@ -1492,7 +1493,7 @@ function newId(){ const a=new Uint8Array(12); try{crypto.getRandomValues(a)}catc
 const cacheProfile = () => { if(me&&profile) store("gk-cache",{uid:me,profile}); };
 
 /* ---------- updates ---------- */
-const WEB_VERSION = "4.93";
+const WEB_VERSION = "4.94";
 /* Admin notifications through the free ntfy app (subscribe to this topic on ntfy.sh). */
 const NTFY_TOPIC = "gittys-kitchen-53ab9854c3d2c29f";
 // plainadmin: the main channel's name is in the page, so its notices say only what's new and where
@@ -1547,6 +1548,7 @@ let RELEASE = {};             // meta/release: {approve, by, at, live}
 // employees and customers get it once he approves it in App settings → App & web updates (meta/features.on[key]).
 // [key, version, date, title, what it does, already approved (for updates that were live before this list)]
 const UPDATES = [
+  ["givers","4.94","2026-11-27","“Given by” for several people, on recipes and photos","Admins and the team can credit who gave a recipe or a photo – one person or several. Once it's saved, only admins and the person who added the recipe or photo can change it. The “Given by” box suggests every approved member as you type a name or an account number, and “+ Add” puts in anyone else. It's there when you add or edit a recipe, on every recipe already in the cookbook (“👤 Add who gave it”), when you add photos, and on every photo already on a recipe (“👤 Given by…”). Each member credited gets a notice, sees the recipe while it waits (⏳ Not published yet), and finds it in My recipes under “Credited to you”, with “Photos credited to you” too. Recipes and photos show “Given by …”.",false],
   ["creditlink","4.93","2026-11-27","“Given by”: credit who gave you a recipe, and they see it","When you add a recipe, there are two boxes: “From” is where the recipe comes from (a person, a cookbook, a magazine), and the new “Given by” is who gave it to you: their full name as on their account, or their account number (like 7 or #7, which puts their name on the recipe). The recipe shows “Given by …”. If that person has an account here, the app says so and links the recipe to them: they see it in My recipes under “Credited to you”, and while it's still waiting in an inbox they see it in its category and in search, marked ⏳ Not published yet, the same as the person who added it.",false],
   ["minewait","4.92","2026-11-27","See the recipes you added before they're published","When someone adds a recipe, they see it right away in its category and when they search, under “Your recipes, not published yet”, marked ⏳ Not published yet with the inbox it's in (like Need to proofread). Tapping it shows the recipe as they sent it. Nobody else sees it in the cookbook until it's approved. My recipes has an Open button for it too.",false],
   ["catnum","4.91","2026-11-26","Search everywhere opens like the Categories page; no more “Cakes 1”","Search everywhere (admins only, it says so at the top) now opens like the Categories page: every category with how many recipes it has everywhere – the cookbook, the inboxes, waiting, Declined and the Recycle bin. Open one to see all its recipes, each saying where it is, or type in the search at the top. At the top, every place is ticked when it opens – the cookbook, the inboxes, waiting, Declined and the Recycle bin; untick any place to leave it out. What you type in the search at the top is shown the same way, by category, with how many were found in each. Also: a file named like cakes_1.pdf or Cookies 1.txt made a new category “Cakes 1”; now the number is left off, so it goes into Cakes. The “Cakes 1”, “Cookies 1” (and any other numbered copies) already made are merged into their real category when this goes live.",false],
@@ -1821,7 +1823,7 @@ function watchMembers(){
     members = s.docs.map(d=>Object.assign({uid:d.id},d.data())).sort((a,b)=>(b.created||0)-(a.created||0));
     // give the member's own reset a few seconds to finish before tidying up after it
     members.filter(m=>m.from && !m.moved && !migrating.has(m.uid)).forEach(m=>{ migrating.add(m.uid); setTimeout(()=>{ migrating.delete(m.uid); migrateMember(m); }, 4000); });
-    renderAcct(); syncTeamList();
+    renderAcct(); syncTeamList(); syncPeopleNow();
     if(location.hash==="#admin") route();
   }, ()=>{});
 }
@@ -2061,7 +2063,7 @@ function card(r){
     <div class="rc-body">
       <h3>${titleHTML(r)}</h3>
       <div class="rc-meta">${noChip(r)}${(r.sec||!/^pesach$/i.test(r.c)) && (r.sec||r.c).toLowerCase()!==(KIND_LABEL[kindOf(r)]||"").toLowerCase()?`<span class="chip">${esc(r.sec||r.c)}</span>`:""}${kindChip(r)}${addedAt(r)>Date.now()-7*864e5?'<span class="newchip">New</span>':""}<span class="rc-time">${TOOL_IC.clock}${esc(timeShort(r))}</span>${r.serves?`<span class="rc-time">${TOOL_IC.people}${esc(servesText(r).replace(/^Serves /,""))}</span>`:""}${t.length?`<span class="oven">${t[0]}</span>`:""}</div>
-      ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}${r.giver&&feat("creditlink")?`<div class="credit">Given by ${esc(r.giver)}</div>`:""}
+      ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}${feat("givers")&&giversText(r)?`<div class="credit">${esc(giversText(r))}</div>`:r.giver&&feat("creditlink")?`<div class="credit">Given by ${esc(r.giver)}</div>`:""}
     </div>
     ${me&&favs().includes(r.id)?HEART.replace("<svg",'<svg class="heart"'):""}
   </a>`;
@@ -2526,7 +2528,7 @@ function recipe(r){
         ${r.rv==="kosher"&&nkHidden()?`<div class="ib-note">🚫 Hidden from the cookbook while it's in Not kosher.</div>`:""}${r.rv==="kosher"&&r.rvNote?`<div class="ib-note"><b>🚫 Why:</b> ${esc(r.rvNote)} (${esc(r.rvNoteBy||"")})</div>`:""}${r.rv==="proof"&&r.rvNote?`<div class="ib-note"><b>✗ Needs changes</b> (${esc(r.rvNoteBy||"")}): ${esc(r.rvNote)}${feat("fixlink")&&mayFix(r)?` <a class="link" href="${fixHref(r.id, r.rvNote)}">Fix it</a>`:""}</div>${linkedNotesHTML(r)}`:""}${(r.rvAsk||[]).length?`<span class="hint">Asked to move up: ${r.rvAsk.map(a=>esc(a.name)).join(", ")}</span>`:""}<div class="row rv-acts">${rvButtons(r)}${rvEditBtn(r)}</div></div>`:""}
       ${!isPublic()&&subs.some(s=>s.status==="pending"&&s.dropOf===r.id)?`<div class="rv-bar"><span>🔀 Merged into <a class="link" href="#${esc(subs.find(s=>s.status==="pending"&&s.dropOf===r.id).editOf)}">${esc(subs.find(s=>s.status==="pending"&&s.dropOf===r.id).t)}</a>. This recipe is deleted automatically when the merged one is released.</span></div>`:""}
       ${!isPublic()&&!feat("recact")&&(r.rvLog||[]).length?`<details class="rv-log"><summary>Who moved it through the inboxes</summary><ul>${rvLogHTML(r.rvLog)}</ul></details>`:""}
-      ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}${r.giver&&feat("creditlink")?`<div class="credit">Given by ${esc(r.giver)}</div>`:""}
+      ${r.by?`<div class="credit">${esc(creditText(r.by))}</div>`:""}${feat("givers")&&giversText(r)?`<div class="credit">${esc(giversText(r))}</div>`:r.giver&&feat("creditlink")?`<div class="credit">Given by ${esc(r.giver)}</div>`:""}${mayGiveOn(r)&&mayGive()&&recipesOnline&&RECIPES.some(x=>x.id===r.id)?`<button type="button" class="linkbtn gv-edit" data-gvrec="${esc(r.id)}">👤 ${giversOf(r).length?"Change who gave it":"Add who gave it"}</button><div class="gv-slot" id="gv-slot-rec"></div>`:""}
       ${feat("labels")?labelsRow(r):""}
       <div class="facts">
         ${t.length?`<div class="fact hot">Oven <b>${t.join(" → ")}</b></div>`:""}
@@ -4744,9 +4746,9 @@ let onlineIds = new Set();    // every recipe id stored online (including delete
 let unsubRecipes = null;
 const withHistory = (rec, base, action, by) => { rec.history = [...((base&&base.history)||[]), {a:action, by:by||"a member", at:Date.now()}].slice(-12); return rec; };
 const historyLines = r => (r.history||[]).slice(-6).map(h=>h.a==="moved" ? `Moved here${h.from?" from "+h.from:""} by ${h.by} on ${fmtDate(h.at)}` : `${h.a==="added"?"Added":"Changed"} by ${h.by} on ${fmtDate(h.at)}`);
-const toDoc = r => ({pub: r.pub===undefined ? pubDefault(r.c) : !!r.pub, ...(r.snackKind?{snackKind:r.snackKind}:{}), ...(r.creditUid?{creditUid:r.creditUid}:{}), ...(r.giver?{giver:r.giver}:{}), ...(Array.isArray(r.meals)?{meals:r.meals}:{}), ...(Array.isArray(r.dish)?{dish:r.dish}:{}), ...(r.pesach?{pesach:true}:{}), ...(r.priv?{priv:true}:{}), ...(Array.isArray(r.also)?{also:r.also.filter(x=>x&&x!==r.c)}:{}), c:r.c, t:r.t, by:r.by||"", n:r.n||"", pre:r.pre||[], kind:r.kind||"", time:r.time||"", serves:r.serves||"", sec:r.sec||"", ...(r.no?{no:r.no}:{}), ...(r.code?{code:r.code}:{}), ord:r.ord||0, deleted:false, updated:Date.now(), ...(r.history?{history:r.history}:{}),
+const toDoc = r => ({pub: r.pub===undefined ? pubDefault(r.c) : !!r.pub, ...(r.snackKind?{snackKind:r.snackKind}:{}), ...(r.creditUid?{creditUid:r.creditUid}:{}), ...(r.giver?{giver:r.giver}:{}), ...(r.ownerUid?{ownerUid:r.ownerUid}:{}), ...(Array.isArray(r.givers)?{givers:r.givers, creditUids:r.givers.map(g=>g.uid).filter(Boolean)}:{}), ...(Array.isArray(r.meals)?{meals:r.meals}:{}), ...(Array.isArray(r.dish)?{dish:r.dish}:{}), ...(r.pesach?{pesach:true}:{}), ...(r.priv?{priv:true}:{}), ...(Array.isArray(r.also)?{also:r.also.filter(x=>x&&x!==r.c)}:{}), c:r.c, t:r.t, by:r.by||"", n:r.n||"", pre:r.pre||[], kind:r.kind||"", time:r.time||"", serves:r.serves||"", sec:r.sec||"", ...(r.no?{no:r.no}:{}), ...(r.code?{code:r.code}:{}), ord:r.ord||0, deleted:false, updated:Date.now(), ...(r.history?{history:r.history}:{}),
   s:r.s.map(([ing,h,items])=>({k:ing?"ing":"step", h:h||"", items:items}))});
-const fromDoc = (id,d) => ({id, pub: d.pub===undefined ? undefined : !!d.pub, ...(d.snackKind?{snackKind:d.snackKind}:{}), ...(d.creditUid?{creditUid:d.creditUid}:{}), ...(d.giver?{giver:d.giver}:{}), ...(Array.isArray(d.meals)?{meals:d.meals}:{}), ...(Array.isArray(d.dish)?{dish:d.dish}:{}), ...(d.pesach?{pesach:true}:{}), ...(d.priv?{priv:true}:{}), ...(d.hu?{hu:true}:{}), ...(Array.isArray(d.also)&&d.also.length?{also:d.also}:{}), c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, pre:d.pre, kind:d.kind||"", time:d.time||"", serves:d.serves||"", sec:d.sec||"", no:d.no||0, code:d.code||"", ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[], rv:d.rv||"", rvNote:d.rvNote||"", rvNoteBy:d.rvNoteBy||"", rvBy:d.rvBy||"", rvUids:d.rvUids||[], rvAsk:d.rvAsk||[], rvLog:d.rvLog||[], oldCodes:d.oldCodes||[], kosherPub:d.kosherPub, kosherFrom:d.kosherFrom||"",
+const fromDoc = (id,d) => ({id, pub: d.pub===undefined ? undefined : !!d.pub, ...(d.snackKind?{snackKind:d.snackKind}:{}), ...(d.creditUid?{creditUid:d.creditUid}:{}), ...(d.giver?{giver:d.giver}:{}), ...(d.ownerUid?{ownerUid:d.ownerUid}:{}), ...(Array.isArray(d.givers)?{givers:d.givers}:{}), ...(Array.isArray(d.meals)?{meals:d.meals}:{}), ...(Array.isArray(d.dish)?{dish:d.dish}:{}), ...(d.pesach?{pesach:true}:{}), ...(d.priv?{priv:true}:{}), ...(d.hu?{hu:true}:{}), ...(Array.isArray(d.also)&&d.also.length?{also:d.also}:{}), c:d.c, t:d.t, by:d.by||"", n:d.n||undefined, pre:d.pre, kind:d.kind||"", time:d.time||"", serves:d.serves||"", sec:d.sec||"", no:d.no||0, code:d.code||"", ord:d.ord||0, cover:d.cover||"", coverPhoto:d.coverPhoto||"", history:d.history||[], rv:d.rv||"", rvNote:d.rvNote||"", rvNoteBy:d.rvNoteBy||"", rvBy:d.rvBy||"", rvUids:d.rvUids||[], rvAsk:d.rvAsk||[], rvLog:d.rvLog||[], oldCodes:d.oldCodes||[], kosherPub:d.kosherPub, kosherFrom:d.kosherFrom||"",
   s:(d.s||[]).map(x=>[x.k==="ing"?1:0, x.h||"", x.items||[]])});
 // Recipes are listed A to Z by category, then by recipe code (101001, 101002…); any without a code go after, A to Z by name.
 const sortName = r => r.t.replace(/^Untitled:\s*/,"").replace(/^[^A-Za-z0-9]+/,"");
@@ -4941,7 +4943,7 @@ function editor(r, cat, sub, draft){
           ${feat("multicat")&&(isAdmin()||suggest)?`<div class="field ed-also-f"${alsoHidden(catNow)?" hidden":""}><span class="lbl">Also in <span class="hint">(optional)</span></span><div class="ed-also" id="ed-also">${[...new Set([...alsoChoices(catNow), ...((src&&src.also)||[])])].filter(c=>c!==catNow && !isPesach(c)).map(c=>`<label class="also-c"><input type="checkbox" value="${esc(c)}" ${((src&&src.also)||[]).includes(c)?"checked":""}><span>${esc(c)}</span></label>`).join("")}
             <span class="also-new"><input id="ed-also-new" type="text" maxlength="30" placeholder="+ Add a category"><button type="button" class="btn sm" id="ed-also-add">Add</button></span></div></div>`:""}
           <div class="field"><label for="ed-by">From (optional)</label><input id="ed-by" type="text" maxlength="40" value="${esc(src?src.by:(suggest?myName():""))}" placeholder="e.g. Bobby">${feat("creditlink")?`<p class="hint">Where the recipe comes from: a person, a cookbook, a magazine…</p></div>
-          <div class="field"><label for="ed-giver">Given by (optional)</label><input id="ed-giver" type="text" maxlength="40" value="${esc(src&&src.giver||"")}" placeholder="Who gave it to you"><p class="hint" id="ed-by-hint">Who gave you this recipe: their full name as on their account, or their account number. They'll see it too.</p>`:""}</div>
+          <div class="field"><label for="ed-giver">Given by (optional)</label>${mayGive() && (isAdmin() || !(r||target) || (r||target).ownerUid===me)?giverPicker("ed-givers", giversOf(src||{}))+`<p class="hint">Pick one or more people (members by name or account number), or add any name. Each one with an account is told and sees the recipe.</p>`:`<input id="ed-giver" type="text" maxlength="40" value="${esc(src&&src.giver||"")}" placeholder="Who gave it to you">`}<p class="hint" id="ed-by-hint"${mayGive() && (isAdmin() || !(r||target) || (r||target).ownerUid===me)?" hidden":""}>Who gave you this recipe: their full name as on their account, or their account number. They'll see it too.</p>`:""}</div>
         </div>
         <div class="field"><label for="ed-k">Meat or dairy</label>
           <select id="ed-k">${[["","Automatic"],["meat","Meat"],["dairy","Dairy"],["fish","Fish"],["other","None of these"]].map(([v,l])=>`<option value="${v}" ${(src&&src.kind||"")===v?"selected":""}>${v?l:`${l}: ${({fish:"fish",meat:"meat",dairy:"dairy",other:"neither"})[autoKind(src||{c:catNow,s:[]})]}`}</option>`).join("")}</select>
@@ -5003,6 +5005,7 @@ function editor(r, cat, sub, draft){
         const bm=creditMemberByNo(v);
         bh.innerHTML = bm ? `✓ No. ${esc(String(bm.no))} is <b>${esc(bm.name)}</b>. Their name goes on the recipe, and they'll see it too.` : u ? `✓ <b>${esc(v)}</b> has an account here, so they'll see this recipe too.` : creditNo(v) ? "No member has that account number." : "Who gave you this recipe: their full name as on their account, or their account number. They'll see it too."; }, 400); }); }
     const giverOf = () => { const g=F.querySelector("#ed-giver"); return g ? g.value.trim() : undefined; };
+    wireGiverPicker("ed-givers");
     const keep=()=>({also:[...F.querySelectorAll("#ed-also input[type=checkbox]:checked")].map(x=>x.value), t:F.querySelector("#ed-t").value, c:sel.value, cn:cn.value, by:F.querySelector("#ed-by").value, n:F.querySelector("#ed-n").value, k:F.querySelector("#ed-k").value, sv:F.querySelector("#ed-serves").value, tm:F.querySelector("#ed-time").value, sc:F.querySelector("#ed-sec").value, pb:F.querySelector("#ed-pub")?F.querySelector("#ed-pub").checked:null});
     // linked recipes picker
     const pq=F.querySelector("#ed-pre-q"), ps=F.querySelector("#ed-pre-sugg");
@@ -5155,7 +5158,8 @@ function editor(r, cat, sub, draft){
         const d=toDoc({c, t, also, ...(src&&Array.isArray(src.meals)?{meals:src.meals}:{}), ...(src&&Array.isArray(src.dish)?{dish:src.dish}:{}), by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:[...pre], kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), s, ord:0});
         try{
           const gv = giverOf(), to = editOf ? "proof" : sendToOf("ed-sendto"), cu = gv ? await creditUidOf(gv) : "";
-          await db.collection("submissions").doc("s-"+newId()).set({...(cu?{creditUid:cu}:{}), ...(gv?{giver:creditByText(gv)}:{}), c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves||"",sec:d.sec,s:d.s, ...(d.also&&d.also.length?{also:d.also}:{}), ...(d.meals&&d.meals.length?{meals:d.meals}:{}), ...(d.dish&&d.dish.length?{dish:d.dish}:{}), uid:actUid(), byName:actName(), status:"pending", stage:to==="hu"?"yoely":to, ...(to==="hu"?{hu:true}:{}), ...(to!=="proof"?{sentTo:to}:{}), ...((to==="yoely"||to==="hu")&&feat("private")?{priv:true}:{}), created:Date.now(), revs:[{by:actName(), uid:actUid(), at:Date.now(), s:d.s, t:d.t}], editOf, ...(rqDraft&&rqDraft.id?{rq:rqDraft.id}:{}), ...(draft&&draft.dropOf?{dropOf:draft.dropOf}:{})});
+          const gl = pickedGivers("ed-givers");
+          await db.collection("submissions").doc("s-"+newId()).set({...(cu?{creditUid:cu}:{}), ...(gv?{giver:creditByText(gv)}:{}), ...(gl&&gl.length?{givers:gl, creditUids:gl.map(g=>g.uid).filter(Boolean)}:{}), c:d.c,t:d.t,by:d.by,n:d.n,pre:d.pre,kind:d.kind,time:d.time,serves:d.serves||"",sec:d.sec,s:d.s, ...(d.also&&d.also.length?{also:d.also}:{}), ...(d.meals&&d.meals.length?{meals:d.meals}:{}), ...(d.dish&&d.dish.length?{dish:d.dish}:{}), uid:actUid(), byName:actName(), status:"pending", stage:to==="hu"?"yoely":to, ...(to==="hu"?{hu:true}:{}), ...(to!=="proof"?{sentTo:to}:{}), ...((to==="yoely"||to==="hu")&&feat("private")?{priv:true}:{}), created:Date.now(), revs:[{by:actName(), uid:actUid(), at:Date.now(), s:d.s, t:d.t}], editOf, ...(rqDraft&&rqDraft.id?{rq:rqDraft.id}:{}), ...(draft&&draft.dropOf?{dropOf:draft.dropOf}:{})});
           if(draft && draft.fromSub) db.collection("submissions").doc(draft.fromSub).delete().catch(()=>{});
           { const eb = isTeam() && target ? editedBack(target, Date.now()) : null; if(eb) await db.collection("recipes").doc(target.id).update(eb).catch(()=>{}); }
           if(to!=="proof"){ sentNotice(to, 1, myName()); toast(`Sent to ${INBOX_NAME[to]}.`); location.hash = to; }
@@ -5168,10 +5172,13 @@ function editor(r, cat, sub, draft){
       let id = r ? r.id : target ? target.id : "r-"+t.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
       if(!r && !target){ if(id==="r-") id="r-recipe"; let k=2, base=id; while(onlineIds.has(id)) id=base+"-"+(k++); }
       const pubBox=F.querySelector("#ed-pub");
-      const rec={id, pub: pubBox ? pubBox.checked : isPriv(r||target) ? false : undefined, ...((r||target)&&(r||target).priv?{priv:true}:{}), ...(also?{also}:{}), c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:pre.filter(x=>x!==id), kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), code:(r&&r.code&&r.c===c&&(r.sec||"")===(F.querySelector("#ed-sec").value.trim()))?r.code:(target&&target.code&&target.c===c)?target.code:nextCode(c, F.querySelector("#ed-sec").value.trim()), s, ord: r ? (r.ord||0) : target ? (target.ord||0) : Date.now()};
+      const ownerNew = !(r||target) && feat("givers") ? {ownerUid: sub ? (sub.uid||"") : me} : {};
+      const rec={...ownerNew, id, pub: pubBox ? pubBox.checked : isPriv(r||target) ? false : undefined, ...((r||target)&&(r||target).priv?{priv:true}:{}), ...(also?{also}:{}), c, t, by:F.querySelector("#ed-by").value.trim(), n:F.querySelector("#ed-n").value.trim(), pre:pre.filter(x=>x!==id), kind:F.querySelector("#ed-k").value, time:F.querySelector("#ed-time").value.trim(), serves:F.querySelector("#ed-serves").value.trim(), sec:F.querySelector("#ed-sec").value.trim(), code:(r&&r.code&&r.c===c&&(r.sec||"")===(F.querySelector("#ed-sec").value.trim()))?r.code:(target&&target.code&&target.c===c)?target.code:nextCode(c, F.querySelector("#ed-sec").value.trim()), s, ord: r ? (r.ord||0) : target ? (target.ord||0) : Date.now()};
       { const base = r || target;
         withHistory(rec, base, sub ? (sub.editOf&&base?"changed":"added") : (base?"changed":"added"), sub ? sub.byName : myName()); }
       const btn=F.querySelector(".primary"); btn.disabled=true; btn.textContent="Saving…";
+      const glBefore = giversOf(r||target||{}), gl = pickedGivers("ed-givers");
+      if(gl!==undefined){ rec.givers=gl; rec.giver=""; rec.creditUid=""; }
       if(feat("creditlink") && giverOf()!==undefined){ const gv=giverOf(), cu=gv ? await creditUidOf(gv) : ""; rec.giver=gv ? creditByText(gv) : ""; rec.creditUid=cu; }
       try{
         if(!isAdmin() && r){   // an employee allowed to edit directly: only the recipe itself changes
@@ -5179,6 +5186,7 @@ function editor(r, cat, sub, draft){
           await db.collection("recipes").doc(id).update(Object.assign({t:d.t, by:d.by, n:d.n, pre:d.pre, kind:d.kind, time:d.time, serves:d.serves, s:d.s, ...(d.also?{also:d.also}:{}), ...(rec.creditUid!==undefined&&feat("creditlink")?{creditUid:rec.creditUid, giver:rec.giver||""}:{}), updated:Date.now()}, d.history?{history:d.history}:{}));
           const eb=editedBack(r, Date.now()); if(eb) await db.collection("recipes").doc(id).update(eb);
         } else
+        if(gl!==undefined) tellCredited(glBefore, gl, rec.t, "#"+id);
         await db.collection("recipes").doc(id).set(Object.assign(toDoc(rec), rec.creditUid===""?{creditUid:""}:{}, rec.giver===""?{giver:""}:{}, editedBack(r||target, Date.now())||{}), {merge:true});
         { const b=r||target; if(b && !(await db.collection("versions").where("rid","==",b.id).get().then(q=>q.size).catch(()=>1))) await saveVersion(b, "Before this history was kept", {by:"", uid:""});
           await saveVersion(rec, b?"Edited":"Added"); }
@@ -5524,6 +5532,7 @@ async function approveSub(sub, pub){
   if(feat("private") && (sub.priv || (tgt && tgt.priv))){ rec.pub = false; rec.priv = true; }
   if(rec.pre===undefined) rec.pre = tgt ? (tgt.pre||[]) : [];
   if(!rec.sec && tgt) rec.sec = tgt.sec||"";
+  rec.ownerUid = tgt ? (tgt.ownerUid||"") : (sub.uid||"");   // who added it: they (and admins) may say who gave it
   const ownCode = feat("subcode") && !tgt && sub.code && codeFits(sub.code, rec.c, rec.sec||"") && !usedCodes.has(sub.code) ? sub.code : "";
   rec.code = (tgt && tgt.code && tgt.c===rec.c) ? tgt.code : ownCode || nextCode(rec.c, rec.sec||"");
   if(sub.code && sub.code!==rec.code) touchHold(sub.code);   // its number wasn't used (moved category): kept for a year
@@ -5857,6 +5866,62 @@ function declinedPage(){
     box.querySelector("[data-no]").onclick=again;
     box.querySelector("[data-yes]").onclick=async()=>{ try{ await db.collection("submissions").doc(x.id).delete(); touchHold(x.code); subs=subs.filter(z=>z.id!==x.id); toast("Deleted"); renderAcct(); again(); }catch(e){ toast("Couldn't delete. Check your connection."); } }; });
 }
+// givers: a recipe or photo can be credited to several people (“Given by”). Admins and the team pick them from every
+// approved member (by name or account number) or add any other name; each person with an account is told and sees it.
+const mayGive = () => feat("givers") && isTeam() && !offline && !!db;
+const mayGiveOn = x => feat("givers") && !offline && !!db && (isAdmin() || (!!x && !!me && (x.ownerUid===me || x.uid===me)));
+const giversOf = x => Array.isArray(x&&x.givers) ? x.givers : (x&&x.giver ? [{name:x.giver, uid:x.creditUid||""}] : []);
+const creditedTo = (x, u) => !!x && (giversOf(x).some(g=>g.uid===u) || (Array.isArray(x.creditUids) && x.creditUids.includes(u)));
+const andList = a => a.length<2 ? (a[0]||"") : a.slice(0,-1).join(", ")+" and "+a[a.length-1];
+const giversText = x => { const g=giversOf(x).map(y=>y.name).filter(Boolean); return g.length ? "Given by "+andList(g) : ""; };
+let PEOPLE = null;
+async function peopleList(){
+  if(isAdmin() && members.length) return members.filter(m=>m.status==="approved").map(m=>({uid:m.uid, name:m.name, no:m.no||""}));
+  if(PEOPLE) return PEOPLE;
+  try{ const d=await db.collection("meta").doc("people").get(); PEOPLE = d.exists ? (d.data().list||[]) : []; }catch(e){ PEOPLE=[]; }
+  if(!PEOPLE.length) PEOPLE = (TEAM||[]).map(t=>({uid:t.uid, name:t.name, no:""}));
+  return PEOPLE;
+}
+function syncPeopleNow(){ if(!feat("givers") || !isAdmin() || !db || offline || !members.length) return;
+  const list = members.filter(m=>m.status==="approved").map(m=>({uid:m.uid, name:m.name, no:m.no||""})).sort((a,b)=>byName(a.name,b.name));
+  if(JSON.stringify(list)!==JSON.stringify(syncPeopleNow.last)){ syncPeopleNow.last=list; db.collection("meta").doc("people").set({list}).catch(()=>{}); } }
+// the picker: chips for the people picked, and a box that suggests members as you type (name or account number) or adds a name
+function giverPicker(id, list){
+  return `<div class="gv" id="${id}" data-g='${esc(JSON.stringify(list||[]))}'><div class="gv-chips"></div>
+    <input type="text" class="gv-in" maxlength="40" autocomplete="off" placeholder="Type a name or account number…" aria-label="Given by">
+    <div class="gv-sug" hidden></div></div>`;
+}
+function wireGiverPicker(id){
+  const box=document.getElementById(id); if(!box) return;
+  const chips=box.querySelector(".gv-chips"), inp=box.querySelector(".gv-in"), sug=box.querySelector(".gv-sug");
+  let list=[]; try{ list=JSON.parse(box.dataset.g||"[]"); }catch(e){}
+  const save=()=>{ box.dataset.g=JSON.stringify(list); };
+  const drawChips=()=>{ chips.innerHTML=list.map((g,i)=>`<span class="gv-chip${g.uid?" on":""}">${g.uid?"👤 ":""}${esc(g.name)}<button type="button" data-gx="${i}" aria-label="Take off ${esc(g.name)}">✕</button></span>`).join("");
+    chips.querySelectorAll("[data-gx]").forEach(b=>b.onclick=()=>{ list.splice(+b.dataset.gx,1); save(); drawChips(); }); };
+  const add=g=>{ if(list.length>=8 || list.some(x=>(g.uid&&x.uid===g.uid) || x.name.toLowerCase()===g.name.toLowerCase())) return; list.push(g); save(); drawChips(); inp.value=""; sug.hidden=true; inp.focus(); };
+  const show=async()=>{ const v=inp.value.trim(); if(!v){ sug.hidden=true; return; }
+    const ppl=await peopleList(), lv=v.toLowerCase().replace(/^(#|no\.?\s*)/,"");
+    const hits=ppl.filter(m=>m.name.toLowerCase().includes(lv) || (m.no && String(m.no)===lv)).slice(0,8);
+    sug.innerHTML = hits.map((m,i)=>`<button type="button" data-gp="${i}">👤 ${esc(m.name)}${m.no?` <small>no. ${esc(String(m.no))}</small>`:""}</button>`).join("")
+      + (/^\d+$/.test(lv) ? "" : `<button type="button" data-gadd>+ Add “${esc(v)}”${hits.length?"":" (no account)"}</button>`);
+    sug.hidden=false;
+    sug.querySelectorAll("[data-gp]").forEach(b=>b.onclick=()=>{ const m=hits[+b.dataset.gp]; add({name:m.name, uid:m.uid}); });
+    const ad=sug.querySelector("[data-gadd]"); if(ad) ad.onclick=()=>add({name:v}); };
+  inp.oninput=show; inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const f=sug.querySelector("button"); if(f) f.click(); } };
+  drawChips();
+}
+const pickedGivers = id => { const b=document.getElementById(id); if(!b) return undefined; try{ return JSON.parse(b.dataset.g||"[]"); }catch(e){ return []; } };
+// tell the people newly credited
+function tellCredited(before, after, title, hash){ const was=new Set(giversOf({givers:before}).map(g=>g.uid));
+  const fresh=after.map(g=>g.uid).filter(u=>u && !was.has(u)); if(fresh.length) notifyPeople(fresh, "You were credited", `${myName()} credited you on “${title}”.`, hash, "star"); }
+// credit an existing recipe or photo, right where it is
+function giverPanel(where, list, onSave){
+  const pid="gvp-"+newId();
+  where.innerHTML=`<div class="panel-a gv-panel"><b>Given by</b>${giverPicker(pid, list)}<div class="row"><button type="button" class="btn solid sm" data-gvsave>Save</button><button type="button" class="btn sm" data-gvno>Cancel</button></div></div>`;
+  wireGiverPicker(pid); where.querySelector(".gv-in").focus();
+  where.querySelector("[data-gvno]").onclick=()=>{ where.innerHTML=""; };
+  where.querySelector("[data-gvsave]").onclick=async e=>{ e.target.disabled=true; try{ await onSave(pickedGivers(pid)); where.innerHTML=""; toast("Saved"); }catch(x){ e.target.disabled=false; toast("Couldn't save. Check your connection."); } };
+}
 // creditlink: “From” names a member who has an account here → the recipe is linked to them (creditUid), so they see it too
 // …or their account number (“7”, “#7”, “no. 7”), for those who can see the member list
 const creditNo = by => { const m=String(by||"").trim().match(/^(?:#|no\.?\s*|number\s*)?(\d{1,5})$/i); return m ? +m[1] : 0; };
@@ -5869,10 +5934,13 @@ async function creditUidOf(by){
 }
 // minewait: a recipe someone added shows up for them (only them) in its category and in search, marked as not published
 // yet, with the inbox it's in; tapping it shows the recipe as sent
-const myWaiting = () => feat("minewait") && me && !offline ? [...subs, ...creditSubs].filter((x,i,a)=>a.findIndex(y=>y.id===x.id)===i).filter(x=>x.status==="pending" && !x.editOf && (x.uid===who() || (feat("creditlink") && x.creditUid===who()))) : [];
+const myWaiting = () => feat("minewait") && me && !offline ? [...subs, ...creditSubs].filter((x,i,a)=>a.findIndex(y=>y.id===x.id)===i).filter(x=>x.status==="pending" && !x.editOf && (x.uid===who() || (feat("creditlink") && x.creditUid===who()) || (feat("givers") && creditedTo(x, who())))) : [];
 let creditSubs = [], unsubCredit = null;
-function watchCredit(){ if(unsubCredit || !feat("creditlink") || !db || !me || maySubsAll()) return;
-  unsubCredit = db.collection("submissions").where("creditUid","==",who()).onSnapshot(s=>{ creditSubs = s.docs.map(d=>Object.assign({id:d.id}, d.data()));
+function watchCredit(){ if(unsubCredit || !(feat("creditlink")||feat("givers")) || !db || !me || maySubsAll()) return;
+  let one=[], many=[];
+  const merged=()=>[...one, ...many].filter((x,i,a)=>a.findIndex(y=>y.id===x.id)===i);
+  if(feat("givers")) db.collection("submissions").where("creditUids","array-contains",who()).onSnapshot(s=>{ many=s.docs.map(d=>Object.assign({id:d.id}, d.data())); creditSubs=merged(); }, ()=>{});
+  unsubCredit = db.collection("submissions").where("creditUid","==",who()).onSnapshot(s=>{ one = s.docs.map(d=>Object.assign({id:d.id}, d.data())); creditSubs = merged();
     const h=location.hash; if((h==="#mine"||/^#c-/.test(h)||!h) && !document.querySelector(".editor, textarea:focus")) route(); }, ()=>{}); }
 const subAsRecipe = x => { let r; try{ r=Object.assign(fromDoc(x.id, x), {t:x.t||"Untitled"}); }catch(e){ r=Object.assign({}, x, {s:[]}); }
   if(!Array.isArray(r.s) || r.s.some(v=>!Array.isArray(v)||!Array.isArray(v[2]))) r.s=[]; return r; };
@@ -5881,7 +5949,7 @@ const waitCard = x => card(Object.assign(subAsRecipe(x), {cover:""})).replace(/h
   .replace('<div class="rc-body">', `<div class="rc-body"><div class="sa-where">⏳ Not published yet · in ${esc(waitWhere(x))}</div>`);
 const waitBlock = (L, title) => L.length ? `<div class="section-head" style="margin-top:22px"><h2 style="font-size:22px">${title}</h2><p>Only you see ${L.length===1?"it":"them"} until ${L.length===1?"it's":"they're"} approved</p></div><div class="grid">${L.map(waitCard).join("")}</div>` : "";
 function mySubPage(id){
-  const x = [...subs, ...creditSubs].find(y=>y.id===id && (y.uid===who() || y.creditUid===who()));
+  const x = [...subs, ...creditSubs].find(y=>y.id===id && (y.uid===who() || y.creditUid===who() || creditedTo(y, who())));
   if(!x){ app.innerHTML=`<section class="wrap"><div class="empty">This recipe isn't waiting anymore. <a class="link" href="#mine">My recipes</a></div></section>`; return; }
   app.innerHTML = `<section class="wrap admin">
     <a class="back" href="#mine">← My recipes</a>
@@ -5890,6 +5958,11 @@ function mySubPage(id){
     <div class="panel-a"><p><span class="pill wait">⏳ Not published yet</span> It's in <b>${esc(waitWhere(x))}</b>. Nobody else sees it in the cookbook until it's approved.</p>
       <div class="pv">${previewHTML(x)}</div></div></section>`;
 }
+async function credPhotos(){ const box=document.getElementById("cred-photos"); if(!box || !db || offline) return;
+  try{ const q=await db.collection("photos").where("creditUids","array-contains",who()).where("status","==","approved").get();
+    if(!q.docs.length) return;
+    box.innerHTML=`<div class="section-head" style="margin-top:24px"><h2 style="font-size:22px">Photos credited to you</h2><p>${q.docs.length}</p></div><div class="ph-grid">${q.docs.map(d=>{ const p=d.data();
+      return `<a class="ph" href="#${esc(p.recipeId||"")}"><img src="${p.thumb}" alt="${esc(p.recipeTitle||"Photo")}" loading="lazy"><span class="hint">${esc(p.recipeTitle||"")}</span></a>`; }).join("")}</div>`; }catch(e){} }
 function minePage(){
   const label = s => s.status==="approved" ? `<span class="pill ok">In the cookbook</span>` : s.status==="rejected" ? `<span class="pill no">Not approved</span>`
     : `<span class="pill wait">${s.proofNote&&stageOf(s)==="proof"?"Being fixed":({proof:"Being proofread",yoely:"In "+YO()+"",kosher:"Being checked in Not kosher",approve:"Waiting for approval",release:"Approved, about to be released"})[stageOf(s)]}</span>`;
@@ -5899,10 +5972,12 @@ function minePage(){
       <div class="macts">${label(s)}${s.status==="approved"&&s.recipeId&&RECIPES.some(r=>r.id===s.recipeId)?`<a class="btn" href="#${esc(s.recipeId)}">Open</a>`:""}
       ${s.status==="pending"&&!s.editOf&&feat("minewait")?`<a class="btn" href="#mysub-${esc(s.id)}">Open</a>`:""}${s.status==="pending"?`<button type="button" class="btn" data-withdraw="${esc(s.id)}">Withdraw</button>`:""}</div></li>`).join("")}</ul>`
       :`<p class="hint mempty">You haven't added any recipes yet. Tap “+ Add a recipe” to share one. ${esc(ADMIN_NAME)} approves each recipe before everyone can see it.</p>`}</div>
-    ${feat("creditlink") ? (()=>{ const cw=creditSubs.filter(x=>x.status==="pending" && x.uid!==me), cr=RECIPES.filter(r=>r.creditUid===who());
+    ${feat("creditlink")||feat("givers") ? (()=>{ const cw=[...creditSubs, ...(maySubsAll()?subs.filter(x=>creditedTo(x, who())):[])].filter((x,i,a)=>a.findIndex(y=>y.id===x.id)===i).filter(x=>x.status==="pending" && x.uid!==me), cr=RECIPES.filter(r=>r.creditUid===who() || creditedTo(r, who()));
       return cw.length||cr.length ? `<div class="section-head" style="margin-top:24px"><h2 style="font-size:22px">Credited to you</h2><p>Recipes someone added with your name</p></div>
       <div class="grid">${cr.map(card).join("")}${cw.map(waitCard).join("")}</div>` : ""; })() : ""}
+    ${feat("givers") ? `<div id="cred-photos"></div>` : ""}
   </section>`;
+  credPhotos();
   app.querySelectorAll("[data-withdraw]").forEach(b=>b.onclick=async()=>{ b.disabled=true; try{ await db.collection("submissions").doc(b.dataset.withdraw).delete(); toast("Recipe withdrawn"); }catch(e){ b.disabled=false; toast("Couldn't withdraw. Check your connection."); } });
 }
 
@@ -5959,7 +6034,8 @@ function loadPhotos(r){
     const waiting = mine.filter(p=>p.status==="pending");
     if(!approved.length && !waiting.length){ g.innerHTML = `<p class="hint">No photos yet. Made this recipe? Add a photo of how it came out.</p>`; return; }
     g.innerHTML = approved.map(p=>`<figure class="ph"><button type="button" class="ph-open" data-id="${esc(p.id)}" aria-label="View photo by ${esc(p.byName||"a member")}"><img src="${p.thumb}" alt="${esc(r.t)} by ${esc(p.byName||"a member")}" loading="lazy"></button>
-        <figcaption>${esc(p.byName||"")}${p.caption?` · ${esc(p.caption)}`:""}</figcaption>
+        <figcaption>${esc(p.byName||"")}${p.caption?` · ${esc(p.caption)}`:""}${feat("givers")&&giversText(p)?`<br><small>${esc(giversText(p))}</small>`:""}</figcaption>
+        ${mayGive()&&mayGiveOn(p)?`<button type="button" class="linkbtn gv-edit" data-gvph="${esc(p.id)}" data-t="${esc(r.t)}" data-g='${esc(JSON.stringify(giversOf(p)))}'>👤 Given by…</button><div class="gv-slot"></div>`:""}
         ${may("review")?`<div class="ph-admin"><button type="button" class="btn sm" data-cover="${esc(p.id)}">${r.coverPhoto===p.id?"Card photo ✓":"Use on card"}</button><button type="button" class="btn sm" data-del="${esc(p.id)}">Remove</button></div>`:""}</figure>`).join("")
       + waiting.map(p=>`<figure class="ph wait"><img src="${p.thumb}" alt="Your photo, waiting for approval"><figcaption><span class="pill wait">Waiting for approval</span></figcaption></figure>`).join("");
     g.querySelectorAll(".ph-open").forEach(b=>b.onclick=()=>{ const p=approved.find(x=>x.id===b.dataset.id); if(p) lightbox(p, r); });
@@ -5991,24 +6067,27 @@ function loadPhotos(r){
       <div class="ph-new-thumbs">${shots.map((s,i)=>`<div class="ph-thumb"><img src="${s.thumb}" alt="New photo ${i+1}"><button type="button" class="ph-x" data-rm="${i}" aria-label="Remove photo ${i+1}">✕</button></div>`).join("")}
         <label class="ph-more" for="ph-cam" aria-label="Take another photo">+</label></div>
       <div class="ph-new-form"><div class="field"><label for="ph-cap">Caption (optional)</label><input id="ph-cap" type="text" maxlength="80" placeholder="e.g. Made it for Shabbos" value="${esc(pick.dataset.cap||"")}"></div>
+      ${mayGive()?`<div class="field"><span class="lbl">Given by (optional)</span>${giverPicker("ph-givers", (()=>{ try{ return JSON.parse(pick.dataset.gv||"[]"); }catch(e){ return []; } })())}</div>`:""}
       <p class="hint">${shots.length} ${shots.length===1?"photo":"photos"}. ${may("review")?"They will appear on the recipe right away.":`${esc(ADMIN_NAME)} will approve them before everyone can see them.`}</p>
       <div class="row"><button type="button" class="btn solid" id="ph-send">${may("review")?(shots.length>1?`Add ${shots.length} photos`:"Add photo"):"Send for approval"}</button><button type="button" class="btn" id="ph-cancel">Cancel</button></div></div></div>`;
     const cap=document.getElementById("ph-cap"); cap.oninput=()=>pick.dataset.cap=cap.value;
+    wireGiverPicker("ph-givers"); { const gb=document.getElementById("ph-givers"); if(gb) new MutationObserver(()=>{ pick.dataset.gv=gb.dataset.g; }).observe(gb, {attributes:true, attributeFilter:["data-g"]}); }
     pick.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ shots.splice(+b.dataset.rm,1); drawPick(); });
     document.getElementById("ph-cancel").onclick=()=>{ shots=[]; pick.dataset.cap=""; drawPick(); };
     document.getElementById("ph-send").onclick=async e=>{
       const btn=e.currentTarget; btn.disabled=true;
-      const caption=document.getElementById("ph-cap").value.trim(), status=may("review")?"approved":"pending";
+      const caption=document.getElementById("ph-cap").value.trim(), status=may("review")?"approved":"pending", pgl=pickedGivers("ph-givers")||[];
       let sent=0;
       try{
         for(const shot of shots.slice()){
           btn.textContent=`Uploading ${sent+1} of ${shots.length}…`;
           const id="p-"+newId();
-          await db.collection("photos").doc(id).set({recipeId:r.id, recipeTitle:r.t, uid:me, byName:myName(), caption, img:shot.img, thumb:shot.thumb, status, created:Date.now()+sent, pub:photoPubOf(r)});
+          await db.collection("photos").doc(id).set({recipeId:r.id, recipeTitle:r.t, uid:me, byName:myName(), caption, img:shot.img, thumb:shot.thumb, status, created:Date.now()+sent, pub:photoPubOf(r), ...(pgl.length?{givers:pgl, creditUids:pgl.map(g=>g.uid).filter(Boolean)}:{})});
           logAct("photo", r.t, r.id);
           if(may("review") && !r.cover){ await db.collection("recipes").doc(r.id).update({cover:shot.thumb, coverPhoto:id}).catch(()=>{}); r.cover=shot.thumb; r.coverPhoto=id; }
           sent++;
         }
+        if(pgl.length) tellCredited([], pgl, r.t, "#"+r.id); pick.dataset.gv="";
         if(!may("review")) notifyAdmin(`${sent>1?sent+" new photos":"New photo"} from ${myName()}`, `${sent>1?"Photos":"A photo"} of “${r.t}” ${sent>1?"are":"is"} waiting for your approval.`, "#admin-approval", "camera");
         toast(may("review")?(sent>1?`${sent} photos added`:"Photo added"):`${sent>1?sent+" photos":"Photo"} sent to ${ADMIN_NAME} for approval`);
         shots=[]; pick.dataset.cap=""; drawPick();
@@ -8481,6 +8560,14 @@ function route(){ setBack(); if(guideOn && location.hash.slice(1)!==guideOn.r.id
   if(!kSame){ KEEP.prev=KEEP.cur; KEEP.cur=kh; }
 }
 var KEEP = {y:{}, cur:"", prev:""};
+document.addEventListener("click", e=>{
+  const br=e.target.closest && e.target.closest("[data-gvrec]");
+  if(br && mayGive()){ const r=RECIPES.find(x=>x.id===br.dataset.gvrec); if(!mayGiveOn(r)) return; const slot=document.getElementById("gv-slot-rec"); if(!r||!slot) return;
+    giverPanel(slot, giversOf(r), async gl=>{ await db.collection("recipes").doc(r.id).update({givers:gl, creditUids:gl.map(g=>g.uid).filter(Boolean), giver:"", creditUid:"", updated:Date.now()}); tellCredited(giversOf(r), gl, r.t, "#"+r.id); }); return; }
+  const bp=e.target.closest && e.target.closest("[data-gvph]");
+  if(bp && mayGive()){ const fig=bp.closest(".ph"), slot=fig && fig.querySelector(".gv-slot"); if(!slot) return; let cur=[]; try{ cur=JSON.parse(bp.dataset.g||"[]"); }catch(x){}
+    giverPanel(slot, cur, async gl=>{ await db.collection("photos").doc(bp.dataset.gvph).update({givers:gl, creditUids:gl.map(g=>g.uid).filter(Boolean)}); tellCredited(cur, gl, bp.dataset.t||"a photo", location.hash); }); }
+});
 // keepopen: when a page is redrawn by itself (new data came in), a “See the recipe” or other dropdown you opened stays open
 function detailsKey(d){ const li=d.closest("li, .panel-a, .imp"), idEl=li && li.querySelector("[data-sid],[data-rid],[data-id]");
   const id = idEl ? (idEl.dataset.sid||idEl.dataset.rid||idEl.dataset.id) : (li && li.dataset.i) || "";

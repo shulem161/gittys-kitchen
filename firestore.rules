@@ -238,6 +238,12 @@ service cloud.firestore {
         && request.resource.data.uids is list && request.resource.data.uids.size() <= 300;
     }
     // Who is on the team (owner, admins, employees), so employees can pick who to write to.
+    // Everyone approved, for the team's “Given by” picker (4.94): name, account number, uid
+    match /meta/people {
+      allow get: if isTeam();
+      allow write: if isAdmin() && request.resource.data.keys().hasOnly(['list'])
+        && request.resource.data.list is list && request.resource.data.list.size() <= 3000;
+    }
     match /meta/team {
       allow get: if isTeam();
       allow write: if isAdmin() && request.resource.data.keys().hasOnly(['list'])
@@ -388,9 +394,14 @@ service cloud.firestore {
         || (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['meals', 'dish', 'kind', 'pesach', 'snackKind', 'updated']) && extra('labels'))
         // Employees given "Edit recipes directly": the recipe itself only, never where it is, who sees it or whether it's deleted
         || (resource != null && resource.data.get('deleted', false) == false
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['t', 'by', 'n', 'pre', 'kind', 'time', 'serves', 's', 'also', 'creditUid', 'giver', 'history', 'updated'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['t', 'by', 'n', 'pre', 'kind', 'time', 'serves', 's', 'also', 'history', 'updated'])
             && extra('editdirect'))
-        || ((noRvChange() || editedBack()) && publishOk())
+        // Who gave a recipe (4.94 givers): only admins and the person who added the recipe may change it
+        || (resource != null && approvedMember() && resource.data.get('ownerUid', '') == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['givers', 'creditUids', 'giver', 'creditUid', 'updated'])
+            && request.resource.data.get('givers', []) is list && request.resource.data.get('givers', []).size() <= 8)
+        || ((noRvChange() || editedBack()) && publishOk()
+            && (isAdmin() || resource == null || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['givers', 'creditUids', 'giver', 'creditUid', 'ownerUid'])))
         || kosherMove()
         || yoelyMove()
         || inboxMoveOk()
@@ -485,7 +496,8 @@ service cloud.firestore {
         && (can('suggest') || extra('edit') || isAdmin())
         && (request.resource.data.uid == request.auth.uid || (isAdmin() && canManage(request.resource.data.uid)));
       allow read: if extra('review') || extra('proofread') || extra('release') || extra('yoely') || extraHu() || extra('kosher') || (signedIn() && resource.data.uid == request.auth.uid)
-        || (signedIn() && resource.data.get('creditUid', '') == request.auth.uid);
+        || (signedIn() && resource.data.get('creditUid', '') == request.auth.uid)
+        || (signedIn() && request.auth.uid in resource.data.get('creditUids', []));
       // three different people: whoever proofread can't approve; neither of them can release
       allow update: if (extra('review') || extra('proofread') || extra('release')
           || (resource.data.get('stage', '') == 'yoely' && yoelyBoxOk(resource.data, request.resource.data)) || (resource.data.get('stage', '') == 'kosher' && extra('kosher')))
@@ -514,8 +526,11 @@ service cloud.firestore {
       allow read: if extra('review')
         || (signedIn() && resource.data.uid == request.auth.uid)
         || (resource.data.status == 'approved' && approvedMember()
-            && (!photoPubOn() || isTeam() || resource.data.get('pub', false) == true));
-      allow update: if extra('review');
+            && (!photoPubOn() || isTeam() || resource.data.get('pub', false) == true || request.auth.uid in resource.data.get('creditUids', [])));
+      allow update: if isAdmin()
+        || (extra('review') && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['givers', 'creditUids']))
+        || (approvedMember() && resource.data.uid == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['givers', 'creditUids'])
+            && request.resource.data.get('givers', []) is list && request.resource.data.get('givers', []).size() <= 8);
       allow delete: if extra('review')
         || (signedIn() && resource.data.uid == request.auth.uid && resource.data.status == 'pending');
     }

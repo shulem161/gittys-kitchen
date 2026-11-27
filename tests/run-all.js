@@ -939,10 +939,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*83 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 83));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*84 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 84));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 83, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 84, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -953,7 +953,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /82/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /83/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1380,6 +1380,19 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
         const byNo = other.no ? (await creditUidOf('#' + other.no)) === other.uid && creditByText('#' + other.no) === other.name : true;
         return {linked: cu === other.uid, seen, byNo}; });
       ok('a recipe credited to someone with an account is linked to them, and they see it while it waits', r.skip || (r.linked && r.seen && r.byNo), r); }
+    // givers: the picker suggests members by name or number, adds other names, and saves several people on a recipe
+    { const r = await A.evaluate(async () => { const kf = FEAT.givers; FEAT.givers = true;
+        const other = members.find(m => m.uid !== me && m.status === 'approved'); if (!other) { FEAT.givers = kf; return {skip: true}; }
+        const host = document.createElement('div'); document.body.appendChild(host); host.innerHTML = giverPicker('gv-test', []); wireGiverPicker('gv-test');
+        const inp = host.querySelector('.gv-in'); inp.value = other.name.slice(0, 3); inp.oninput(); await new Promise(z => setTimeout(z, 300));
+        const sug = [...host.querySelectorAll('[data-gp]')].map(b => b.textContent); const pick = [...host.querySelectorAll('[data-gp]')].find(b => b.textContent.includes(other.name)); if (pick) pick.click();
+        inp.value = 'Aunt Rivky'; inp.oninput(); await new Promise(z => setTimeout(z, 200)); const ad = host.querySelector('[data-gadd]'); if (ad) ad.click();
+        const gl = pickedGivers('gv-test'); host.remove();
+        const rec = RECIPES[0]; await db.collection('recipes').doc(rec.id).update({givers: gl, creditUids: gl.map(g => g.uid).filter(Boolean)}); await new Promise(z => setTimeout(z, 700));
+        const saved = RECIPES.find(x => x.id === rec.id), txt = giversText(saved);
+        await db.collection('recipes').doc(rec.id).update({givers: [], creditUids: []}); FEAT.givers = kf;
+        return {sug: sug.length, gl, txt, linked: creditedTo(saved, other.uid)}; });
+      ok('“Given by”: the picker suggests members and adds other names; a recipe can have several, shown as “Given by A and B”', r.skip || (r.sug > 0 && r.gl.length === 2 && r.linked && /Given by .+ and Aunt Rivky/.test(r.txt)), r); }
     // Menu ideas by meal
     { await A.goto(F + '#menu'); await A.waitForTimeout(500); await A.fill('#mn-q', '');
       const chips = await A.locator('[data-mq]').allTextContents();

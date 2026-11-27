@@ -613,6 +613,27 @@ await check('someone credited on a waiting recipe can read it', assertSucceeds(g
 await check('…and list the ones credited to them', assertSucceeds(getDocs(query(collection(as('cred1'), 'submissions'), where('creditUid', '==', 'cred1')))));
 await check("…but someone else can't", assertFails(getDoc(doc(as('cred2'), 'submissions', 's-cred'))));
 
+// Given by, several people (4.94)
+await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
+  await setDoc(doc(d, 'recipes', 'r-giv'), { c: 'Cakes', t: 'Given cake', pub: true, s: [], ownerUid: 'gvown' });
+  await setDoc(doc(d, 'users', 'gvown'), { name: 'Giv Own', status: 'approved', role: 'public', created: 1, favs: [] });
+  await setDoc(doc(d, 'photos', 'ph-giv'), { uid: 'gvown', status: 'approved', img: 'x', thumb: 'x', recipeId: 'r-giv', pub: false });
+  await setDoc(doc(d, 'submissions', 's-giv'), { uid: 'adm', status: 'pending', stage: 'proof', t: 'Given', c: 'Cakes', givers: [{ name: 'Cred One', uid: 'cred1' }], creditUids: ['cred1'] });
+  await setDoc(doc(d, 'users', 'gvemp'), { name: 'Giv Emp', status: 'approved', role: 'employee', perms: {}, created: 1, favs: [] }); });
+await check('the person who added a recipe can say who gave it', assertSucceeds(updateDoc(doc(as('gvown'), 'recipes', 'r-giv'), { givers: [{ name: 'Cred One', uid: 'cred1' }, { name: 'Bobby' }], creditUids: ['cred1'], updated: 1 })));
+await check("…but not change anything else that way", assertFails(updateDoc(doc(as('gvown'), 'recipes', 'r-giv'), { givers: [], creditUids: [], t: 'X' })));
+await check('an admin can change who gave it', assertSucceeds(updateDoc(doc(ADM, 'recipes', 'r-giv'), { givers: [{ name: 'Bobby' }], creditUids: [], updated: 2 })));
+await check("an employee who didn't add it can't", assertFails(updateDoc(doc(as('gvemp'), 'recipes', 'r-giv'), { givers: [], creditUids: [], updated: 3 })));
+await check("a customer can't say who gave a recipe", assertFails(updateDoc(doc(PUB, 'recipes', 'r-giv'), { givers: [], creditUids: [] })));
+await check("an employee who didn't add a photo can't say who gave it", assertFails(updateDoc(doc(as('gvemp'), 'photos', 'ph-giv'), { givers: [], creditUids: [] })));
+await check('the person who added a photo can say who gave it', assertSucceeds(updateDoc(doc(as('gvown'), 'photos', 'ph-giv'), { givers: [{ name: 'Cred One', uid: 'cred1' }], creditUids: ['cred1'] })));
+await check("…but not approve it that way", assertFails(updateDoc(doc(as('gvown'), 'photos', 'ph-giv'), { status: 'rejected' })));
+await check('someone credited (of several) reads the waiting recipe', assertSucceeds(getDoc(doc(as('cred1'), 'submissions', 's-giv'))));
+await check('…and lists the ones credited to them', assertSucceeds(getDocs(query(collection(as('cred1'), 'submissions'), where('creditUids', 'array-contains', 'cred1')))));
+await check("…but someone else can't", assertFails(getDoc(doc(as('cred2'), 'submissions', 's-giv'))));
+await check('the team can read the people list for the picker', assertSucceeds(getDoc(doc(as('gvemp'), 'meta', 'people'))));
+await check("…customers can't", assertFails(getDoc(doc(PUB, 'meta', 'people'))));
+
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(`::notice::Rule checks: ${pass} passed, ${fail} failed`);
