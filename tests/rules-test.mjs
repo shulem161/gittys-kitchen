@@ -604,6 +604,15 @@ await check('a customer can list the public photos of a recipe', assertSucceeds(
 await check("…but not all of a recipe's photos", assertFails(getDocs(query(collection(PUB, 'photos'), where('recipeId', '==', 'r-team'), where('status', '==', 'approved')))));
 await env.withSecurityRulesDisabled(async c => { await setDoc(doc(c.firestore(), 'meta', 'features'), { on: { photopub: false } }, { merge: true }); });
 
+// Credited recipes (4.93): the person named in “From” can read a waiting recipe linked to them, nobody else
+await env.withSecurityRulesDisabled(async c => { const d = c.firestore();
+  await setDoc(doc(d, 'users', 'cred1'), { name: 'Cred One', status: 'approved', role: 'public', created: 1, favs: [] });
+  await setDoc(doc(d, 'users', 'cred2'), { name: 'Cred Two', status: 'approved', role: 'public', created: 1, favs: [] });
+  await setDoc(doc(d, 'submissions', 's-cred'), { uid: 'adm', status: 'pending', stage: 'proof', t: 'Credited', c: 'Cakes', creditUid: 'cred1' }); });
+await check('someone credited on a waiting recipe can read it', assertSucceeds(getDoc(doc(as('cred1'), 'submissions', 's-cred'))));
+await check('…and list the ones credited to them', assertSucceeds(getDocs(query(collection(as('cred1'), 'submissions'), where('creditUid', '==', 'cred1')))));
+await check("…but someone else can't", assertFails(getDoc(doc(as('cred2'), 'submissions', 's-cred'))));
+
 await env.cleanup();
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(`::notice::Rule checks: ${pass} passed, ${fail} failed`);

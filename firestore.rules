@@ -388,7 +388,7 @@ service cloud.firestore {
         || (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['meals', 'dish', 'kind', 'pesach', 'snackKind', 'updated']) && extra('labels'))
         // Employees given "Edit recipes directly": the recipe itself only, never where it is, who sees it or whether it's deleted
         || (resource != null && resource.data.get('deleted', false) == false
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['t', 'by', 'n', 'pre', 'kind', 'time', 'serves', 's', 'also', 'history', 'updated'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['t', 'by', 'n', 'pre', 'kind', 'time', 'serves', 's', 'also', 'creditUid', 'giver', 'history', 'updated'])
             && extra('editdirect'))
         || ((noRvChange() || editedBack()) && publishOk())
         || kosherMove()
@@ -484,7 +484,8 @@ service cloud.firestore {
         && (request.resource.data.get('stage', '') == 'proof' || (request.resource.data.get('stage', '') in ['yoely', 'kosher'] && extra('scanto')))
         && (can('suggest') || extra('edit') || isAdmin())
         && (request.resource.data.uid == request.auth.uid || (isAdmin() && canManage(request.resource.data.uid)));
-      allow read: if extra('review') || extra('proofread') || extra('release') || extra('yoely') || extraHu() || extra('kosher') || (signedIn() && resource.data.uid == request.auth.uid);
+      allow read: if extra('review') || extra('proofread') || extra('release') || extra('yoely') || extraHu() || extra('kosher') || (signedIn() && resource.data.uid == request.auth.uid)
+        || (signedIn() && resource.data.get('creditUid', '') == request.auth.uid);
       // three different people: whoever proofread can't approve; neither of them can release
       allow update: if (extra('review') || extra('proofread') || extra('release')
           || (resource.data.get('stage', '') == 'yoely' && yoelyBoxOk(resource.data, request.resource.data)) || (resource.data.get('stage', '') == 'kosher' && extra('kosher')))

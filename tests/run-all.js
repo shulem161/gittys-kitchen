@@ -939,10 +939,10 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     // App & web updates: every update is the owner's first; everyone else gets it once he approves it
     await A.goto(F + '#c-bread'); await A.waitForTimeout(300); await V.goto(F + '#c-bread'); await V.waitForTimeout(300);
     ok('a new update is on for the owner straight away, but not for anyone else', (await A.locator('.tab-search').count()) === 1 && (await V.locator('.tab-search').count()) === 0);
-    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*81 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 81));
+    ok('App & web updates is in the Inboxes, with how many are waiting', /App & web updates[\s\S]*83 to approve/.test(await A.evaluate(() => { openMenu(); const x = document.querySelector('.mgroup[data-mg=inboxes]').textContent; closeMenu(); return x; })) && await A.evaluate(() => pendingCount() >= 83));
     await A.evaluate(() => { try { localStorage.removeItem('gk-updtab'); } catch (e) {} }); await A.goto(F + '#updates'); await A.waitForTimeout(400);
     const upTxt = await A.locator('#app').innerText();
-    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 81, upTxt.slice(0, 300));
+    ok('it has two tabs, To approve and Approved, opening on To approve', (await A.locator('[data-updtab]').count()) === 3 && /To approve/.test(upTxt) && /Search bar under the categories/.test(upTxt) && (await A.locator('#set-upds [data-set=no]').count()) === 83, upTxt.slice(0, 300));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200);
     ok('…Approved lists what everyone has already', /Not kosher inbox/.test(await A.locator('#set-upds').innerText()) && (await A.locator('#set-upds [data-set=no]').count()) === 0);
     await V.goto(F + '#updates'); await V.waitForTimeout(300);
@@ -953,7 +953,7 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
     ok('Approve first asks who gets it: admins only, admins and employees, or everyone', /Who gets it\?/.test(updPickTxt) && /Admins only/.test(updPickTxt) && /Admins and employees/.test(updPickTxt) && /Everyone/.test(updPickTxt) && /Cancel/.test(updPickTxt), updPickTxt);
     await A.locator('#set-upds [data-upd=tabsearch][data-set=all]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
-    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /80/.test(await A.locator('[data-updtab=wait] .count').innerText()));
+    ok('approving an update moves it to Approved and gives it to everyone', (await V.locator('.tab-search').count()) === 1 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0 && /82/.test(await A.locator('[data-updtab=wait] .count').innerText()));
     await A.click('[data-updtab=done]'); await A.waitForTimeout(200); await A.locator('#set-upds [data-upd=tabsearch][data-set=wait]').click(); await A.waitForTimeout(800);
     await V.goto(F + '#c-bread'); await V.waitForTimeout(400);
     ok('…and taking it back moves it to To approve and takes it away again', (await V.locator('.tab-search').count()) === 0 && (await A.locator('#set-upds [data-upd=tabsearch]').count()) === 0);
@@ -1359,6 +1359,27 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('PASS', name
       const st = await A.evaluate(() => ({tiles: document.querySelectorAll('#app [data-sacat]').length, binOff: !document.querySelector('[data-saon=bin]').checked, bookOn: document.querySelector('[data-saon=book]').checked, txt: document.getElementById('app').innerText}));
       ok('Search everywhere opens with every place ticked, a place can be unticked, and what you search shows by category', allOn === allBoxes && allBoxes === 5 && st.binOff && st.bookOn && st.tiles > 0 && /by category/.test(st.txt), [allOn, allBoxes, st]);
       await A.evaluate(() => { allSearchPage2.off = new Set(); }); await A.fill('#q', ''); }
+    // minewait: someone's own waiting recipe shows for them in its category and in search, marked not published yet
+    { const r = await A.evaluate(async () => { const kf = FEAT.minewait; FEAT.minewait = true;
+        await db.collection('submissions').doc('s-mine-wait').set({c: 'Cakes', t: 'Zebrawood Honey Cake', s: toDoc({c: 'Cakes', t: 'x', s: [[1, '', ['1 cup honey']]]}).s, uid: me, byName: myName(), status: 'pending', stage: 'proof', created: Date.now()});
+        await new Promise(z => setTimeout(z, 900));
+        category('Cakes'); const cat = document.getElementById('app').innerText;
+        results('Zebrawood'); const res = document.getElementById('app').innerText;
+        mySubPage('s-mine-wait'); const pg = document.getElementById('app').innerText;
+        await db.collection('submissions').doc('s-mine-wait').delete(); FEAT.minewait = kf;
+        return {cat: /Zebrawood Honey Cake/.test(cat) && /Not published yet/.test(cat), res: /Zebrawood Honey Cake/.test(res) && /Need to proofread/.test(res), pg: /honey/.test(pg) && /Not published yet/.test(pg)}; });
+      ok('a recipe someone added shows for them in its category and in search, marked not published yet with its inbox, and opens', r.cat && r.res && r.pg, r); }
+    // creditlink: a member named in “From” is linked to the recipe and sees it while it waits
+    { const r = await A.evaluate(async () => { const kf = [FEAT.creditlink, FEAT.minewait]; FEAT.creditlink = true; FEAT.minewait = true;
+        const other = members.find(m => m.uid !== me && m.status === 'approved' && m.no) || members.find(m => m.uid !== me && m.status === 'approved'); if (!other) return {skip: true};
+        const cu = await creditUidOf(other.name);
+        await db.collection('submissions').doc('s-cred-t').set({c: 'Cakes', t: 'Credit Linked Torte', s: [], uid: 'someone-else', byName: 'X', status: 'pending', stage: 'proof', creditUid: me, created: Date.now()});
+        const keep = creditSubs; creditSubs = [{id: 's-cred-t', c: 'Cakes', t: 'Credit Linked Torte', s: [], uid: 'someone-else', status: 'pending', stage: 'proof', creditUid: me}];
+        const seen = myWaiting().some(x => x.id === 's-cred-t'); creditSubs = keep;
+        await db.collection('submissions').doc('s-cred-t').delete(); FEAT.creditlink = kf[0]; FEAT.minewait = kf[1];
+        const byNo = other.no ? (await creditUidOf('#' + other.no)) === other.uid && creditByText('#' + other.no) === other.name : true;
+        return {linked: cu === other.uid, seen, byNo}; });
+      ok('a recipe credited to someone with an account is linked to them, and they see it while it waits', r.skip || (r.linked && r.seen && r.byNo), r); }
     // Menu ideas by meal
     { await A.goto(F + '#menu'); await A.waitForTimeout(500); await A.fill('#mn-q', '');
       const chips = await A.locator('[data-mq]').allTextContents();
